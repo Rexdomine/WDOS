@@ -6,7 +6,7 @@ import subprocess
 import sys
 import threading
 from django.core.management import call_command
-from django.test import TestCase, SimpleTestCase, override_settings
+from django.test import TransactionTestCase, SimpleTestCase, override_settings
 from django.utils import timezone
 from .models import EmailIntent, Invitation, Person, Account
 from . import services
@@ -14,10 +14,10 @@ from wdos_project.runtime import supervise
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
-class OperatorTests(TestCase):
+class OperatorTests(TransactionTestCase):
     def test_http_request_never_calls_provider_even_when_configured(self):
         with override_settings(BREVO_API_KEY='unit-test-only', WDOS_EMAIL_FROM='sender@example.org'):
-            with patch('accounts.brevo.send') as send, self.captureOnCommitCallbacks(execute=True):
+            with patch('accounts.brevo.send') as send:
                 self.client.post('/auth/register/',{'name':'Ada','email':'ada@example.org','password':'very long operator test password!'})
             send.assert_not_called()
         self.assertEqual(EmailIntent.objects.get().state,'pending')

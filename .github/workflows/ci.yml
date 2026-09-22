@@ -24,6 +24,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/wdos_test
+      DB_SSLMODE: disable
       DJANGO_SECRET_KEY: ci-only-secret
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
     steps:

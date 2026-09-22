@@ -1,0 +1,30 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <title>WDOS · Foundation</title>
+  <link rel="stylesheet" href="{% static 'foundation/tokens.css' %}">
+</head>
+<body>
+  <main class="wdos-shell">
+    <header class="wdos-header">
+      <div class="wdos-brand" aria-label="WODDI Digital Operating System">WDOS</div>
+      <span class="wdos-status">{{ environment|upper }}</span>
+    </header>
+    <section class="wdos-hero" aria-labelledby="page-title">
+      <p class="eyebrow">WODDI DIGITAL OPERATING SYSTEM</p>
+      <h1 id="page-title">A shared platform foundation.</h1>
+      <p class="lede">The delivery spine for governed, auditable network operations.</p>
+      <div class="wdos-card-grid">
+        <article class="wdos-card"><span class="card-label">FRAMEWORK</span><strong>Django</strong><span>Server-rendered foundation</span></article>
+        <article class="wdos-card"><span class="card-label">ENVIRONMENT</span><strong>{{ environment|upper }}</strong><span>Review deployment boundary</span></article>
+        <article class="wdos-card"><span class="card-label">STATUS</span><strong>Ready</strong><span>Health and migration checks active</span></article>
+      </div>
+    </section>
+    <footer class="wdos-footer">No Woman Is Left Out · Foundation stage</footer>
+  </main>
+</body>
+</html>

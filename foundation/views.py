@@ -1,6 +1,7 @@
 import os
 from django.db import connection
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.utils import timezone
 
 from .models import Role
@@ -37,10 +38,6 @@ def _migration_count():
 
 
 def app_shell(request):
-    return JsonResponse({
-        "service": "wdos",
-        "stage": "foundation",
-        "framework": "django",
+    return render(request, "foundation/app_shell.html", {
         "environment": os.getenv("WDOS_ENVIRONMENT", "local"),
-        "message": "WDOS Stage 1 Django foundation shell",
     })

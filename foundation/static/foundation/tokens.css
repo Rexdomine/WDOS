@@ -1,0 +1,30 @@
+:root {
+  --wdos-magenta: #D4006A;
+  --wdos-lemon: #7CB518;
+  --wdos-black: #000000;
+  --wdos-ink: #171717;
+  --wdos-paper: #F8F7F4;
+  --wdos-muted: #6B6B6B;
+  --wdos-border: #D9D7D2;
+  --wdos-radius: 18px;
+  --wdos-space: clamp(1rem, 2vw, 2rem);
+  color: var(--wdos-ink);
+  background: var(--wdos-paper);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+.wdos-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.wdos-header { display: flex; align-items: center; justify-content: space-between; padding: var(--wdos-space); border-bottom: 4px solid var(--wdos-black); background: var(--wdos-paper); }
+.wdos-brand { color: var(--wdos-black); font-size: 1.35rem; font-weight: 900; letter-spacing: .12em; }
+.wdos-status { color: var(--wdos-black); background: var(--wdos-lemon); border-radius: 999px; padding: .35rem .7rem; font-size: .7rem; font-weight: 800; letter-spacing: .08em; }
+.wdos-hero { width: min(1120px, 100%); margin: 0 auto; padding: clamp(4rem, 12vw, 9rem) var(--wdos-space); flex: 1; }
+.eyebrow, .card-label { margin: 0 0 1rem; color: var(--wdos-magenta); font-size: .72rem; font-weight: 900; letter-spacing: .14em; }
+h1 { max-width: 780px; margin: 0; color: var(--wdos-black); font-size: clamp(2.5rem, 8vw, 6.5rem); line-height: .94; letter-spacing: -.06em; }
+.lede { max-width: 620px; margin: 1.5rem 0 0; color: var(--wdos-muted); font-size: clamp(1.05rem, 2vw, 1.35rem); line-height: 1.5; }
+.wdos-card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: clamp(3rem, 8vw, 6rem); }
+.wdos-card { display: flex; min-height: 150px; flex-direction: column; justify-content: space-between; gap: .75rem; padding: 1.25rem; border: 1px solid var(--wdos-border); border-top: 6px solid var(--wdos-magenta); border-radius: var(--wdos-radius); background: #fff; box-shadow: 0 10px 30px rgb(0 0 0 / 5%); }
+.wdos-card strong { color: var(--wdos-black); font-size: 1.5rem; }
+.wdos-card > span:last-child { color: var(--wdos-muted); font-size: .88rem; }
+.wdos-footer { padding: var(--wdos-space); color: #fff; background: var(--wdos-black); font-size: .8rem; letter-spacing: .04em; }
+@media (max-width: 700px) { .wdos-card-grid { grid-template-columns: 1fr; } .wdos-card { min-height: 120px; } }

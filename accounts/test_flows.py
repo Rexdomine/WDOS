@@ -38,7 +38,7 @@ class AuthFlows(TestCase):
         account=Account.objects.get()
         self.assertFalse(account.user.is_staff)
         intent=EmailIntent.objects.get()
-        self.assertEqual(intent.state,'blocked')
+        self.assertEqual(intent.state,'pending')
         payload=json.loads(services.decrypt(intent.encrypted_payload))
         code=payload['textContent'].split(' is ')[1].split('.')[0]
         self.assertNotIn(code,intent.encrypted_payload)
@@ -179,7 +179,7 @@ class AuthFlows(TestCase):
             response=self.client.get(path)
             self.assertEqual(response.status_code,200)
             self.assertIn('no-store',response['Cache-Control'])
-            self.assertEqual(response['Referrer-Policy'],'no-referrer')
+            self.assertEqual(response['Referrer-Policy'],'same-origin')
             self.assertContains(response,'WODDI DIGITAL OPERATING SYSTEM')
         self.assertEqual(self.client.get('/auth/revoke/').status_code,405)
         client=Client(enforce_csrf_checks=True)

@@ -8,7 +8,7 @@ Status: implementation candidate, not accepted or activated. Stage 2 maps AUTH-0
 - Django → DB: transaction and account lock serialize token/MFA/link/session-version changes. Account pending → active only on contact proof. Suspension never cleared by login/recovery. Verified account and permanent Person remain distinct; invitation claims only an existing intended person, never silently merge identities. One-to-one Person linkage plus person lock prevents two accounts claiming the same record.
 - Session: password → pending MFA → authenticated for staff, superusers or any scoped grant. Admin uses the same gateway. Current account, active user, security version, absolute/idle expiry and second-factor requirement checked on each request. Scope permission helper requires exact role/network/geography/function and nonrevoked/unexpired grant; no implicit HQ authority. Business dashboards remain later stages.
 - Proofs: keyed SHA256 digests only; verification six digits with five attempts per issuance, all other proofs high entropy. Account/purpose binding, atomic consume and predecessor invalidation. Equal-to-expiry is expired. Reset revokes sessions/pending MFA and leaves MFA intact. TOTP counter prevents replay; encrypted seed; hashed one-use recovery codes shown once.
-- Django → Brevo: encrypted durable intent committed before call. Fixed HTTPS API endpoint, no credential-bearing redirects, bounded timeout, inline HTML/text (no hosted template prerequisite). Key/sender are server-only. Acceptance/message ID is not delivery. Missing config = blocked, not fake success.
+- Django → outbox → Brevo: the HTTP request only commits an encrypted durable intent; it never waits on provider latency (avoids a network timing account-enumeration oracle). The supervised mailer polls committed intents every ten seconds. Fixed HTTPS API endpoint, no credential-bearing redirects, bounded timeout, inline HTML/text (no hosted template prerequisite). Key/sender are server-only. Acceptance/message ID is not delivery. Missing config = blocked, not fake success.
 - Email lifecycle: pending/blocked → sending → accepted/failed/unknown; expired payloads erased. Interrupted `sending` becomes `unknown` through recovery command. Unknown/failed are never automatically resent. Explicit user resend issues a new proof and invalidates predecessors. A lost provider response or failed local terminal commit may result in email receipt while local state remains unknown; receipt never grants authority. No exactly-once email delivery claim.
 - Throttles: keyed identifier hashes, database fixed windows. 10 subject attempts / 15 minutes, 60 source-address attempts / 15 minutes; resend cooldown 60 seconds. Source address is REMOTE_ADDR, not arbitrary forwarded input; deployment proxy topology must be verified before activation. Limits behind a shared proxy can be conservative; never trust a client-controlled X-Forwarded-For.
 
@@ -27,6 +27,10 @@ Existing legacy users without Account fail closed; no automatic email-based iden
 - `WDOS_SECURE_COOKIES=1`: default; local HTTP browser testing alone may explicitly set 0.
 
 No real email was sent during implementation tests. Final activation needs key, verified sender, account permissions/transactional availability and controlled acceptance + mailbox evidence.
+
+## Runtime supervision
+
+The existing Docker service starts `python -m wdos_project.runtime`: migrations and role seeding complete before Gunicorn and the auth mailer start. Either child exiting stops its sibling and exits nonzero for platform restart. SIGTERM stops both. The mailer is part of the same WDOS service; no additional paid resource or VPS permission change is introduced. DB row locking fences multiple mailers; each intent crosses the provider boundary once. A crash after claim is conservative unknown, never automatic replay.
 
 ## Operator commands
 

@@ -85,7 +85,7 @@ def _email_locked(account, purpose):
     import html
     payload = {'to':[{'email':account.email}], 'subject':subject, 'textContent':text, 'htmlContent':'<html><body><h1>WODDI Digital Operating System</h1><p>'+html.escape(text).replace('\n','<br>')+'</p><p>No Woman Is Left Out</p></body></html>'}
     intent = EmailIntent.objects.create(account=account, token=token, encrypted_payload=encrypt(json.dumps(payload)), expires_at=token.expires_at)
-    transaction.on_commit(lambda: dispatch_email(intent.pk))
+    # A supervised outbox worker sends after commit; request timing never waits on Brevo.
     return intent
 
 
@@ -124,6 +124,7 @@ def _consume_locked(account, purpose, secret, token_id=None):
     token = query.order_by('-created_at').first()
     now = timezone.now()
     if not token or token.expires_at <= now or token.attempts >= 5:
+        audit(account, purpose+'_expired_or_unavailable')
         return False
     token.attempts += 1
     good = constant_time_compare(token.digest, digest(secret))
@@ -228,11 +229,16 @@ def claim_invitation(account_id, code, email):
         account = Account.objects.select_for_update().get(pk=account_id)
         if account.status!='active' or not account.verified_at or account.email!=email.strip().lower():
             return False
-        invite = Invitation.objects.select_for_update().filter(digest=digest(code)).first()
-        if not invite or invite.email.lower()!=account.email or invite.claimed_at or invite.revoked_at or invite.expires_at <= timezone.now():
+        candidate = Invitation.objects.filter(digest=digest(code)).first()
+        if not candidate:
+            audit(account, 'invitation_rejected')
+            return False
+        # Issuance locks person before invitations; claims use the same order.
+        person = Person.objects.select_for_update().get(pk=candidate.person_id)
+        invite = Invitation.objects.select_for_update().get(pk=candidate.pk)
+        if invite.person_id != person.pk or invite.email.lower()!=account.email or invite.claimed_at or invite.revoked_at or invite.expires_at <= timezone.now():
             audit(account,'invitation_rejected')
             return False
-        person = Person.objects.select_for_update().get(pk=invite.person_id)
         if (account.person_id and account.person_id!=person.pk) or Account.objects.filter(person=person).exclude(pk=account.pk).exists():
             return False
         account.person = person

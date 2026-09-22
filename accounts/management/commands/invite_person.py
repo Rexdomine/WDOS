@@ -36,5 +36,5 @@ class Command(BaseCommand):
             text=f'You have been invited to link your WDOS account to an existing person record. Sign in with this email, open Claim an invited record and enter: {secret}. This invitation expires in seven days. No leadership role is granted.'
             payload={'to':[{'email':email}], 'subject':'Your WDOS invitation', 'textContent':text, 'htmlContent':'<h1>Your WDOS invitation</h1><p>'+html.escape(text)+'</p>'}
             intent=EmailIntent.objects.create(invitation=invitation,expires_at=invitation.expires_at,encrypted_payload=encrypt(json.dumps(payload)))
-            transaction.on_commit(lambda: dispatch_email(intent.pk))
+            # The supervised outbox worker sends this committed intent.
         self.stdout.write('Invitation queued. Provider acceptance and delivery must be checked separately.')

@@ -73,6 +73,7 @@ def login(request):
                 if not account:
                     make_password(form.cleaned_data['password'])
                 if not good or not account.user.is_active:
+                    services.audit(account, 'sign_in_rejected')
                     form.add_error(None,'Email or password was not recognised.')
                 elif account.status!='active':
                     request.session.flush()
@@ -183,6 +184,7 @@ def invitation(request):
     if request.method=='POST' and form.is_valid():
         if rate(request,'invite',str(account.pk)) and services.claim_invitation(account.pk,form.cleaned_data['code'],form.cleaned_data['email']):
             return page(request,'AUTH-05','Record linked','Your account is linked to the intended WDOS person. No leadership or HQ role has been granted.')
+        services.audit(account, 'invitation_claim_rejected')
         form.add_error(None,'This invitation cannot be claimed. Check your details or contact your invitation issuer.')
     return page(request,'AUTH-05','Claim your invited record','Confirm the invitation before linking this account to an existing WDOS record.',form,'Claim record')
 

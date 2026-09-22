@@ -8,7 +8,7 @@ class EmailForm(forms.Form):
 
 class RegisterForm(EmailForm):
     name = forms.CharField(label='Full name', max_length=150, widget=forms.TextInput(attrs={'autocomplete':'name'}))
-    password = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete':'new-password'}), min_length=12, max_length=128)
+    password = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete':'new-password'}), min_length=12, max_length=128, help_text='Use at least 12 characters. A long, unique passphrase is best.')
     field_order = ['name','email','password']
 
     def clean_password(self):
@@ -19,7 +19,7 @@ class RegisterForm(EmailForm):
 
 class LoginForm(EmailForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete':'current-password'}), max_length=128)
-    remember = forms.BooleanField(label='Keep me signed in', required=False)
+    remember = forms.BooleanField(label='Keep me signed in (optional)', required=False)
 
 
 class VerifyForm(EmailForm):

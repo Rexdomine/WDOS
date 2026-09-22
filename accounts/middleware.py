@@ -38,6 +38,6 @@ class AccountSecurityMiddleware:
         response = self.get_response(request)
         if request.path.startswith(('/auth/', '/app', '/admin/')) or request.path == '/':
             response['Cache-Control'] = 'no-store, private'
-            response['Referrer-Policy'] = 'no-referrer'
+            response['Referrer-Policy'] = 'same-origin'
             response['X-Robots-Tag'] = 'noindex, nofollow'
         return response

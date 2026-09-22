@@ -14,6 +14,13 @@ WODDI Digital Operating System — the shared platform foundation for WGMN and W
 
 Stage 1 establishes the implementation spine: application shell, backend/API baseline, persistence and migration contracts, environment safety, CI, review deployment, seed strategy, observability, and QA harness. No business module is claimed complete by this foundation pass.
 
+Current deployable foundation:
+
+- `GET /` — foundation app shell payload
+- `GET /health` and `GET /api/health` — health checks
+- `Dockerfile` — staging container entrypoint
+- `.github/workflows/ci.yml` — compile and focused test gate
+
 The authoritative stage contract remains in the project workspace under `development-baseline/stages/stage-01.md` until the implementation repository structure is finalized against the approved stack decision.
 
 ## Safety

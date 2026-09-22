@@ -1,0 +1,36 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+.secrets/
+
+# Local planning and WDOS source-of-truth artifacts
+.planning/
+.receive_render_key.py
+development-baseline/
+design-review/
+source/
+notes/
+qa/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+
+# Provider metadata
+.render/
+.vercel/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/

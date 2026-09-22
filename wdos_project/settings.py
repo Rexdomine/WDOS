@@ -14,6 +14,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "foundation",
+    "accounts",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -22,6 +23,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.AccountSecurityMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 ROOT_URLCONF = "wdos_project.urls"
@@ -53,7 +55,29 @@ if DATABASE_URL:
 else:
     DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
 
-AUTH_PASSWORD_VALIDATORS = []
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+# Provisional Stage 2 policy; final values require IT approval.
+WDOS_VERIFY_TTL = 600
+WDOS_RESET_TTL = 1800
+WDOS_MFA_TTL = 600
+WDOS_IDLE_TTL = 1800
+WDOS_SESSION_TTL = 43200
+WDOS_REMEMBER_TTL = 604800
+WDOS_PUBLIC_ORIGIN = os.getenv("WDOS_PUBLIC_ORIGIN", "https://wdos-staging.onrender.com")
+BREVO_API_KEY = os.getenv("WDOS_BREVO_API_KEY", "")
+WDOS_EMAIL_FROM = os.getenv("WDOS_EMAIL_FROM", "")
+SESSION_COOKIE_SECURE = os.getenv("WDOS_SECURE_COOKIES", "1") == "1"
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+SECURE_REFERRER_POLICY = "no-referrer"
+X_FRAME_OPTIONS = "DENY"
+SESSION_COOKIE_AGE = WDOS_SESSION_TTL
+LOGIN_URL = "/auth/login/"
+
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "UTC"
 USE_I18N = True

@@ -34,11 +34,5 @@ jobs:
           python-version: '3.13'
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Django system and migration checks
-        run: |
-          python manage.py check
-          python manage.py makemigrations --check --dry-run
-          python manage.py migrate --noinput
-          python manage.py collectstatic --noinput
-      - name: Focused tests
-        run: python manage.py test -v 2
+      - name: Canonical Django verification (PostgreSQL)
+        run: make verify

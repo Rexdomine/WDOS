@@ -17,6 +17,8 @@ qa/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+db.sqlite3
+staticfiles/
 .venv/
 venv/
 

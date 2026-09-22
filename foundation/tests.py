@@ -5,6 +5,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
+from django.templatetags.static import static
 from django.urls import reverse
 
 from .models import Role
@@ -26,7 +27,7 @@ class FoundationTests(TestCase):
         response = self.client.get(reverse("app-shell"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "WODDI DIGITAL OPERATING SYSTEM")
-        self.assertContains(response, "/static/foundation/tokens.css")
+        self.assertContains(response, static("foundation/tokens.css"))
         css = Path(settings.BASE_DIR / "foundation/static/foundation/tokens.css").read_text()
         self.assertIn("--wdos-magenta: #D4006A", css)
 

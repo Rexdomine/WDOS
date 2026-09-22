@@ -38,5 +38,6 @@ jobs:
           python manage.py check
           python manage.py makemigrations --check --dry-run
           python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
       - name: Focused tests
         run: python manage.py test -v 2

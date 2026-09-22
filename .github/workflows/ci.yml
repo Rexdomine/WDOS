@@ -7,14 +7,18 @@ on:
     branches: [main, staging]
 
 jobs:
-  foundation:
+  django:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Compile
-        run: python -m py_compile app.py tests/test_foundation.py
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Django system and migration checks
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
       - name: Focused tests
-        run: python -m unittest discover -s tests -v
+        run: python manage.py test -v 2

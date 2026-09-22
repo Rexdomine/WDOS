@@ -12,16 +12,19 @@ WODDI Digital Operating System — the shared platform foundation for WGMN and W
 
 ## Stage 1
 
-Stage 1 establishes the implementation spine: application shell, backend/API baseline, persistence and migration contracts, environment safety, CI, review deployment, seed strategy, observability, and QA harness. No business module is claimed complete by this foundation pass.
+Stage 1 establishes the implementation spine: Django application shell, backend/API baseline, persistence and migration contracts, environment safety, CI, review deployment, seed strategy, observability, and QA harness. No business module is claimed complete by this foundation pass.
 
-Current deployable foundation:
+Current Django foundation:
 
-- `GET /` — foundation app shell payload
-- `GET /health` and `GET /api/health` — health checks
-- `Dockerfile` — staging container entrypoint
-- `.github/workflows/ci.yml` — compile and focused test gate
+- `GET /` — Django app shell payload
+- `GET /health` and `GET /api/health` — database-backed health checks
+- `foundation.Role` model with initial migration
+- `python manage.py seed_roles` — idempotent system-role seed
+- `docs/stage-01-contracts.md` — auth/session and persistence contracts
+- `Dockerfile` — Django/Gunicorn staging container
+- `.github/workflows/ci.yml` — Django checks, migration check, and tests
 
-The authoritative stage contract remains in the project workspace under `development-baseline/stages/stage-01.md` until the implementation repository structure is finalized against the approved stack decision.
+The authoritative stage contract remains in the project workspace under `development-baseline/stages/stage-01.md`.
 
 ## Safety
 

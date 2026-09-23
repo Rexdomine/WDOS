@@ -7,6 +7,30 @@ on:
     branches: [main, staging]
 
 jobs:
+  ui-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install browser test dependencies
+        run: |
+          pip install -r requirements.txt playwright==1.63.0
+          python -m playwright install --with-deps chromium
+      - name: Verify frozen UI references
+        run: python scripts/check_ui_reference_manifest.py
+      - name: Isolated Stage 2 browser/state regression
+        run: python scripts/stage2_browser_qa.py
+      - name: Browser and reference evidence for human review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage2-ui-reference-evidence
+          path: .hermes/stage2-fidelity-qa/
+          if-no-files-found: error
+          retention-days: 14
   django:
     runs-on: ubuntu-latest
     services:
@@ -34,6 +58,8 @@ jobs:
           python-version: '3.13'
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Frozen approved UI reference integrity
+        run: python scripts/check_ui_reference_manifest.py
       - name: Canonical Django verification (PostgreSQL)
         run: make verify
       - name: Build and exercise deployment image

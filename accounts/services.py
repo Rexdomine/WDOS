@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
+from .email_templates import render_email
 from .models import Account, ActionToken, AuditEvent, EmailIntent, Invitation, Person, RecoveryCode, Throttle
 
 
@@ -77,14 +78,17 @@ def _email_locked(account, purpose):
     token, secret = _issue_locked(account, purpose)
     if purpose == 'verify':
         subject = 'Verify your WDOS account'
-        text = f'Your WDOS verification code is {secret}. It expires in {settings.WDOS_VERIFY_TTL // 60} minutes. If you did not request this, ignore this email.'
+        expiry_minutes = settings.WDOS_VERIFY_TTL // 60
+        text = f'Your WDOS verification code is {secret}. It expires in {expiry_minutes} minutes. If you did not request this, ignore this email.'
+        html_content = render_email('verify', {'code': secret, 'expiry_minutes': expiry_minutes})
     else:
         subject = 'Reset your WDOS password'
         # Fragment is not sent to access logs. The browser posts it to a CSRF-protected form.
         url = settings.WDOS_PUBLIC_ORIGIN.rstrip('/')+'/auth/reset/#'+str(token.pk)+'.'+secret
-        text = f'Reset your WDOS password: {url}\nThis link expires in {settings.WDOS_RESET_TTL // 60} minutes. If you did not request this, ignore this email.'
-    import html
-    payload = {'to':[{'email':account.email}], 'subject':subject, 'textContent':text, 'htmlContent':'<html><body><h1>WODDI Digital Operating System</h1><p>'+html.escape(text).replace('\n','<br>')+'</p><p>No Woman Is Left Out</p></body></html>'}
+        expiry_minutes = settings.WDOS_RESET_TTL // 60
+        text = f'Reset your WDOS password: {url}\nThis link expires in {expiry_minutes} minutes. If you did not request this, ignore this email.'
+        html_content = render_email('reset', {'url': url, 'expiry_minutes': expiry_minutes})
+    payload = {'to':[{'email':account.email}], 'subject':subject, 'textContent':text, 'htmlContent':html_content}
     intent = EmailIntent.objects.create(account=account, token=token, encrypted_payload=encrypt(json.dumps(payload)), expires_at=token.expires_at)
     # A supervised outbox worker sends after commit; request timing never waits on Brevo.
     return intent

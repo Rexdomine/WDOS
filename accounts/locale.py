@@ -47,6 +47,7 @@ def localize_form(form, lang):
         'password_too_common': 'password_too_common',
         'password_entirely_numeric': 'password_entirely_numeric',
         'password_too_similar': 'password_too_similar',
+        'password_reused': 'password_reused',
     }
     for name, errors in form.errors.items():
         translated = []

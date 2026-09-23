@@ -170,6 +170,22 @@ class AuthFlows(TestCase):
         self.assertEqual(other.get('/auth/session/').status_code,401)
         self.assertFalse(services.reset_password(str(token.pk),secret,self.password+'other'))
 
+    def test_reset_reused_password_is_localized_through_request_boundary(self):
+        from .locale import catalog
+        account=self.create('reused@example.org')
+        token,secret=services.issue_token(account,'reset')
+        self.client.get('/?lang=fr')
+        response=self.client.post('/auth/reset/', {
+            'proof': f'{token.pk}.{secret}',
+            'password': self.password,
+            'confirm': self.password,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, catalog('fr')['password_reused'])
+        self.assertNotContains(response, 'Choose a password you have not used here before.')
+        token.refresh_from_db()
+        self.assertIsNone(token.used_at)
+
     def test_suspension_and_idle_expiry_rechecked(self):
         account=self.create(); self.login(account)
         Account.objects.filter(pk=account.pk).update(status='suspended')

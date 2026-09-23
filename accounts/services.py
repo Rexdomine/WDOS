@@ -178,7 +178,7 @@ def reset_password(token_id, secret, password):
         account = Account.objects.select_for_update().select_related('user').get(pk=token.account_id)
         validate_password(password, account.user)
         if account.user.check_password(password):
-            raise ValidationError('Choose a password you have not used here before.')
+            raise ValidationError('Choose a password you have not used here before.', code='password_reused')
         if account.status!='active' or not _consume_locked(account, 'reset', secret, token_id):
             return False
         account.user.set_password(password)

@@ -51,6 +51,17 @@ class AuthFlows(TestCase):
         self.login(account)
         self.assertEqual(self.client.session['wdos_language'], 'fr')
 
+    def test_anonymous_csrf_valid_logout_does_not_create_session(self):
+        client = Client(enforce_csrf_checks=True)
+        client.get('/?lang=fr')
+        csrf_response = client.get('/auth/login/')
+        token = csrf_response.cookies['csrftoken'].value
+        before = Session.objects.count()
+        response = client.post('/auth/logout/', HTTP_X_CSRFTOKEN=token)
+        self.assertRedirects(response, '/auth/login/')
+        self.assertEqual(Session.objects.count(), before)
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+
     def test_invitation_success_keeps_authenticated_controls(self):
         from django.core.management import call_command
         from io import StringIO

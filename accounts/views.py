@@ -238,9 +238,16 @@ def invitation(request):
 @require_POST
 def logout(request):
     lang = _locale(request)
+    was_authenticated = request.user.is_authenticated
     django_logout(request)
-    request.session['wdos_language'] = lang
-    return redirect('accounts:login')
+    if was_authenticated:
+        request.session['wdos_language'] = lang
+    response = redirect('accounts:login')
+    response.set_cookie(
+        LOCALE_COOKIE, lang, max_age=LOCALE_COOKIE_AGE,
+        httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
+    )
+    return response
 
 
 @require_POST

@@ -26,7 +26,7 @@ def logout_preserving_language(request):
     from django.contrib.auth import logout
     lang = request.session.get('wdos_language', 'en')
     logout(request)
-    request.session['wdos_language'] = lang if lang in LANGUAGES else 'en'
+    return lang if lang in LANGUAGES else 'en'
 
 
 def catalog(lang):

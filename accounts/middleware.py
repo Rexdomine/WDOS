@@ -35,7 +35,14 @@ class AccountSecurityMiddleware:
         if request.path.startswith('/admin/'):
             # One sign-in gateway: Django admin cannot bypass MFA or account status.
             if not request.wdos_account or not request.user.is_staff or not request.session.get('mfa_verified'):
-                return redirect('accounts:login')
+                response = redirect('accounts:login')
+                lang = getattr(request, 'wdos_locale_after_logout', None)
+                if lang:
+                    response.set_cookie(
+                        'wdos_language', lang, max_age=31536000,
+                        httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
+                    )
+                return response
         response = self.get_response(request)
         lang = getattr(request, 'wdos_locale_after_logout', None)
         if lang:

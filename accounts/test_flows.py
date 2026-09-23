@@ -78,6 +78,22 @@ class AuthFlows(TestCase):
         from .locale import catalog
         self.assertContains(response, catalog('fr')['status_title'])
 
+    def test_admin_forced_logout_preserves_session_only_locale(self):
+        account = self.create('admin-forced-locale@example.org')
+        self.login(account)
+        account.user.is_staff = True
+        account.user.save(update_fields=['is_staff'])
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies.pop('wdos_language', None)
+        Account.objects.filter(pk=account.pk).update(security_version=account.security_version + 1)
+
+        response = self.client.get('/admin/')
+
+        self.assertRedirects(response, '/auth/login/')
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+
     def test_current_cookie_locale_wins_forced_security_logout(self):
         account = self.create('forced-cookie-locale@example.org')
         self.login(account)

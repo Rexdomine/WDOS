@@ -30,6 +30,7 @@ jobs:
           name: stage2-ui-reference-evidence
           path: .hermes/stage2-fidelity-qa/
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 14
   django:
     runs-on: ubuntu-latest

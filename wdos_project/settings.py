@@ -77,6 +77,7 @@ if os.getenv("WDOS_ENVIRONMENT") == "production":
         origin = urlsplit(explicit_origin)
         valid_origin = (
             origin.scheme == "https" and bool(origin.hostname)
+            and not origin.hostname.endswith(".")
             and origin.hostname != "wdos-staging.onrender.com"
             and not origin.username and not origin.password
             and origin.path in ("", "/") and not origin.query and not origin.fragment

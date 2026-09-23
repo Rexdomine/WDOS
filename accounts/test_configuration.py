@@ -14,7 +14,7 @@ class ProductionOriginTests(SimpleTestCase):
         return subprocess.run([sys.executable, '-c', 'from wdos_project.settings import WDOS_PUBLIC_ORIGIN; print(WDOS_PUBLIC_ORIGIN)'], env=env, text=True, capture_output=True, timeout=10)
 
     def test_production_requires_explicit_non_staging_https_origin(self):
-        for origin in (None, '', 'https://wdos-staging.onrender.com', 'http://wdos.example.org', 'https://', 'https://user:pass@wdos.example.org', 'https://wdos.example.org/#proof'):
+        for origin in (None, '', 'https://wdos-staging.onrender.com', 'https://wdos-staging.onrender.com.', 'https://wdos.example.org.', 'http://wdos.example.org', 'https://', 'https://user:pass@wdos.example.org', 'https://wdos.example.org/#proof'):
             with self.subTest(origin=origin):
                 result = self.load(origin)
                 self.assertNotEqual(result.returncode, 0)

@@ -76,6 +76,18 @@ class AuthFlows(TestCase):
         account.refresh_from_db()
         self.assertEqual(account.status, 'pending')
 
+    def test_pending_sign_in_preserves_registration_verification_binding(self):
+        response = self.client.post('/auth/register/', {
+            'name': 'Ada', 'email': 'pending-signin@example.org', 'password': self.password
+        })
+        self.assertRedirects(response, '/auth/verify/')
+        account = Account.objects.get(email='pending-signin@example.org')
+        intent = EmailIntent.objects.get(account=account)
+        code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
+        self.assertRedirects(self.client.post('/auth/login/', {'email': account.email, 'password': self.password}), '/auth/status/')
+        response = self.client.post('/auth/verify/', {'email': account.email, 'code': code})
+        self.assertContains(response, 'Contact verified')
+
     def test_verification_attempt_limit_and_purpose(self):
         account=services.register('Ada','ada@example.org',self.password)
         token,code=services.issue_token(account,'verify')

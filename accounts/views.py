@@ -82,7 +82,10 @@ def login(request):
                     services.audit(account, 'sign_in_rejected')
                     form.add_error(None,'Email or password was not recognised.')
                 elif account.status!='active':
+                    pending_registration_account = request.session.get('pending_registration_account')
                     request.session.flush()
+                    if pending_registration_account == account.pk:
+                        request.session['pending_registration_account'] = pending_registration_account
                     request.session['access_notice'] = account.status
                     return redirect('accounts:status')
                 elif services.requires_mfa(account):

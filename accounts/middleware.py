@@ -1,6 +1,6 @@
 """Recheck durable eligibility, revocation and second-factor authority every request."""
 from django.conf import settings
-from django.contrib.auth import logout
+from .locale import logout_preserving_language as logout
 from django.shortcuts import redirect
 from django.utils import timezone
 from .models import Account
@@ -26,7 +26,8 @@ class AccountSecurityMiddleware:
             elif requires_mfa(account) and not request.session.get('mfa_verified'):
                 reason = 'mfa'
             if reason:
-                logout(request)
+                lang = logout(request)
+                request.wdos_locale_after_logout = lang
                 request.session['access_notice'] = reason
             else:
                 request.wdos_account = account
@@ -34,8 +35,21 @@ class AccountSecurityMiddleware:
         if request.path.startswith('/admin/'):
             # One sign-in gateway: Django admin cannot bypass MFA or account status.
             if not request.wdos_account or not request.user.is_staff or not request.session.get('mfa_verified'):
-                return redirect('accounts:login')
+                response = redirect('accounts:login')
+                lang = getattr(request, 'wdos_locale_after_logout', None)
+                if lang:
+                    response.set_cookie(
+                        'wdos_language', lang, max_age=31536000,
+                        httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
+                    )
+                return response
         response = self.get_response(request)
+        lang = getattr(request, 'wdos_locale_after_logout', None)
+        if lang:
+            response.set_cookie(
+                'wdos_language', lang, max_age=31536000,
+                httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
+            )
         if request.path.startswith(('/auth/', '/app', '/admin/')) or request.path == '/':
             response['Cache-Control'] = 'no-store, private'
             response['Referrer-Policy'] = 'same-origin'

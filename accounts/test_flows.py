@@ -8,6 +8,7 @@ import pyotp
 from django.conf import settings
 from django.db import transaction, connection, close_old_connections
 from django.test import TestCase, TransactionTestCase, Client, RequestFactory, override_settings
+from django.contrib.sessions.models import Session
 from django.utils import timezone
 from . import services, brevo
 from .models import Account, ActionToken, AuditEvent, EmailIntent, Invitation, Person, RecoveryCode, AccessGrant
@@ -30,6 +31,146 @@ class AuthFlows(TestCase):
 
     def login(self, account, client=None):
         return (client or self.client).post('/auth/login/',{'email':account.email,'password':self.password})
+
+    def test_cookie_less_public_gets_do_not_create_sessions(self):
+        before = Session.objects.count()
+        paths = ['/', '/auth/login/', '/auth/register/', '/auth/recover/', '/auth/reset/', '/auth/status/']
+        for path in paths:
+            for _ in range(3):
+                response = Client().get(path)
+                self.assertEqual(response.status_code, 200)
+        self.assertEqual(Session.objects.count(), before)
+
+    def test_locale_cookie_is_allowlisted_and_survives_auth_transition(self):
+        response = self.client.get('/?lang=fr')
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        self.client.cookies['wdos_language'] = 'xx'
+        self.assertEqual(self.client.get('/').context['lang'], 'en')
+        self.client.cookies['wdos_language'] = 'fr'
+        account = self.create('locale-cookie@example.org')
+        self.login(account)
+        self.assertEqual(self.client.session['wdos_language'], 'fr')
+
+    def test_anonymous_csrf_valid_logout_does_not_create_session(self):
+        client = Client(enforce_csrf_checks=True)
+        client.get('/?lang=fr')
+        csrf_response = client.get('/auth/login/')
+        token = csrf_response.cookies['csrftoken'].value
+        before = Session.objects.count()
+        response = client.post('/auth/logout/', HTTP_X_CSRFTOKEN=token)
+        self.assertRedirects(response, '/auth/login/')
+        self.assertEqual(Session.objects.count(), before)
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+
+    def test_session_only_locale_survives_forced_security_logout(self):
+        account = self.create('forced-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies.pop('wdos_language', None)
+        Account.objects.filter(pk=account.pk).update(security_version=account.security_version + 1)
+
+        response = self.client.get('/auth/status/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        from .locale import catalog
+        self.assertContains(response, catalog('fr')['status_title'])
+
+    def test_admin_forced_logout_preserves_session_only_locale(self):
+        account = self.create('admin-forced-locale@example.org')
+        self.login(account)
+        account.user.is_staff = True
+        account.user.save(update_fields=['is_staff'])
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies.pop('wdos_language', None)
+        Account.objects.filter(pk=account.pk).update(security_version=account.security_version + 1)
+
+        response = self.client.get('/admin/')
+
+        self.assertRedirects(response, '/auth/login/')
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+
+    def test_current_cookie_locale_wins_forced_security_logout(self):
+        account = self.create('forced-cookie-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies['wdos_language'] = 'pt'
+        Account.objects.filter(pk=account.pk).update(security_version=account.security_version + 1)
+
+        response = self.client.get('/auth/status/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies['wdos_language'].value, 'pt')
+
+    def test_current_cookie_locale_wins_session_revocation(self):
+        account = self.create('revoke-cookie-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies['wdos_language'] = 'pt'
+
+        response = self.client.post('/auth/revoke/')
+
+        self.assertRedirects(response, '/auth/login/')
+        self.assertEqual(response.cookies['wdos_language'].value, 'pt')
+
+    def test_session_only_locale_survives_password_reset_logout(self):
+        account = self.create('reset-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies.pop('wdos_language', None)
+        token, secret = services.issue_token(account, 'reset')
+
+        response = self.client.post('/auth/reset/', {
+            'proof': f'{token.pk}.{secret}',
+            'password': self.password + 'new',
+            'confirm': self.password + 'new',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        self.assertContains(response, 'Mot de passe mis à jour')
+
+    def test_cookie_only_locale_survives_password_reset_logout(self):
+        account = self.create('reset-cookie-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session.pop('wdos_language', None)
+        session.save()
+        self.client.cookies['wdos_language'] = 'fr'
+        token, secret = services.issue_token(account, 'reset')
+
+        response = self.client.post('/auth/reset/', {
+            'proof': f'{token.pk}.{secret}',
+            'password': self.password + 'new',
+            'confirm': self.password + 'new',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        self.assertContains(response, 'Mot de passe mis à jour')
+
+    def test_session_only_locale_survives_session_revocation(self):
+        account = self.create('revoke-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies.pop('wdos_language', None)
+
+        response = self.client.post('/auth/revoke/')
+
+        self.assertRedirects(response, '/auth/login/')
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
 
     def test_invitation_success_keeps_authenticated_controls(self):
         from django.core.management import call_command
@@ -62,9 +203,11 @@ class AuthFlows(TestCase):
         self.assertNotIn(code,intent.encrypted_payload)
         response=self.client.post('/auth/verify/',{'email':account.email,'code':code})
         self.assertContains(response,'Contact verified')
+        self.client.get('/?lang=sw')
         self.login(account)
         self.assertEqual(self.client.get('/auth/session/').status_code,200)
-        self.assertRedirects(self.client.post('/auth/logout/'),'/auth/login/')
+        self.client.post('/auth/logout/')
+        self.assertEqual(self.client.session['wdos_language'], 'sw')
         self.assertEqual(self.client.get('/auth/session/').status_code,401)
 
     def test_verification_is_bound_to_the_registration_session(self):
@@ -84,9 +227,13 @@ class AuthFlows(TestCase):
         account = Account.objects.get(email='pending-signin@example.org')
         intent = EmailIntent.objects.get(account=account)
         code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
-        self.assertRedirects(self.client.post('/auth/login/', {'email': account.email, 'password': self.password}), '/auth/status/')
+        self.client.get('/?lang=fr')
+        response = self.client.post('/auth/login/', {'email': account.email, 'password': self.password})
+        self.assertRedirects(response, '/auth/status/')
+        self.assertEqual(self.client.session['wdos_language'], 'fr')
         response = self.client.post('/auth/verify/', {'email': account.email, 'code': code})
-        self.assertContains(response, 'Contact verified')
+        from .locale import catalog
+        self.assertContains(response, catalog('fr')['verified_title'])
 
     def test_email_owner_can_reclaim_pending_registration(self):
         services.register('Attacker', 'reclaim@example.org', 'attacker passphrase long enough!')
@@ -163,6 +310,22 @@ class AuthFlows(TestCase):
         self.assertContains(response,'Password updated')
         self.assertEqual(other.get('/auth/session/').status_code,401)
         self.assertFalse(services.reset_password(str(token.pk),secret,self.password+'other'))
+
+    def test_reset_reused_password_is_localized_through_request_boundary(self):
+        from .locale import catalog
+        account=self.create('reused@example.org')
+        token,secret=services.issue_token(account,'reset')
+        self.client.get('/?lang=fr')
+        response=self.client.post('/auth/reset/', {
+            'proof': f'{token.pk}.{secret}',
+            'password': self.password,
+            'confirm': self.password,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, catalog('fr')['password_reused'])
+        self.assertNotContains(response, 'Choose a password you have not used here before.')
+        token.refresh_from_db()
+        self.assertIsNone(token.used_at)
 
     def test_suspension_and_idle_expiry_rechecked(self):
         account=self.create(); self.login(account)
@@ -280,6 +443,36 @@ class AuthFlows(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'too similar')
+
+    def test_registration_similarity_attribute_is_localized_for_every_catalog(self):
+        from .locale import catalog
+        for lang in ('en', 'fr', 'pt', 'ar', 'sw'):
+            response = self.client.post('/auth/register/?lang='+lang, {
+                'name': 'Ada Example', 'email': 'similar-'+lang+'@example.org',
+                'password': 'Ada Example Ada'
+            })
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, catalog(lang)['name'])
+            self.assertNotContains(response, 'First name')
+
+
+    def test_auth_ui_has_approved_welcome_actions_and_language_persistence(self):
+        response = self.client.get('/?lang=ar')
+        self.assertContains(response, 'name="lang"')
+        self.assertContains(response, 'مرحبًا بكِ في WDOS')
+        self.assertContains(response, 'dir="rtl"')
+        self.assertContains(response, 'إذا كانت لديكِ هوية WDOS', html=False)
+        self.assertEqual(self.client.cookies['wdos_language'].value, 'ar')
+        self.assertNotIn('wdos_language', self.client.session)
+        next_response = self.client.get('/auth/login/')
+        self.assertContains(next_response, 'dir="rtl"')
+
+    def test_password_controls_are_independent_and_accessible_on_reset(self):
+        response = self.client.get('/auth/reset/')
+        self.assertContains(response, 'data-target="id_password"')
+        self.assertContains(response, 'data-target="id_confirm"')
+        self.assertContains(response, 'aria-pressed="false"')
+        self.assertContains(response, '<svg', html=False)
 
 
 @override_settings(BREVO_API_KEY='unit-test-only',WDOS_EMAIL_FROM='sender@example.org', PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])

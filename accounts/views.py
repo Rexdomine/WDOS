@@ -17,7 +17,9 @@ LOCALE_COOKIE = 'wdos_language'
 LOCALE_COOKIE_AGE = 31536000
 
 def _locale(request):
-    lang = request.GET.get('lang') or request.COOKIES.get(LOCALE_COOKIE) or request.session.get(LOCALE_COOKIE) or 'en'
+    lang = (request.GET.get('lang') or request.COOKIES.get(LOCALE_COOKIE)
+            or request.session.get(LOCALE_COOKIE)
+            or getattr(request, 'wdos_locale_after_logout', None) or 'en')
     if lang not in LANGUAGES: lang = 'en'
     return lang
 
@@ -25,17 +27,22 @@ def _restore_locale(request, lang):
     request.session.flush()
     request.session['wdos_language'] = lang
 
+
+def _set_locale_cookie(response, lang):
+    response.set_cookie(
+        LOCALE_COOKIE, lang, max_age=LOCALE_COOKIE_AGE,
+        httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
+    )
+    return response
+
+
 def page(request, screen, title, lede, form=None, action=None, **extra):
     lang = _locale(request)
     t = catalog(lang)
     if form is not None: localize_form(form, lang)
     values = dict(screen=screen, title=translate(lang, title), lede=translate(lang, lede), form=form, action=translate(lang, action) if action else action, note=translate(lang, extra.pop('note', '')) if extra.get('note') else extra.pop('note', None), lang=lang, language=LANGUAGES[lang], languages=LANGUAGES, translations=t, **extra)
     response = render(request, 'accounts/auth.html', values)
-    response.set_cookie(
-        LOCALE_COOKIE, lang, max_age=LOCALE_COOKIE_AGE,
-        httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
-    )
-    return response
+    return _set_locale_cookie(response, lang)
 
 
 def rate(request, scope, identity=''):
@@ -180,8 +187,10 @@ def reset(request):
             form.add_error('password',exc)
         else:
             if ok:
-                django_logout(request)
-                return page(request,'AUTH-07','Password updated','Your previous sessions have been revoked. Sign in with your new password. MFA is still required where enabled.')
+                lang = django_logout(request)
+                request.wdos_locale_after_logout = lang
+                response = page(request,'AUTH-07','Password updated','Your previous sessions have been revoked. Sign in with your new password. MFA is still required where enabled.')
+                return _set_locale_cookie(response, lang)
             form.add_error(None,'This recovery link is invalid, expired or already used. Request a new link.')
     return page(request,'AUTH-07','Set a new password','Choose a password you have not used here before, then return to sign in.',form,'Save new password')
 
@@ -259,8 +268,9 @@ def revoke_sessions(request):
         account.security_version+=1
         account.save(update_fields=['security_version'])
         services.audit(account,'all_sessions_revoked')
-    django_logout(request)
-    return redirect('accounts:login')
+    lang = django_logout(request)
+    response = redirect('accounts:login')
+    return _set_locale_cookie(response, lang)
 
 
 @require_http_methods(['GET'])

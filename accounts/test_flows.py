@@ -62,6 +62,54 @@ class AuthFlows(TestCase):
         self.assertEqual(Session.objects.count(), before)
         self.assertEqual(response.cookies['wdos_language'].value, 'fr')
 
+    def test_session_only_locale_survives_forced_security_logout(self):
+        account = self.create('forced-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies.pop('wdos_language', None)
+        Account.objects.filter(pk=account.pk).update(security_version=account.security_version + 1)
+
+        response = self.client.get('/auth/status/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        from .locale import catalog
+        self.assertContains(response, catalog('fr')['status_title'])
+
+    def test_session_only_locale_survives_password_reset_logout(self):
+        account = self.create('reset-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies.pop('wdos_language', None)
+        token, secret = services.issue_token(account, 'reset')
+
+        response = self.client.post('/auth/reset/', {
+            'proof': f'{token.pk}.{secret}',
+            'password': self.password + 'new',
+            'confirm': self.password + 'new',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        self.assertContains(response, 'Mot de passe mis à jour')
+
+    def test_session_only_locale_survives_session_revocation(self):
+        account = self.create('revoke-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies.pop('wdos_language', None)
+
+        response = self.client.post('/auth/revoke/')
+
+        self.assertRedirects(response, '/auth/login/')
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+
     def test_invitation_success_keeps_authenticated_controls(self):
         from django.core.management import call_command
         from io import StringIO

@@ -101,6 +101,18 @@ def register(name, email, password):
     user.set_password(password)
     try:
         with transaction.atomic():
+            existing = Account.objects.select_for_update().select_related('user').filter(email__iexact=email).first()
+            if existing:
+                if existing.status != 'pending':
+                    return None
+                existing.user.first_name = name
+                existing.user.set_password(password)
+                existing.user.save(update_fields=['first_name', 'password'])
+                existing.display_name = name
+                existing.save(update_fields=['display_name'])
+                _email_locked(existing, 'verify')
+                audit(existing, 'registration_requested')
+                return existing
             # Never attach a new account to an existing legacy user by email.
             if get_user_model().objects.filter(email__iexact=email).exists():
                 return None

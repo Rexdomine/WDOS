@@ -20,7 +20,9 @@ class CoreTests(TestCase):
         self.assertFalse(account.user.is_superuser)
         self.assertEqual(account.status, 'pending')
         self.assertIsNone(account.person_id)
-        self.assertIsNone(services.register('Other', 'ada@example.org', self.password))
+        reclaimed = services.register('Other', 'ada@example.org', self.password+' updated')
+        self.assertEqual(reclaimed.pk, account.pk)
+        self.assertEqual(reclaimed.display_name, 'Other')
         self.assertEqual(Account.objects.count(), 1)
 
     def test_verification_single_use_and_expiry(self):

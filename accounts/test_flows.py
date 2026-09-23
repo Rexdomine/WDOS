@@ -88,6 +88,25 @@ class AuthFlows(TestCase):
         response = self.client.post('/auth/verify/', {'email': account.email, 'code': code})
         self.assertContains(response, 'Contact verified')
 
+    def test_email_owner_can_reclaim_pending_registration(self):
+        services.register('Attacker', 'reclaim@example.org', 'attacker passphrase long enough!')
+        victim_password = 'victim passphrase long enough!'
+        response = self.client.post('/auth/register/', {
+            'name': 'Victim Owner', 'email': 'reclaim@example.org', 'password': victim_password
+        })
+        self.assertRedirects(response, '/auth/verify/')
+        account = Account.objects.get(email='reclaim@example.org')
+        intent = EmailIntent.objects.filter(account=account).order_by('-created_at').first()
+        code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
+        other = Client()
+        self.assertContains(other.post('/auth/login/', {
+            'email': account.email, 'password': 'attacker passphrase long enough!'
+        }), 'not recognised')
+        self.assertContains(self.client.post('/auth/verify/', {'email': account.email, 'code': code}), 'Contact verified')
+        account.refresh_from_db()
+        self.assertEqual(account.display_name, 'Victim Owner')
+        self.assertTrue(account.user.check_password(victim_password))
+
     def test_verification_attempt_limit_and_purpose(self):
         account=services.register('Ada','ada@example.org',self.password)
         token,code=services.issue_token(account,'verify')

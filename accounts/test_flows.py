@@ -107,6 +107,29 @@ class AuthFlows(TestCase):
         self.assertEqual(account.display_name, 'Victim Owner')
         self.assertTrue(account.user.check_password(victim_password))
 
+    def test_reclaim_invalidates_an_older_owner_registration_session(self):
+        owner = Client()
+        owner.post('/auth/register/', {
+            'name': 'Victim Owner', 'email': 'race@example.org', 'password': 'victim passphrase long enough!'
+        })
+        attacker = Client()
+        attacker.post('/auth/register/', {
+            'name': 'Attacker', 'email': 'race@example.org', 'password': 'attacker passphrase long enough!'
+        })
+        account = Account.objects.get(email='race@example.org')
+        intent = EmailIntent.objects.filter(account=account).order_by('-created_at').first()
+        code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
+        self.assertContains(owner.post('/auth/verify/', {'email': account.email, 'code': code}), 'could not be verified')
+        account.refresh_from_db()
+        self.assertEqual(account.status, 'pending')
+        owner.post('/auth/register/', {
+            'name': 'Victim Owner', 'email': 'race@example.org', 'password': 'victim passphrase long enough!'
+        })
+        account.refresh_from_db()
+        intent = EmailIntent.objects.filter(account=account).order_by('-created_at').first()
+        code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
+        self.assertContains(owner.post('/auth/verify/', {'email': account.email, 'code': code}), 'Contact verified')
+
     def test_verification_attempt_limit_and_purpose(self):
         account=services.register('Ada','ada@example.org',self.password)
         token,code=services.issue_token(account,'verify')

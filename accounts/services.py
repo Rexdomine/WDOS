@@ -109,7 +109,8 @@ def register(name, email, password):
                 existing.user.set_password(password)
                 existing.user.save(update_fields=['first_name', 'password'])
                 existing.display_name = name
-                existing.save(update_fields=['display_name'])
+                existing.security_version += 1
+                existing.save(update_fields=['display_name', 'security_version'])
                 _email_locked(existing, 'verify')
                 audit(existing, 'registration_requested')
                 return existing

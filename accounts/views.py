@@ -46,7 +46,9 @@ def register(request):
                 form.add_error('password', exc)
             else:
                 if account is not None:
-                    request.session['pending_registration_account'] = account.pk
+                    request.session['pending_registration_account'] = {
+                        'id': account.pk, 'version': account.security_version
+                    }
                     return redirect('accounts:verify')
                 form.add_error(None, 'This email is already registered. Sign in or request recovery instead.')
     return page(request,'AUTH-03','Create your WDOS account','Start with the contact details we use to verify your identity and keep one account.',form,'Create account', note='Creating an account does not grant a leadership or HQ role.')
@@ -84,7 +86,9 @@ def login(request):
                 elif account.status!='active':
                     pending_registration_account = request.session.get('pending_registration_account')
                     request.session.flush()
-                    if pending_registration_account == account.pk:
+                    if (isinstance(pending_registration_account, dict)
+                            and pending_registration_account.get('id') == account.pk
+                            and pending_registration_account.get('version') == account.security_version):
                         request.session['pending_registration_account'] = pending_registration_account
                     request.session['access_notice'] = account.status
                     return redirect('accounts:status')
@@ -106,8 +110,12 @@ def verify(request):
     if request.method=='POST' and form.is_valid():
         email = form.cleaned_data['email'].lower()
         account = Account.objects.filter(email=email).first()
-        pending_account = request.session.get('pending_registration_account')
-        if (rate(request,'verify',email) and account and pending_account == account.pk
+        pending_registration = request.session.get('pending_registration_account', {})
+        if not isinstance(pending_registration, dict):
+            pending_registration = {}
+        if (rate(request,'verify',email) and account
+                and pending_registration.get('id') == account.pk
+                and pending_registration.get('version') == account.security_version
                 and services.verify_contact(account.pk,form.cleaned_data['code'])):
             request.session.pop('pending_registration_account', None)
             return page(request,'AUTH-04','Contact verified','Your account is ready. Sign in to continue.')

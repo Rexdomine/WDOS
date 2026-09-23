@@ -31,6 +31,24 @@ class AuthFlows(TestCase):
     def login(self, account, client=None):
         return (client or self.client).post('/auth/login/',{'email':account.email,'password':self.password})
 
+    def test_invitation_success_keeps_authenticated_controls(self):
+        from django.core.management import call_command
+        from io import StringIO
+        account = self.create()
+        person = Person.objects.create(display_name='Invited person')
+        call_command('invite_person', person=str(person.pk), email=account.email, stdout=StringIO())
+        intent = EmailIntent.objects.get(invitation__person=person)
+        payload = json.loads(services.decrypt(intent.encrypted_payload))
+        code = payload['textContent'].split('enter: ')[1].split('.')[0]
+        self.login(account)
+        response = self.client.post('/auth/invitation/', {'email': account.email, 'code': code})
+        self.assertContains(response, 'Record linked')
+        self.assertContains(response, 'Your invited person record is linked.')
+        self.assertContains(response, 'Sign out all sessions')
+        self.assertNotContains(response, 'Back to sign in')
+        self.assertEqual(self.client.get('/auth/session/').status_code, 200)
+        self.assertRedirects(self.client.post('/auth/logout/'), '/auth/login/')
+
     def test_real_registration_verification_login_logout(self):
         with self.captureOnCommitCallbacks(execute=True):
             response=self.client.post('/auth/register/',{'name':'Ada','email':'ADA@example.org','password':self.password,'is_staff':'true','role':'HQ'})

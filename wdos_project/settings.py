@@ -69,6 +69,24 @@ WDOS_IDLE_TTL = 1800
 WDOS_SESSION_TTL = 43200
 WDOS_REMEMBER_TTL = 604800
 WDOS_PUBLIC_ORIGIN = os.getenv("WDOS_PUBLIC_ORIGIN", "https://wdos-staging.onrender.com")
+if os.getenv("WDOS_ENVIRONMENT") == "production":
+    from urllib.parse import urlsplit
+    from django.core.exceptions import ImproperlyConfigured
+    explicit_origin = os.getenv("WDOS_PUBLIC_ORIGIN", "")
+    try:
+        origin = urlsplit(explicit_origin)
+        valid_origin = (
+            origin.scheme == "https" and bool(origin.hostname)
+            and origin.hostname != "wdos-staging.onrender.com"
+            and not origin.username and not origin.password
+            and origin.path in ("", "/") and not origin.query and not origin.fragment
+            and origin.port in (None, 443)
+        )
+    except ValueError:
+        valid_origin = False
+    if not valid_origin:
+        raise ImproperlyConfigured("Production requires an explicit, production-specific HTTPS WDOS_PUBLIC_ORIGIN.")
+    WDOS_PUBLIC_ORIGIN = explicit_origin.rstrip("/")
 BREVO_API_KEY = os.getenv("WDOS_BREVO_API_KEY", "")
 WDOS_EMAIL_FROM = os.getenv("WDOS_EMAIL_FROM", "")
 SESSION_COOKIE_SECURE = os.getenv("WDOS_SECURE_COOKIES", "1") == "1"

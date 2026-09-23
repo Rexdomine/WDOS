@@ -78,6 +78,33 @@ class AuthFlows(TestCase):
         from .locale import catalog
         self.assertContains(response, catalog('fr')['status_title'])
 
+    def test_current_cookie_locale_wins_forced_security_logout(self):
+        account = self.create('forced-cookie-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies['wdos_language'] = 'pt'
+        Account.objects.filter(pk=account.pk).update(security_version=account.security_version + 1)
+
+        response = self.client.get('/auth/status/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies['wdos_language'].value, 'pt')
+
+    def test_current_cookie_locale_wins_session_revocation(self):
+        account = self.create('revoke-cookie-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'fr'
+        session.save()
+        self.client.cookies['wdos_language'] = 'pt'
+
+        response = self.client.post('/auth/revoke/')
+
+        self.assertRedirects(response, '/auth/login/')
+        self.assertEqual(response.cookies['wdos_language'].value, 'pt')
+
     def test_session_only_locale_survives_password_reset_logout(self):
         account = self.create('reset-locale@example.org')
         self.login(account)

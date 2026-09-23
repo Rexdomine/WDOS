@@ -24,7 +24,8 @@ _VALIDATOR_ATTRIBUTE_KEYS = {
 
 def logout_preserving_language(request):
     from django.contrib.auth import logout
-    lang = request.session.get('wdos_language', 'en')
+    lang = (request.GET.get('lang') or request.COOKIES.get('wdos_language')
+            or request.session.get('wdos_language', 'en'))
     logout(request)
     return lang if lang in LANGUAGES else 'en'
 

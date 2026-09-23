@@ -81,6 +81,7 @@ if os.getenv("WDOS_ENVIRONMENT") == "production":
             and origin.hostname != "wdos-staging.onrender.com"
             and not origin.username and not origin.password
             and origin.path in ("", "/") and not origin.query and not origin.fragment
+            and not explicit_origin.endswith(("?", "#"))
             and origin.port in (None, 443)
         )
     except ValueError:

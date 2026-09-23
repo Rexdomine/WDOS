@@ -20,6 +20,8 @@ def page(request, screen, title, lede, form=None, action=None, **extra):
 def rate(request, scope, identity=''):
     # REMOTE_ADDR is supplied by the server, never arbitrary X-Forwarded-For.
     ip_ok = services.throttle(scope+':ip', request.META.get('REMOTE_ADDR','unknown'), limit=60)
+    if not ip_ok:
+        return False
     subject_ok = services.throttle(scope+':subject', identity.lower(), limit=10) if identity else True
     return ip_ok and subject_ok
 
@@ -34,15 +36,19 @@ def welcome(request):
 def register(request):
     form = forms.RegisterForm(request.POST or None)
     if request.method=='POST' and form.is_valid():
+        request.session.pop('pending_registration_account', None)
         if not rate(request, 'register', form.cleaned_data['email']):
             form.add_error(None, 'Please wait before trying again.')
         else:
             try:
-                services.register(form.cleaned_data['name'], form.cleaned_data['email'], form.cleaned_data['password'])
+                account = services.register(form.cleaned_data['name'], form.cleaned_data['email'], form.cleaned_data['password'])
             except ValidationError as exc:
                 form.add_error('password', exc)
             else:
-                return redirect('accounts:verify')
+                if account is not None:
+                    request.session['pending_registration_account'] = account.pk
+                    return redirect('accounts:verify')
+                form.add_error(None, 'This email is already registered. Sign in or request recovery instead.')
     return page(request,'AUTH-03','Create your WDOS account','Start with the contact details we use to verify your identity and keep one account.',form,'Create account', note='Creating an account does not grant a leadership or HQ role.')
 
 
@@ -97,7 +103,10 @@ def verify(request):
     if request.method=='POST' and form.is_valid():
         email = form.cleaned_data['email'].lower()
         account = Account.objects.filter(email=email).first()
-        if rate(request,'verify',email) and account and services.verify_contact(account.pk,form.cleaned_data['code']):
+        pending_account = request.session.get('pending_registration_account')
+        if (rate(request,'verify',email) and account and pending_account == account.pk
+                and services.verify_contact(account.pk,form.cleaned_data['code'])):
+            request.session.pop('pending_registration_account', None)
             return page(request,'AUTH-04','Contact verified','Your account is ready. Sign in to continue.')
         form.add_error(None,'This code could not be verified. Check your details or request another code.')
     return page(request,'AUTH-04','Verify your contact details','Enter your email and its verification code. Email delivery may be unavailable until review configuration is complete.',form,'Verify contact')

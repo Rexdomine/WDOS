@@ -7,7 +7,7 @@ import urllib.error
 import pyotp
 from django.conf import settings
 from django.db import transaction, connection, close_old_connections
-from django.test import TestCase, TransactionTestCase, Client, override_settings
+from django.test import TestCase, TransactionTestCase, Client, RequestFactory, override_settings
 from django.utils import timezone
 from . import services, brevo
 from .models import Account, ActionToken, AuditEvent, EmailIntent, Invitation, Person, RecoveryCode, AccessGrant
@@ -66,6 +66,15 @@ class AuthFlows(TestCase):
         self.assertEqual(self.client.get('/auth/session/').status_code,200)
         self.assertRedirects(self.client.post('/auth/logout/'),'/auth/login/')
         self.assertEqual(self.client.get('/auth/session/').status_code,401)
+
+    def test_verification_is_bound_to_the_registration_session(self):
+        account = services.register('Ada', 'bound@example.org', self.password)
+        intent = EmailIntent.objects.get(account=account)
+        code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
+        response = self.client.post('/auth/verify/', {'email': account.email, 'code': code})
+        self.assertContains(response, 'could not be verified')
+        account.refresh_from_db()
+        self.assertEqual(account.status, 'pending')
 
     def test_verification_attempt_limit_and_purpose(self):
         account=services.register('Ada','ada@example.org',self.password)
@@ -203,6 +212,20 @@ class AuthFlows(TestCase):
         client=Client(enforce_csrf_checks=True)
         for path in ['/auth/login/','/auth/verify/','/auth/recover/','/auth/reset/','/auth/mfa/','/auth/logout/']:
             self.assertEqual(client.post(path,{}).status_code,403)
+
+    def test_ip_rate_limit_does_not_create_subject_rows(self):
+        request = RequestFactory().post('/', REMOTE_ADDR='198.51.100.7')
+        with patch('accounts.views.services.throttle', return_value=False) as throttle:
+            from . import views
+            self.assertFalse(views.rate(request, 'verify', 'victim@example.org'))
+        throttle.assert_called_once_with('verify:ip', '198.51.100.7', limit=60)
+
+    def test_registration_password_rejects_submitted_name(self):
+        response = self.client.post('/auth/register/', {
+            'name': 'Ada Example', 'email': 'name@example.org', 'password': 'Ada Example Ada'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'too similar')
 
 
 @override_settings(BREVO_API_KEY='unit-test-only',WDOS_EMAIL_FROM='sender@example.org', PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])

@@ -13,7 +13,12 @@ class RegisterForm(EmailForm):
 
     def clean_password(self):
         value = self.cleaned_data['password']
-        validate_password(value)
+        name = self.cleaned_data.get('name', '')
+        user = None
+        if name:
+            from django.contrib.auth import get_user_model
+            user = get_user_model()(first_name=name)
+        validate_password(value, user)
         return value
 
 

@@ -96,7 +96,7 @@ def _email_locked(account, purpose):
 
 def register(name, email, password):
     email = email.strip().lower()
-    user = get_user_model()(username=uuid.uuid4().hex, email=email)
+    user = get_user_model()(username=uuid.uuid4().hex, email=email, first_name=name)
     validate_password(password, user)
     user.set_password(password)
     try:

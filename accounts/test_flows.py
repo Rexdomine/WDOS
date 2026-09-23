@@ -189,6 +189,45 @@ class AuthFlows(TestCase):
 
 @override_settings(BREVO_API_KEY='unit-test-only',WDOS_EMAIL_FROM='sender@example.org', PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
 class DeliveryTests(TestCase):
+    def test_malformed_outbox_payload_is_failed_and_quarantined_without_provider_call(self):
+        services.register('Ada','malformed@example.org','very long delivery test passphrase!')
+        intent=EmailIntent.objects.get()
+        intent.encrypted_payload='not-fernet'
+        intent.save(update_fields=['encrypted_payload'])
+        with patch('accounts.brevo.send') as mocked:
+            services.dispatch_email(intent.pk)
+        mocked.assert_not_called()
+        intent.refresh_from_db()
+        self.assertEqual(intent.state,'failed')
+        self.assertEqual(intent.error_code,'invalid_payload')
+        self.assertEqual(intent.encrypted_payload,'')
+
+    def test_invalid_json_outbox_payload_is_failed_and_next_intent_can_send(self):
+        services.register('Ada','json@example.org','very long delivery test passphrase!')
+        first=EmailIntent.objects.get()
+        first.encrypted_payload=services.encrypt('{not-json')
+        first.save(update_fields=['encrypted_payload'])
+        services.register('Bea','valid@example.org','another very long delivery passphrase!')
+        second=EmailIntent.objects.exclude(pk=first.pk).get()
+        with patch('accounts.brevo.send', return_value='message-id') as mocked:
+            services.dispatch_email(first.pk)
+            services.dispatch_email(second.pk)
+        first.refresh_from_db(); second.refresh_from_db()
+        self.assertEqual(first.state,'failed')
+        self.assertEqual(second.state,'accepted')
+        self.assertEqual(mocked.call_count,1)
+
+    def test_invalid_utf8_outbox_payload_is_failed_and_quarantined(self):
+        services.register('Ada','encoding@example.org','very long delivery test passphrase!')
+        intent=EmailIntent.objects.get()
+        intent.encrypted_payload=services.cipher().encrypt(b'\xff').decode('ascii')
+        intent.save(update_fields=['encrypted_payload'])
+        with patch('accounts.brevo.send') as mocked:
+            services.dispatch_email(intent.pk)
+        mocked.assert_not_called()
+        intent.refresh_from_db()
+        self.assertEqual(intent.state,'failed')
+        self.assertEqual(intent.error_code,'invalid_payload')
     def test_intent_claimed_before_call_and_no_duplicate_send(self):
         account=services.register('Ada','ada@example.org','very long delivery test passphrase!')
         intent=EmailIntent.objects.get(account=account)

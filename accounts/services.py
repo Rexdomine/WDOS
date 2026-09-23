@@ -7,6 +7,7 @@ import uuid
 from datetime import timedelta
 import pyotp
 from cryptography.fernet import Fernet
+from cryptography.fernet import InvalidToken
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -267,7 +268,17 @@ def dispatch_email(intent_id):
             intent.error_code = 'not_configured'
             intent.save()
             return
-        payload = json.loads(decrypt(intent.encrypted_payload))
+        try:
+            payload = json.loads(decrypt(intent.encrypted_payload))
+            if not isinstance(payload, dict):
+                raise ValueError('Email payload must be an object')
+        except (InvalidToken, ValueError, TypeError, UnicodeError):
+            intent.state = 'failed'
+            intent.error_code = 'invalid_payload'
+            intent.encrypted_payload = ''
+            intent.finished_at = timezone.now()
+            intent.save()
+            return
         intent.state = 'sending'
         intent.started_at = timezone.now()
         intent.save()

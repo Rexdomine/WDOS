@@ -58,7 +58,7 @@ jobs:
           with urllib.request.urlopen('http://127.0.0.1:18088/auth/login/', timeout=5) as response:
               assert response.status == 200
               assert response.headers['Cache-Control'].startswith('no-store')
-          processes = subprocess.check_output(['docker','top','wdos-stage2-smoke','-eo','args'], text=True)
+          processes = subprocess.check_output(['docker','top','wdos-stage2-smoke','-eo','pid,args'], text=True)
           assert 'run_auth_mailer' in processes and 'gunicorn' in processes
           subprocess.run(['docker','stop','--time','15','wdos-stage2-smoke'], check=True)
           state = json.loads(subprocess.check_output(['docker','inspect','wdos-stage2-smoke'], text=True))[0]['State']

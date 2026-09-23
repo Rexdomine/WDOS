@@ -31,7 +31,7 @@ class Command(BaseCommand):
             person=Person.objects.select_for_update().get(pk=person.pk)
             if hasattr(person,'account'):
                 raise CommandError('Person already has a linked account.')
-            Invitation.objects.filter(person=person, email=email, claimed_at=None, revoked_at=None).update(revoked_at=timezone.now())
+            Invitation.objects.filter(person=person, claimed_at=None, revoked_at=None).update(revoked_at=timezone.now())
             invitation=Invitation.objects.create(person=person,email=email,digest=digest(secret),expires_at=timezone.now()+timedelta(days=7))
             text=f'You have been invited to link your WDOS account to an existing person record. Sign in with this email, open Claim an invited record and enter: {secret}. This invitation expires in seven days. No leadership role is granted.'
             payload={'to':[{'email':email}], 'subject':'Your WDOS invitation', 'textContent':text, 'htmlContent':'<h1>Your WDOS invitation</h1><p>'+html.escape(text)+'</p>'}

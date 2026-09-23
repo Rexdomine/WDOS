@@ -53,3 +53,13 @@ class CoreTests(TestCase):
         client = Client(enforce_csrf_checks=True)
         self.assertEqual(client.post('/auth/register/', {}).status_code, 403)
         self.assertEqual(self.client.get('/auth/logout/').status_code, 405)
+
+    def test_nested_auth_render_uses_root_relative_static_urls(self):
+        for path in ('/auth/login/', '/auth/reset/'):
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            html = response.content.decode()
+            self.assertRegex(html, r'href="/static/accounts/design\.[a-f0-9]+\.css"')
+            self.assertRegex(html, r'src="/static/accounts/auth\.[a-f0-9]+\.js"')
+            self.assertNotIn('href="static/', html)
+            self.assertNotIn('src="static/', html)

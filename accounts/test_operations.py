@@ -57,6 +57,49 @@ class OperatorTests(TransactionTestCase):
         send.assert_not_called()
         intent.refresh_from_db(); self.assertEqual(intent.state,'expired')
 
+    def test_reissuing_invitation_revokes_all_prior_emails_for_person(self):
+        person=Person.objects.create(display_name='Existing person')
+        call_command('invite_person',person=str(person.pk),email='old@example.org',stdout=StringIO())
+        call_command('invite_person',person=str(person.pk),email='new@example.org',stdout=StringIO())
+        invites=list(Invitation.objects.filter(person=person).order_by('created_at'))
+        self.assertEqual(len(invites),2)
+        self.assertIsNotNone(invites[0].revoked_at)
+        self.assertIsNone(invites[1].revoked_at)
+        for index, email in enumerate(('old@example.org', 'new@example.org')):
+            intent = EmailIntent.objects.get(invitation=invites[index])
+            payload = json.loads(services.decrypt(intent.encrypted_payload))
+            code = payload['textContent'].split('enter: ')[1].split('.')[0]
+            account = services.register('Invited', email, 'very long operator test password!')
+            assert account is not None
+            _, proof = services.issue_token(account, 'verify')
+            services.verify_contact(account.pk, proof)
+            self.assertEqual(services.claim_invitation(account.pk, code, email), index == 1)
+            account.refresh_from_db()
+            self.assertEqual(account.person_id, person.pk if index == 1 else None)
+        with patch('accounts.brevo.send') as send:
+            services.dispatch_email(EmailIntent.objects.get(invitation=invites[0]).pk)
+        send.assert_not_called()
+
+    @override_settings(BREVO_API_KEY='unit-test-only', WDOS_EMAIL_FROM='sender@example.org')
+    def test_worker_quarantines_non_object_payload_and_continues(self):
+        services.register('Bad', 'bad@example.org', 'very long operator test password!')
+        first = EmailIntent.objects.get()
+        first.encrypted_payload = services.encrypt('null')
+        first.save(update_fields=['encrypted_payload'])
+        services.register('Good', 'good@example.org', 'very long operator test password!')
+        second = EmailIntent.objects.exclude(pk=first.pk).get()
+        with patch('accounts.brevo.send', return_value='message-id') as send:
+            call_command('run_auth_mailer', once=True, stdout=StringIO())
+            call_command('run_auth_mailer', once=True, stdout=StringIO())
+        first.refresh_from_db(); second.refresh_from_db()
+        self.assertEqual(first.state, 'failed')
+        self.assertEqual(first.error_code, 'invalid_payload')
+        self.assertEqual(first.encrypted_payload, '')
+        self.assertIsNone(first.started_at)
+        self.assertIsNotNone(first.finished_at)
+        self.assertEqual(second.state, 'accepted')
+        self.assertEqual(send.call_count, 1)
+
     def test_operator_access_always_revokes_sessions(self):
         account=services.register('Ada','ada@example.org','very long operator test password!')
         token,secret=services.issue_token(account,'verify')

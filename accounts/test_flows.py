@@ -97,6 +97,25 @@ class AuthFlows(TestCase):
         self.assertEqual(response.cookies['wdos_language'].value, 'fr')
         self.assertContains(response, 'Mot de passe mis à jour')
 
+    def test_cookie_only_locale_survives_password_reset_logout(self):
+        account = self.create('reset-cookie-locale@example.org')
+        self.login(account)
+        session = self.client.session
+        session.pop('wdos_language', None)
+        session.save()
+        self.client.cookies['wdos_language'] = 'fr'
+        token, secret = services.issue_token(account, 'reset')
+
+        response = self.client.post('/auth/reset/', {
+            'proof': f'{token.pk}.{secret}',
+            'password': self.password + 'new',
+            'confirm': self.password + 'new',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        self.assertContains(response, 'Mot de passe mis à jour')
+
     def test_session_only_locale_survives_session_revocation(self):
         account = self.create('revoke-locale@example.org')
         self.login(account)

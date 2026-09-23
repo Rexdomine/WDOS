@@ -187,7 +187,8 @@ def reset(request):
             form.add_error('password',exc)
         else:
             if ok:
-                lang = django_logout(request)
+                lang = _locale(request)
+                django_logout(request)
                 request.wdos_locale_after_logout = lang
                 response = page(request,'AUTH-07','Password updated','Your previous sessions have been revoked. Sign in with your new password. MFA is still required where enabled.')
                 return _set_locale_cookie(response, lang)

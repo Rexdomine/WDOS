@@ -8,6 +8,7 @@ import pyotp
 from django.conf import settings
 from django.db import transaction, connection, close_old_connections
 from django.test import TestCase, TransactionTestCase, Client, RequestFactory, override_settings
+from django.contrib.sessions.models import Session
 from django.utils import timezone
 from . import services, brevo
 from .models import Account, ActionToken, AuditEvent, EmailIntent, Invitation, Person, RecoveryCode, AccessGrant
@@ -30,6 +31,25 @@ class AuthFlows(TestCase):
 
     def login(self, account, client=None):
         return (client or self.client).post('/auth/login/',{'email':account.email,'password':self.password})
+
+    def test_cookie_less_public_gets_do_not_create_sessions(self):
+        before = Session.objects.count()
+        paths = ['/', '/auth/login/', '/auth/register/', '/auth/recover/', '/auth/reset/', '/auth/status/']
+        for path in paths:
+            for _ in range(3):
+                response = Client().get(path)
+                self.assertEqual(response.status_code, 200)
+        self.assertEqual(Session.objects.count(), before)
+
+    def test_locale_cookie_is_allowlisted_and_survives_auth_transition(self):
+        response = self.client.get('/?lang=fr')
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        self.client.cookies['wdos_language'] = 'xx'
+        self.assertEqual(self.client.get('/').context['lang'], 'en')
+        self.client.cookies['wdos_language'] = 'fr'
+        account = self.create('locale-cookie@example.org')
+        self.login(account)
+        self.assertEqual(self.client.session['wdos_language'], 'fr')
 
     def test_invitation_success_keeps_authenticated_controls(self):
         from django.core.management import call_command
@@ -321,7 +341,8 @@ class AuthFlows(TestCase):
         self.assertContains(response, 'مرحبًا بكِ في WDOS')
         self.assertContains(response, 'dir="rtl"')
         self.assertContains(response, 'إذا كانت لديكِ هوية WDOS', html=False)
-        self.assertEqual(self.client.session['wdos_language'], 'ar')
+        self.assertEqual(self.client.cookies['wdos_language'].value, 'ar')
+        self.assertNotIn('wdos_language', self.client.session)
         next_response = self.client.get('/auth/login/')
         self.assertContains(next_response, 'dir="rtl"')
 

@@ -13,10 +13,12 @@ from . import forms, services
 from .models import Account
 from .locale import LANGUAGES, catalog, translate, localize_form, logout_preserving_language as django_logout
 
+LOCALE_COOKIE = 'wdos_language'
+LOCALE_COOKIE_AGE = 31536000
+
 def _locale(request):
-    lang = request.GET.get('lang') or request.session.get('wdos_language') or 'en'
+    lang = request.GET.get('lang') or request.COOKIES.get(LOCALE_COOKIE) or request.session.get(LOCALE_COOKIE) or 'en'
     if lang not in LANGUAGES: lang = 'en'
-    request.session['wdos_language'] = lang
     return lang
 
 def _restore_locale(request, lang):
@@ -28,7 +30,12 @@ def page(request, screen, title, lede, form=None, action=None, **extra):
     t = catalog(lang)
     if form is not None: localize_form(form, lang)
     values = dict(screen=screen, title=translate(lang, title), lede=translate(lang, lede), form=form, action=translate(lang, action) if action else action, note=translate(lang, extra.pop('note', '')) if extra.get('note') else extra.pop('note', None), lang=lang, language=LANGUAGES[lang], languages=LANGUAGES, translations=t, **extra)
-    return render(request, 'accounts/auth.html', values)
+    response = render(request, 'accounts/auth.html', values)
+    response.set_cookie(
+        LOCALE_COOKIE, lang, max_age=LOCALE_COOKIE_AGE,
+        httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
+    )
+    return response
 
 
 def rate(request, scope, identity=''):

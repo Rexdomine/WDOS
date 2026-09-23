@@ -303,6 +303,17 @@ class AuthFlows(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'too similar')
 
+    def test_registration_similarity_attribute_is_localized_for_every_catalog(self):
+        from .locale import catalog
+        for lang in ('en', 'fr', 'pt', 'ar', 'sw'):
+            response = self.client.post('/auth/register/?lang='+lang, {
+                'name': 'Ada Example', 'email': 'similar-'+lang+'@example.org',
+                'password': 'Ada Example Ada'
+            })
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, catalog(lang)['name'])
+            self.assertNotContains(response, 'First name')
+
 
     def test_auth_ui_has_approved_welcome_actions_and_language_persistence(self):
         response = self.client.get('/?lang=ar')

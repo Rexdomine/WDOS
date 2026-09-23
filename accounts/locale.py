@@ -13,6 +13,13 @@ LANGUAGES = {
 C = json.loads(Path(__file__).with_name('locales.json').read_text(encoding='utf-8'))
 BASE = C['en']
 _KEYS = {value: key for key, value in BASE.items()}
+_VALIDATOR_ATTRIBUTE_KEYS = {
+    'email': 'email',
+    'email address': 'email',
+    'first name': 'name',
+    'last name': 'name',
+    'full name': 'name',
+}
 
 
 def logout_preserving_language(request):
@@ -29,6 +36,12 @@ def catalog(lang):
 def translate(lang, text):
     """Call only for application-owned literals, never names or identifiers."""
     return catalog(lang).get(_KEYS.get(text), text)
+
+
+def _translate_validator_attribute(lang, value):
+    """Map Django validator field metadata to an approved localized label."""
+    key = _VALIDATOR_ATTRIBUTE_KEYS.get(str(value).strip().lower())
+    return catalog(lang).get(key, value) if key else translate(lang, str(value).capitalize())
 
 
 def localize_form(form, lang):
@@ -58,7 +71,7 @@ def localize_form(form, lang):
             message = c[key] if key else translate(lang, str(error.message))
             params = dict(error.params or {})
             if 'verbose_name' in params:
-                params['verbose_name'] = translate(lang, str(params['verbose_name']).capitalize())
+                params['verbose_name'] = _translate_validator_attribute(lang, params['verbose_name'])
             translated.append(ValidationError(message, code=error.code, params=params))
         errors.data[:] = translated
     return form

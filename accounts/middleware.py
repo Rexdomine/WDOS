@@ -1,0 +1,43 @@
+"""Recheck durable eligibility, revocation and second-factor authority every request."""
+from django.conf import settings
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+from django.utils import timezone
+from .models import Account
+from .services import requires_mfa
+
+
+class AccountSecurityMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        request.wdos_account = None
+        if request.user.is_authenticated:
+            account = Account.objects.select_related('user').filter(user=request.user).first()
+            now = timezone.now().timestamp()
+            reason = None
+            if not account or not request.user.is_active or account.status != 'active':
+                reason = 'unavailable'
+            elif request.session.get('security_version') != account.security_version:
+                reason = 'expired'
+            elif now >= request.session.get('absolute_expiry', 0) or now >= request.session.get('last_activity', 0) + settings.WDOS_IDLE_TTL:
+                reason = 'expired'
+            elif requires_mfa(account) and not request.session.get('mfa_verified'):
+                reason = 'mfa'
+            if reason:
+                logout(request)
+                request.session['access_notice'] = reason
+            else:
+                request.wdos_account = account
+                request.session['last_activity'] = now
+        if request.path.startswith('/admin/'):
+            # One sign-in gateway: Django admin cannot bypass MFA or account status.
+            if not request.wdos_account or not request.user.is_staff or not request.session.get('mfa_verified'):
+                return redirect('accounts:login')
+        response = self.get_response(request)
+        if request.path.startswith(('/auth/', '/app', '/admin/')) or request.path == '/':
+            response['Cache-Control'] = 'no-store, private'
+            response['Referrer-Policy'] = 'same-origin'
+            response['X-Robots-Tag'] = 'noindex, nofollow'
+        return response

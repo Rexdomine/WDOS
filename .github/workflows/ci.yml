@@ -34,11 +34,37 @@ jobs:
           python-version: '3.13'
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Django system and migration checks
+      - name: Canonical Django verification (PostgreSQL)
+        run: make verify
+      - name: Build and exercise deployment image
         run: |
-          python manage.py check
-          python manage.py makemigrations --check --dry-run
-          python manage.py migrate --noinput
-          python manage.py collectstatic --noinput
-      - name: Focused tests
-        run: python manage.py test -v 2
+          docker build -t wdos-stage2-ci .
+          docker run -d --name wdos-stage2-smoke --network host \
+            -e DATABASE_URL -e DB_SSLMODE -e DJANGO_ALLOWED_HOSTS \
+            -e DJANGO_SECRET_KEY=ci-only-strong-placeholder-not-a-real-key-2026 \
+            -e PORT=18088 wdos-stage2-ci
+          python - <<'PY'
+          import json, subprocess, time, urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:18088/health', timeout=2) as response:
+                      health = json.load(response)
+                  assert health['database'] == 'ok' and health['migration_rows'] == 21
+                  break
+              except Exception:
+                  if attempt == 29:
+                      raise
+                  time.sleep(2)
+          with urllib.request.urlopen('http://127.0.0.1:18088/auth/login/', timeout=5) as response:
+              assert response.status == 200
+              assert response.headers['Cache-Control'].startswith('no-store')
+          processes = subprocess.check_output(['docker','top','wdos-stage2-smoke','-eo','pid,args'], text=True)
+          assert 'run_auth_mailer' in processes and 'gunicorn' in processes
+          subprocess.run(['docker','stop','--time','15','wdos-stage2-smoke'], check=True)
+          state = json.loads(subprocess.check_output(['docker','inspect','wdos-stage2-smoke'], text=True))[0]['State']
+          assert not state['Running'] and state['ExitCode'] == 0, state
+          print('Deployment image: PostgreSQL health, auth page, both children, clean termination passed')
+          PY
+      - name: Container diagnostics on failure
+        if: failure()
+        run: docker logs wdos-stage2-smoke || true

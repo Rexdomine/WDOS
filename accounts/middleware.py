@@ -1,6 +1,6 @@
 """Recheck durable eligibility, revocation and second-factor authority every request."""
 from django.conf import settings
-from django.contrib.auth import logout
+from .locale import logout_preserving_language as logout
 from django.shortcuts import redirect
 from django.utils import timezone
 from .models import Account

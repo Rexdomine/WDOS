@@ -1,6 +1,6 @@
 """The AUTH-01..09 server-rendered gateway. All mutations require POST + CSRF."""
 from django.conf import settings
-from django.contrib.auth import login as django_login, logout as django_logout, get_user_model
+from django.contrib.auth import login as django_login, get_user_model
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -11,10 +11,24 @@ from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.debug import sensitive_post_parameters
 from . import forms, services
 from .models import Account
+from .locale import LANGUAGES, catalog, translate, localize_form, logout_preserving_language as django_logout
 
+def _locale(request):
+    lang = request.GET.get('lang') or request.session.get('wdos_language') or 'en'
+    if lang not in LANGUAGES: lang = 'en'
+    request.session['wdos_language'] = lang
+    return lang
+
+def _restore_locale(request, lang):
+    request.session.flush()
+    request.session['wdos_language'] = lang
 
 def page(request, screen, title, lede, form=None, action=None, **extra):
-    return render(request, 'accounts/auth.html', dict(screen=screen, title=title, lede=lede, form=form, action=action, **extra))
+    lang = _locale(request)
+    t = catalog(lang)
+    if form is not None: localize_form(form, lang)
+    values = dict(screen=screen, title=translate(lang, title), lede=translate(lang, lede), form=form, action=translate(lang, action) if action else action, note=translate(lang, extra.pop('note', '')) if extra.get('note') else extra.pop('note', None), lang=lang, language=LANGUAGES[lang], languages=LANGUAGES, translations=t, **extra)
+    return render(request, 'accounts/auth.html', values)
 
 
 def rate(request, scope, identity=''):
@@ -55,7 +69,9 @@ def register(request):
 
 
 def establish(request, account, mfa=False, remember=False):
+    lang = _locale(request)
     django_login(request, account.user, backend='django.contrib.auth.backends.ModelBackend')
+    request.session['wdos_language'] = lang
     now = timezone.now().timestamp()
     ttl = settings.WDOS_REMEMBER_TTL if remember else settings.WDOS_SESSION_TTL
     request.session['security_version'] = account.security_version
@@ -84,8 +100,9 @@ def login(request):
                     services.audit(account, 'sign_in_rejected')
                     form.add_error(None,'Email or password was not recognised.')
                 elif account.status!='active':
+                    lang = _locale(request)
                     pending_registration_account = request.session.get('pending_registration_account')
-                    request.session.flush()
+                    _restore_locale(request, lang)
                     if (isinstance(pending_registration_account, dict)
                             and pending_registration_account.get('id') == account.pk
                             and pending_registration_account.get('version') == account.security_version):
@@ -93,7 +110,8 @@ def login(request):
                     request.session['access_notice'] = account.status
                     return redirect('accounts:status')
                 elif services.requires_mfa(account):
-                    request.session.flush()
+                    lang = _locale(request)
+                    _restore_locale(request, lang)
                     request.session['pending_mfa'] = {'id':account.pk, 'version':account.security_version, 'until':timezone.now().timestamp()+settings.WDOS_MFA_TTL, 'remember':form.cleaned_data['remember']}
                     return redirect('accounts:mfa')
                 else:
@@ -212,7 +230,9 @@ def invitation(request):
 
 @require_POST
 def logout(request):
+    lang = _locale(request)
     django_logout(request)
+    request.session['wdos_language'] = lang
     return redirect('accounts:login')
 
 

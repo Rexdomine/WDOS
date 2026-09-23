@@ -62,9 +62,11 @@ class AuthFlows(TestCase):
         self.assertNotIn(code,intent.encrypted_payload)
         response=self.client.post('/auth/verify/',{'email':account.email,'code':code})
         self.assertContains(response,'Contact verified')
+        self.client.get('/?lang=sw')
         self.login(account)
         self.assertEqual(self.client.get('/auth/session/').status_code,200)
-        self.assertRedirects(self.client.post('/auth/logout/'),'/auth/login/')
+        self.client.post('/auth/logout/')
+        self.assertEqual(self.client.session['wdos_language'], 'sw')
         self.assertEqual(self.client.get('/auth/session/').status_code,401)
 
     def test_verification_is_bound_to_the_registration_session(self):
@@ -84,9 +86,13 @@ class AuthFlows(TestCase):
         account = Account.objects.get(email='pending-signin@example.org')
         intent = EmailIntent.objects.get(account=account)
         code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
-        self.assertRedirects(self.client.post('/auth/login/', {'email': account.email, 'password': self.password}), '/auth/status/')
+        self.client.get('/?lang=fr')
+        response = self.client.post('/auth/login/', {'email': account.email, 'password': self.password})
+        self.assertRedirects(response, '/auth/status/')
+        self.assertEqual(self.client.session['wdos_language'], 'fr')
         response = self.client.post('/auth/verify/', {'email': account.email, 'code': code})
-        self.assertContains(response, 'Contact verified')
+        from .locale import catalog
+        self.assertContains(response, catalog('fr')['verified_title'])
 
     def test_email_owner_can_reclaim_pending_registration(self):
         services.register('Attacker', 'reclaim@example.org', 'attacker passphrase long enough!')
@@ -280,6 +286,24 @@ class AuthFlows(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'too similar')
+
+
+    def test_auth_ui_has_approved_welcome_actions_and_language_persistence(self):
+        response = self.client.get('/?lang=ar')
+        self.assertContains(response, 'name="lang"')
+        self.assertContains(response, 'مرحبًا بكِ في WDOS')
+        self.assertContains(response, 'dir="rtl"')
+        self.assertContains(response, 'إذا كانت لديكِ هوية WDOS', html=False)
+        self.assertEqual(self.client.session['wdos_language'], 'ar')
+        next_response = self.client.get('/auth/login/')
+        self.assertContains(next_response, 'dir="rtl"')
+
+    def test_password_controls_are_independent_and_accessible_on_reset(self):
+        response = self.client.get('/auth/reset/')
+        self.assertContains(response, 'data-target="id_password"')
+        self.assertContains(response, 'data-target="id_confirm"')
+        self.assertContains(response, 'aria-pressed="false"')
+        self.assertContains(response, '<svg', html=False)
 
 
 @override_settings(BREVO_API_KEY='unit-test-only',WDOS_EMAIL_FROM='sender@example.org', PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])

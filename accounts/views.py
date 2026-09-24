@@ -366,6 +366,8 @@ def reset(request):
         ok = (rate(request, 'reset-consume', token_id)
               and services.reset_password(token_id, secret, form.cleaned_data['password']))
     except ValidationError as exc:
+        if not services.is_live_reset_proof(token_id, secret):
+            return _invalid_reset_page(request)
         request.session[RESET_RETRY_SESSION_KEY] = services.encrypt(proof)
         form.add_error('password', exc)
         return page(

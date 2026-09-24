@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import Client, TestCase, override_settings
@@ -151,6 +152,26 @@ class AuthUIStateRegressionTests(TestCase):
         self.assertContains(response, 'Link expired')
         self.assertNotContains(response, 'name="password"')
         self.assertNotIn('reset_retry_proof', self.client.session)
+
+    @patch('accounts.views.services.reset_password')
+    @patch('accounts.views.services.is_live_reset_proof', side_effect=[True, False])
+    def test_reset_error_drops_proof_that_expires_during_password_validation(
+            self, live_proof, reset_password):
+        account = self.create_active('expired-during-reset-error@example.org')
+        token, secret = services.issue_token(account, 'reset')
+        proof = f'{token.pk}.{secret}'
+        reset_password.side_effect = services.ValidationError('password rejected')
+
+        response = self.client.post('/auth/reset/', {
+            'proof': proof,
+            'password': self.password + ' changed',
+            'confirm': self.password + ' changed',
+        })
+
+        self.assertContains(response, 'Link expired')
+        self.assertNotContains(response, 'name="password"')
+        self.assertNotIn('reset_retry_proof', self.client.session)
+        self.assertEqual(live_proof.call_count, 2)
 
     def test_verification_is_bound_masked_and_has_real_resend_cooldown(self):
         account = self.register_pending('recognisable@example.org')

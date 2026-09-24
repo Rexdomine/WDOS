@@ -108,8 +108,10 @@ def step(request, step):
             return redirect('onboarding:step', step=8)
         if revision != (draft.revision if draft else 0) or (draft and draft.state == 'accepted'):
             return render_step(request, step, draft, form, localized_notice(c, CONFLICT_KEYS), 409)
-        if step == 7 and request.POST.get('action') == 'back':
-            return redirect('onboarding:step', step=6)
+        if request.POST.get('action') == 'back':
+            if step == 1:
+                return redirect('accounts:status')
+            return redirect('onboarding:step', step=step - 1)
         valid = form.is_valid()
         if step == 7:
             for previous in range(1, 7):

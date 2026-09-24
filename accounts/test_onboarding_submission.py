@@ -42,6 +42,10 @@ class SubmissionTests(TestCase):
     def submit(self, revision=6):
         return self.client.post('/onboarding/7/', {'revision': revision, 'review_confirmed': 'on', 'action': 'continue'})
 
+    def test_back_skips_validation_on_incomplete_step(self):
+        response = self.client.post('/onboarding/3/', {'revision': 0, 'action': 'back'})
+        self.assertRedirects(response, '/onboarding/2/')
+
     def test_no_policy_goes_to_review_not_automatic_membership(self):
         self.fill()
         response = self.submit()

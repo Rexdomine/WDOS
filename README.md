@@ -51,3 +51,10 @@ python manage.py provision_reviewer_grant \
 
 The command requires an active verified account, records an audit event, and
 always creates an expiry; it does not grant broad staff or superuser access.
+To withdraw one grant before expiry, use the targeted audited revocation command:
+
+```sh
+python manage.py revoke_reviewer_grant --grant-id 123 --reason "Reviewer scope changed"
+```
+
+Revocation is idempotent and affects only the selected grant.

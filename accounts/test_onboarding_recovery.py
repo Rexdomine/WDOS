@@ -1,16 +1,23 @@
 """Real-browser recovery regressions; route controls delay/abort real requests."""
 from concurrent.futures import ThreadPoolExecutor
+import unittest
+
+try:
+    from playwright.sync_api import sync_playwright, expect
+except ImportError:  # Browser-only dependency is optional for Django discovery.
+    sync_playwright = None
+    expect = None
 
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.db import close_old_connections
 from django.test import override_settings
-from playwright.sync_api import sync_playwright, expect
 
 from . import services
 from .models import OnboardingDraft, OnboardingEvent
 from .test_onboarding_submission import TEST_POLICY
 
 
+@unittest.skipIf(sync_playwright is None, 'Playwright is not installed')
 @override_settings(
     PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'],
     STORAGES={'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}},

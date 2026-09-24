@@ -27,6 +27,10 @@ class FoundationTests(TestCase):
         response = self.client.get(reverse("app-shell"))
         self.assertRedirects(response, "/auth/login/")
 
+    def test_app_alias_uses_the_guarded_foundation_shell(self):
+        response = self.client.get('/app')
+        self.assertRedirects(response, '/auth/login/')
+
     def test_seed_command_is_idempotent(self):
         call_command("seed_roles", stdout=StringIO())
         call_command("seed_roles", stdout=StringIO())

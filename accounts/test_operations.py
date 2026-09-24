@@ -8,7 +8,7 @@ import threading
 from django.core.management import call_command
 from django.test import TransactionTestCase, SimpleTestCase, override_settings
 from django.utils import timezone
-from .models import AccessGrant, EmailIntent, Invitation, Person, Account
+from .models import AccessGrant, AuditEvent, EmailIntent, Invitation, Person, Account
 from . import services
 from wdos_project.runtime import supervise
 
@@ -131,6 +131,21 @@ class OperatorTests(TransactionTestCase):
         self.assertEqual((grant.role, grant.function, grant.network, grant.geography),
                          ('reviewer', 'onboarding', 'WGMN', 'Nigeria'))
         self.assertGreater(grant.expires_at, timezone.now())
+
+    def test_targeted_reviewer_grant_revocation_is_audited_and_idempotent(self):
+        account = services.register('Revocable Reviewer', 'revocable@example.org', 'very long operator test password!')
+        _, secret = services.issue_token(account, 'verify')
+        services.verify_contact(account.pk, secret)
+        grant = AccessGrant.objects.create(
+            account=account, role='reviewer', function='onboarding', network='WGMN',
+            geography='Nigeria', expires_at=timezone.now() + timedelta(hours=1),
+        )
+        call_command('revoke_reviewer_grant', grant_id=grant.pk, reason='Scope changed', stdout=StringIO())
+        grant.refresh_from_db()
+        self.assertIsNotNone(grant.revoked_at)
+        self.assertTrue(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant').exists())
+        call_command('revoke_reviewer_grant', grant_id=grant.pk, reason='Repeat safely', stdout=StringIO())
+        self.assertEqual(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant').count(), 1)
 
     def test_operator_provisioning_uses_canonicalized_policy_scope(self):
         account = services.register('Padded Reviewer', 'padded-reviewer@example.org', 'very long operator test password!')

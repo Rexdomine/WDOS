@@ -114,11 +114,19 @@ class OperatorTests(TransactionTestCase):
         account = services.register('Reviewer', 'reviewer@example.org', 'very long operator test password!')
         _, secret = services.issue_token(account, 'verify')
         services.verify_contact(account.pk, secret)
-        call_command(
-            'provision_reviewer_grant', email=account.email, role='reviewer',
-            function='onboarding', network='WGMN', geography='Nigeria',
-            expires_hours=4, stdout=StringIO(),
-        )
+        policy = {
+            'version': 'operator-v1', 'approval_reference': 'approved',
+            'privacy_notice': 'notice', 'review_role': 'reviewer',
+            'review_function': 'onboarding',
+            'eligibility': [{'code': 'adult', 'label': 'Adult', 'network': 'WGMN', 'basis': 'verified'}],
+            'homes': [{'code': 'lagos', 'label': 'Lagos', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'}],
+        }
+        with override_settings(WDOS_ONBOARDING_POLICY=policy):
+            call_command(
+                'provision_reviewer_grant', email=account.email, role='reviewer',
+                function='onboarding', network='WGMN', geography='Nigeria',
+                expires_hours=4, stdout=StringIO(),
+            )
         grant = AccessGrant.objects.get(account=account)
         self.assertEqual((grant.role, grant.function, grant.network, grant.geography),
                          ('reviewer', 'onboarding', 'WGMN', 'Nigeria'))

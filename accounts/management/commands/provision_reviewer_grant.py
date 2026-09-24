@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import AccessGrant, Account
+from accounts.onboarding_policy import current_policy
 from accounts.services import audit
 
 
@@ -23,6 +24,16 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options['expires_hours'] <= 0:
             raise CommandError('--expires-hours must be positive.')
+        policy = current_policy()
+        if not policy:
+            raise CommandError('A valid WDOS_ONBOARDING_POLICY_JSON is required.')
+        if options['role'] != policy['review_role'] or options['function'] != policy['review_function']:
+            raise CommandError('Role and function must match the active onboarding policy.')
+        if not any(
+            row['network'] == options['network'] and row['country'] == options['geography'].strip()
+            for row in policy['homes']
+        ):
+            raise CommandError('Network and geography must match an active policy home.')
         with transaction.atomic():
             account = (
                 Account.objects.select_for_update().select_related('user')

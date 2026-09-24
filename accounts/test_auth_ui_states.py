@@ -292,15 +292,16 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
             )
             try:
                 page = browser.new_page()
-                page.goto(self.live_server_url + '/auth/reset/#browser-only-proof')
+                browser_proof = '00000000-0000-0000-0000-000000000001.browser-only-proof'
+                page.goto(self.live_server_url + '/auth/reset/#' + browser_proof)
                 self.assertTrue(page.locator('[data-reset-form]').is_visible())
                 self.assertFalse(page.locator('[data-reset-missing]').is_visible())
-                self.assertEqual(page.locator('#id_proof').input_value(), 'browser-only-proof')
+                self.assertEqual(page.locator('#id_proof').input_value(), browser_proof)
                 self.assertEqual(page.url, self.live_server_url + '/auth/reset/')
 
                 page.goto(self.live_server_url + '/auth/reset/')
-                self.assertFalse(page.locator('[data-reset-form]').is_visible())
-                self.assertTrue(page.locator('[data-reset-missing]').is_visible())
+                self.assertTrue(page.locator('[data-reset-form]').is_visible())
+                self.assertFalse(page.locator('[data-reset-missing]').is_visible())
             finally:
                 browser.close()
 
@@ -308,5 +309,20 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         js = (Path(__file__).parent / 'static' / 'accounts' / 'auth.js').read_text(encoding='utf-8')
         self.assertLess(js.index('const fragment'), js.index('history.replaceState'))
         self.assertIn('location.pathname + location.search', js)
+        self.assertIn('preserve_fragment', js)
+        self.assertIn('credentials: "same-origin"', js)
         self.assertNotIn('localStorage', js)
         self.assertNotIn('sessionStorage', js)
+
+    def test_reset_fragment_is_bound_to_the_session_before_url_cleanup(self):
+        account = services.register('Reset Fragment', 'reset-fragment@example.org', 'a genuinely long WDOS example passphrase!')
+        verification, code = services.issue_token(account, 'verify')
+        self.assertTrue(services.verify_contact(account.pk, code))
+        token, secret = services.issue_token(account, 'reset')
+        proof = f'{token.pk}.{secret}'
+        response = self.client.post('/auth/reset/', {
+            'preserve_fragment': '1', 'proof': proof,
+        })
+        self.assertEqual(response.status_code, 204)
+        self.assertContains(self.client.get('/auth/reset/'), 'data-proof-bound="true"')
+        self.assertTrue(self.client.session.get('reset_retry_proof'))

@@ -8,7 +8,7 @@ from django.contrib.auth import login as django_login
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.debug import sensitive_post_parameters
@@ -328,12 +328,20 @@ def _invalid_reset_page(request):
 @require_http_methods(['GET', 'POST'])
 def reset(request):
     if request.method == 'GET':
-        request.session.pop(RESET_RETRY_SESSION_KEY, None)
+        proof_bound = _reset_retry_proof(request) is not None
         return page(
             request, 'AUTH-07', 'Set a new password',
             'Choose a password you have not used here before, then return to sign in.',
-            forms.ResetForm(), 'Save new password', reset_requires_fragment=True,
+            forms.ResetForm(), 'Save new password', reset_requires_fragment=not proof_bound,
+            reset_proof_bound=proof_bound,
         )
+
+    if request.POST.get('preserve_fragment') == '1':
+        proof = _valid_reset_proof(request.POST.get('proof', ''))
+        if proof is None:
+            return JsonResponse({'error': 'invalid proof'}, status=400)
+        request.session[RESET_RETRY_SESSION_KEY] = services.encrypt(proof)
+        return HttpResponse(status=204)
 
     proof = _reset_retry_proof(request)
     if proof is None:

@@ -7,10 +7,31 @@ const resetMissing = document.querySelector("[data-reset-missing]");
 const proof = document.getElementById("id_proof");
 const fragment = location.hash.length > 1 ? location.hash.slice(1) : "";
 if (resetPanel && proof && fragment) {
-  proof.value = fragment;
-  resetPanel.hidden = false;
-  if (resetMissing) resetMissing.hidden = true;
-  history.replaceState(null, "", location.pathname + location.search);
+  const csrf = resetPanel.querySelector('input[name="csrfmiddlewaretoken"]');
+  const preserveFragment = async () => {
+    if (!csrf) return false;
+    const body = new URLSearchParams({
+      csrfmiddlewaretoken: csrf.value,
+      preserve_fragment: "1",
+      proof: fragment,
+    });
+    const response = await fetch(location.pathname, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {"X-Requested-With": "XMLHttpRequest"},
+      body,
+    });
+    if (!response.ok) throw new Error("Could not preserve reset proof");
+    return true;
+  };
+  preserveFragment().then(() => {
+    proof.value = fragment;
+    resetPanel.hidden = false;
+    if (resetMissing) resetMissing.hidden = true;
+    history.replaceState(null, "", location.pathname + location.search);
+  }).catch(() => {
+    // Keep the fragment intact so a retry can preserve it before navigation.
+  });
 }
 
 for (const panel of document.querySelectorAll("[data-resend-issued-at]")) {

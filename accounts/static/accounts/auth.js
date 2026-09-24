@@ -4,10 +4,13 @@
 // They never enter a query string, response markup, browser storage, or logs.
 const resetPanel = document.querySelector("[data-reset-form]");
 const resetMissing = document.querySelector("[data-reset-missing]");
+const resetInvalid = document.querySelector("[data-reset-invalid]");
 const proof = document.getElementById("id_proof");
 const fragmentValue = location.hash.length > 1 ? location.hash.slice(1) : "";
-const fragment = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[A-Za-z0-9_-]+$/i.test(fragmentValue) ? fragmentValue : "";
-if (resetPanel && proof && fragment) {
+const proofPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[A-Za-z0-9_-]+$/i;
+const fragment = proofPattern.test(fragmentValue) ? fragmentValue : "";
+const replacementFragment = fragmentValue && fragmentValue !== "main" ? fragmentValue : "";
+if (resetPanel && proof && (fragment || replacementFragment)) {
   resetPanel.hidden = true;
   const csrf = resetPanel.querySelector('input[name="csrfmiddlewaretoken"]');
   const preserveFragment = async () => {
@@ -15,7 +18,7 @@ if (resetPanel && proof && fragment) {
     const body = new URLSearchParams({
       csrfmiddlewaretoken: csrf.value,
       preserve_fragment: "1",
-      proof: fragment,
+      proof: fragment || replacementFragment,
     });
     const response = await fetch(location.pathname, {
       method: "POST",
@@ -38,7 +41,8 @@ if (resetPanel && proof && fragment) {
   }).catch(error => {
     if (error.status === 400) {
       resetPanel.hidden = true;
-      if (resetMissing) resetMissing.hidden = false;
+      if (resetMissing) resetMissing.hidden = true;
+      if (resetInvalid) resetInvalid.hidden = false;
       history.replaceState(null, "", location.pathname + location.search);
     }
     // Keep valid fragments intact on transport/server failures.

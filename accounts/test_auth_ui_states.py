@@ -402,8 +402,10 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
 
         response = self.client.get('/auth/reset/')
         self.assertContains(response, '<section class="state-card reset-missing" data-reset-missing hidden')
+        self.assertContains(response, '<section class="state-card reset-invalid" data-reset-invalid hidden')
         self.assertContains(response, 'fragmentValue')
         self.assertContains(response, '[A-Za-z0-9_-]+$')
+        self.assertContains(response, 'replacementFragment')
 
     def test_reset_fragment_is_bound_to_the_session_before_url_cleanup(self):
         account = services.register('Reset Fragment', 'reset-fragment@example.org', 'a genuinely long WDOS example passphrase!')

@@ -38,7 +38,7 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: wdos_test
         ports:
           - 5432:5432
@@ -48,7 +48,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/wdos_test
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/wdos_test
       DB_SSLMODE: disable
       DJANGO_SECRET_KEY: ci-only-secret
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1

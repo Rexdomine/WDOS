@@ -90,6 +90,17 @@ class OnboardingUITests(TestCase):
         self.assertEqual(self.client.get('/onboarding/2/').context['form'].initial['full_name'],'Amara Ézè')
         self.assertEqual(self.client.get('/onboarding/photo/').status_code,404)
 
+    def test_oversized_multipart_is_rejected_without_route_500(self):
+        from wdos_project.upload_handlers import MAX_REQUEST_BYTES
+        payload = b'x' * (MAX_REQUEST_BYTES + 1)
+        response = self.client.post('/onboarding/2/', {
+            'revision': 0,
+            'full_name': 'Amara Ézè',
+            'photo': SimpleUploadedFile('oversized.bin', payload, content_type='application/octet-stream'),
+        })
+        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(self.client.get('/onboarding/photo/').status_code, 404)
+
     @override_settings(WDOS_ONBOARDING_POLICY=TEST_POLICY)
     def test_configured_consent_notice_is_readable_not_just_a_checkbox(self):
         response=self.client.get('/onboarding/privacy/')

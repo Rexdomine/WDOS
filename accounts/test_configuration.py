@@ -17,8 +17,10 @@ class UploadBoundaryTests(SimpleTestCase):
     def test_upload_handler_rejects_oversized_content_length(self):
         from django.core.files.uploadhandler import StopUpload
         from wdos_project.upload_handlers import UploadSizeLimitHandler, MAX_REQUEST_BYTES
+        handler = UploadSizeLimitHandler()
+        handler.handle_raw_input(None, {}, MAX_REQUEST_BYTES + 1, b'--', 'utf-8')
         with self.assertRaises(StopUpload):
-            UploadSizeLimitHandler().handle_raw_input(None, {}, MAX_REQUEST_BYTES + 1, b'--', 'utf-8')
+            handler.receive_data_chunk(b'x', 0)
 
     def test_upload_handler_rejects_oversized_chunk_stream(self):
         from django.core.files.uploadhandler import StopUpload

@@ -1,10 +1,11 @@
 import os
 from django.db import connection
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from .models import Role
+from accounts.models import Membership
 
 
 def health(request):
@@ -38,6 +39,11 @@ def _migration_count():
 
 
 def app_shell(request):
+    account = getattr(request, 'wdos_account', None)
+    if not account:
+        return redirect('/auth/login/')
+    if account.status != 'active' or not Membership.objects.filter(draft__account=account).exists():
+        return redirect('/auth/status/')
     return render(request, "foundation/app_shell.html", {
         "environment": os.getenv("WDOS_ENVIRONMENT", "local"),
     })

@@ -23,13 +23,9 @@ class FoundationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["service"], "wdos")
 
-    def test_app_shell_renders_django_brand_and_tokens(self):
+    def test_app_shell_requires_authenticated_accepted_member(self):
         response = self.client.get(reverse("app-shell"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "WODDI DIGITAL OPERATING SYSTEM")
-        self.assertContains(response, static("foundation/tokens.css"))
-        css = Path(settings.BASE_DIR / "foundation/static/foundation/tokens.css").read_text()
-        self.assertIn("--wdos-magenta: #D4006A", css)
+        self.assertRedirects(response, "/auth/login/")
 
     def test_seed_command_is_idempotent(self):
         call_command("seed_roles", stdout=StringIO())

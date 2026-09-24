@@ -48,7 +48,7 @@ def render_step(request, number, draft, form, notice=None, status=200):
         'revision': draft.revision if draft else 0,
         'lang': lang, 'direction': LANGUAGES[lang]['dir'], 'screen_id': f'ONB-{number:02d}',
         'initials': ''.join(n[0] for n in account.display_name.split()[:2]),
-        'scope_label': c['onb_membership'], 'state_label': c['onb_more_needed'] if draft and draft.state == 'review_needed' else c['onb_in_progress'],
+        'scope_label': c['onb_membership'], 'state_label': c['onb_more_needed'] if draft and draft.state == 'review_needed' else c['onb_ready'] if draft and draft.state == 'accepted' else c['onb_in_progress'],
         'draft': draft, 'policy': current_policy(), 'tab': tab,
         'events': draft.events.order_by('-id')[:100] if draft and tab == 'history' else [],
         'consents': draft.consents.order_by('-id')[:100] if draft and tab == 'history' else [],

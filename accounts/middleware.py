@@ -50,7 +50,7 @@ class AccountSecurityMiddleware:
                 'wdos_language', lang, max_age=31536000,
                 httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
             )
-        if request.path.startswith(('/auth/', '/app', '/admin/')) or request.path == '/':
+        if request.path.startswith(('/auth/', '/app', '/admin/', '/onboarding/')) or request.path == '/':
             response['Cache-Control'] = 'no-store, private'
             response['Referrer-Policy'] = 'same-origin'
             response['X-Robots-Tag'] = 'noindex, nofollow'

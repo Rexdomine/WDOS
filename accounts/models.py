@@ -105,6 +105,7 @@ class OnboardingDraft(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     submission_revision = models.PositiveIntegerField(null=True)
     submitted_at = models.DateTimeField(null=True)
+    photo = models.BinaryField(default=bytes, blank=True)
 
     class Meta:
         constraints = [

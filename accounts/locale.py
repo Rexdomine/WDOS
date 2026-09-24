@@ -54,6 +54,11 @@ def localize_form(form, lang):
         bound.label = translate(lang, bound.label)
         bound.field.label = bound.label
         bound.help_text = translate(lang, str(bound.help_text))
+        if hasattr(bound.field, 'choices'):
+            choices = []
+            for value, label in bound.field.choices:
+                choices.append((value, translate(lang, str(label))))
+            bound.field.choices = choices
     error_keys = {
         'required': 'required_field', 'invalid': 'invalid_field',
         'min_length': 'too_short', 'max_length': 'too_long',

@@ -608,7 +608,7 @@ def status(request):
         account=account, status_kind=notice,
         status_title=translate(_locale(request), status_title),
         status_text=translate(_locale(request), status_text),
-        status_action=status_action,
+        status_action=status_action, onboarding_available=bool(account),
     )
 
 

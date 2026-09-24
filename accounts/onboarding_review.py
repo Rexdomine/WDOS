@@ -61,6 +61,9 @@ def review(request, account_id):
         home = next((h for h in policy['homes'] if h['code'] == home_code and all(h[k] == draft.data.get(k) for k in ['network', 'country', 'region', 'district'])), None)
         if not home:
             return JsonResponse({'error': 'More information needed'}, status=422)
+        # Lock the identity rows before checking invitations. Invitation issuance
+        # takes the same email-account lock first, preventing a stranded identity.
+        list(Invitation.objects.select_for_update().filter(email__iexact=target.email).order_by('pk'))
         if target.person_id:
             person = Person.objects.select_for_update().get(pk=target.person_id)
         else:

@@ -394,6 +394,12 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         except ImportError:
             self.skipTest('Playwright is not installed')
 
+        account = services.register('Browser Reset', 'browser-reset@example.org', 'a genuinely long WDOS example passphrase!')
+        verification, code = services.issue_token(account, 'verify')
+        self.assertTrue(services.verify_contact(account.pk, code))
+        token, secret = services.issue_token(account, 'reset')
+        browser_proof = f'{token.pk}.{secret}'
+
         with sync_playwright() as playwright:
             installed = [Path(playwright.chromium.executable_path)]
             installed += sorted(Path('/opt/hermes/.playwright').glob(
@@ -407,11 +413,6 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
             )
             try:
                 page = browser.new_page()
-                account = services.register('Browser Reset', 'browser-reset@example.org', 'a genuinely long WDOS example passphrase!')
-                verification, code = services.issue_token(account, 'verify')
-                self.assertTrue(services.verify_contact(account.pk, code))
-                token, secret = services.issue_token(account, 'reset')
-                browser_proof = f'{token.pk}.{secret}'
                 page.goto(self.live_server_url + '/auth/reset/#' + browser_proof)
                 page.wait_for_url(lambda url: '#' not in url and 'reset_flow=' in url)
                 self.assertTrue(page.locator('[data-reset-form]').is_visible())

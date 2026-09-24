@@ -35,7 +35,8 @@ class SubmissionTests(TestCase):
         for number, value in enumerate(values, 1):
             if number == 6 and policy:
                 value['notice_digest'] = self.client.get('/onboarding/6/').context['form'].initial['notice_digest']
-            response = self.client.post(f'/onboarding/{number}/', {'revision': number-1, 'action': 'continue', **value})
+            current_revision = OnboardingDraft.objects.filter(account=self.account).values_list('revision', flat=True).first() or 0
+            response = self.client.post(f'/onboarding/{number}/', {'revision': current_revision, 'action': 'continue', **value})
             self.assertEqual(response.status_code, 302, (number, response.status_code))
 
     def submit(self, revision=6):
@@ -85,6 +86,24 @@ class SubmissionTests(TestCase):
         self.assertEqual(record.notice, TEST_POLICY['privacy_notice'])
         self.assertTrue(record.privacy_ack)
         self.assertFalse(record.optional_updates)
+
+    @override_settings(WDOS_ONBOARDING_POLICY=TEST_POLICY)
+    def test_consent_after_edit_and_resubmission_uses_new_revision(self):
+        self.fill(policy=True)
+        self.submit()
+        draft = OnboardingDraft.objects.get(account=self.account)
+        first = draft.consents.get()
+        self.login(self.account)
+        response = self.client.post('/onboarding/2/', {'revision': 7, 'full_name': 'Edited Name', 'preferred_name': 'Edited'})
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, 'draft')
+        self.fill(policy=True)
+        draft.refresh_from_db()
+        self.submit(revision=draft.revision)
+        draft.refresh_from_db()
+        self.assertEqual(draft.consents.count(), 2)
+        self.assertGreater(draft.consents.order_by('-id').first().revision, first.revision)
 
     @override_settings(WDOS_ONBOARDING_POLICY=TEST_POLICY)
     def test_policy_change_requires_fresh_acknowledgement(self):

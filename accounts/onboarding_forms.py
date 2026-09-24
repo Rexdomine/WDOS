@@ -1,7 +1,10 @@
 """Forms map to approved v1 ONB controls; sample policy values are not defaults."""
 from zoneinfo import available_timezones
+import io
+from PIL import Image, UnidentifiedImageError
 from django import forms
 from .onboarding_policy import current_policy
+from .locale import LANGUAGES
 
 
 class BaseForm(forms.Form):
@@ -13,7 +16,7 @@ class BaseForm(forms.Form):
 
 
 class WelcomeForm(BaseForm):
-    language = forms.ChoiceField(label='Interface language', choices=[('en', 'English')])
+    language = forms.ChoiceField(label='Interface language', choices=[(code, item['name']) for code, item in LANGUAGES.items()])
     timezone = forms.ChoiceField(label='Your timezone', choices=[(s, s) for s in sorted(available_timezones())], initial='UTC')
     reading = forms.ChoiceField(label='Reading preference', choices=[('standard', 'Standard text'), ('large', 'Large text')], initial='standard')
     reduce_motion = forms.BooleanField(label='Motion preference', required=False, help_text='Reduce non-essential motion')
@@ -23,7 +26,29 @@ class ProfileForm(BaseForm):
     full_name = forms.CharField(label='Full name', max_length=150)
     preferred_name = forms.CharField(label='Preferred name', max_length=150, required=False)
     email = forms.EmailField(label='Email address', disabled=True)
-    photo = forms.FileField(label='Profile photo', required=False, disabled=True)
+    photo = forms.FileField(label='Profile photo', required=False)
+
+    def clean_photo(self):
+        uploaded = self.cleaned_data.get('photo')
+        if not uploaded:
+            return None
+        if uploaded.size > 2 * 1024 * 1024:
+            raise forms.ValidationError('Check the highlighted information')
+        try:
+            with Image.open(uploaded) as image:
+                if image.format not in ('JPEG', 'PNG') or image.width * image.height > 12000000:
+                    raise ValueError('Unsupported image')
+                image.load()
+                clean = image.convert('RGB')
+                clean.thumbnail((512, 512))
+                # New image drops EXIF/ICC/comments and original file name.
+                stripped = Image.new('RGB', clean.size)
+                stripped.paste(clean)
+                output = io.BytesIO()
+                stripped.save(output, format='PNG')
+                return output.getvalue()
+        except (OSError, ValueError, UnidentifiedImageError, Image.DecompressionBombError) as error:
+            raise forms.ValidationError('Check the highlighted information') from error
 
 
 class NetworkForm(BaseForm):

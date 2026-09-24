@@ -7,7 +7,7 @@ from django.core.validators import validate_email
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
-from accounts.models import Person, Invitation, EmailIntent
+from accounts.models import Account, Person, Invitation, EmailIntent
 from accounts.services import digest, encrypt, dispatch_email
 from accounts.email_templates import render_email
 
@@ -28,6 +28,15 @@ class Command(BaseCommand):
             raise CommandError('Valid recipient and existing person ID are required.') from None
         secret=secrets.token_urlsafe(32)
         with transaction.atomic():
+            # Account identity is the cross-workflow serialization point. Review approval
+            # locks the same email's account before it inspects invitations/persons.
+            accounts = list(Account.objects.select_for_update().filter(email__iexact=email).order_by('pk'))
+            # Re-read the authoritative identity only after the email lock has
+            # been acquired.  A concurrent approval may have linked this email
+            # while this transaction was waiting; never write an invitation for
+            # a different Person in that case.
+            if any(account.person_id is not None and account.person_id != person.pk for account in accounts):
+                raise CommandError('Email is already linked to a different person.')
             person=Person.objects.select_for_update().get(pk=person.pk)
             if hasattr(person,'account'):
                 raise CommandError('Person already has a linked account.')

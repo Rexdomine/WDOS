@@ -76,7 +76,12 @@ jobs:
               try:
                   with urllib.request.urlopen('http://127.0.0.1:18088/health', timeout=2) as response:
                       health = json.load(response)
-                  assert health['database'] == 'ok' and health['migration_rows'] == 21
+                  assert health['database'] == 'ok'
+                  migration_check = subprocess.run(
+                      ['docker', 'exec', 'wdos-stage2-smoke', 'python', 'manage.py', 'migrate', '--check', '--noinput'],
+                      capture_output=True, text=True,
+                  )
+                  assert migration_check.returncode == 0, migration_check.stderr or migration_check.stdout
                   break
               except Exception:
                   if attempt == 29:

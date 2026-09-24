@@ -24,13 +24,17 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options['expires_hours'] <= 0:
             raise CommandError('--expires-hours must be positive.')
+        role = options['role'].strip()
+        function = options['function'].strip()
+        network = options['network'].strip()
+        geography = options['geography'].strip()
         policy = current_policy()
         if not policy:
             raise CommandError('A valid WDOS_ONBOARDING_POLICY_JSON is required.')
-        if options['role'] != policy['review_role'] or options['function'] != policy['review_function']:
+        if role != policy['review_role'] or function != policy['review_function']:
             raise CommandError('Role and function must match the active onboarding policy.')
         if not any(
-            row['network'] == options['network'] and row['country'] == options['geography'].strip()
+            row['network'] == network and row['country'] == geography
             for row in policy['homes']
         ):
             raise CommandError('Network and geography must match an active policy home.')
@@ -45,10 +49,10 @@ class Command(BaseCommand):
                 raise CommandError('An active, verified account is required.')
             grant = AccessGrant.objects.create(
                 account=account,
-                role=options['role'].strip(),
-                function=options['function'].strip(),
-                network=options['network'],
-                geography=options['geography'].strip(),
+                role=role,
+                function=function,
+                network=network,
+                geography=geography,
                 expires_at=timezone.now() + timedelta(hours=options['expires_hours']),
             )
             audit(account, 'operator_provision_reviewer_grant')

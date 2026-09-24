@@ -349,10 +349,11 @@ def reset(request):
     proof = _reset_retry_proof(request)
     if proof is None:
         return _invalid_reset_page(request)
+    proof_is_live = services.is_live_reset_proof(*proof.split('.', 1))
+    if not proof_is_live:
+        return _invalid_reset_page(request)
     form = forms.ResetForm(request.POST)
     if not form.is_valid():
-        if not services.is_live_reset_proof(*proof.split('.', 1)):
-            return _invalid_reset_page(request)
         request.session[RESET_RETRY_SESSION_KEY] = services.encrypt(proof)
         return page(
             request, 'AUTH-07', 'Set a new password',
@@ -404,6 +405,9 @@ def mfa(request):
         if rate(request, 'mfa-begin', str(account.pk)):
             secret = services.begin_mfa(account.pk)
         if secret:
+            # begin_mfa() writes a replacement pending secret; do not let the
+            # pre-POST ORM snapshot suppress the freshly-created form.
+            account.refresh_from_db()
             form = forms.MFAForm()
     elif request.method == 'POST':
         form = forms.MFAForm(request.POST)

@@ -136,6 +136,22 @@ class AuthUIStateRegressionTests(TestCase):
         })
         self.assertContains(response, 'Password updated')
 
+    def test_invalid_reset_submission_drops_proof_that_expired_before_error_render(self):
+        account = self.create_active('expired-reset-error@example.org')
+        token, secret = services.issue_token(account, 'reset')
+        proof = f'{token.pk}.{secret}'
+        self.client.session['reset_retry_proof'] = services.encrypt(proof)
+        self.client.session.save()
+        ActionToken.objects.filter(pk=token.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
+
+        response = self.client.post('/auth/reset/', {
+            'password': 'one', 'confirm': 'two',
+        })
+
+        self.assertContains(response, 'Link expired')
+        self.assertNotContains(response, 'name="password"')
+        self.assertNotIn('reset_retry_proof', self.client.session)
+
     def test_verification_is_bound_masked_and_has_real_resend_cooldown(self):
         account = self.register_pending('recognisable@example.org')
         response = self.client.get('/auth/verify/')
@@ -218,6 +234,18 @@ class AuthUIStateRegressionTests(TestCase):
         self.assertContains(challenge, 'Cannot access your authenticator?')
         self.assertContains(challenge, 'href="/auth/help/"')
         self.assertContains(challenge, 'support cannot bypass MFA')
+
+    def test_expired_mfa_restart_renders_the_replacement_setup_form(self):
+        account = self.create_active('mfa-expired-restart@example.org', privileged=True)
+        account.mfa_pending_secret = services.encrypt('stale-secret')
+        account.mfa_pending_until = timezone.now() - timedelta(seconds=1)
+        account.save(update_fields=['mfa_pending_secret', 'mfa_pending_until'])
+        self.assertRedirects(self.login(account), '/auth/mfa/')
+
+        response = self.client.post('/auth/mfa/', {'begin': '1'})
+
+        self.assertContains(response, 'name="code"')
+        self.assertContains(response, 'Add WDOS to your authenticator')
 
     def test_already_linked_invitation_has_no_claim_form(self):
         account = self.create_active('linked@example.org')

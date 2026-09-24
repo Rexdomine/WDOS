@@ -58,7 +58,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt playwright==1.63.0
+          python -m playwright install --with-deps chromium
       - name: Frozen approved UI reference integrity
         run: python scripts/check_ui_reference_manifest.py
       - name: Canonical Django verification (PostgreSQL)

@@ -56,7 +56,14 @@ def review(request, account_id):
         if any(not FORMS[n](draft.data, initial=initial, account=target).is_valid() for n in range(1, 8)):
             return JsonResponse({'error': 'More information needed'}, status=422)
         consent = draft.consents.order_by('-id').first()
-        if not consent or not consent.privacy_ack or consent.digest != policy['digest']:
+        if (
+            not consent
+            or consent.revision != draft.submission_revision
+            or not consent.privacy_ack
+            or consent.digest != policy['digest']
+            or consent.optional_updates != bool(draft.data.get('optional_updates'))
+            or consent.channel != draft.data.get('channel')
+        ):
             return JsonResponse({'error': 'More information needed'}, status=422)
         home = next((h for h in policy['homes'] if h['code'] == home_code and all(h[k] == draft.data.get(k) for k in ['network', 'country', 'region', 'district'])), None)
         if not home:

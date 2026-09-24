@@ -27,8 +27,8 @@ def localized_notice(catalogue, keys):
     return {'title': catalogue[keys[0]], 'body': catalogue[keys[1]]}
 
 
-def initial_data(account, draft):
-    return {'full_name': account.display_name, 'email': account.email, 'language': 'en', 'timezone': 'UTC', 'reading': 'standard', **(draft.data if draft else {})}
+def initial_data(account, draft, language='en'):
+    return {'full_name': account.display_name, 'email': account.email, 'language': language, 'timezone': 'UTC', 'reading': 'standard', **(draft.data if draft else {})}
 
 
 def render_step(request, number, draft, form, notice=None, status=200):
@@ -91,7 +91,7 @@ def step(request, step):
         notice = {'title': c['onb_more_needed'], 'body': c['onb_more_body']} if draft.state == 'review_needed' else None
         return render_step(request, step, draft, None, notice)
     form_class = FORMS[step]
-    form = form_class(request.POST if request.method == 'POST' else None, request.FILES if request.method == 'POST' else None, initial=initial_data(account, draft), account=account)
+    form = form_class(request.POST if request.method == 'POST' else None, request.FILES if request.method == 'POST' else None, initial=initial_data(account, draft, lang), account=account)
     if request.method == 'GET':
         return render_step(request, step, draft, form)
     try:

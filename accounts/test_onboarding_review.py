@@ -75,6 +75,16 @@ class ReviewTests(TestCase):
         self.assertEqual(self.approve(revision=6).status_code, 409)
         self.assertEqual(Person.objects.count(), 0)
 
+    def test_approval_rejects_consent_choices_changed_after_submission(self):
+        draft = OnboardingDraft.objects.get(account=self.account)
+        consent = draft.consents.get()
+        draft.data['optional_updates'] = True
+        draft.save(update_fields=['data'])
+        consent.optional_updates = False
+        consent.save(update_fields=['optional_updates'])
+        self.assertEqual(self.approve().status_code, 422)
+        self.assertEqual(Person.objects.count(), 0)
+
     def test_mfa_required_for_review(self):
         session=self.client.session; session['mfa_verified']=False; session.save()
         self.assertEqual(self.approve().status_code, 403)

@@ -131,6 +131,13 @@ def step(request, step):
             draft = OnboardingDraft(account=locked)
         # Partial drafts retain validated fields only. Browser-supplied role/person/email are not writable.
         changes = {key: value for key, value in form.cleaned_data.items() if not form.fields[key].disabled and key != 'photo'}
+        unchanged = bool(draft) and draft.data == {**draft.data, **changes} and not (
+            step == 2 and form.cleaned_data.get('photo') is not None
+        )
+        if step == 6:
+            unchanged = unchanged and draft.consents.filter(revision=draft.revision).exists()
+        if valid and unchanged:
+            return redirect('onboarding:step', step=draft.next_step)
         draft.data = {**draft.data, **changes}
         if step == 1 and form.cleaned_data.get('language') in LANGUAGES:
             request.session['wdos_language'] = form.cleaned_data['language']

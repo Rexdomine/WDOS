@@ -103,6 +103,26 @@ class SubmissionTests(TestCase):
         self.assertFalse(record.optional_updates)
 
     @override_settings(WDOS_ONBOARDING_POLICY=TEST_POLICY)
+    def test_identical_consent_replay_is_idempotent(self):
+        self.fill(policy=True)
+        draft = OnboardingDraft.objects.get(account=self.account)
+        events = draft.events.count()
+        consents = draft.consents.count()
+        response = self.client.post('/onboarding/6/', {
+            'revision': draft.revision,
+            'privacy_ack': 'on',
+            'optional_updates': '',
+            'channel': 'email',
+            'notice_digest': self.client.get('/onboarding/6/').context['form'].initial['notice_digest'],
+            'action': 'continue',
+        })
+        self.assertRedirects(response, '/onboarding/7/')
+        draft.refresh_from_db()
+        self.assertEqual(draft.events.count(), events)
+        self.assertEqual(draft.consents.count(), consents)
+        self.assertEqual(draft.revision, 6)
+
+    @override_settings(WDOS_ONBOARDING_POLICY=TEST_POLICY)
     def test_consent_after_edit_and_resubmission_uses_new_revision(self):
         self.fill(policy=True)
         self.submit()

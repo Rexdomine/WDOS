@@ -95,8 +95,11 @@ def step(request, step):
     if request.method == 'GET':
         return render_step(request, step, draft, form)
     if getattr(request, '_wdos_upload_rejected', False):
-        form.add_error('photo', 'The uploaded file is too large.')
-        return render_step(request, step, draft, form, localized_notice(c, INVALID_KEYS), 422)
+        # The photo belongs only to the profile step.  Never manufacture a
+        # photo field error on another step when a multipart body is capped.
+        upload_error = c['onb_upload_too_large']
+        form.add_error('photo' if step == 2 else None, upload_error)
+        return render_step(request, step, draft, form, localized_notice(c, INVALID_KEYS), 422 if step == 2 else 400)
     try:
         revision = int(request.POST.get('revision', ''))
     except (TypeError, ValueError):

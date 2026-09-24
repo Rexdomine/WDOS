@@ -35,6 +35,13 @@ class UploadBoundaryTests(SimpleTestCase):
         handler.handle_raw_input(None, {}, MAX_UPLOAD_BYTES + 1024, b'--', 'utf-8')
         self.assertLess(MAX_UPLOAD_BYTES + 1024, MAX_REQUEST_BYTES)
 
+    def test_upload_error_is_localized_in_every_supported_locale(self):
+        from .locale import LANGUAGES, catalog
+        self.assertEqual(set(LANGUAGES), {'en', 'fr', 'pt', 'ar', 'sw'})
+        for language in LANGUAGES:
+            with self.subTest(language=language):
+                self.assertTrue(catalog(language)['onb_upload_too_large'])
+
 
 class ProductionOriginTests(SimpleTestCase):
     def load(self, origin=None, environment='production'):

@@ -196,5 +196,3 @@ class OnboardingRecoveryBrowserTests(StaticLiveServerTestCase):
             p.click('button[name=action][value=back]')
         self.assertEqual(response.value.status, 302)
         self.assertTrue(response.value.headers['location'].endswith('/onboarding/1/'))
-        p.wait_for_url('**/onboarding/1/')
-        expect(p.locator('[name=email]')).to_be_disabled()

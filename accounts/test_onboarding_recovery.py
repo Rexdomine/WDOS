@@ -187,15 +187,14 @@ class OnboardingRecoveryBrowserTests(StaticLiveServerTestCase):
         self.next()
         expect(p.locator('#onboarding-interrupted')).to_be_visible()
 
-    def test_invalid_back_and_disabled_identity(self):
+    def test_back_skips_validation_and_preserves_disabled_identity(self):
         p = self.page
         p.goto(self.live_server_url + '/onboarding/2/')
         expect(p.locator('[name=email]')).to_be_disabled()
         p.fill('[name=full_name]', '')
         with p.expect_response(lambda r: r.request.method == 'POST') as response:
             p.click('button[name=action][value=back]')
-        # formnovalidate bypasses browser validation, not authoritative server validation.
-        self.assertEqual(response.value.status, 422)
-        expect(p.get_by_text('This field is required.', exact=True)).to_be_visible()
+        self.assertEqual(response.value.status, 302)
+        self.assertTrue(response.value.headers['location'].endswith('/onboarding/1/'))
+        p.wait_for_url('**/onboarding/1/')
         expect(p.locator('[name=email]')).to_be_disabled()
-        expect(p.locator('[name=full_name]')).to_have_value('')

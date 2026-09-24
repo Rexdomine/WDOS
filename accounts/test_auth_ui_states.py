@@ -390,6 +390,7 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         reset = self.client.get('/auth/reset/')
         login = self.client.get('/auth/login/')
         self.assertContains(reset, 'data-reset-form')
+        self.assertContains(reset, "if (fragment && fragment !== 'main')")
         self.assertNotContains(login, 'data-reset-form')
         self.assertNotContains(login, "document.querySelector('[data-reset-form]')")
 
@@ -408,6 +409,11 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         response = self.client.get('/auth/reset/')
         self.assertContains(response, '<section class="state-card reset-missing" data-reset-missing hidden')
         self.assertContains(response, '<section class="state-card reset-invalid" data-reset-invalid hidden')
+
+    def test_valid_fragment_keeps_expired_state_hidden_until_rejection(self):
+        js = (Path(__file__).parent / 'static' / 'accounts' / 'auth.js').read_text(encoding='utf-8')
+        self.assertNotIn('if (resetInvalid && replacementFragment) resetInvalid.hidden = false;', js)
+        self.assertIn('if (resetInvalid) resetInvalid.hidden = false;', js)
 
     def test_reset_fragment_is_bound_to_the_session_before_url_cleanup(self):
         account = services.register('Reset Fragment', 'reset-fragment@example.org', 'a genuinely long WDOS example passphrase!')

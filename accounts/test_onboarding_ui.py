@@ -98,7 +98,9 @@ class OnboardingUITests(TestCase):
             'full_name': 'Amara Ézè',
             'photo': SimpleUploadedFile('oversized.bin', payload, content_type='application/octet-stream'),
         })
-        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 422)
+        self.assertContains(response, 'The uploaded file is too large.', status_code=422)
+        self.assertEqual(self.client.get('/onboarding/1/').status_code, 200)
         self.assertEqual(self.client.get('/onboarding/photo/').status_code, 404)
 
     @override_settings(WDOS_ONBOARDING_POLICY=TEST_POLICY)

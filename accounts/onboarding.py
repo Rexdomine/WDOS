@@ -94,6 +94,9 @@ def step(request, step):
     form = form_class(request.POST if request.method == 'POST' else None, request.FILES if request.method == 'POST' else None, initial=initial_data(account, draft, lang), account=account)
     if request.method == 'GET':
         return render_step(request, step, draft, form)
+    if getattr(request, '_wdos_upload_rejected', False):
+        form.add_error('photo', 'The uploaded file is too large.')
+        return render_step(request, step, draft, form, localized_notice(c, INVALID_KEYS), 422)
     try:
         revision = int(request.POST.get('revision', ''))
     except (TypeError, ValueError):

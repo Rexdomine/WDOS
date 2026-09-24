@@ -17,13 +17,19 @@ class UploadSizeLimitHandler(MemoryFileUploadHandler):
     def handle_raw_input(self, input_data, META, content_length, boundary, encoding=None):
         self._received = 0
         self._reject_request = bool(content_length and content_length > MAX_REQUEST_BYTES)
+        if self._reject_request and self.request is not None:
+            self.request._wdos_upload_rejected = True
         self.activated = bool(content_length and content_length <= MAX_REQUEST_BYTES)
 
     def receive_data_chunk(self, raw_data, start):
         if self._reject_request:
+            if self.request is not None:
+                self.request._wdos_upload_rejected = True
             raise StopUpload(connection_reset=True)
         self._received += len(raw_data)
         if self._received > MAX_REQUEST_BYTES:
+            if self.request is not None:
+                self.request._wdos_upload_rejected = True
             raise StopUpload(connection_reset=True)
         if self.activated:
             return super().receive_data_chunk(raw_data, start)

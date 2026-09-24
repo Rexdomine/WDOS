@@ -24,6 +24,7 @@ LOCALE_COOKIE_AGE = 31536000
 VERIFY_RESEND_SECONDS = 60
 SUPPORT_URL = 'https://thewoddi.org/contact.html'
 RESET_RETRY_SESSION_KEY = 'reset_retry_proof'
+RESET_FLOW_QUERY_KEY = 'reset_flow'
 
 
 def _locale(request):
@@ -302,22 +303,73 @@ def _valid_reset_proof(value):
     return value
 
 
+def _reset_flow_id(proof):
+    token_id, separator, _ = (proof or '').partition('.')
+    if not separator:
+        return None
+    try:
+        return str(uuid.UUID(token_id))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 def _reset_retry_proof(request):
     raw_posted = request.POST.get('proof', '')
     if raw_posted:
         return _valid_reset_proof(raw_posted)
-    encrypted = request.session.get(RESET_RETRY_SESSION_KEY)
+    flow_id = request.GET.get(RESET_FLOW_QUERY_KEY) or request.POST.get(RESET_FLOW_QUERY_KEY)
+    proofs = request.session.get(RESET_RETRY_SESSION_KEY, {})
+    if isinstance(proofs, str):
+        try:
+            return _valid_reset_proof(services.decrypt(proofs))
+        except (InvalidToken, ValueError, TypeError, UnicodeError):
+            request.session.pop(RESET_RETRY_SESSION_KEY, None)
+            return None
+    if not isinstance(proofs, dict) or not flow_id:
+        return None
+    encrypted = proofs.get(flow_id)
     if not encrypted:
         return None
     try:
         return _valid_reset_proof(services.decrypt(encrypted))
     except (InvalidToken, ValueError, TypeError, UnicodeError):
-        request.session.pop(RESET_RETRY_SESSION_KEY, None)
+        proofs.pop(flow_id, None)
+        request.session[RESET_RETRY_SESSION_KEY] = proofs
+        request.session.modified = True
         return None
 
 
-def _invalid_reset_page(request):
-    request.session.pop(RESET_RETRY_SESSION_KEY, None)
+def _store_reset_retry_proof(request, proof):
+    flow_id = _reset_flow_id(proof)
+    if not flow_id:
+        return None
+    proofs = request.session.get(RESET_RETRY_SESSION_KEY, {})
+    if not isinstance(proofs, dict):
+        proofs = {}
+    proofs[flow_id] = services.encrypt(proof)
+    request.session[RESET_RETRY_SESSION_KEY] = dict(list(proofs.items())[-4:])
+    request.session.modified = True
+    return flow_id
+
+
+def _clear_reset_retry_proof(request, proof=None):
+    flow_id = _reset_flow_id(proof) or request.GET.get(RESET_FLOW_QUERY_KEY) or request.POST.get(RESET_FLOW_QUERY_KEY)
+    proofs = request.session.get(RESET_RETRY_SESSION_KEY, {})
+    if not isinstance(proofs, dict):
+        proofs = {}
+    if flow_id:
+        proofs.pop(flow_id, None)
+    else:
+        return
+    if proofs:
+        request.session[RESET_RETRY_SESSION_KEY] = proofs
+    else:
+        request.session.pop(RESET_RETRY_SESSION_KEY, None)
+    request.session.modified = True
+
+
+def _invalid_reset_page(request, proof=None):
+    _clear_reset_retry_proof(request, proof)
     return page(
         request, 'AUTH-07', 'Link expired',
         'This password reset link can no longer be used.',
@@ -331,7 +383,7 @@ def reset(request):
     if request.method == 'GET':
         proof_bound = _reset_retry_proof(request)
         if proof_bound and not services.is_live_reset_proof(*proof_bound.split('.', 1)):
-            return _invalid_reset_page(request)
+            return _invalid_reset_page(request, proof_bound)
         return page(
             request, 'AUTH-07', 'Set a new password',
             'Choose a password you have not used here before, then return to sign in.',
@@ -342,20 +394,22 @@ def reset(request):
     if request.POST.get('preserve_fragment') == '1':
         proof = _valid_reset_proof(request.POST.get('proof', ''))
         if proof is None or not services.is_live_reset_proof(*proof.split('.', 1)):
-            request.session.pop(RESET_RETRY_SESSION_KEY, None)
             return JsonResponse({'error': 'invalid proof'}, status=400)
-        request.session[RESET_RETRY_SESSION_KEY] = services.encrypt(proof)
-        return HttpResponse(status=204)
+        flow_id = _store_reset_retry_proof(request, proof)
+        response = HttpResponse(status=204)
+        if flow_id:
+            response['X-Reset-Flow'] = flow_id
+        return response
 
     proof = _reset_retry_proof(request)
     if proof is None:
         return _invalid_reset_page(request)
     proof_is_live = services.is_live_reset_proof(*proof.split('.', 1))
     if not proof_is_live:
-        return _invalid_reset_page(request)
+        return _invalid_reset_page(request, proof)
     form = forms.ResetForm(request.POST)
     if not form.is_valid():
-        request.session[RESET_RETRY_SESSION_KEY] = services.encrypt(proof)
+        _store_reset_retry_proof(request, proof)
         return page(
             request, 'AUTH-07', 'Set a new password',
             'Choose a password you have not used here before, then return to sign in.',
@@ -368,8 +422,8 @@ def reset(request):
               and services.reset_password(token_id, secret, form.cleaned_data['password']))
     except ValidationError as exc:
         if not services.is_live_reset_proof(token_id, secret):
-            return _invalid_reset_page(request)
-        request.session[RESET_RETRY_SESSION_KEY] = services.encrypt(proof)
+            return _invalid_reset_page(request, proof)
+        _store_reset_retry_proof(request, proof)
         form.add_error('password', exc)
         return page(
             request, 'AUTH-07', 'Set a new password',
@@ -377,9 +431,9 @@ def reset(request):
             form, 'Save new password', reset_proof_bound=True,
         )
     if not ok:
-        return _invalid_reset_page(request)
+        return _invalid_reset_page(request, proof)
 
-    request.session.pop(RESET_RETRY_SESSION_KEY, None)
+    _clear_reset_retry_proof(request, proof)
     lang = _locale(request)
     django_logout(request)
     request.wdos_locale_after_logout = lang

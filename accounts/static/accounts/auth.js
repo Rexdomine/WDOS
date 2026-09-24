@@ -9,7 +9,7 @@ const proof = document.getElementById("id_proof");
 const fragmentValue = location.hash.length > 1 ? location.hash.slice(1) : "";
 const proofPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[A-Za-z0-9_-]+$/i;
 const fragment = proofPattern.test(fragmentValue) ? fragmentValue : "";
-const replacementFragment = fragmentValue && fragmentValue !== "main" ? fragmentValue : "";
+const replacementFragment = fragmentValue && fragmentValue !== "main" && !/^id_[A-Za-z0-9_-]+$/.test(fragmentValue) ? fragmentValue : "";
 if (resetPanel && proof && (fragment || replacementFragment)) {
   resetPanel.hidden = true;
   const csrf = resetPanel.querySelector('input[name="csrfmiddlewaretoken"]');
@@ -37,7 +37,11 @@ if (resetPanel && proof && (fragment || replacementFragment)) {
     proof.value = fragment;
     resetPanel.hidden = false;
     if (resetMissing) resetMissing.hidden = true;
-    history.replaceState(null, "", location.pathname + location.search);
+    const flowId = response.headers.get("X-Reset-Flow");
+    const next = new URL(location.href);
+    next.hash = "";
+    if (flowId) next.searchParams.set("reset_flow", flowId);
+    history.replaceState(null, "", next.pathname + next.search);
   }).catch(error => {
     if (error.status === 400) {
       resetPanel.hidden = true;

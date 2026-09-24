@@ -406,7 +406,7 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         reset = self.client.get('/auth/reset/')
         login = self.client.get('/auth/login/')
         self.assertContains(reset, 'data-reset-form')
-        self.assertContains(reset, "if (fragment && fragment !== 'main')")
+        self.assertIn('if (fragment && fragment !== \'main\' && !/^id_[A-Za-z0-9_-]+$/.test(fragment))', reset.content.decode())
         self.assertNotContains(login, 'data-reset-form')
         self.assertNotContains(login, "document.querySelector('[data-reset-form]')")
 
@@ -426,7 +426,26 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         self.assertContains(response, '<section class="state-card reset-missing" data-reset-missing hidden')
         self.assertContains(response, '<section class="state-card reset-invalid" data-reset-invalid hidden')
 
-    def test_valid_fragment_keeps_expired_state_hidden_until_rejection(self):
+    def test_reset_bindings_are_isolated_by_flow_id(self):
+        first = self.create_active('first-flow@example.org')
+        second = self.create_active('second-flow@example.org')
+        first_token, first_secret = services.issue_token(first, 'reset')
+        second_token, second_secret = services.issue_token(second, 'reset')
+
+        first_response = self.client.post('/auth/reset/', {
+            'preserve_fragment': '1', 'proof': f'{first_token.pk}.{first_secret}',
+        })
+        second_response = self.client.post('/auth/reset/', {
+            'preserve_fragment': '1', 'proof': f'{second_token.pk}.{second_secret}',
+        })
+
+        self.assertEqual(first_response.headers['X-Reset-Flow'], str(first_token.pk))
+        self.assertEqual(second_response.headers['X-Reset-Flow'], str(second_token.pk))
+        first_page = self.client.get('/auth/reset/?reset_flow=' + str(first_token.pk))
+        second_page = self.client.get('/auth/reset/?reset_flow=' + str(second_token.pk))
+        self.assertContains(first_page, 'data-proof-bound="true"')
+        self.assertContains(second_page, 'data-proof-bound="true"')
+
         js = (Path(__file__).parent / 'static' / 'accounts' / 'auth.js').read_text(encoding='utf-8')
         self.assertNotIn('if (resetInvalid && replacementFragment) resetInvalid.hidden = false;', js)
         self.assertIn('if (resetInvalid) resetInvalid.hidden = false;', js)
@@ -441,5 +460,7 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
             'preserve_fragment': '1', 'proof': proof,
         })
         self.assertEqual(response.status_code, 204)
-        self.assertContains(self.client.get('/auth/reset/'), 'data-proof-bound="true"')
+        flow_id = response.headers['X-Reset-Flow']
+        self.assertEqual(flow_id, str(token.pk))
+        self.assertContains(self.client.get('/auth/reset/?reset_flow=' + flow_id), 'data-proof-bound="true"')
         self.assertTrue(self.client.session.get('reset_retry_proof'))

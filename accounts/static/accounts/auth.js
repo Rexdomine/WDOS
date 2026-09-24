@@ -5,7 +5,8 @@
 const resetPanel = document.querySelector("[data-reset-form]");
 const resetMissing = document.querySelector("[data-reset-missing]");
 const proof = document.getElementById("id_proof");
-const fragment = location.hash.length > 1 ? location.hash.slice(1) : "";
+const fragmentValue = location.hash.length > 1 ? location.hash.slice(1) : "";
+const fragment = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[A-Za-z0-9_-]+$/i.test(fragmentValue) ? fragmentValue : "";
 if (resetPanel && proof && fragment) {
   resetPanel.hidden = true;
   const csrf = resetPanel.querySelector('input[name="csrfmiddlewaretoken"]');

@@ -393,6 +393,18 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         self.assertNotContains(login, 'data-reset-form')
         self.assertNotContains(login, "document.querySelector('[data-reset-form]')")
 
+    def test_reset_fragment_bootstrap_ignores_in_page_anchors_and_keeps_rejection_state_mounted(self):
+        account = self.create_active('bound-reset@example.org')
+        token, secret = services.issue_token(account, 'reset')
+        session = self.client.session
+        session['reset_retry_proof'] = services.encrypt(f'{token.pk}.{secret}')
+        session.save()
+
+        response = self.client.get('/auth/reset/')
+        self.assertContains(response, '<section class="state-card reset-missing" data-reset-missing hidden')
+        self.assertContains(response, 'fragmentValue')
+        self.assertContains(response, '[A-Za-z0-9_-]+$')
+
     def test_reset_fragment_is_bound_to_the_session_before_url_cleanup(self):
         account = services.register('Reset Fragment', 'reset-fragment@example.org', 'a genuinely long WDOS example passphrase!')
         verification, code = services.issue_token(account, 'verify')

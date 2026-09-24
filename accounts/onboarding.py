@@ -28,7 +28,7 @@ def localized_notice(catalogue, keys):
 
 
 def initial_data(account, draft, language='en'):
-    return {'full_name': account.display_name, 'email': account.email, 'language': language, 'timezone': 'UTC', 'reading': 'standard', **(draft.data if draft else {})}
+    return {'full_name': account.display_name, 'email': account.email, 'timezone': 'UTC', 'reading': 'standard', **(draft.data if draft else {}), 'language': language}
 
 
 def render_step(request, number, draft, form, notice=None, status=200):

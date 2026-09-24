@@ -8,6 +8,12 @@ from django.test import SimpleTestCase, override_settings
 from .onboarding_policy import current_policy
 
 
+class UploadBoundaryTests(SimpleTestCase):
+    def test_request_body_cap_precedes_profile_photo_parsing(self):
+        from django.conf import settings
+        self.assertEqual(settings.DATA_UPLOAD_MAX_MEMORY_SIZE, 2 * 1024 * 1024)
+
+
 class ProductionOriginTests(SimpleTestCase):
     def load(self, origin=None, environment='production'):
         env = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'WDOS_PUBLIC_ORIGIN', 'WDOS_BREVO_API_KEY', 'WDOS_EMAIL_FROM')}

@@ -58,10 +58,13 @@ class OnboardingDraftTests(TestCase):
         self.assertEqual(page.context['form'].initial['timezone'], 'Africa/Lagos')
         self.assertEqual(page.context['revision'], 1)
 
-    def test_new_draft_language_starts_from_resolved_locale(self):
+    def test_explicit_locale_overrides_saved_draft_language(self):
+        self.save(1, {'language': 'en', 'timezone': 'UTC', 'reading': 'standard'})
         page = self.client.get('/onboarding/1/?lang=fr')
-        self.assertEqual(page.context['form'].initial['language'], 'fr')
         self.assertEqual(page.context['lang'], 'fr')
+        self.assertEqual(page.context['form'].initial['language'], 'fr')
+
+        self.assertEqual(page.context['form'].initial['language'], 'fr')
 
     def test_records_tab_is_read_only_and_does_not_post_current_step_form(self):
         page = self.client.get('/onboarding/1/?tab=records')

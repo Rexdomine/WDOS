@@ -55,5 +55,12 @@ class Command(BaseCommand):
                 geography=geography,
                 expires_at=timezone.now() + timedelta(hours=options['expires_hours']),
             )
-            audit(account, 'operator_provision_reviewer_grant')
+            audit(account, 'operator_provision_reviewer_grant', {
+                'grant_id': grant.pk,
+                'role': grant.role,
+                'function': grant.function,
+                'network': grant.network,
+                'geography': grant.geography,
+                'expires_at': grant.expires_at.isoformat(),
+            })
         self.stdout.write(f'Reviewer grant {grant.pk} provisioned; expiry is {grant.expires_at.isoformat()}.')

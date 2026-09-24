@@ -9,6 +9,24 @@ from .onboarding_policy import current_policy
 
 
 class UploadBoundaryTests(SimpleTestCase):
+    def test_deployed_wsgi_boundary_caps_declared_and_chunked_bodies(self):
+        from wdos_project.wsgi import RawBodyLimitMiddleware
+        from wdos_project.upload_handlers import MAX_REQUEST_BYTES
+
+        seen = []
+        def app(environ, start_response):
+            body = environ['wsgi.input'].read()
+            seen.append((environ['wdos.raw_body_rejected'], body))
+            start_response('200 OK', [('Content-Type', 'text/plain')])
+            return [b'ok']
+
+        for environ in (
+            {'CONTENT_LENGTH': str(MAX_REQUEST_BYTES + 1), 'wsgi.input': __import__('io').BytesIO(b'x')},
+            {'wsgi.input': __import__('io').BytesIO(b'x' * (MAX_REQUEST_BYTES + 1))},
+        ):
+            RawBodyLimitMiddleware(app)(environ, lambda status, headers: None)
+        self.assertEqual(seen, [(True, b''), (True, b'x' * MAX_REQUEST_BYTES)])
+
     def test_request_body_cap_precedes_profile_photo_parsing(self):
         from django.conf import settings
         self.assertEqual(settings.DATA_UPLOAD_MAX_MEMORY_SIZE, 2 * 1024 * 1024)

@@ -2,6 +2,7 @@ from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
 import json
+import inspect
 import subprocess
 import sys
 import threading
@@ -10,6 +11,7 @@ from django.test import TransactionTestCase, SimpleTestCase, override_settings
 from django.utils import timezone
 from .models import AccessGrant, AuditEvent, EmailIntent, Invitation, Person, Account
 from . import services
+from .management.commands import revoke_reviewer_grant
 from wdos_project.runtime import supervise
 
 
@@ -146,6 +148,13 @@ class OperatorTests(TransactionTestCase):
         self.assertTrue(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant', detail={'grant_id': grant.pk, 'reason': 'Scope changed'}).exists())
         call_command('revoke_reviewer_grant', grant_id=grant.pk, reason='Repeat safely', stdout=StringIO())
         self.assertEqual(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant').count(), 1)
+
+    def test_reviewer_grant_revocation_locks_account_before_grant(self):
+        source = inspect.getsource(revoke_reviewer_grant.Command.handle)
+        self.assertLess(
+            source.index('Account.objects.select_for_update'),
+            source.index('AccessGrant.objects.select_for_update'),
+        )
 
     def test_operator_provisioning_uses_canonicalized_policy_scope(self):
         account = services.register('Padded Reviewer', 'padded-reviewer@example.org', 'very long operator test password!')

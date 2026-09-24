@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import AccessGrant
+from accounts.models import Account, AccessGrant
 from accounts.services import audit
 
 
@@ -19,9 +19,19 @@ class Command(BaseCommand):
         if not reason:
             raise CommandError('--reason must not be blank.')
         with transaction.atomic():
+            account_id = (
+                AccessGrant.objects
+                .filter(pk=options['grant_id'])
+                .values_list('account_id', flat=True)
+                .first()
+            )
+            if not account_id:
+                raise CommandError('Reviewer grant does not exist.')
+            # Match review/provisioning order: account before grant. This keeps
+            # revocation and approval from taking the two rows in reverse order.
+            account = Account.objects.select_for_update().get(pk=account_id)
             grant = (
                 AccessGrant.objects.select_for_update()
-                .select_related('account')
                 .filter(pk=options['grant_id'])
                 .first()
             )
@@ -30,7 +40,7 @@ class Command(BaseCommand):
             if grant.revoked_at is None:
                 grant.revoked_at = timezone.now()
                 grant.save(update_fields=['revoked_at'])
-                audit(grant.account, 'operator_revoke_reviewer_grant', {
+                audit(account, 'operator_revoke_reviewer_grant', {
                     'grant_id': grant.pk,
                     'reason': reason,
                 })

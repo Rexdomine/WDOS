@@ -328,12 +328,15 @@ def _invalid_reset_page(request):
 @require_http_methods(['GET', 'POST'])
 def reset(request):
     if request.method == 'GET':
-        proof_bound = _reset_retry_proof(request) is not None
+        proof_bound = _reset_retry_proof(request)
+        if proof_bound and not services.is_live_reset_proof(*proof_bound.split('.', 1)):
+            request.session.pop(RESET_RETRY_SESSION_KEY, None)
+            proof_bound = None
         return page(
             request, 'AUTH-07', 'Set a new password',
             'Choose a password you have not used here before, then return to sign in.',
-            forms.ResetForm(), 'Save new password', reset_requires_fragment=not proof_bound,
-            reset_proof_bound=proof_bound,
+            forms.ResetForm(), 'Save new password', reset_requires_fragment=proof_bound is None,
+            reset_proof_bound=proof_bound is not None,
         )
 
     if request.POST.get('preserve_fragment') == '1':
@@ -423,6 +426,8 @@ def mfa(request):
         if account.mfa_pending_until > timezone.now():
             secret = services.decrypt(account.mfa_pending_secret)
             form = form or forms.MFAForm()
+        elif request.method == 'POST':
+            form = None
     elif not setup and request.method == 'GET':
         form = forms.MFAForm()
     title = 'Protect your administrator account' if setup else 'Verify your sign-in'

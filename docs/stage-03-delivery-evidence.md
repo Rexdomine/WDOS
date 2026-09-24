@@ -4,7 +4,7 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Candidate source hash: `50970aa6d0b58b92ae219c9e2c6bf3677bc40071` (product implementation hash verified before this evidence-only documentation update; the final PR head is read back from GitHub in the closeout record)
+- Candidate implementation hash: `97a580c7b15167441c66cb82f26012e50b8d30ec` (the exact final PR head is read back from GitHub after this evidence record is committed; hosted checks and review status are keyed to that public head)
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map
@@ -12,18 +12,18 @@
 | Gate | Evidence | Result / limit |
 |---|---|---|
 | Canonical regression | `/opt/data/tmp/wdos-stage3/arabic-final-verify.log` | PASS: 169 tests, 73.348s, canonical exit 0. |
-| Refreshed source integrity | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json`, `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Both manifests identify the capture source tree as `e1be979c...ffb1`; this is pre-packaging evidence. The exact PR head is `2b3bc1f...ba31fb3`; the post-capture delta is explicitly covered by focused tests and hosted CI, with no template/static/UI asset changes. |
+| Refreshed source integrity | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json`, `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Both manifests identify the capture source tree as `e1be979c...ffb1`; this is pre-packaging evidence. The implementation delta at `97a580c...` is server-side review/consent/route hardening plus focused regressions and does not change the approved onboarding templates, static assets, locale catalogs, or screenshot geometry. |
 | Arabic/localization repair | `arabic-final-verify.log`; `accounts/test_locale.py` | PASS on the candidate. The catalog fragment `تفضيلات الحركة` was repaired and exercised. |
 | Recovery/lost-response review | `/opt/data/tmp/wdos-stage3/postcommit-independent-closeout.md` | PASS: 7 focused tests. |
 | Visual recovery review | `/opt/data/tmp/wdos-stage3/recovery-final-acceptance.md` | Parent fresh-vision review reports no remaining Arabic fragment or clipping blocker. |
 | Browser capture inventory | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json` and `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Machine-capture manifests are retained in the closeout workspace, not committed to the repository; the older `visual-correction-parent-verification.md` hash is superseded and is not used as candidate evidence. |
 
 The post-capture candidate delta is server-side authorization, consent
-revision binding, policy-validated operator provisioning, and regression coverage;
+revision binding, policy-validated operator provisioning, targeted grant
+revocation, safe back navigation, guarded dashboard routing, and regression coverage;
 it does not alter the approved onboarding templates, static assets, locale
-catalogs, or screenshot geometry. The previous hosted run `36036493012` passed
-both Django and browser jobs on `ad283bfd`; the post-correction exact-head run
-is required before this record can be treated as final.
+catalogs, or screenshot geometry. Hosted checks must be read back on the exact
+public head after this evidence update.
 
 ## Release status
 

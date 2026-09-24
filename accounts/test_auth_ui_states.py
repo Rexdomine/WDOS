@@ -454,10 +454,12 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         self.assertTrue(services.verify_contact(account.pk, code))
         token, secret = services.issue_token(account, 'reset')
         session = self.client.session
-        session['reset_retry_proof'] = services.encrypt(f'{token.pk}.{secret}')
+        session['reset_retry_proof'] = {
+            str(token.pk): services.encrypt(f'{token.pk}.{secret}'),
+        }
         session.save()
 
-        response = self.client.get('/auth/reset/')
+        response = self.client.get('/auth/reset/?reset_flow=' + str(token.pk))
         self.assertContains(response, '<section class="state-card reset-missing" data-reset-missing hidden')
         self.assertContains(response, '<section class="state-card reset-invalid" data-reset-invalid hidden')
 

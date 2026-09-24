@@ -215,7 +215,8 @@ class AuthFlows(TestCase):
         intent = EmailIntent.objects.get(account=account)
         code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
         response = self.client.post('/auth/verify/', {'email': account.email, 'code': code})
-        self.assertContains(response, 'could not be verified')
+        self.assertContains(response, 'Verification link unavailable')
+        self.assertNotContains(response, 'name="code"')
         account.refresh_from_db()
         self.assertEqual(account.status, 'pending')
 
@@ -234,6 +235,9 @@ class AuthFlows(TestCase):
         response = self.client.post('/auth/verify/', {'email': account.email, 'code': code})
         from .locale import catalog
         self.assertContains(response, catalog('fr')['verified_title'])
+        self.assertNotIn('access_notice', self.client.session)
+        status = self.client.get('/auth/status/')
+        self.assertContains(status, catalog('fr')['signed_out'])
 
     def test_email_owner_can_reclaim_pending_registration(self):
         services.register('Attacker', 'reclaim@example.org', 'attacker passphrase long enough!')
@@ -266,7 +270,9 @@ class AuthFlows(TestCase):
         account = Account.objects.get(email='race@example.org')
         intent = EmailIntent.objects.filter(account=account).order_by('-created_at').first()
         code = json.loads(services.decrypt(intent.encrypted_payload))['textContent'].split(' is ')[1].split('.')[0]
-        self.assertContains(owner.post('/auth/verify/', {'email': account.email, 'code': code}), 'could not be verified')
+        stale = owner.post('/auth/verify/', {'email': account.email, 'code': code})
+        self.assertContains(stale, 'Verification link unavailable')
+        self.assertNotContains(stale, 'name="code"')
         account.refresh_from_db()
         self.assertEqual(account.status, 'pending')
         owner.post('/auth/register/', {
@@ -347,7 +353,8 @@ class AuthFlows(TestCase):
         response=self.client.post('/auth/mfa/',{'begin':'1'})
         account.refresh_from_db()
         secret=services.decrypt(account.mfa_pending_secret)
-        self.assertContains(response,secret)
+        # Exercise the setup surface without placing the private key in assertion evidence.
+        self.assertContains(response,'class="setup-secret"')
         response=self.client.post('/auth/mfa/',{'code':pyotp.TOTP(secret).now()})
         self.assertContains(response,'Save your recovery codes')
         codes=response.context['codes']

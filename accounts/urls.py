@@ -15,5 +15,8 @@ urlpatterns = [
     path('auth/logout/', views.logout, name='logout'),
     path('auth/revoke/', views.revoke_sessions, name='revoke'),
     path('auth/session/', views.session_info, name='session'),
+    path('auth/help/', views.help_page, name='help'),
+    path('auth/privacy/', views.privacy, name='privacy'),
+    path('auth/terms/', views.terms, name='terms'),
     path('app', views.status, name='app'),
 ]

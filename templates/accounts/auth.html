@@ -162,6 +162,7 @@
             <p class="submit-status" role="status" aria-live="polite"></p>
           </form>
         </div>
+        <script>if (location.hash.length > 1) { const panel = document.querySelector('[data-reset-form]'); if (panel) panel.hidden = true; }</script>
       {% endif %}
 
       {% if verification_bound %}

@@ -64,7 +64,12 @@ jobs:
       - name: Frozen approved UI reference integrity
         run: python scripts/check_ui_reference_manifest.py
       - name: Canonical Django verification (PostgreSQL)
-        run: make verify
+        run: |
+          set -o pipefail
+          make verify > /tmp/wdos-make-verify.log 2>&1 || {
+            tail -n 250 /tmp/wdos-make-verify.log
+            exit 1
+          }
       - name: Build and exercise deployment image
         run: |
           docker build -t wdos-stage2-ci .

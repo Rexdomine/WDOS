@@ -106,6 +106,11 @@ class ReviewTests(TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertContains(dashboard, 'A shared platform foundation.')
 
+    def test_unaccepted_member_cannot_open_dashboard_directly(self):
+        self.login(self.account)
+        response = self.client.get('/app')
+        self.assertRedirects(response, '/auth/status/')
+
     def test_accepted_network_cannot_be_silently_changed(self):
         self.assertEqual(self.approve().status_code, 200)
         self.login(self.account)

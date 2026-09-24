@@ -4,7 +4,7 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Candidate source hash: `e1be979c15e0c862c695ae224c91d43e53191df5d42444ed2f2a47e53431ffb1`
+- Candidate source hash: `f8569814c5b4ff03b08ce6cdab404009f95e60bd` (exact pushed PR head; evidence captures were generated from the pre-packaging source tree and are separately identified below)
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map
@@ -12,11 +12,11 @@
 | Gate | Evidence | Result / limit |
 |---|---|---|
 | Canonical regression | `/opt/data/tmp/wdos-stage3/arabic-final-verify.log` | PASS: 169 tests, 73.348s, canonical exit 0. |
-| Refreshed source integrity | `verified-ui/manifest.json`, `recovery-visual/machine-capture-manifest.json` | Both manifests identify source hash `e1be979c...ffb1`; capture sources match each other. The recovery manifest records that this is intentionally different from the earlier base82 hash. |
+| Refreshed source integrity | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json`, `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Both manifests identify the capture source tree as `e1be979c...ffb1`; this is pre-packaging evidence and is not the PR commit. The exact PR head is `f856981...e60bd`. |
 | Arabic/localization repair | `arabic-final-verify.log`; `accounts/test_locale.py` | PASS on the candidate. The catalog fragment `تفضيلات الحركة` was repaired and exercised. |
 | Recovery/lost-response review | `/opt/data/tmp/wdos-stage3/postcommit-independent-closeout.md` | PASS: 7 focused tests. |
 | Visual recovery review | `/opt/data/tmp/wdos-stage3/recovery-final-acceptance.md` | Parent fresh-vision review reports no remaining Arabic fragment or clipping blocker. |
-| Browser capture inventory | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json` and `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Machine-capture manifests are the durable source mapping; the older `visual-correction-parent-verification.md` hash is superseded and is not used as candidate evidence. |
+| Browser capture inventory | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json` and `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Machine-capture manifests are retained in the closeout workspace, not committed to the repository; the older `visual-correction-parent-verification.md` hash is superseded and is not used as candidate evidence. |
 
 ## Release status
 

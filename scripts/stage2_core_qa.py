@@ -92,6 +92,7 @@ def run(browser,base,out,record,fixtures):
         def invalid_reset():
             p.goto(base+'/auth/reset/#'+str(uuid.uuid4())+'.'+secrets.token_urlsafe(32))
             p.wait_for_url(lambda url: '#' not in url)
+            p.locator('main a[href="/auth/recover/"]').first.wait_for(state='visible')
             if p.locator('#id_password').is_visible():
                 np='NW-'+secrets.token_urlsafe(18)+'!aA1';p.locator('#id_password').fill(np);p.locator('#id_confirm').fill(np);submit(p)
             assert not p.locator('#id_password').is_visible()
@@ -110,6 +111,7 @@ def run(browser,base,out,record,fixtures):
             capture(p,'reset-success-'+label)
             p.goto(base+'/');p.goto(base+'/auth/reset/#'+fragment);p.wait_for_url(lambda url: '#' not in url)
             assert not p.locator('#id_password').is_visible()
+            p.locator('main a[href="/auth/recover/"]').first.wait_for(state='visible')
             assert p.locator('main a[href="/auth/recover/"]').first.is_visible()
             active.user.refresh_from_db();assert active.user.check_password(np),'one-use proof was replayable'
             return capture(p,'reset-used-'+label)

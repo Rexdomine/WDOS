@@ -394,7 +394,12 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         self.assertNotContains(login, "document.querySelector('[data-reset-form]')")
 
     def test_reset_fragment_bootstrap_ignores_in_page_anchors_and_keeps_rejection_state_mounted(self):
-        account = self.create_active('bound-reset@example.org')
+        account = services.register(
+            'Bound Reset', 'bound-reset@example.org',
+            'a genuinely long WDOS example passphrase!',
+        )
+        token, code = services.issue_token(account, 'verify')
+        self.assertTrue(services.verify_contact(account.pk, code))
         token, secret = services.issue_token(account, 'reset')
         session = self.client.session
         session['reset_retry_proof'] = services.encrypt(f'{token.pk}.{secret}')

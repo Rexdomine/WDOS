@@ -133,7 +133,8 @@ class AuthUIStateRegressionTests(TestCase):
         self.assertContains(response, 'name="password"')
         self.assertNotContains(response, proof)
         response = self.client.post('/auth/reset/', {
-            'proof': '', 'password': self.password + ' changed', 'confirm': self.password + ' changed',
+            'proof': '', 'reset_flow': str(token.pk),
+            'password': self.password + ' changed', 'confirm': self.password + ' changed',
         })
         self.assertContains(response, 'Password updated')
 

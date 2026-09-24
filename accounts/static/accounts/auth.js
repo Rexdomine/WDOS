@@ -37,7 +37,7 @@ if (resetPanel && proof && (fragment || replacementFragment)) {
     proof.value = fragment;
     resetPanel.hidden = false;
     if (resetMissing) resetMissing.hidden = true;
-    const flowId = response.headers.get("X-Reset-Flow");
+    const flowId = response.headers.get("X-Reset-Flow") || (fragment ? fragment.split(".", 1)[0] : "");
     const next = new URL(location.href);
     next.hash = "";
     if (flowId) next.searchParams.set("reset_flow", flowId);

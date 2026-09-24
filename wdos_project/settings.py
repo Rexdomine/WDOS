@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import json
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "wdos-local-development-only")
@@ -91,6 +92,11 @@ if os.getenv("WDOS_ENVIRONMENT") == "production":
     WDOS_PUBLIC_ORIGIN = explicit_origin.rstrip("/")
 BREVO_API_KEY = os.getenv("WDOS_BREVO_API_KEY", "")
 WDOS_EMAIL_FROM = os.getenv("WDOS_EMAIL_FROM", "")
+try:
+    # Operator-supplied JSON keeps policy out of source and fails closed when invalid.
+    WDOS_ONBOARDING_POLICY = json.loads(os.getenv("WDOS_ONBOARDING_POLICY_JSON", "null"))
+except (TypeError, ValueError, json.JSONDecodeError):
+    WDOS_ONBOARDING_POLICY = None
 SESSION_COOKIE_SECURE = os.getenv("WDOS_SECURE_COOKIES", "1") == "1"
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 SECURE_REFERRER_POLICY = "same-origin"

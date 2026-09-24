@@ -1,5 +1,6 @@
 """Settings import contract; no database or provider access."""
 import os
+import json
 import subprocess
 import sys
 from django.test import SimpleTestCase
@@ -29,3 +30,11 @@ class ProductionOriginTests(SimpleTestCase):
         result = self.load(environment='staging')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), 'https://wdos-staging.onrender.com')
+
+    def test_operator_policy_json_is_loaded_without_source_defaults(self):
+        policy = {'version': 'operator-v1', 'approval_reference': 'approved', 'privacy_notice': 'notice', 'review_role': 'reviewer', 'review_function': 'onboarding', 'eligibility': [], 'homes': []}
+        env = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'WDOS_PUBLIC_ORIGIN', 'WDOS_BREVO_API_KEY', 'WDOS_EMAIL_FROM')}
+        env['WDOS_ONBOARDING_POLICY_JSON'] = json.dumps(policy)
+        result = subprocess.run([sys.executable, '-c', 'from wdos_project.settings import WDOS_ONBOARDING_POLICY; print(WDOS_ONBOARDING_POLICY["version"])'], env=env, text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'operator-v1')

@@ -89,6 +89,20 @@ class ReviewTests(TestCase):
         session=self.client.session; session['mfa_verified']=False; session.save()
         self.assertEqual(self.approve().status_code, 403)
 
+    def test_reviewer_cannot_read_unsubmitted_draft(self):
+        draft = OnboardingDraft.objects.get(account=self.account)
+        draft.state = 'draft'
+        draft.save(update_fields=['state'])
+        response = self.client.get(f'/onboarding/review/{self.account.pk}/')
+        self.assertEqual(response.status_code, 409)
+
+    def test_accepted_first_use_opens_dashboard(self):
+        self.assertEqual(self.approve().status_code, 200)
+        self.login(self.account)
+        response = self.client.get('/onboarding/8/')
+        self.assertContains(response, 'href="/app"')
+        self.assertNotContains(response, 'disabled aria-disabled="true"')
+
     def test_accepted_network_cannot_be_silently_changed(self):
         self.assertEqual(self.approve().status_code, 200)
         self.login(self.account)

@@ -31,9 +31,9 @@ if (resetPanel && proof && (fragment || replacementFragment)) {
       error.status = response.status;
       throw error;
     }
-    return true;
+    return response;
   };
-  preserveFragment().then(() => {
+  preserveFragment().then(response => {
     proof.value = fragment;
     resetPanel.hidden = false;
     if (resetMissing) resetMissing.hidden = true;

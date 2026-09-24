@@ -460,6 +460,7 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         js = (Path(__file__).parent / 'static' / 'accounts' / 'auth.js').read_text(encoding='utf-8')
         self.assertNotIn('if (resetInvalid && replacementFragment) resetInvalid.hidden = false;', js)
         self.assertIn('if (resetInvalid) resetInvalid.hidden = false;', js)
+        self.assertIn('preserveFragment().then(response => {', js)
 
     def test_reset_fragment_is_bound_to_the_session_before_url_cleanup(self):
         account = services.register('Reset Fragment', 'reset-fragment@example.org', 'a genuinely long WDOS example passphrase!')

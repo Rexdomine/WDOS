@@ -4,6 +4,9 @@ import uuid
 
 from cryptography.fernet import InvalidToken
 from django.conf import settings
+from django.contrib.sessions.backends.db import SessionStore
+from django.contrib.sessions.models import Session
+from django.db import transaction
 from django.contrib.auth import login as django_login
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
@@ -343,12 +346,23 @@ def _store_reset_retry_proof(request, proof):
     flow_id = _reset_flow_id(proof)
     if not flow_id:
         return None
-    proofs = request.session.get(RESET_RETRY_SESSION_KEY, {})
-    if not isinstance(proofs, dict):
-        proofs = {}
-    proofs[flow_id] = services.encrypt(proof)
-    request.session[RESET_RETRY_SESSION_KEY] = dict(list(proofs.items())[-4:])
-    request.session.modified = True
+    new_session = not request.session.session_key
+    if new_session:
+        request.session.save()
+    session_key = request.session.session_key
+    with transaction.atomic():
+        Session.objects.select_for_update().get(session_key=session_key)
+        store = SessionStore(session_key=session_key)
+        session_data = store.load()
+        proofs = session_data.get(RESET_RETRY_SESSION_KEY, {})
+        if not isinstance(proofs, dict):
+            proofs = {}
+        proofs[flow_id] = services.encrypt(proof)
+        session_data[RESET_RETRY_SESSION_KEY] = dict(list(proofs.items())[-4:])
+        store._session_cache = session_data
+        store.save(must_create=False)
+    request.session._session_cache = session_data
+    request.session.modified = new_session
     return flow_id
 
 

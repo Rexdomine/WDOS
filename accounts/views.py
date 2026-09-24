@@ -241,6 +241,7 @@ def verify(request):
         if (rate(request, 'verify', str(account.pk))
                 and services.verify_contact(account.pk, form.cleaned_data['code'])):
             request.session.pop('pending_registration_account', None)
+            request.session.pop('access_notice', None)
             return page(
                 request, 'AUTH-04', 'Contact verified',
                 'Your account is ready. Sign in to continue.',

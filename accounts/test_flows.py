@@ -235,6 +235,9 @@ class AuthFlows(TestCase):
         response = self.client.post('/auth/verify/', {'email': account.email, 'code': code})
         from .locale import catalog
         self.assertContains(response, catalog('fr')['verified_title'])
+        self.assertNotIn('access_notice', self.client.session)
+        status = self.client.get('/auth/status/')
+        self.assertContains(status, catalog('fr')['signed_out_title'])
 
     def test_email_owner_can_reclaim_pending_registration(self):
         services.register('Attacker', 'reclaim@example.org', 'attacker passphrase long enough!')

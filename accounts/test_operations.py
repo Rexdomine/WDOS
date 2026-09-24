@@ -143,7 +143,7 @@ class OperatorTests(TransactionTestCase):
         call_command('revoke_reviewer_grant', grant_id=grant.pk, reason='Scope changed', stdout=StringIO())
         grant.refresh_from_db()
         self.assertIsNotNone(grant.revoked_at)
-        self.assertTrue(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant').exists())
+        self.assertTrue(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant', detail={'grant_id': grant.pk, 'reason': 'Scope changed'}).exists())
         call_command('revoke_reviewer_grant', grant_id=grant.pk, reason='Repeat safely', stdout=StringIO())
         self.assertEqual(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant').count(), 1)
 

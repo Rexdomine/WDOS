@@ -17,6 +17,8 @@ def current_policy():
         result[key] = result[key].strip()
     if len(result['version']) > 100 or len(result['approval_reference']) > 500:
         return None
+    if len(result['review_role']) > 64 or len(result['review_function']) > 64:
+        return None
     for collection, keys in [('eligibility', ['code', 'label', 'network', 'basis']), ('homes', ['code', 'label', 'network', 'country', 'region', 'district', 'kind'])]:
         rows = value.get(collection)
         if not isinstance(rows, list) or not rows:
@@ -29,6 +31,8 @@ def current_policy():
             normalized = dict(row)
             for key in keys:
                 normalized[key] = normalized[key].strip()
+            if collection == 'homes' and len(normalized['country']) > 100:
+                return None
             if normalized['network'] not in ('WGMN', 'WNNN') or normalized['code'] in seen:
                 return None
             seen.add(normalized['code'])

@@ -82,6 +82,7 @@ class Throttle(models.Model):
 class AuditEvent(models.Model):
     account = models.ForeignKey(Account, null=True, on_delete=models.PROTECT)
     event = models.CharField(max_length=48)
+    detail = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
 
 

@@ -30,7 +30,10 @@ class Command(BaseCommand):
             if grant.revoked_at is None:
                 grant.revoked_at = timezone.now()
                 grant.save(update_fields=['revoked_at'])
-                audit(grant.account, 'operator_revoke_reviewer_grant')
+                audit(grant.account, 'operator_revoke_reviewer_grant', {
+                    'grant_id': grant.pk,
+                    'reason': reason,
+                })
                 status = 'revoked'
             else:
                 status = 'already revoked'

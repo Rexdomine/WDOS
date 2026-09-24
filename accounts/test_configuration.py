@@ -3,7 +3,9 @@ import os
 import json
 import subprocess
 import sys
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
+
+from .onboarding_policy import current_policy
 
 
 class ProductionOriginTests(SimpleTestCase):
@@ -31,7 +33,21 @@ class ProductionOriginTests(SimpleTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), 'https://wdos-staging.onrender.com')
 
-    def test_operator_policy_json_is_loaded_without_source_defaults(self):
+    def test_policy_scope_lengths_fit_access_grant_columns(self):
+        base = {
+            'version': 'operator-v1', 'approval_reference': 'approved', 'privacy_notice': 'notice',
+            'review_role': 'reviewer', 'review_function': 'onboarding',
+            'eligibility': [{'code': 'adult', 'label': 'Adult', 'network': 'WGMN', 'basis': 'verified'}],
+            'homes': [{'code': 'lagos', 'label': 'Lagos', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'}],
+        }
+        for key, value in (('review_role', 'r' * 65), ('review_function', 'f' * 65)):
+            candidate = dict(base, **{key: value})
+            with self.subTest(key=key), override_settings(WDOS_ONBOARDING_POLICY=candidate):
+                self.assertIsNone(current_policy())
+        candidate = dict(base, homes=[dict(base['homes'][0], country='N' * 101)])
+        with override_settings(WDOS_ONBOARDING_POLICY=candidate):
+            self.assertIsNone(current_policy())
+
         policy = {'version': 'operator-v1', 'approval_reference': 'approved', 'privacy_notice': 'notice', 'review_role': 'reviewer', 'review_function': 'onboarding', 'eligibility': [], 'homes': []}
         env = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'WDOS_PUBLIC_ORIGIN', 'WDOS_BREVO_API_KEY', 'WDOS_EMAIL_FROM')}
         env['WDOS_ONBOARDING_POLICY_JSON'] = json.dumps(policy)

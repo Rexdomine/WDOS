@@ -4,7 +4,7 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Exact candidate identity: `52e597ca2c8ac27633c36999c89eb418e9c434c8` (new same-family security repair; read back locally before push). 
+- Exact candidate identity: `4a24bdd973440255047fa76249b7f8a833b799cb` (read back locally and from the live PR before this evidence refresh).
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map
@@ -13,6 +13,7 @@
 |---|---|---|
 | Canonical regression | `/opt/data/tmp/wdos-stage3/arabic-final-verify.log` | PASS: 169 tests, 73.348s, canonical exit 0. |
 | Same-family quota regression | `accounts.test_onboarding` + `accounts.test_configuration` | PASS: 34 tests under isolated SQLite; full-draft quota returns 429 before Pillow image decoding, with revision/history unchanged. |
+| Hosted exact-head CI | GitHub Actions run `36067423127` on `4a24bdd973440255047fa76249b7f8a833b799cb` | PASS: `django`, `ui-browser`, CodeRabbit, and GitGuardian all successful. Codex code/security review is still pending on this exact head. |
 | Refreshed source integrity | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json`, `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Both manifests identify the capture source tree as `e1be979c...ffb1`; this is pre-packaging evidence. The implementation delta after capture is limited to server-side review/consent/route hardening, operator audit provenance, locale precedence, request-body upload protection via the first-position limiting upload handler, and focused regressions; the accepted-state template correction is covered by hosted UI-browser evidence. |
 | Arabic/localization repair | `arabic-final-verify.log`; `accounts/test_locale.py` | PASS on the candidate. The catalog fragment `تفضيلات الحركة` was repaired and exercised. |
 | Recovery/lost-response review | `/opt/data/tmp/wdos-stage3/postcommit-independent-closeout.md` | PASS: 7 focused tests. |

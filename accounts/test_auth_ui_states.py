@@ -173,6 +173,21 @@ class AuthUIStateRegressionTests(TestCase):
         self.assertNotIn('reset_retry_proof', self.client.session)
         self.assertEqual(live_proof.call_count, 2)
 
+    def test_invalid_fragment_drops_any_stale_retry_proof(self):
+        account = self.create_active('stale-fragment@example.org')
+        token, secret = services.issue_token(account, 'reset')
+        stale_proof = f'{token.pk}.{secret}'
+        session = self.client.session
+        session['reset_retry_proof'] = services.encrypt(stale_proof)
+        session.save()
+
+        response = self.client.post('/auth/reset/', {
+            'preserve_fragment': '1', 'proof': 'not-a-valid-proof',
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn('reset_retry_proof', self.client.session)
+
     def test_verification_is_bound_masked_and_has_real_resend_cooldown(self):
         account = self.register_pending('recognisable@example.org')
         response = self.client.get('/auth/verify/')
@@ -370,6 +385,13 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         self.assertIn('credentials: "same-origin"', js)
         self.assertNotIn('localStorage', js)
         self.assertNotIn('sessionStorage', js)
+
+    def test_reset_fragment_guard_is_scoped_to_reset_screen(self):
+        reset = self.client.get('/auth/reset/')
+        login = self.client.get('/auth/login/')
+        self.assertContains(reset, 'data-reset-form')
+        self.assertNotContains(login, 'data-reset-form')
+        self.assertNotContains(login, "document.querySelector('[data-reset-form]')")
 
     def test_reset_fragment_is_bound_to_the_session_before_url_cleanup(self):
         account = services.register('Reset Fragment', 'reset-fragment@example.org', 'a genuinely long WDOS example passphrase!')

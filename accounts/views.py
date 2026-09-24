@@ -343,6 +343,7 @@ def reset(request):
     if request.POST.get('preserve_fragment') == '1':
         proof = _valid_reset_proof(request.POST.get('proof', ''))
         if proof is None or not services.is_live_reset_proof(*proof.split('.', 1)):
+            request.session.pop(RESET_RETRY_SESSION_KEY, None)
             return JsonResponse({'error': 'invalid proof'}, status=400)
         request.session[RESET_RETRY_SESSION_KEY] = services.encrypt(proof)
         return HttpResponse(status=204)

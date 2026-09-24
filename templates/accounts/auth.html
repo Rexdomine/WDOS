@@ -108,7 +108,7 @@
       {% endif %}
 
       {% if form %}
-        <div{% if reset_requires_fragment %} hidden{% endif %} data-reset-form{% if reset_proof_bound %} data-proof-bound="true"{% endif %}>
+        <div{% if reset_requires_fragment %} hidden{% endif %}{% if screen == 'AUTH-07' %} data-reset-form{% if reset_proof_bound %} data-proof-bound="true"{% endif %}{% endif %}>
           <p class="form-guidance">{{ translations.required }}</p>
           <form method="post" class="auth-live-form" data-working-label="{{ translations.working }}" novalidate>
             {% csrf_token %}
@@ -162,7 +162,7 @@
             <p class="submit-status" role="status" aria-live="polite"></p>
           </form>
         </div>
-        <script>if (location.hash.length > 1) { const panel = document.querySelector('[data-reset-form]'); if (panel) panel.hidden = true; }</script>
+        {% if screen == 'AUTH-07' %}<script>if (location.hash.length > 1) { const panel = document.querySelector('[data-reset-form]'); if (panel) panel.hidden = true; }</script>{% endif %}
       {% endif %}
 
       {% if verification_bound %}

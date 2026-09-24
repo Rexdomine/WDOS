@@ -4,7 +4,7 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Candidate source hash: `2b3bc1fabaea702d0db8d63de9c454339ba31fb3` (exact pushed PR head; evidence captures were generated from the pre-packaging source tree and are separately identified below)
+- Candidate source hash: `50970aa6d0b58b92ae219c9e2c6bf3677bc40071` (product implementation hash verified before this evidence-only documentation update; the final PR head is read back from GitHub in the closeout record)
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map
@@ -21,8 +21,9 @@
 The post-capture candidate delta is server-side authorization, consent
 revision binding, policy-validated operator provisioning, and regression coverage;
 it does not alter the approved onboarding templates, static assets, locale
-catalogs, or screenshot geometry. Hosted CI run `36035389754` passed both
-Django and browser jobs on this exact candidate.
+catalogs, or screenshot geometry. The previous hosted run `36036493012` passed
+both Django and browser jobs on `ad283bfd`; the post-correction exact-head run
+is required before this record can be treated as final.
 
 ## Release status
 

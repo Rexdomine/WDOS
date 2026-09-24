@@ -1,7 +1,7 @@
 """Stage 3 contract regressions: real authenticated requests and durable state."""
 from django.test import TestCase, override_settings
 from . import test_flows as _flow_helpers
-from .models import Person
+from .models import Person, OnboardingDraft, OnboardingEvent
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -98,6 +98,18 @@ class OnboardingDraftTests(TestCase):
         self.assertContains(response, 'Check the highlighted information', status_code=422)
         page = self.client.get('/onboarding/2/')
         self.assertEqual(page.context['form'].initial['preferred_name'], 'Amara')
+
+    def test_repeated_unchanged_invalid_submission_does_not_grow_history(self):
+        first = self.save(2, {'full_name': ''})
+        self.assertEqual(first.status_code, 422)
+        draft = OnboardingDraft.objects.get(account=self.account)
+        before_revision = draft.revision
+        before_events = OnboardingEvent.objects.filter(draft=draft).count()
+        response = self.save(2, {'full_name': ''}, revision=before_revision)
+        self.assertEqual(response.status_code, 422)
+        draft.refresh_from_db()
+        self.assertEqual(draft.revision, before_revision)
+        self.assertEqual(OnboardingEvent.objects.filter(draft=draft).count(), before_events)
 
     def test_post_needs_expected_revision(self):
         response = self.client.post('/onboarding/1/', {'timezone': 'UTC'})

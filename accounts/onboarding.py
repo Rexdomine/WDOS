@@ -136,7 +136,9 @@ def step(request, step):
         )
         if step == 6:
             unchanged = unchanged and draft.consents.filter(revision=draft.revision).exists()
-        if valid and unchanged:
+        if unchanged:
+            if not valid:
+                return render_step(request, step, draft, form, localized_notice(c, INVALID_KEYS), 422)
             return redirect('onboarding:step', step=draft.next_step)
         draft.data = {**draft.data, **changes}
         if step == 1 and form.cleaned_data.get('language') in LANGUAGES:

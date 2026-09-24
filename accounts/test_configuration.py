@@ -32,6 +32,16 @@ class UploadBoundaryTests(SimpleTestCase):
         self.assertEqual(settings.DATA_UPLOAD_MAX_MEMORY_SIZE, 2 * 1024 * 1024)
         self.assertEqual(settings.FILE_UPLOAD_HANDLERS[0], 'wdos_project.upload_handlers.UploadSizeLimitHandler')
 
+    def test_rejected_raw_body_marks_request_for_non_mutating_recovery_before_csrf(self):
+        from django.http import HttpResponse
+        from django.test import RequestFactory
+        from wdos_project.request_limits import RawBodyRejectedCsrfBypassMiddleware
+        request = RequestFactory().post('/onboarding/2/', data={})
+        request.META['wdos.raw_body_rejected'] = True
+        response = RawBodyRejectedCsrfBypassMiddleware(lambda req: HttpResponse('ok'))(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(request._dont_enforce_csrf_checks)
+
     def test_upload_handler_rejects_oversized_content_length(self):
         from django.core.files.uploadhandler import StopUpload
         from wdos_project.upload_handlers import UploadSizeLimitHandler, MAX_REQUEST_BYTES

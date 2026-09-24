@@ -3,6 +3,7 @@ from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
+from django.contrib.sessions.backends.db import SessionStore
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -205,7 +206,32 @@ class AuthUIStateRegressionTests(TestCase):
         })
 
         self.assertEqual(response.status_code, 400)
-        self.assertTrue(self.client.session.get('reset_retry_proof'))
+        self.assertFalse(self.client.session.get('reset_retry_proof'))
+
+    def test_reset_proof_clear_reloads_concurrent_unrelated_flow(self):
+        account = self.create_active('concurrent-reset@example.org')
+        other = self.create_active('concurrent-reset-other@example.org')
+        token_a, secret_a = services.issue_token(account, 'reset')
+        token_b, secret_b = services.issue_token(other, 'reset')
+        proof_a = f'{token_a.pk}.{secret_a}'
+        proof_b = f'{token_b.pk}.{secret_b}'
+        response = self.client.post('/auth/reset/', {'preserve_fragment': '1', 'proof': proof_a})
+        flow_a = response.headers['X-Reset-Flow']
+        response = self.client.post('/auth/reset/', {'preserve_fragment': '1', 'proof': proof_b})
+        flow_b = response.headers['X-Reset-Flow']
+        session = self.client.session
+        session_key = session.session_key
+        stale = SessionStore(session_key=session_key)
+        stale.load()
+        fresh = SessionStore(session_key=session_key)
+        data = fresh.load()
+        data['reset_retry_proof'][flow_b] = services.encrypt(proof_b)
+        fresh._session_cache = data
+        fresh.save(must_create=False)
+        session = stale
+        from .views import _clear_reset_retry_proof
+        _clear_reset_retry_proof(type('Request', (), {'session': session, 'GET': {}, 'POST': {}})(), proof_a)
+        self.assertIn(flow_b, session.load().get('reset_retry_proof', {}))
 
     def test_verification_is_bound_masked_and_has_real_resend_cooldown(self):
         account = self.register_pending('recognisable@example.org')

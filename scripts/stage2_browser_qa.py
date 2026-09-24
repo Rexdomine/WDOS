@@ -62,7 +62,10 @@ def fixtures():
     from accounts.models import Account
     User=get_user_model(); suffix=secrets.token_hex(5); pw='NW-'+secrets.token_urlsafe(18)+'!aA1'
     data={}
-    for label,status,staff in [('pending','pending',False),('active','active',False),('staff_mfa','active',True),('suspended','suspended',False)]:
+    labels=[('pending','pending',False),('active','active',False),('staff_mfa','active',True),('suspended','suspended',False)]
+    labels += [(f'active_{lang}','active',False) for lang in LANGS if lang != 'en']
+    labels += [(f'staff_mfa_{lang}','active',True) for lang in LANGS if lang != 'en']
+    for label,status,staff in labels:
         email=f'nw-{label}-{suffix}@example.invalid'; u=User.objects.create_user(email=email,password=pw,username=email); u.is_staff=staff; u.save(update_fields=['is_staff'])
         a=Account.objects.create(user=u,email=email,display_name='NightWing Fixture',status=status,verified_at=None if status=='pending' else __import__('django').utils.timezone.now())
         data[label]=(a,email)
@@ -81,15 +84,36 @@ def run_server():
 
 def main():
     db=bootstrap(); run_server()
+    qa_data, qa_pw = fixtures()
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         browser=p.chromium.launch(headless=True, executable_path=CHROME)
+
+        def visit(page, sid, route, suffix=''):
+            if sid == 'AUTH-05':
+                lang = suffix.split('lang=', 1)[1] if 'lang=' in suffix else 'en'
+                account, email = qa_data.get('active_'+lang, qa_data['active'])
+                page.goto(BASE+'/auth/login/'+suffix, wait_until='networkidle')
+                page.locator('#id_email').fill(email); page.locator('#id_password').fill(qa_pw)
+                page.locator('form.auth-live-form button[type=submit]').click()
+                page.wait_for_load_state('networkidle')
+            elif sid == 'AUTH-08':
+                lang = suffix.split('lang=', 1)[1] if 'lang=' in suffix else 'en'
+                account, email = qa_data.get('staff_mfa_'+lang, qa_data['staff_mfa'])
+                page.goto(BASE+'/auth/login/'+suffix, wait_until='networkidle')
+                page.locator('#id_email').fill(email); page.locator('#id_password').fill(qa_pw)
+                page.locator('form.auth-live-form button[type=submit]').click()
+                page.wait_for_load_state('networkidle')
+            page.goto(BASE+route+suffix, wait_until='networkidle', timeout=25000)
+            if sid in {'AUTH-05', 'AUTH-08'}:
+                assert route in page.url and '/auth/login/' not in page.url, f'{sid} was not authenticated: {page.url}'
+
         # Public breadth, canonical captures, locales, controls and destinations.
         for width,height,label in [(1440,1000,'desktop'),(390,844,'mobile')]:
             ctx=browser.new_context(viewport={'width':width,'height':height}); page=ctx.new_page(); page.set_default_timeout(9000)
             for sid,route in ROUTES.items():
                 try:
-                    page.goto(BASE+route,wait_until='networkidle',timeout=25000)
+                    visit(page, sid, route)
                     for sel in ['.setup-secret','.recovery-codes','[sensitive]']:
                         for loc in page.locator(sel).all(): loc.evaluate("e=>e.textContent='[REDACTED]'")
                     assert not page.evaluate('document.documentElement.scrollWidth>innerWidth'), 'horizontal overflow'
@@ -102,8 +126,8 @@ def main():
                 except Exception as e: record(f'public:{sid}:{label}','fail',str(e))
             for lang in LANGS:
                 try:
-                    for route in ROUTES.values():
-                        page.goto(BASE+route+'?lang='+lang,wait_until='networkidle')
+                    for sid,route in ROUTES.items():
+                        visit(page, sid, route, '?lang='+lang)
                         assert page.locator('html').get_attribute('lang')==lang
                         assert page.locator('html').get_attribute('dir')==('rtl' if lang=='ar' else 'ltr')
                         assert page.locator('select[name=lang]').input_value()==lang

@@ -4,6 +4,7 @@ from pathlib import Path
 import secrets,uuid
 import pyotp
 from django.utils import timezone
+from django.contrib.sessions.backends.db import SessionStore
 from django.contrib.sessions.models import Session
 from accounts import services
 from accounts.models import Account,Person,Invitation,RecoveryCode
@@ -147,8 +148,13 @@ def run(browser,base,out,record,fixtures):
             assert RecoveryCode.objects.get(account=staff,digest=services.digest(recovery[0])).used_at
             capture(p,'mfa-recovered-'+label)
             sessionid=next(x['value'] for x in c.cookies() if x['name']=='sessionid')
-            Session.objects.filter(session_key=sessionid).update(expire_date=timezone.now()-timedelta(seconds=1))
-            p.goto(base+'/auth/status/');assert p.locator('main a[href="/auth/login/"]').count()>0
+            expired_session=Session.objects.get(session_key=sessionid)
+            session_data=expired_session.get_decoded()
+            session_data['absolute_expiry']=timezone.now().timestamp()-1
+            expired_session.session_data=SessionStore(session_key=sessionid).encode(session_data)
+            expired_session.save(update_fields=['session_data'])
+            p.goto(base+'/auth/status/');assert p.locator('main .status-card.status-expired').is_visible()
+            assert 'Sign in again to continue' in p.locator('main').inner_text()
             return capture(p,'expired-'+label)
         case('journey:mfa-recovery-expiry:'+label,recovery_login);c.close()
         c,p=context(width)

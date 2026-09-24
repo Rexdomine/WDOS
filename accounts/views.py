@@ -323,11 +323,11 @@ def _reset_retry_proof(request):
     flow_id = request.GET.get(RESET_FLOW_QUERY_KEY) or request.POST.get(RESET_FLOW_QUERY_KEY)
     proofs = request.session.get(RESET_RETRY_SESSION_KEY, {})
     if isinstance(proofs, str):
-        try:
-            return _valid_reset_proof(services.decrypt(proofs))
-        except (InvalidToken, ValueError, TypeError, UnicodeError):
-            request.session.pop(RESET_RETRY_SESSION_KEY, None)
-            return None
+        # Legacy scalar proofs have no flow binding.  Discard them rather than
+        # allowing a stale proof to survive a replacement-flow rejection.
+        request.session.pop(RESET_RETRY_SESSION_KEY, None)
+        request.session.modified = True
+        return None
     if not isinstance(proofs, dict) or not flow_id:
         return None
     encrypted = proofs.get(flow_id)
@@ -368,18 +368,28 @@ def _store_reset_retry_proof(request, proof):
 
 def _clear_reset_retry_proof(request, proof=None):
     flow_id = _reset_flow_id(proof) or request.GET.get(RESET_FLOW_QUERY_KEY) or request.POST.get(RESET_FLOW_QUERY_KEY)
-    proofs = request.session.get(RESET_RETRY_SESSION_KEY, {})
-    if not isinstance(proofs, dict):
-        proofs = {}
-    if flow_id:
-        proofs.pop(flow_id, None)
-    else:
+    if not flow_id:
         return
-    if proofs:
-        request.session[RESET_RETRY_SESSION_KEY] = proofs
-    else:
-        request.session.pop(RESET_RETRY_SESSION_KEY, None)
-    request.session.modified = True
+    new_session = not request.session.session_key
+    if new_session:
+        request.session.save()
+    session_key = request.session.session_key
+    with transaction.atomic():
+        Session.objects.select_for_update().get(session_key=session_key)
+        store = SessionStore(session_key=session_key)
+        session_data = store.load()
+        proofs = session_data.get(RESET_RETRY_SESSION_KEY, {})
+        if not isinstance(proofs, dict):
+            proofs = {}
+        proofs.pop(flow_id, None)
+        if proofs:
+            session_data[RESET_RETRY_SESSION_KEY] = proofs
+        else:
+            session_data.pop(RESET_RETRY_SESSION_KEY, None)
+        store._session_cache = session_data
+        store.save(must_create=False)
+    request.session._session_cache = session_data
+    request.session.modified = new_session
 
 
 def _invalid_reset_page(request, proof=None):
@@ -409,6 +419,9 @@ def reset(request):
     if request.POST.get('preserve_fragment') == '1':
         proof = _valid_reset_proof(request.POST.get('proof', ''))
         if proof is None or not services.is_live_reset_proof(*proof.split('.', 1)):
+            if isinstance(request.session.get(RESET_RETRY_SESSION_KEY), str):
+                request.session.pop(RESET_RETRY_SESSION_KEY, None)
+                request.session.modified = True
             return JsonResponse({'error': 'invalid proof'}, status=400)
         flow_id = _store_reset_retry_proof(request, proof)
         response = HttpResponse(status=204)

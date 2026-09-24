@@ -4,7 +4,7 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Exact verified implementation head: `d63023091340fdd3a6b27a30e9572b0c68b74600`; hosted exact-head CI run: `36042906233` (Django and UI-browser passed). This evidence record is documentation-only after that implementation head; the final PR head is always read back from GitHub.
+- Exact candidate identity: the GitHub PR head is authoritative and must be read back before acceptance; this documentation file deliberately does not embed a self-invalidating commit hash. The current closeout ledger records the exact head and hosted run after each push.
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map

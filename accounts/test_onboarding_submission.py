@@ -69,6 +69,17 @@ class SubmissionTests(TestCase):
         self.assertEqual(draft.events.count(), events)
         self.assertEqual(draft.revision, 7)
 
+    def test_review_needed_current_revision_replay_returns_same_submission(self):
+        self.fill()
+        self.submit()
+        draft = OnboardingDraft.objects.get(account=self.account)
+        events = draft.events.count()
+        replay = self.submit(revision=draft.revision)
+        self.assertRedirects(replay, '/onboarding/8/')
+        draft.refresh_from_db()
+        self.assertEqual(draft.events.count(), events)
+        self.assertEqual(draft.submission_revision, 6)
+
     def test_reload_does_not_resubmit(self):
         self.fill()
         self.submit()

@@ -104,7 +104,7 @@ def step(request, step):
         if locked.status != 'active' or not locked.user.is_active or locked.security_version != request.session.get('security_version'):
             return redirect('accounts:login')
         draft = OnboardingDraft.objects.select_for_update().filter(account=locked).first()
-        if step == 7 and draft and draft.state != 'draft' and draft.submission_revision == revision:
+        if step == 7 and draft and draft.state != 'draft' and revision in (draft.submission_revision, draft.revision):
             return redirect('onboarding:step', step=8)
         if revision != (draft.revision if draft else 0) or (draft and draft.state == 'accepted'):
             return render_step(request, step, draft, form, localized_notice(c, CONFLICT_KEYS), 409)

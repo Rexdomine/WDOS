@@ -331,8 +331,7 @@ def reset(request):
     if request.method == 'GET':
         proof_bound = _reset_retry_proof(request)
         if proof_bound and not services.is_live_reset_proof(*proof_bound.split('.', 1)):
-            request.session.pop(RESET_RETRY_SESSION_KEY, None)
-            proof_bound = None
+            return _invalid_reset_page(request)
         return page(
             request, 'AUTH-07', 'Set a new password',
             'Choose a password you have not used here before, then return to sign in.',

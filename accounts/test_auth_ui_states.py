@@ -153,6 +153,22 @@ class AuthUIStateRegressionTests(TestCase):
         self.assertNotContains(response, 'name="password"')
         self.assertNotIn('reset_retry_proof', self.client.session)
 
+    def test_expired_bound_reset_proof_renders_unusable_link_state_on_get(self):
+        account = self.create_active('expired-bound-reset@example.org')
+        token, secret = services.issue_token(account, 'reset')
+        proof = f'{token.pk}.{secret}'
+        self.client.session['reset_retry_proof'] = services.encrypt(proof)
+        self.client.session.save()
+        ActionToken.objects.filter(pk=token.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
+
+        response = self.client.get('/auth/reset/')
+
+        self.assertContains(response, 'Link expired')
+        self.assertContains(response, 'This password reset link can no longer be used.')
+        self.assertNotContains(response, 'Recovery link required')
+        self.assertNotContains(response, 'name="password"')
+        self.assertNotIn('reset_retry_proof', self.client.session)
+
     @patch('accounts.views.services.reset_password')
     @patch('accounts.views.services.is_live_reset_proof', side_effect=[True, False])
     def test_reset_error_drops_proof_that_expires_during_password_validation(

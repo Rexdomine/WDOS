@@ -29,3 +29,13 @@ The authoritative stage contract remains in the project workspace under `develop
 ## Safety
 
 Do not commit credentials, local environment files, provider tokens, database dumps, build output, or Render metadata. Review deployment targets and environment identity before every external operation.
+
+## Stage 3 onboarding policy
+
+The onboarding reviewer and consent flow fail closed until an operator supplies
+`WDOS_ONBOARDING_POLICY_JSON`. The value is JSON configuration, not a source or
+test default; `accounts.onboarding_policy.current_policy()` validates its
+version, approval reference, privacy notice, reviewer role/function, explicit
+eligibility rows, and local-home rows before the policy is usable. Keep the
+operator-approved value in the deployment secret/environment configuration and
+never commit it to this repository.

@@ -61,6 +61,7 @@ def review(request, account_id):
         if (
             not consent
             or consent.revision != draft.submission_revision
+            or consent.revision != draft.revision - 1
             or not consent.privacy_ack
             or consent.digest != policy['digest']
             or consent.optional_updates != bool(draft.data.get('optional_updates'))

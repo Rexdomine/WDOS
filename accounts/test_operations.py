@@ -8,7 +8,7 @@ import threading
 from django.core.management import call_command
 from django.test import TransactionTestCase, SimpleTestCase, override_settings
 from django.utils import timezone
-from .models import EmailIntent, Invitation, Person, Account
+from .models import AccessGrant, EmailIntent, Invitation, Person, Account
 from . import services
 from wdos_project.runtime import supervise
 
@@ -109,6 +109,20 @@ class OperatorTests(TransactionTestCase):
             call_command('set_account_access',email=account.email,action=action,stdout=StringIO())
             account.refresh_from_db()
             self.assertEqual(account.security_version,old+1)
+
+    def test_operator_can_provision_scoped_reviewer_grant(self):
+        account = services.register('Reviewer', 'reviewer@example.org', 'very long operator test password!')
+        _, secret = services.issue_token(account, 'verify')
+        services.verify_contact(account.pk, secret)
+        call_command(
+            'provision_reviewer_grant', email=account.email, role='reviewer',
+            function='onboarding', network='WGMN', geography='Nigeria',
+            expires_hours=4, stdout=StringIO(),
+        )
+        grant = AccessGrant.objects.get(account=account)
+        self.assertEqual((grant.role, grant.function, grant.network, grant.geography),
+                         ('reviewer', 'onboarding', 'WGMN', 'Nigeria'))
+        self.assertGreater(grant.expires_at, timezone.now())
 
 
 class SupervisorTests(SimpleTestCase):

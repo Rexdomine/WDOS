@@ -39,3 +39,15 @@ version, approval reference, privacy notice, reviewer role/function, explicit
 eligibility rows, and local-home rows before the policy is usable. Keep the
 operator-approved value in the deployment secret/environment configuration and
 never commit it to this repository.
+
+After the account is active and verified, provision the scoped reviewer grant
+through the auditable operator command (using values approved in the policy):
+
+```sh
+python manage.py provision_reviewer_grant \
+  --email reviewer@example.org --role reviewer --function onboarding \
+  --network WGMN --geography Nigeria --expires-hours 4
+```
+
+The command requires an active verified account, records an audit event, and
+always creates an expiry; it does not grant broad staff or superuser access.

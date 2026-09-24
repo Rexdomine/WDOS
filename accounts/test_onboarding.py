@@ -1,4 +1,7 @@
 """Stage 3 contract regressions: real authenticated requests and durable state."""
+from unittest.mock import patch
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from . import test_flows as _flow_helpers
 from .models import Person, OnboardingDraft, OnboardingEvent
@@ -126,6 +129,30 @@ class OnboardingDraftTests(TestCase):
         ])
         response = self.save(2, {'full_name': 'Bounded History'}, revision=draft.revision)
         self.assertEqual(response.status_code, 429)
+        draft.refresh_from_db()
+        self.assertEqual(draft.revision, MAX_ONBOARDING_EVENTS)
+        self.assertEqual(draft.events.count(), MAX_ONBOARDING_EVENTS)
+
+    def test_history_quota_precedes_profile_photo_decoding(self):
+        draft = OnboardingDraft.objects.create(account=self.account, revision=MAX_ONBOARDING_EVENTS)
+        OnboardingEvent.objects.bulk_create([
+            OnboardingEvent(
+                draft=draft,
+                actor=self.account,
+                event='draft_saved',
+                revision=revision,
+                detail={'step': 2},
+            )
+            for revision in range(1, MAX_ONBOARDING_EVENTS + 1)
+        ])
+        upload = SimpleUploadedFile('profile.png', b'not decoded', content_type='image/png')
+        with patch('accounts.onboarding_forms.Image.open') as image_open:
+            response = self.client.post(
+                '/onboarding/2/',
+                {'revision': MAX_ONBOARDING_EVENTS, 'action': 'continue', 'photo': upload},
+            )
+        self.assertEqual(response.status_code, 429)
+        image_open.assert_not_called()
         draft.refresh_from_db()
         self.assertEqual(draft.revision, MAX_ONBOARDING_EVENTS)
         self.assertEqual(draft.events.count(), MAX_ONBOARDING_EVENTS)

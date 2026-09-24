@@ -4,7 +4,7 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Exact candidate identity: `7d36a285f7593a77a902b02cec10975fdccc3591` (read back from GitHub PR #4 immediately before this closeout; the earlier capture head is retained only as historical evidence).
+- Exact candidate identity: `52e597ca2c8ac27633c36999c89eb418e9c434c8` (new same-family security repair; read back locally before push). 
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map
@@ -12,6 +12,7 @@
 | Gate | Evidence | Result / limit |
 |---|---|---|
 | Canonical regression | `/opt/data/tmp/wdos-stage3/arabic-final-verify.log` | PASS: 169 tests, 73.348s, canonical exit 0. |
+| Same-family quota regression | `accounts.test_onboarding` + `accounts.test_configuration` | PASS: 34 tests under isolated SQLite; full-draft quota returns 429 before Pillow image decoding, with revision/history unchanged. |
 | Refreshed source integrity | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json`, `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Both manifests identify the capture source tree as `e1be979c...ffb1`; this is pre-packaging evidence. The implementation delta after capture is limited to server-side review/consent/route hardening, operator audit provenance, locale precedence, request-body upload protection via the first-position limiting upload handler, and focused regressions; the accepted-state template correction is covered by hosted UI-browser evidence. |
 | Arabic/localization repair | `arabic-final-verify.log`; `accounts/test_locale.py` | PASS on the candidate. The catalog fragment `تفضيلات الحركة` was repaired and exercised. |
 | Recovery/lost-response review | `/opt/data/tmp/wdos-stage3/postcommit-independent-closeout.md` | PASS: 7 focused tests. |

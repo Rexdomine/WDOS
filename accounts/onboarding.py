@@ -121,6 +121,12 @@ def step(request, step):
             if step == 1:
                 return redirect('accounts:status')
             return redirect('onboarding:step', step=step - 1)
+        # Enforce the durable history bound before form validation.  Profile
+        # validation decodes uploaded images, so checking only after
+        # form.is_valid() still permits expensive work on a full draft.
+        if draft and draft.events.count() >= MAX_ONBOARDING_EVENTS:
+            safe_form = form_class(initial=initial_data(locked, draft, lang), account=locked)
+            return render_step(request, step, draft, safe_form, localized_notice(c, INVALID_KEYS), 429)
         valid = form.is_valid()
         if step == 7:
             for previous in range(1, 7):
@@ -143,8 +149,6 @@ def step(request, step):
             if not valid:
                 return render_step(request, step, draft, form, localized_notice(c, INVALID_KEYS), 422)
             return redirect('onboarding:step', step=draft.next_step)
-        if draft.pk and draft.events.count() >= MAX_ONBOARDING_EVENTS:
-            return render_step(request, step, draft, form, localized_notice(c, INVALID_KEYS), 429)
         draft.data = {**draft.data, **changes}
         if step == 1 and form.cleaned_data.get('language') in LANGUAGES:
             request.session['wdos_language'] = form.cleaned_data['language']

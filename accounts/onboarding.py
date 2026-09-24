@@ -66,6 +66,8 @@ def render_step(request, number, draft, form, notice=None, status=200):
     response['Cache-Control'] = 'no-store, private'
     response['Referrer-Policy'] = 'same-origin'
     response['X-Robots-Tag'] = 'noindex, nofollow'
+    if request.GET.get('lang') in LANGUAGES:
+        response.set_cookie('wdos_language', lang, max_age=31536000, samesite='Lax')
     return response
 
 

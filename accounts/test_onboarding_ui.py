@@ -59,6 +59,14 @@ class OnboardingUITests(TestCase):
         follow = self.client.get(response['Location'])
         self.assertContains(follow, 'Parlez-nous de vous')
 
+    def test_explicit_locale_switch_updates_cookie_for_following_routes(self):
+        self.client.cookies['wdos_language'] = 'en'
+        response = self.client.get('/onboarding/1/?lang=fr')
+        self.assertEqual(response.cookies['wdos_language'].value, 'fr')
+        self.client.cookies.update(response.cookies)
+        follow = self.client.get('/onboarding/2/')
+        self.assertContains(follow, 'Parlez-nous de vous')
+
 
     def test_onboarding_invalid_submission_localizes_error(self):
         self.client.cookies['wdos_language'] = 'fr'

@@ -2,6 +2,7 @@
 from django.test import TestCase, override_settings
 from . import test_flows as _flow_helpers
 from .models import Person, OnboardingDraft, OnboardingEvent
+from .onboarding import MAX_ONBOARDING_EVENTS
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -110,6 +111,24 @@ class OnboardingDraftTests(TestCase):
         draft.refresh_from_db()
         self.assertEqual(draft.revision, before_revision)
         self.assertEqual(OnboardingEvent.objects.filter(draft=draft).count(), before_events)
+
+    def test_changed_saves_stop_before_history_quota_is_exceeded(self):
+        draft = OnboardingDraft.objects.create(account=self.account, revision=MAX_ONBOARDING_EVENTS)
+        OnboardingEvent.objects.bulk_create([
+            OnboardingEvent(
+                draft=draft,
+                actor=self.account,
+                event='draft_saved',
+                revision=revision,
+                detail={'step': 2},
+            )
+            for revision in range(1, MAX_ONBOARDING_EVENTS + 1)
+        ])
+        response = self.save(2, {'full_name': 'Bounded History'}, revision=draft.revision)
+        self.assertEqual(response.status_code, 429)
+        draft.refresh_from_db()
+        self.assertEqual(draft.revision, MAX_ONBOARDING_EVENTS)
+        self.assertEqual(draft.events.count(), MAX_ONBOARDING_EVENTS)
 
     def test_post_needs_expected_revision(self):
         response = self.client.post('/onboarding/1/', {'timezone': 'UTC'})

@@ -4,7 +4,7 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Exact candidate identity: `4c94e77840e4b05c3016b7c5d81507bdc9f0b9d8` (read back from GitHub PR #4 immediately before capture).
+- Exact candidate identity: `7d36a285f7593a77a902b02cec10975fdccc3591` (read back from GitHub PR #4 immediately before this closeout; the earlier capture head is retained only as historical evidence).
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map

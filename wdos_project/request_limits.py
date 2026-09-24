@@ -10,6 +10,10 @@ class RawBodyRejectedCsrfBypassMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.META.get('wdos.raw_body_rejected'):
+        if (
+            request.META.get('wdos.raw_body_rejected')
+            and request.path == '/onboarding/2/'
+            and request.method == 'POST'
+        ):
             request._dont_enforce_csrf_checks = True
         return self.get_response(request)

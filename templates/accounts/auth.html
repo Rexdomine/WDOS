@@ -162,7 +162,7 @@
             <p class="submit-status" role="status" aria-live="polite"></p>
           </form>
         </div>
-        {% if screen == 'AUTH-07' %}<script>const fragment = location.hash.slice(1); if (fragment && fragment !== 'main') { const panel = document.querySelector('[data-reset-form]'); if (panel) panel.hidden = true; }</script>{% endif %}
+        {% if screen == 'AUTH-07' %}<script>(function () { const fragment = location.hash.slice(1); if (fragment && fragment !== 'main') { const panel = document.querySelector('[data-reset-form]'); if (panel) panel.hidden = true; } }());</script>{% endif %}
       {% endif %}
 
       {% if verification_bound %}

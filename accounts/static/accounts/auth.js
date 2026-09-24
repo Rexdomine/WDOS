@@ -21,7 +21,11 @@ if (resetPanel && proof && fragment) {
       headers: {"X-Requested-With": "XMLHttpRequest"},
       body,
     });
-    if (!response.ok) throw new Error("Could not preserve reset proof");
+    if (!response.ok) {
+      const error = new Error("Could not preserve reset proof");
+      error.status = response.status;
+      throw error;
+    }
     return true;
   };
   preserveFragment().then(() => {
@@ -29,8 +33,13 @@ if (resetPanel && proof && fragment) {
     resetPanel.hidden = false;
     if (resetMissing) resetMissing.hidden = true;
     history.replaceState(null, "", location.pathname + location.search);
-  }).catch(() => {
-    // Keep the fragment intact so a retry can preserve it before navigation.
+  }).catch(error => {
+    if (error.status === 400) {
+      resetPanel.hidden = true;
+      if (resetMissing) resetMissing.hidden = false;
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    // Keep valid fragments intact on transport/server failures.
   });
 }
 

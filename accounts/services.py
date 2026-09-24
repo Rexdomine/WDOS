@@ -190,6 +190,22 @@ def reset_password(token_id, secret, password):
         return True
 
 
+def is_live_reset_proof(token_id, secret):
+    try:
+        token_id = uuid.UUID(token_id)
+    except (ValueError, TypeError, AttributeError):
+        return False
+    token = ActionToken.objects.select_related('account').filter(
+        pk=token_id, purpose='reset', used_at=None,
+    ).first()
+    return bool(
+        token and token.account.status == 'active'
+        and token.attempts < 5
+        and token.expires_at > timezone.now()
+        and constant_time_compare(token.digest, digest(secret))
+    )
+
+
 def requires_mfa(account):
     return bool(account.user.is_staff or account.user.is_superuser or account.mfa_secret or account.accessgrant_set.filter(revoked_at=None, expires_at__gt=timezone.now()).exists())
 

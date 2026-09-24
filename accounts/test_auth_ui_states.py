@@ -292,7 +292,11 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
             )
             try:
                 page = browser.new_page()
-                browser_proof = '00000000-0000-0000-0000-000000000001.browser-only-proof'
+                account = services.register('Browser Reset', 'browser-reset@example.org', 'a genuinely long WDOS example passphrase!')
+                verification, code = services.issue_token(account, 'verify')
+                self.assertTrue(services.verify_contact(account.pk, code))
+                token, secret = services.issue_token(account, 'reset')
+                browser_proof = f'{token.pk}.{secret}'
                 page.goto(self.live_server_url + '/auth/reset/#' + browser_proof)
                 page.wait_for_url(lambda url: '#' not in url)
                 self.assertTrue(page.locator('[data-reset-form]').is_visible())

@@ -157,11 +157,13 @@ class AuthUIStateRegressionTests(TestCase):
         account = self.create_active('expired-bound-reset@example.org')
         token, secret = services.issue_token(account, 'reset')
         proof = f'{token.pk}.{secret}'
-        self.client.session['reset_retry_proof'] = services.encrypt(proof)
-        self.client.session.save()
+        response = self.client.post('/auth/reset/', {
+            'preserve_fragment': '1', 'proof': proof,
+        })
+        flow_id = response.headers['X-Reset-Flow']
         ActionToken.objects.filter(pk=token.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
 
-        response = self.client.get('/auth/reset/')
+        response = self.client.get('/auth/reset/?reset_flow=' + flow_id)
 
         self.assertContains(response, 'Link expired')
         self.assertContains(response, 'This password reset link can no longer be used.')
@@ -202,7 +204,7 @@ class AuthUIStateRegressionTests(TestCase):
         })
 
         self.assertEqual(response.status_code, 400)
-        self.assertNotIn('reset_retry_proof', self.client.session)
+        self.assertTrue(self.client.session.get('reset_retry_proof'))
 
     def test_verification_is_bound_masked_and_has_real_resend_cooldown(self):
         account = self.register_pending('recognisable@example.org')
@@ -353,6 +355,12 @@ class AuthUIStateRegressionTests(TestCase):
     'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
 })
 class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
+    def create_active(self, email):
+        account = services.register('Browser Reset', email, 'a genuinely long WDOS example passphrase!')
+        token, code = services.issue_token(account, 'verify')
+        self.assertTrue(services.verify_contact(account.pk, code))
+        return account
+
     def test_fragment_reveals_form_before_history_is_cleared(self):
         try:
             from playwright.sync_api import sync_playwright
@@ -378,13 +386,13 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
                 token, secret = services.issue_token(account, 'reset')
                 browser_proof = f'{token.pk}.{secret}'
                 page.goto(self.live_server_url + '/auth/reset/#' + browser_proof)
-                page.wait_for_url(lambda url: '#' not in url)
+                page.wait_for_url(lambda url: '#' not in url and 'reset_flow=' in url)
                 self.assertTrue(page.locator('[data-reset-form]').is_visible())
                 self.assertFalse(page.locator('[data-reset-missing]').is_visible())
                 self.assertEqual(page.locator('#id_proof').input_value(), browser_proof)
-                self.assertEqual(page.url, self.live_server_url + '/auth/reset/')
+                self.assertTrue(page.url.startswith(self.live_server_url + '/auth/reset/?reset_flow='))
 
-                page.goto(self.live_server_url + '/auth/reset/')
+                page.reload()
                 self.assertTrue(page.locator('[data-reset-form]').is_visible())
                 self.assertFalse(page.locator('[data-reset-missing]').is_visible())
             finally:

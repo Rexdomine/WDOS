@@ -112,7 +112,10 @@
           <p class="form-guidance">{{ translations.required }}</p>
           <form method="post" class="auth-live-form" data-working-label="{{ translations.working }}" novalidate>
             {% csrf_token %}
-            {% if screen == 'AUTH-07' %}<input type="hidden" name="proof" id="id_proof" value="">{% endif %}
+            {% if screen == 'AUTH-07' %}
+              <input type="hidden" name="proof" id="id_proof" value="">
+              {% if reset_flow %}<input type="hidden" name="reset_flow" value="{{ reset_flow }}">{% endif %}
+            {% endif %}
             {% if form.errors %}
               <div class="error-summary" role="alert" tabindex="-1">
                 <strong>{{ translations.errors }}</strong>

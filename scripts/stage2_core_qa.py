@@ -35,7 +35,7 @@ def run(browser,base,out,record,fixtures):
         c,p=context(width)
         def password_and_loading():
             token,proof=services.issue_token(active,'reset')
-            p.goto(base+'/auth/reset/#'+str(token.pk)+'.'+proof);p.wait_for_url(lambda url: '#' not in url)
+            p.goto(base+'/auth/reset/#'+str(token.pk)+'.'+proof);p.wait_for_url(lambda url: '#' not in url and 'reset_flow=' in url)
             first=p.locator('#id_password');second=p.locator('#id_confirm')
             assert first.get_attribute('type')=='password' and second.get_attribute('type')=='password'
             toggle=p.locator('button[data-target="id_password"]');toggle.focus();toggle.press('Space')
@@ -102,7 +102,7 @@ def run(browser,base,out,record,fixtures):
         c,p=context(width)
         def reset_success_replay():
             token,proof=services.issue_token(active,'reset');fragment=str(token.pk)+'.'+proof
-            p.goto(base+'/auth/reset/#'+fragment);p.wait_for_url(lambda url: '#' not in url)
+            p.goto(base+'/auth/reset/#'+fragment);p.wait_for_url(lambda url: '#' not in url and 'reset_flow=' in url)
             assert p.locator('#id_password').is_visible(),'valid fragment incorrectly hidden'
             capture(p,'reset-valid-'+label)
             np='NW-'+secrets.token_urlsafe(18)+'!aA1';p.locator('#id_password').fill(np);p.locator('#id_confirm').fill(np);submit(p)

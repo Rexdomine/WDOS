@@ -414,6 +414,7 @@ def reset(request):
             request, 'AUTH-07', 'Set a new password',
             'Choose a password you have not used here before, then return to sign in.',
             form, 'Save new password', reset_proof_bound=True,
+            reset_flow=_reset_flow_id(proof),
         )
 
     token_id, secret = proof.split('.', 1)
@@ -429,6 +430,7 @@ def reset(request):
             request, 'AUTH-07', 'Set a new password',
             'Choose a password you have not used here before, then return to sign in.',
             form, 'Save new password', reset_proof_bound=True,
+            reset_flow=_reset_flow_id(proof),
         )
     if not ok:
         return _invalid_reset_page(request, proof)

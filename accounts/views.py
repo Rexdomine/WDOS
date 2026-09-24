@@ -389,6 +389,7 @@ def reset(request):
             'Choose a password you have not used here before, then return to sign in.',
             forms.ResetForm(), 'Save new password', reset_requires_fragment=proof_bound is None,
             reset_proof_bound=proof_bound is not None,
+            reset_flow=_reset_flow_id(proof_bound) if proof_bound else None,
         )
 
     if request.POST.get('preserve_fragment') == '1':

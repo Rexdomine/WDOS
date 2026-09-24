@@ -224,6 +224,7 @@
             <select id="language" name="lang" aria-label="{{ translations.language }}" onchange="this.form.submit()">
               {% for code, item in languages.items %}<option value="{{ code }}"{% if code == lang %} selected{% endif %}>{{ item.name }}</option>{% endfor %}
             </select>
+            {% if screen == 'AUTH-07' and reset_flow %}<input type="hidden" name="reset_flow" value="{{ reset_flow }}">{% endif %}
           </form>
         </div>
 

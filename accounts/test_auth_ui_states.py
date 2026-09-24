@@ -452,8 +452,10 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
         self.assertEqual(second_response.headers['X-Reset-Flow'], str(second_token.pk))
         first_page = self.client.get('/auth/reset/?reset_flow=' + str(first_token.pk))
         second_page = self.client.get('/auth/reset/?reset_flow=' + str(second_token.pk))
+        first_language_page = self.client.get('/auth/reset/?lang=fr&reset_flow=' + str(first_token.pk))
         self.assertContains(first_page, 'data-proof-bound="true"')
         self.assertContains(second_page, 'data-proof-bound="true"')
+        self.assertContains(first_language_page, 'name="reset_flow" value="' + str(first_token.pk) + '"')
 
         js = (Path(__file__).parent / 'static' / 'accounts' / 'auth.js').read_text(encoding='utf-8')
         self.assertNotIn('if (resetInvalid && replacementFragment) resetInvalid.hidden = false;', js)

@@ -12,6 +12,7 @@ const fragment = proofPattern.test(fragmentValue) ? fragmentValue : "";
 const replacementFragment = fragmentValue && fragmentValue !== "main" ? fragmentValue : "";
 if (resetPanel && proof && (fragment || replacementFragment)) {
   resetPanel.hidden = true;
+  if (resetInvalid && replacementFragment) resetInvalid.hidden = false;
   const csrf = resetPanel.querySelector('input[name="csrfmiddlewaretoken"]');
   const preserveFragment = async () => {
     if (!csrf) return false;

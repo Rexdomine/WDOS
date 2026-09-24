@@ -12,21 +12,29 @@ def current_policy():
     required = ['version', 'approval_reference', 'privacy_notice', 'review_role', 'review_function']
     if any(not isinstance(value.get(k), str) or not value[k].strip() for k in required):
         return None
-    if len(value['version']) > 100 or len(value['approval_reference']) > 500:
+    result = deepcopy(value)
+    for key in required:
+        result[key] = result[key].strip()
+    if len(result['version']) > 100 or len(result['approval_reference']) > 500:
         return None
     for collection, keys in [('eligibility', ['code', 'label', 'network', 'basis']), ('homes', ['code', 'label', 'network', 'country', 'region', 'district', 'kind'])]:
         rows = value.get(collection)
         if not isinstance(rows, list) or not rows:
             return None
         seen = set()
+        normalized_rows = []
         for row in rows:
             if not isinstance(row, dict) or any(not isinstance(row.get(k), str) or not row[k].strip() for k in keys):
                 return None
-            if row['network'] not in ('WGMN', 'WNNN') or row['code'] in seen:
+            normalized = dict(row)
+            for key in keys:
+                normalized[key] = normalized[key].strip()
+            if normalized['network'] not in ('WGMN', 'WNNN') or normalized['code'] in seen:
                 return None
-            seen.add(row['code'])
-        if collection == 'homes' and any(r['kind'] not in ('chapter', 'virtual') for r in rows):
+            seen.add(normalized['code'])
+            normalized_rows.append(normalized)
+        result[collection] = normalized_rows
+        if collection == 'homes' and any(r['kind'] not in ('chapter', 'virtual') for r in normalized_rows):
             return None
-    result = deepcopy(value)
-    result['digest'] = hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
+    result['digest'] = hashlib.sha256(json.dumps(result, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
     return result

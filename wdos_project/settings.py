@@ -101,6 +101,11 @@ SESSION_COOKIE_SECURE = os.getenv("WDOS_SECURE_COOKIES", "1") == "1"
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 # Reject oversized multipart bodies before Django upload handlers spool files.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
+FILE_UPLOAD_HANDLERS = [
+    "wdos_project.upload_handlers.UploadSizeLimitHandler",
+    "django.core.files.uploadhandler.MemoryFileUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 SESSION_COOKIE_AGE = WDOS_SESSION_TTL

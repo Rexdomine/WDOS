@@ -12,6 +12,20 @@ class UploadBoundaryTests(SimpleTestCase):
     def test_request_body_cap_precedes_profile_photo_parsing(self):
         from django.conf import settings
         self.assertEqual(settings.DATA_UPLOAD_MAX_MEMORY_SIZE, 2 * 1024 * 1024)
+        self.assertEqual(settings.FILE_UPLOAD_HANDLERS[0], 'wdos_project.upload_handlers.UploadSizeLimitHandler')
+
+    def test_upload_handler_rejects_oversized_content_length(self):
+        from django.core.files.uploadhandler import StopUpload
+        from wdos_project.upload_handlers import UploadSizeLimitHandler, MAX_UPLOAD_BYTES
+        with self.assertRaises(StopUpload):
+            UploadSizeLimitHandler().handle_raw_input(None, {}, MAX_UPLOAD_BYTES + 1, b'--', 'utf-8')
+
+    def test_upload_handler_rejects_oversized_chunk_stream(self):
+        from django.core.files.uploadhandler import StopUpload
+        from wdos_project.upload_handlers import UploadSizeLimitHandler, MAX_UPLOAD_BYTES
+        handler = UploadSizeLimitHandler()
+        with self.assertRaises(StopUpload):
+            handler.receive_data_chunk(b'x' * (MAX_UPLOAD_BYTES + 1), 0)
 
 
 class ProductionOriginTests(SimpleTestCase):

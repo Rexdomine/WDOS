@@ -89,7 +89,8 @@ def run(browser,base,out,record,fixtures):
         case('journey:reset-missing:'+label,missing_reset);c.close()
         c,p=context(width)
         def invalid_reset():
-            p.goto(base+'/auth/reset/#'+str(uuid.uuid4())+'.'+secrets.token_urlsafe(32));assert '#' not in p.url
+            p.goto(base+'/auth/reset/#'+str(uuid.uuid4())+'.'+secrets.token_urlsafe(32))
+            p.wait_for_url(lambda url: '#' not in url)
             if p.locator('#id_password').is_visible():
                 np='NW-'+secrets.token_urlsafe(18)+'!aA1';p.locator('#id_password').fill(np);p.locator('#id_confirm').fill(np);submit(p)
             assert not p.locator('#id_password').is_visible()
@@ -99,14 +100,14 @@ def run(browser,base,out,record,fixtures):
         c,p=context(width)
         def reset_success_replay():
             token,proof=services.issue_token(active,'reset');fragment=str(token.pk)+'.'+proof
-            p.goto(base+'/auth/reset/#'+fragment);assert '#' not in p.url
+            p.goto(base+'/auth/reset/#'+fragment);p.wait_for_url(lambda url: '#' not in url)
             assert p.locator('#id_password').is_visible(),'valid fragment incorrectly hidden'
             capture(p,'reset-valid-'+label)
             np='NW-'+secrets.token_urlsafe(18)+'!aA1';p.locator('#id_password').fill(np);p.locator('#id_confirm').fill(np);submit(p)
             active.user.refresh_from_db();assert active.user.check_password(np)
             assert p.locator('#id_password').count()==0
             capture(p,'reset-success-'+label)
-            p.goto(base+'/');p.goto(base+'/auth/reset/#'+fragment);rp='NW-'+secrets.token_urlsafe(18)+'!aA1';p.locator('#id_password').fill(rp);p.locator('#id_confirm').fill(rp);submit(p)
+            p.goto(base+'/');p.goto(base+'/auth/reset/#'+fragment);p.wait_for_url(lambda url: '#' not in url);rp='NW-'+secrets.token_urlsafe(18)+'!aA1';p.locator('#id_password').fill(rp);p.locator('#id_confirm').fill(rp);submit(p)
             assert not p.locator('#id_password').is_visible()
             assert p.locator('main a[href="/auth/recover/"]').first.is_visible()
             active.user.refresh_from_db();assert active.user.check_password(np),'one-use proof was replayable'

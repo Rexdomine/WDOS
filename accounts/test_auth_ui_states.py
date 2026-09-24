@@ -294,6 +294,7 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
                 page = browser.new_page()
                 browser_proof = '00000000-0000-0000-0000-000000000001.browser-only-proof'
                 page.goto(self.live_server_url + '/auth/reset/#' + browser_proof)
+                page.wait_for_url(lambda url: '#' not in url)
                 self.assertTrue(page.locator('[data-reset-form]').is_visible())
                 self.assertFalse(page.locator('[data-reset-missing]').is_visible())
                 self.assertEqual(page.locator('#id_proof').input_value(), browser_proof)

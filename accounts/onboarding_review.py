@@ -28,11 +28,11 @@ def review(request, account_id):
         draft = OnboardingDraft.objects.select_for_update().filter(account=target).first()
         if not draft:
             return denied()
-        if request.method == 'GET' and draft.state != 'review_needed':
-            return JsonResponse({'error': 'More information needed'}, status=409)
         grants = list(AccessGrant.objects.select_for_update().filter(account=actor, role=policy['review_role'], function=policy['review_function'], network=draft.data.get('network', ''), geography=draft.data.get('country', ''), revoked_at=None))
         if not any(g.expires_at > timezone.now() for g in grants):
             return denied()
+        if request.method == 'GET' and draft.state != 'review_needed':
+            return JsonResponse({'error': 'More information needed'}, status=409)
         if target.status != 'active' or not target.user.is_active or not target.verified_at:
             return JsonResponse({'error': 'Access has changed'}, status=409)
         if request.method == 'GET':

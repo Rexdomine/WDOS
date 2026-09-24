@@ -69,6 +69,11 @@ class OnboardingDraftTests(TestCase):
         self.assertNotContains(page, 'name="review_confirmed"')
         self.assertNotContains(page, 'id="onboarding-form"')
 
+    def test_selected_tab_has_active_state(self):
+        page = self.client.get('/onboarding/1/?tab=records')
+        self.assertContains(page, 'class="tab active" aria-current="page"')
+        self.assertNotContains(page, 'class="tab active" href="/onboarding/1/"')
+
     def test_stale_tab_cannot_overwrite_saved_draft(self):
         self.save(1, {'language': 'en', 'timezone': 'Africa/Lagos', 'reading': 'standard'})
         response = self.save(1, {'language': 'en', 'timezone': 'UTC', 'reading': 'standard'})

@@ -102,6 +102,9 @@ class ReviewTests(TestCase):
         response = self.client.get('/onboarding/8/')
         self.assertContains(response, 'href="/app"')
         self.assertNotContains(response, 'disabled aria-disabled="true"')
+        dashboard = self.client.get('/app')
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertContains(dashboard, 'A shared platform foundation.')
 
     def test_accepted_network_cannot_be_silently_changed(self):
         self.assertEqual(self.approve().status_code, 200)

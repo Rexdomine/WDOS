@@ -34,7 +34,8 @@ def run(browser,base,out,record,fixtures):
         data,pw=fixtures();pending,pemail=data['pending'];active,aemail=data['active'];staff,semail=data['staff_mfa'];suspended,xemail=data['suspended']
         c,p=context(width)
         def password_and_loading():
-            p.goto(base+'/auth/reset/#'+str(uuid.uuid4())+'.'+secrets.token_urlsafe(32))
+            token,proof=services.issue_token(active,'reset')
+            p.goto(base+'/auth/reset/#'+str(token.pk)+'.'+proof);p.wait_for_url(lambda url: '#' not in url)
             first=p.locator('#id_password');second=p.locator('#id_confirm')
             assert first.get_attribute('type')=='password' and second.get_attribute('type')=='password'
             toggle=p.locator('button[data-target="id_password"]');toggle.focus();toggle.press('Space')
@@ -107,7 +108,7 @@ def run(browser,base,out,record,fixtures):
             active.user.refresh_from_db();assert active.user.check_password(np)
             assert p.locator('#id_password').count()==0
             capture(p,'reset-success-'+label)
-            p.goto(base+'/');p.goto(base+'/auth/reset/#'+fragment);p.wait_for_url(lambda url: '#' not in url);rp='NW-'+secrets.token_urlsafe(18)+'!aA1';p.locator('#id_password').fill(rp);p.locator('#id_confirm').fill(rp);submit(p)
+            p.goto(base+'/');p.goto(base+'/auth/reset/#'+fragment);p.wait_for_url(lambda url: '#' not in url)
             assert not p.locator('#id_password').is_visible()
             assert p.locator('main a[href="/auth/recover/"]').first.is_visible()
             active.user.refresh_from_db();assert active.user.check_password(np),'one-use proof was replayable'

@@ -7,6 +7,7 @@ const resetMissing = document.querySelector("[data-reset-missing]");
 const proof = document.getElementById("id_proof");
 const fragment = location.hash.length > 1 ? location.hash.slice(1) : "";
 if (resetPanel && proof && fragment) {
+  resetPanel.hidden = true;
   const csrf = resetPanel.querySelector('input[name="csrfmiddlewaretoken"]');
   const preserveFragment = async () => {
     if (!csrf) return false;
@@ -43,17 +44,18 @@ if (resetPanel && proof && fragment) {
   });
 }
 
-for (const panel of document.querySelectorAll("[data-resend-issued-at]")) {
-  const issuedAt = Number(panel.dataset.resendIssuedAt || "0");
+for (const panel of document.querySelectorAll("[data-resend-remaining]")) {
+  const initialRemaining = Number(panel.dataset.resendRemaining || "0");
   const status = panel.querySelector("[data-resend-status]");
   const button = panel.querySelector("[data-resend-button]");
-  if (!issuedAt || !status || !button) continue;
+  if (!status || !button) continue;
+  let remaining = Math.max(0, Math.ceil(initialRemaining));
   let timer;
   const tick = () => {
-    const remaining = Math.max(0, 60 - Math.floor(Date.now() / 1000 - issuedAt));
     if (remaining > 0) {
       button.disabled = true;
       status.textContent = `${panel.dataset.resendWait} ${remaining}s`;
+      remaining -= 1;
     } else {
       button.disabled = false;
       status.textContent = panel.dataset.resendReady;

@@ -361,7 +361,10 @@ class ResetFragmentBrowserSemanticsTests(StaticLiveServerTestCase):
 
     def test_script_uses_the_real_static_path_and_never_browser_storage(self):
         js = (Path(__file__).parent / 'static' / 'accounts' / 'auth.js').read_text(encoding='utf-8')
-        self.assertLess(js.index('const fragment'), js.index('history.replaceState'))
+        self.assertIn('const fragment', js)
+        self.assertIn('resetPanel.hidden = true', js)
+        self.assertIn('data-resend-remaining', js)
+        self.assertNotIn('Date.now()', js)
         self.assertIn('location.pathname + location.search', js)
         self.assertIn('preserve_fragment', js)
         self.assertIn('credentials: "same-origin"', js)

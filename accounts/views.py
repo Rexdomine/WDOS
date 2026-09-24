@@ -351,6 +351,8 @@ def reset(request):
         return _invalid_reset_page(request)
     form = forms.ResetForm(request.POST)
     if not form.is_valid():
+        if not services.is_live_reset_proof(*proof.split('.', 1)):
+            return _invalid_reset_page(request)
         request.session[RESET_RETRY_SESSION_KEY] = services.encrypt(proof)
         return page(
             request, 'AUTH-07', 'Set a new password',
@@ -422,7 +424,7 @@ def mfa(request):
         if form.is_bound:
             form.add_error(None, 'This code could not be verified. Try a fresh authenticator code or an unused recovery code.')
 
-    if setup and account.mfa_pending_secret and account.mfa_pending_until:
+    if setup and not secret and account.mfa_pending_secret and account.mfa_pending_until:
         if account.mfa_pending_until > timezone.now():
             secret = services.decrypt(account.mfa_pending_secret)
             form = form or forms.MFAForm()

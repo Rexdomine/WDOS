@@ -82,8 +82,8 @@
         </section>
       {% endif %}
 
-      {% if reset_invalid or reset_proof_bound %}
-        <section class="state-card reset-invalid" data-reset-invalid{% if reset_proof_bound %} hidden{% endif %} role="alert">
+      {% if reset_invalid or reset_proof_bound or reset_requires_fragment %}
+        <section class="state-card reset-invalid" data-reset-invalid{% if not reset_invalid %} hidden{% endif %} role="alert">
           <h2>{{ translations.link_expired }}</h2>
           <p>{{ translations.link_expired_text }}</p>
           <a class="btn primary" href="{% url 'accounts:recover' %}">{% include 'accounts/arrow.html' %}{{ translations.fresh_link }}</a>

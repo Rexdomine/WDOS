@@ -103,5 +103,32 @@ function initializeProfileMenus() {
     document.addEventListener('click', (event) => { if (!menu.contains(event.target)) close(); });
   });
 }
+function initializeRecordTabs() {
+  const tabs = Array.from(document.querySelectorAll('[data-record-tab]'));
+  if (!tabs.length) return;
+  const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls'))).filter(Boolean);
+  const activate = (tab, moveFocus = false) => {
+    tabs.forEach((candidate) => {
+      const selected = candidate === tab;
+      candidate.classList.toggle('active', selected);
+      candidate.setAttribute('aria-selected', String(selected));
+      candidate.tabIndex = selected ? 0 : -1;
+    });
+    panels.forEach((panel) => { panel.hidden = panel.id !== tab.getAttribute('aria-controls'); });
+    if (moveFocus) tab.focus();
+  };
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', (event) => { event.preventDefault(); activate(tab); window.history.replaceState({}, '', tab.hash); });
+    tab.addEventListener('keydown', (event) => {
+      if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      activate(tabs[next], true);
+    });
+  });
+  const initial = tabs.find((tab) => tab.hash === window.location.hash) || tabs[0];
+  activate(initial);
+}
 
 initializeProfileMenus();
+initializeRecordTabs();

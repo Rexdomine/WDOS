@@ -46,8 +46,8 @@ class Stage3RepairTests(TestCase):
         self.assertContains(shell, 'Home')
         self.assertContains(shell, 'My activities')
         self.assertContains(shell, 'Records')
-        self.assertContains(shell, 'Related information')
-        self.assertContains(shell, 'Workspace actions')
+        self.assertContains(shell, 'record-tabs')
+        self.assertContains(shell, 'class="actions"')
         self.assertContains(shell, 'overflow-x: hidden')
 
     def test_foundation_response_is_private_and_uncacheable(self):
@@ -108,6 +108,57 @@ class Stage3RepairTests(TestCase):
                 self.assertTrue(capture.is_file(), capture)
                 self.assertTrue(comparison.is_file(), comparison)
 
+    def test_foundation_shell_matches_core01_page_hierarchy_without_duplicate_sections(self):
+        account = self.create_active('foundation-core01-hierarchy@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='CORE-01 Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Ikeja Chapter'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        self.assertIn('class="pagehead"', html)
+        self.assertIn('class="actions"', html)
+        self.assertIn('class="tabs"', html)
+        self.assertIn('class="grid"', html)
+        self.assertIn('class="panel"', html)
+        self.assertIn('class="record-summary"', html)
+        self.assertIn('related-information-panel', html)
+        self.assertNotIn('class="hero-card"', html)
+        self.assertNotIn('id="next-action"', html)
+        self.assertNotIn('id="support-links"', html)
+
+    def test_foundation_record_tabs_have_keyboard_and_panel_contract(self):
+        account = self.create_active('foundation-record-tabs@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Tab Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        self.assertIn('data-record-tab', html)
+        self.assertIn('aria-controls="overview-panel"', html)
+        self.assertIn('aria-controls="records-panel"', html)
+        self.assertIn('aria-controls="history-panel"', html)
+        self.assertIn('id="overview-panel"', html)
+        self.assertIn('id="records-panel"', html)
+        self.assertIn('id="history-panel"', html)
+        script = (Path(__file__).parent / 'static' / 'accounts' / 'onboarding.js').read_text()
+        self.assertIn('initializeRecordTabs', script)
+        self.assertIn('ArrowRight', script)
+        self.assertIn('aria-selected', script)
+
     def test_foundation_shell_contains_core01_workspace_hierarchy(self):
         account = self.create_active('foundation-hierarchy@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
@@ -122,10 +173,7 @@ class Stage3RepairTests(TestCase):
         )
         self.login(account)
         html = self.client.get('/foundation/').content.decode()
-        for landmark in (
-            'records-table', 'local-connection', 'related-information',
-            'record-tabs', 'next-action', 'support-links',
-        ):
+        for landmark in ('overview-panel', 'records-panel', 'history-panel', 'record-tabs'):
             self.assertIn(f'id="{landmark}"', html)
 
     def test_foundation_shell_does_not_fabricate_unmodeled_workspace_state(self):
@@ -161,9 +209,9 @@ class Stage3RepairTests(TestCase):
         )
         self.login(account)
         html = self.client.get('/foundation/').content.decode()
-        self.assertIn('class="workspace-columns"', html)
-        self.assertIn('class="workspace-record-card"', html)
-        self.assertIn('class="related-information-panel"', html)
+        self.assertIn('class="grid"', html)
+        self.assertIn('class="record-summary"', html)
+        self.assertIn('related-information-panel', html)
         self.assertIn('Record tabs', html)
 
     def test_foundation_mobile_shell_contains_approved_navigation_controls(self):
@@ -181,16 +229,14 @@ class Stage3RepairTests(TestCase):
         self.login(account)
         html = self.client.get('/foundation/').content.decode()
         for label, href in (
-            ('Home', '#workspace-home'), ('My work', '#activities'),
-            ('Meetings', '#records-table'), ('Messages', '#support-links'), ('More', '#more'),
+            ('Home', '#workspace-home'), ('My work', '#records-panel'),
+            ('Meetings', '#history-panel'), ('Messages', '#history-panel'), ('More', '#records-panel'),
         ):
             self.assertIn(f'href="{href}"', html)
             self.assertIn(f'>{label}<', html)
         self.assertIn('class="mobile-nav"', html)
-        for target in ('workspace-home', 'activities', 'records-table', 'support-links', 'more'):
+        for target in ('workspace-home', 'records-panel', 'history-panel'):
             self.assertIn(f'id="{target}"', html)
-        self.assertIn('id="meetings"', html)
-        self.assertIn('id="messages"', html)
 
     def test_foundation_desktop_navigation_controls_have_matching_destinations(self):
         account = self.create_active('foundation-desktop-nav@example.org')
@@ -207,11 +253,11 @@ class Stage3RepairTests(TestCase):
         self.login(account)
         html = self.client.get('/foundation/').content.decode()
         for label, href, target in (
-            ('My activities', '#activities', 'activities'),
-            ('Meetings &amp; events', '#meetings', 'meetings'),
-            ('Messages', '#messages', 'messages'),
-            ('Help &amp; support', '#support', 'support'),
-            ('Settings', '#settings', 'settings'),
+            ('My activities', '#records-panel', 'records-panel'),
+            ('Meetings &amp; events', '#history-panel', 'history-panel'),
+            ('Messages', '#history-panel', 'history-panel'),
+            ('Help &amp; support', '#records-panel', 'records-panel'),
+            ('Settings', '#records-panel', 'records-panel'),
         ):
             self.assertIn(f'href="{href}"', html)
             self.assertIn(f'>{label}<', html)
@@ -248,10 +294,10 @@ class Stage3RepairTests(TestCase):
         )
         self.login(account)
         html = self.client.get('/foundation/').content.decode()
-        self.assertIn('id="activities"', html)
-        self.assertIn('id="support"', html)
-        self.assertIn('href="#activities"', html)
-        self.assertIn('href="#support"', html)
+        self.assertIn('id="records-panel"', html)
+        self.assertIn('id="history-panel"', html)
+        self.assertIn('href="#records-panel"', html)
+        self.assertIn('href="#history-panel"', html)
 
     def test_foundation_logout_uses_persisted_locale_and_direction(self):
         account = self.create_active('accepted-locale@example.org')
@@ -293,10 +339,9 @@ class Stage3RepairTests(TestCase):
         self.login(account)
         workspace_keys = (
             'onb_member', 'onb_workspace', 'onb_home', 'onb_activities',
-            'onb_records', 'onb_overview', 'onb_connection',
-            'onb_meetings', 'onb_messages', 'onb_help', 'onb_settings',
+            'onb_records', 'onb_overview', 'onb_history',
+            'onb_messages', 'onb_help',
             'onb_workspace_title',
-            'onb_next_steps_eyebrow', 'onb_support_eyebrow', 'onb_support_links_title',
             'onb_support_text', 'onb_my_work', 'onb_meetings_short',
             'onb_more', 'onb_local_connection',
         )
@@ -309,9 +354,7 @@ class Stage3RepairTests(TestCase):
                 self.assertIn(escape(catalog(lang)[key]), html, msg=f'{lang} missing {key}')
             if lang != 'en':
                 self.assertNotIn('Your workspace', html)
-                self.assertNotIn('Meetings &amp; events', html)
-                self.assertNotIn('Help &amp; support', html)
-                self.assertNotIn('Settings are not available for this membership yet.', html)
+                self.assertNotIn('Your workspace', html)
 
     def test_status_explainer_is_localized_and_does_not_leak_restricted_identity(self):
         account = self.create_active('private-status@example.org')

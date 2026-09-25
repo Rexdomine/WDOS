@@ -90,6 +90,26 @@ class Stage3RepairTests(TestCase):
         self.assertIn('.foundation-shell', css)
         self.assertIn('.foundation-shell .content', css)
 
+    def test_foundation_shell_contains_core01_workspace_hierarchy(self):
+        account = self.create_active('foundation-hierarchy@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Hierarchy Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        for landmark in (
+            'records-table', 'local-connection', 'related-information',
+            'record-tabs', 'next-action', 'support-links',
+        ):
+            self.assertIn(f'id="{landmark}"', html)
+
     def test_foundation_workspace_actions_have_real_targets(self):
         account = self.create_active('foundation-actions@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
@@ -152,6 +172,20 @@ class Stage3RepairTests(TestCase):
                 'sw': 'Kwa nini ninaona hali hii?',
             }
             self.assertContains(response, f'aria-label="{expected[lang]}"')
+
+    def test_status_explainer_copy_is_distinct_for_each_supported_locale(self):
+        account = self.create_active('distinct-status-explainer@example.org')
+        self.login(account)
+        for lang in ('en', 'fr', 'pt', 'ar', 'sw'):
+            response = self.client.get('/auth/status/?lang=' + lang)
+            self.assertNotEqual(
+                response.context['status_explainer_text'],
+                response.context['lede'],
+            )
+            self.assertNotEqual(
+                response.context['status_explainer_text'],
+                response.context['status_text'],
+            )
 
     def test_status_explainer_contains_distinct_context_from_status_sentence(self):
         account = self.create_active('status-explainer-context@example.org')

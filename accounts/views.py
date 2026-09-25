@@ -615,16 +615,26 @@ def status(request):
         'signed_out': ('Sign in required', 'Sign in to check your account. Restricted records are never shown here.', 'login'),
     }
     status_title, status_text, status_action = variants.get(notice, variants['signed_out'])
+    lang = _locale(request)
+    translations = catalog(lang)
+    action_labels = {
+        'verify': translations.get('verify_action', ''),
+        'help': translations.get('get_support', ''),
+        'login': translations.get('sign_in_again', ''),
+        'invitation': translations.get('claim', ''),
+    }
+    next_step = action_labels.get(status_action) or translations.get('continue', '')
+    status_explainer_text = (
+        f"{translations.get('status_explainer', '')} {translate(lang, status_title)}. "
+        f"{next_step}"
+    )
     return page(
         request, 'AUTH-09', 'Check your access status',
         'Your account status and safest next step are shown without exposing restricted records.',
         account=account, status_kind=notice,
-        status_title=translate(_locale(request), status_title),
-        status_text=translate(_locale(request), status_text),
-        status_explainer_text=translate(
-            _locale(request),
-            'Your account status and safest next step are shown without exposing restricted records.',
-        ),
+        status_title=translate(lang, status_title),
+        status_text=translate(lang, status_text),
+        status_explainer_text=status_explainer_text,
         status_action=status_action, onboarding_available=bool(account),
     )
 

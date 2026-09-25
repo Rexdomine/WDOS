@@ -90,6 +90,10 @@ class Stage3RepairTests(TestCase):
         self.assertIn('.foundation-shell', css)
         self.assertIn('.foundation-shell .content', css)
 
+    def test_foundation_rtl_desktop_content_offsets_away_from_right_sidebar(self):
+        css = (Path(__file__).parent / 'static' / 'accounts' / 'design.css').read_text()
+        self.assertIn('[dir="rtl"] .foundation-shell .content{margin-left:0;margin-right:232px}', css)
+
     def test_foundation_shell_contains_core01_workspace_hierarchy(self):
         account = self.create_active('foundation-hierarchy@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

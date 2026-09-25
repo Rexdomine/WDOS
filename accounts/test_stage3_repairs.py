@@ -43,6 +43,27 @@ class Stage3RepairTests(TestCase):
         self.assertContains(shell, 'method="post"')
         self.assertContains(shell, 'name="csrfmiddlewaretoken"')
 
+    def test_foundation_logout_uses_persisted_locale_and_direction(self):
+        account = self.create_active('accepted-locale@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Localized Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        expected = {'fr': ('fr', 'ltr', 'Se déconnecter'), 'pt': ('pt', 'ltr', 'Terminar sessão'),
+                    'ar': ('ar', 'rtl', 'تسجيل الخروج'), 'sw': ('sw', 'ltr', 'Ondoka')}
+        for lang, (html_lang, direction, label) in expected.items():
+            self.client.cookies['wdos_language'] = lang
+            shell = self.client.get('/foundation/')
+            self.assertContains(shell, f'<html lang="{html_lang}" dir="{direction}">')
+            self.assertContains(shell, f'>{label}</button>')
+
     def test_status_explainer_is_localized_and_does_not_leak_restricted_identity(self):
         account = self.create_active('private-status@example.org')
         self.login(account)

@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}" dir="{{ direction }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,7 +15,7 @@
       <span class="wdos-status">{{ environment|upper }}</span>
       <form method="post" action="/auth/logout/">
         {% csrf_token %}
-        <button type="submit">Sign out</button>
+        <button type="submit">{{ translations.sign_out }}</button>
       </form>
     </header>
     <section class="wdos-hero" aria-labelledby="page-title">

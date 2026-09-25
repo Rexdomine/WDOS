@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from .models import Role
 from accounts.models import OnboardingDraft
+from accounts.locale import LANGUAGES, catalog
 
 
 def health(request):
@@ -51,6 +52,12 @@ def app_shell(request):
         ).exists()
     ):
         return redirect('/auth/status/')
+    lang = request.COOKIES.get('wdos_language') or request.session.get('wdos_language', 'en')
+    if lang not in LANGUAGES:
+        lang = 'en'
     return render(request, "foundation/app_shell.html", {
         "environment": os.getenv("WDOS_ENVIRONMENT", "local"),
+        "lang": lang,
+        "direction": LANGUAGES[lang]['dir'],
+        "translations": catalog(lang),
     })

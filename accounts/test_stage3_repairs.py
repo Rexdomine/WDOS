@@ -50,6 +50,31 @@ class Stage3RepairTests(TestCase):
         self.assertContains(response, 'lang="fr"')
         self.assertContains(response, catalog('fr')['onb_workspace_title'])
 
+    def test_foundation_ignores_unsupported_cookie_before_locale_precedence(self):
+        account = self.create_active('validated-locale@example.org')
+        draft = OnboardingDraft.objects.create(
+            account=account, state='accepted', next_step=6, data={'language': 'fr'}
+        )
+        person = Person.objects.create(display_name='Validated Locale Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        session = self.client.session
+        session['wdos_language'] = 'ar'
+        session.save()
+        self.client.cookies['wdos_language'] = 'unsupported'
+
+        response = self.client.get('/foundation/')
+
+        self.assertContains(response, 'lang="ar"')
+        self.assertContains(response, catalog('ar')['onb_workspace_title'])
+
     def test_accepted_membership_login_and_root_open_foundation_shell(self):
         account = self.create_active('accepted-nav@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
@@ -145,6 +170,10 @@ class Stage3RepairTests(TestCase):
         css = (Path(__file__).parent / 'static' / 'accounts' / 'design.css').read_text()
         self.assertIn('.foundation-shell', css)
         self.assertIn('.foundation-shell .content', css)
+
+    def test_foundation_notification_button_resets_native_chrome(self):
+        css = (Path(__file__).parent / 'static' / 'accounts' / 'design.css').read_text()
+        self.assertIn('.foundation-shell .toptools > .icon{border:0;background:transparent;padding:0}', css)
 
     def test_foundation_rtl_desktop_content_offsets_away_from_right_sidebar(self):
         css = (Path(__file__).parent / 'static' / 'accounts' / 'design.css').read_text()

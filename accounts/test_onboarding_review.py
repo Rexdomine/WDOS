@@ -113,6 +113,16 @@ class ReviewTests(TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertContains(dashboard, 'A shared platform foundation.')
 
+    def test_accepted_first_use_actions_open_read_only_records(self):
+        self.assertEqual(self.approve().status_code, 200)
+        self.login(self.account)
+        response = self.client.get('/onboarding/8/')
+        self.assertContains(response, 'href="/onboarding/8/?tab=records"')
+        records = self.client.get('/onboarding/8/?tab=records')
+        self.assertEqual(records.status_code, 200)
+        self.assertContains(records, 'aria-current="page"')
+        self.assertNotContains(records, 'id="onboarding-form"')
+
     def test_unaccepted_member_cannot_open_dashboard_directly(self):
         self.login(self.account)
         response = self.client.get('/app')

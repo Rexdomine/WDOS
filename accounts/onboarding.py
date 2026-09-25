@@ -8,9 +8,12 @@ from .models import Account, OnboardingDraft, OnboardingEvent, OnboardingConsent
 from .onboarding_policy import current_policy
 from .onboarding_forms import FORMS
 from .locale import LANGUAGES, catalog, localize_form, translate
+from .services import throttle
 
 
 MAX_ONBOARDING_EVENTS = 256
+MAX_PHOTO_ATTEMPTS = 10
+PHOTO_ATTEMPT_WINDOW = 900
 
 TITLES = {
     1: ('Make WDOS feel like home', 'Continue'),
@@ -127,6 +130,12 @@ def step(request, step):
         # validation decodes uploaded images, so checking only after
         # form.is_valid() still permits expensive work on a full draft.
         if draft and draft.events.count() >= MAX_ONBOARDING_EVENTS:
+            safe_form = form_class(initial=initial_data(locked, draft, lang), account=locked)
+            return render_step(request, step, draft, safe_form, localized_notice(c, INVALID_KEYS), 429)
+        if step == 2 and request.FILES.get('photo') is not None and not throttle(
+            'onboarding-photo-attempt', str(locked.pk), limit=MAX_PHOTO_ATTEMPTS,
+            seconds=PHOTO_ATTEMPT_WINDOW,
+        ):
             safe_form = form_class(initial=initial_data(locked, draft, lang), account=locked)
             return render_step(request, step, draft, safe_form, localized_notice(c, INVALID_KEYS), 429)
         valid = form.is_valid()

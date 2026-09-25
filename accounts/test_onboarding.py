@@ -157,6 +157,22 @@ class OnboardingDraftTests(TestCase):
         self.assertEqual(draft.revision, MAX_ONBOARDING_EVENTS)
         self.assertEqual(draft.events.count(), MAX_ONBOARDING_EVENTS)
 
+    def test_photo_attempts_are_rate_limited_before_rejected_decode(self):
+        with patch('accounts.onboarding_forms.Image.open') as image_open:
+            image_open.side_effect = ValueError('rejected test image')
+            responses = []
+            for _ in range(11):
+                draft = OnboardingDraft.objects.filter(account=self.account).first()
+                revision = draft.revision if draft else 0
+                upload = SimpleUploadedFile('profile.png', b'not decoded', content_type='image/png')
+                responses.append(self.save(2, {'full_name': 'Candidate', 'photo': upload}, revision=revision))
+        self.assertEqual([response.status_code for response in responses[:10]], [422] * 10)
+        self.assertEqual(responses[-1].status_code, 429)
+        self.assertEqual(image_open.call_count, 10)
+        draft = OnboardingDraft.objects.get(account=self.account)
+        self.assertEqual(draft.revision, 1)
+        self.assertEqual(draft.events.count(), 1)
+
     def test_post_needs_expected_revision(self):
         response = self.client.post('/onboarding/1/', {'timezone': 'UTC'})
         self.assertEqual(response.status_code, 409)

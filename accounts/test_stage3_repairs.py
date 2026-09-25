@@ -97,6 +97,17 @@ class Stage3RepairTests(TestCase):
         self.assertIn('position:fixed;bottom:0;left:0;right:0', css)
         self.assertIn('.foundation-shell .mobile-nav{display:grid', css)
 
+    def test_localization_evidence_commits_current_head_desktop_and_mobile_comparisons(self):
+        evidence = Path(__file__).parents[1] / 'docs' / 'stage-03-delivery-evidence.md'
+        text = evidence.read_text()
+        self.assertIn('7ddcca2e48bca29d9f31b49585093f94b5315485', text)
+        for locale in ('en', 'fr', 'pt', 'ar', 'sw'):
+            for viewport in ('desktop', 'mobile'):
+                capture = evidence.parents[0] / 'stage-03-evidence' / 'captures' / f'foundation-localized-{locale}-{viewport}-7ddcca2.png'
+                comparison = evidence.parents[0] / 'stage-03-evidence' / 'comparisons' / f'foundation-localized-{locale}-{viewport}-7ddcca2.png'
+                self.assertTrue(capture.is_file(), capture)
+                self.assertTrue(comparison.is_file(), comparison)
+
     def test_foundation_shell_contains_core01_workspace_hierarchy(self):
         account = self.create_active('foundation-hierarchy@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

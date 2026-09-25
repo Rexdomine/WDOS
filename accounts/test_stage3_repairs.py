@@ -148,6 +148,28 @@ class Stage3RepairTests(TestCase):
         self.assertIn('class="related-information-panel"', html)
         self.assertIn('Record tabs', html)
 
+    def test_foundation_mobile_shell_contains_approved_navigation_controls(self):
+        account = self.create_active('foundation-mobile-nav@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Mobile Navigation Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        for label, href in (
+            ('Home', '#workspace-home'), ('My work', '#activities'),
+            ('Meetings', '#meetings'), ('Messages', '#messages'), ('More', '#more'),
+        ):
+            self.assertIn(f'href="{href}"', html)
+            self.assertIn(f'>{label}<', html)
+        self.assertIn('class="mobile-nav"', html)
+
     def test_foundation_workspace_actions_have_real_targets(self):
         account = self.create_active('foundation-actions@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

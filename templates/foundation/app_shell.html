@@ -36,12 +36,20 @@
     </div>
   </div>
 
+  <nav class="mobile-nav" aria-label="Workspace navigation">
+    <a href="#workspace-home" aria-current="page"><span aria-hidden="true">⌂</span>Home</a>
+    <a href="#activities"><span aria-hidden="true">▣</span>My work</a>
+    <a href="#meetings"><span aria-hidden="true">□</span>Meetings</a>
+    <a href="#messages"><span aria-hidden="true">✉</span>Messages</a>
+    <a href="#more"><span aria-hidden="true">⋯</span>More</a>
+  </nav>
+
   <div class="content">
     <div class="topbar">
       <div><span class="crumb">{{ scope_label }}</span><h1>Your workspace</h1></div>
       <div class="profile-menu" data-profile-menu><button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button><div class="profile-menu-panel" data-profile-panel role="menu" hidden><strong>{{ display_name }}</strong><form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form></div></div>
     </div>
-    <main aria-labelledby="page-title">
+    <main id="workspace-home" aria-labelledby="page-title">
       <section class="hero-card" aria-labelledby="page-title">
         <div><p class="eyebrow">MEMBERSHIP</p><h2 id="page-title">Welcome back, {{ display_name }}.</h2><p>Your workspace brings together the records, activities, and support connected to your membership.</p></div>
         <span class="status-pill">ACTIVE</span>

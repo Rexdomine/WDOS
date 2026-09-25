@@ -164,12 +164,15 @@ class Stage3RepairTests(TestCase):
         html = self.client.get('/foundation/').content.decode()
         for label, href in (
             ('Home', '#workspace-home'), ('My work', '#activities'),
-            ('Meetings', '#meetings'), ('Messages', '#messages'), ('More', '#more'),
+            ('Meetings', '#records-table'), ('Messages', '#support-links'), ('More', '#more'),
         ):
             self.assertIn(f'href="{href}"', html)
             self.assertIn(f'>{label}<', html)
-            self.assertIn(f'id="{href[1:]}"', html)
         self.assertIn('class="mobile-nav"', html)
+        for target in ('workspace-home', 'activities', 'records-table', 'support-links', 'more'):
+            self.assertIn(f'id="{target}"', html)
+        self.assertNotIn('id="meetings"', html)
+        self.assertNotIn('id="messages"', html)
 
     def test_foundation_shell_renders_persisted_local_home_label(self):
         account = self.create_active('foundation-local-home@example.org')

@@ -191,7 +191,7 @@
 
       {% if codes %}
         <ul class="recovery-codes">{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
-        <a class="btn primary" href="{% url 'accounts:status' %}">{% include 'accounts/arrow.html' %}{{ translations.saved_codes }}</a>
+        <a class="btn primary" href="{{ workspace_url|default_if_none:'' }}">{% include 'accounts/arrow.html' %}{{ translations.saved_codes }}</a>
       {% endif %}
 
       {% if recovery_requested %}

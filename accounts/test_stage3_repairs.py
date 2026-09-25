@@ -88,3 +88,31 @@ class Stage3RepairTests(TestCase):
         script = (Path(__file__).parent / 'static' / 'accounts' / 'onboarding.js').read_text()
         self.assertIn('function initializeProfileMenus()', script)
         self.assertIn('initializeProfileMenus();', script)
+
+    def test_mfa_setup_recovery_codes_continue_to_current_workspace(self):
+        account = self.create_active('mfa-setup-destination@example.org')
+        account.user.is_staff = True
+        account.user.save(update_fields=['is_staff'])
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Accepted Setup Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.assertRedirects(self.login(account), '/auth/mfa/')
+        setup = self.client.post('/auth/mfa/', {'begin': '1'})
+        self.assertEqual(setup.status_code, 200)
+        account.refresh_from_db()
+        secret = services.decrypt(account.mfa_pending_secret)
+        recovery = self.client.post('/auth/mfa/', {'code': pyotp.TOTP(secret).now()})
+        self.assertEqual(recovery.status_code, 200)
+        self.assertContains(recovery, 'href="/foundation/"')
+
+    def test_profile_menu_preserves_avatar_fill_and_rtl_label_alignment(self):
+        css = (Path(__file__).parent / 'static' / 'accounts' / 'onboarding.css').read_text()
+        self.assertNotIn('.profile-trigger{border:0;background:transparent', css)
+        self.assertIn('.profile-menu-panel button{width:100%;padding:9px;border:0;background:transparent;text-align:start;', css)

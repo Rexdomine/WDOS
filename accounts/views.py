@@ -522,7 +522,7 @@ def mfa(request):
                         return page(
                             request, 'AUTH-08', 'Save your recovery codes',
                             'Each code works once. These codes are shown only now. Store them privately.',
-                            codes=result,
+                            codes=result, workspace_url=_workspace_destination(account),
                         )
                     return redirect(_workspace_destination(account))
         if form.is_bound:

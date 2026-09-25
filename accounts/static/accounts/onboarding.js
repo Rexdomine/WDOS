@@ -114,7 +114,11 @@ function initializeRecordTabs() {
       candidate.setAttribute('aria-selected', String(selected));
       candidate.tabIndex = selected ? 0 : -1;
     });
-    panels.forEach((panel) => { panel.hidden = panel.id !== tab.getAttribute('aria-controls'); });
+    panels.forEach((panel) => {
+      // The approved Overview composition keeps related information beside the
+      // workspace record; only the primary overview/history panels are exclusive.
+      panel.hidden = panel.id === 'records-panel' ? false : panel.id !== tab.getAttribute('aria-controls');
+    });
     if (moveFocus) tab.focus();
   };
   tabs.forEach((tab, index) => {
@@ -126,6 +130,20 @@ function initializeRecordTabs() {
       activate(tabs[next], true);
     });
   });
+  const activateHash = () => {
+    const tab = tabs.find((candidate) => candidate.hash === window.location.hash);
+    if (tab) activate(tab);
+  };
+  document.querySelectorAll('[data-record-target]').forEach((shortcut) => {
+    shortcut.addEventListener('click', (event) => {
+      const tab = tabs.find((candidate) => candidate.getAttribute('aria-controls') === shortcut.dataset.recordTarget);
+      if (!tab) return;
+      event.preventDefault();
+      activate(tab);
+      window.history.replaceState({}, '', shortcut.hash);
+    });
+  });
+  window.addEventListener("hashchange", activateHash);
   const initial = tabs.find((tab) => tab.hash === window.location.hash) || tabs[0];
   activate(initial);
 }

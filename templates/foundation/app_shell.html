@@ -16,11 +16,11 @@
     <div class="workspace"><div><b>{{ scope_label }}</b><span>{{ translations.onb_member }}</span></div><span class="icon" aria-hidden="true">›</span></div>
     <div class="nav-label">{{ translations.onb_workspace }}</div>
     <a class="navitem active" href="#workspace-home"><span class="icon" aria-hidden="true">⌂</span>{{ translations.onb_home }}</a>
-    <a class="navitem" href="#records-panel"><span class="icon" aria-hidden="true">▣</span>{{ translations.onb_activities }}</a>
-    <a class="navitem" href="#history-panel"><span class="icon" aria-hidden="true">□</span>{{ translations.onb_meetings }}</a>
-    <a class="navitem" href="#history-panel"><span class="icon" aria-hidden="true">✉</span>{{ translations.onb_messages }}</a>
-    <a class="navitem" href="#records-panel"><span class="icon" aria-hidden="true">?</span>{{ translations.onb_help }}</a>
-    <a class="navitem" href="#records-panel"><span class="icon" aria-hidden="true">⚙</span>{{ translations.onb_settings }}</a>
+    <a class="navitem" href="#records-panel" data-record-target="records-panel"><span class="icon" aria-hidden="true">▣</span>{{ translations.onb_activities }}</a>
+    <a class="navitem" href="#history-panel" data-record-target="history-panel"><span class="icon" aria-hidden="true">□</span>{{ translations.onb_meetings }}</a>
+    <a class="navitem" href="#history-panel" data-record-target="history-panel"><span class="icon" aria-hidden="true">✉</span>{{ translations.onb_messages }}</a>
+    <a class="navitem" href="#records-panel" data-record-target="records-panel"><span class="icon" aria-hidden="true">?</span>{{ translations.onb_help }}</a>
+    <a class="navitem" href="#records-panel" data-record-target="records-panel"><span class="icon" aria-hidden="true">⚙</span>{{ translations.onb_settings }}</a>
   </aside>
 
   <div class="mobile-head">
@@ -38,10 +38,10 @@
 
   <nav class="mobile-nav" aria-label="{{ translations.onb_workspace }}">
     <a href="#workspace-home" aria-current="page"><span aria-hidden="true">⌂</span>{{ translations.onb_home }}</a>
-    <a href="#records-panel"><span aria-hidden="true">▣</span>{{ translations.onb_my_work }}</a>
-    <a href="#history-panel"><span aria-hidden="true">□</span>{{ translations.onb_meetings_short }}</a>
-    <a href="#history-panel"><span aria-hidden="true">✉</span>{{ translations.onb_messages }}</a>
-    <a href="#records-panel"><span aria-hidden="true">⋯</span>{{ translations.onb_more }}</a>
+    <a href="#records-panel" data-record-target="records-panel"><span aria-hidden="true">▣</span>{{ translations.onb_my_work }}</a>
+    <a href="#history-panel" data-record-target="history-panel"><span aria-hidden="true">□</span>{{ translations.onb_meetings_short }}</a>
+    <a href="#history-panel" data-record-target="history-panel"><span aria-hidden="true">✉</span>{{ translations.onb_messages }}</a>
+    <a href="#records-panel" data-record-target="records-panel"><span aria-hidden="true">⋯</span>{{ translations.onb_more }}</a>
   </nav>
 
   <div class="content">
@@ -52,7 +52,7 @@
     <main id="workspace-home" aria-labelledby="page-title">
       <div class="pagehead">
         <div><div class="eyebrow">{{ scope_label }}</div><h1 id="page-title">{{ translations.onb_workspace_title }}</h1><p>{{ translations.onb_workspace_description }}</p></div>
-        <div class="actions"><a class="btn" href="#workspace-home">{{ translations.onb_view_all }}</a><a class="btn primary" href="#records-panel">{{ translations.onb_open_activities }}</a></div>
+        <div class="actions"><a class="btn" href="#workspace-home">{{ translations.onb_view_all }}</a><a class="btn primary" href="#records-panel" data-record-target="records-panel">{{ translations.onb_open_activities }}</a></div>
       </div>
       <div class="tabs" id="record-tabs" role="tablist" aria-label="{{ translations.onb_record_tabs }}">
         <a class="tab active" data-record-tab href="#overview-panel" id="overview-tab" role="tab" aria-selected="true" aria-controls="overview-panel" tabindex="0">{{ translations.onb_overview }}</a>
@@ -66,7 +66,7 @@
           <div class="records-table-wrap"><table class="records-table"><caption>{{ translations.onb_workspace_records }}</caption><thead><tr><th scope="col">{{ translations.onb_record }}</th><th scope="col">{{ translations.onb_status_label }}</th><th scope="col">{{ translations.onb_next_action }}</th></tr></thead><tbody><tr><th scope="row">{{ translations.onb_membership }}</th><td>{{ membership_status }}</td><td>{{ translations.onb_review_workspace }}</td></tr><tr><th scope="row">{{ translations.onb_activities }}</th><td>{{ activity_status }}</td><td>{{ translations.onb_open_activities }}</td></tr></tbody></table></div>
           <p class="notice">{{ translations.onb_keep_membership_context }}</p>
         </section>
-        <section class="panel related-information-panel" id="records-panel" role="tabpanel" aria-labelledby="records-tab" tabindex="0" hidden>
+        <section class="panel related-information-panel" id="records-panel" role="tabpanel" aria-labelledby="records-tab" tabindex="0">
           <div class="panelhead"><h2>{{ translations.onb_related_information }}</h2></div>
           <div class="mini-item"><div><h3>{{ translations.onb_local_connection }}</h3><p>{{ local_home_label }}</p><div class="meta">{{ translations.onb_membership }}</div></div></div>
           <div class="mini-item"><div><h3>{{ translations.onb_help }}</h3><p>{{ translations.onb_support_text }}</p><div class="meta">{{ translations.onb_contact_support }}</div></div></div>

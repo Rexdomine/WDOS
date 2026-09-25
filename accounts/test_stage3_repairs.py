@@ -159,6 +159,27 @@ class Stage3RepairTests(TestCase):
         self.assertIn('ArrowRight', script)
         self.assertIn('aria-selected', script)
 
+    def test_foundation_record_shortcuts_activate_tabs_and_preserve_overview_related_information(self):
+        account = self.create_active('foundation-record-shortcuts@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Shortcut Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        script = (Path(__file__).parent / 'static' / 'accounts' / 'onboarding.js').read_text()
+        self.assertIn('window.addEventListener(\"hashchange\"', script)
+        self.assertIn('data-record-target', html)
+        self.assertIn('data-record-target=\"records-panel\"', html)
+        self.assertIn('data-record-target=\"history-panel\"', html)
+        self.assertNotIn('id=\"records-panel\" role=\"tabpanel\" aria-labelledby=\"records-tab\" tabindex=\"0\" hidden', html)
+
     def test_foundation_shell_contains_core01_workspace_hierarchy(self):
         account = self.create_active('foundation-hierarchy@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

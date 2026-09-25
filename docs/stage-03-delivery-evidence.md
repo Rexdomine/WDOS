@@ -4,7 +4,7 @@
 
 - Branch: `fix/stage3-auth-navigation`
 - Target: `staging`
-- Exact candidate head for this evidence: `7ddcca2e48bca29d9f31b49585093f94b5315485`; the foundation localization captures and comparisons below are generated from this exact candidate. This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
+- Exact candidate head for this evidence: `ee70048fe84e06854001e399d92b32ee5f55b2b2`; the current-head tab interaction captures and comparisons below are generated from this exact candidate. Earlier capture sets remain historical evidence for their recorded heads. This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map
 
@@ -12,7 +12,7 @@
 |---|---|---|
 | Canonical regression | `make verify` with `DATABASE_URL` and provider credentials unset | PASS: 201 tests, 15 expected PostgreSQL/Playwright environment-gated skips, exit 0; system check, migration check, migration and collectstatic passed. |
 | Same-family photo-attempt regression | `accounts.test_onboarding.OnboardingDraftTests` | PASS: rejected photo attempts 1–10 reach the decoder, attempt 11 returns 429 before another decode, and the 429 response preserves safe text fields with localized recovery copy. |
-| Hosted exact-head CI | PR 5 live checks | Candidate `7ddcca2e48bca29d9f31b49585093f94b5315485`: `ui-browser`, `django`, GitGuardian, and CodeRabbit successful; exact-head Codex code and security reviews completed. |
+-| Hosted exact-head CI | PR 5 live checks | Prior candidate `7ddcca2e48bca29d9f31b49585093f94b5315485`: `ui-browser`, `django`, GitGuardian, and CodeRabbit successful; exact-head Codex code and security reviews completed. Re-run required for current candidate `ee70048fe84e06854001e399d92b32ee5f55b2b2`. |
 | Refreshed source integrity | `/opt/data/tmp/wdos-stage3/verified-ui/runtime.json` and `manifest.json` | Capture run `1790322779649435136`, Chromium 1187, source hash `8f4cada01cb4b7b5f1eb030f464dc2880ea9c7640deefe465715ffd80363f6c5`; this is the checked-out PR head recorded above, not the Stage 2 AUTH harness. |
 | Exact-code browser capture | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json` | Dedicated onboarding harness completed 82 real Chromium captures: ONB-01..08 at desktop/mobile in English, Arabic, French, Portuguese, and Kiswahili, plus ONB-02 validation and draft-reload states. Representative exact-candidate hashes: ONB-01 desktop `dd79c20e4b50e32d612367df57cf24777d190dd488cee5d579e1e887414e9708`, ONB-01 mobile `8cc2045b357d58547d629551fb5f24380602f364e29aee1b7e6e9b9f49b83cd7`, ONB-02 desktop `1d27908f7b1f728abe4f70ad9f5f9b4e30be66ea561d98cef945342c97a92fa3`, ONB-02 mobile `ccb6318665747a6eaf994379f5136919fb7fa78007493963d51c5df30960f6a8`, ONB-08 desktop `c779748b05adebdda49306aba754ed80516541d17a0226f9e7616ef631858e88`, and ONB-08 mobile `900e13f09c1304721f3039bc5742b198417ec4a60121a84990895bf3f79d0732`. |
 | Exact interaction evidence | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json`, `/opt/data/tmp/wdos-stage3/state-coverage-review.md` | PASS for real route entry, locale/direction binding, ONB-02 validation, draft reload, and reviewer permission boundary. The state review explicitly lists uncovered approved variants; they are not silently claimed as passed. |
@@ -74,6 +74,21 @@ safe back navigation, locale override precedence, guarded dashboard routing, and
 first-use presentation. The exact-code browser run above now exercises the accepted-state
 first-use template correction at its source head. The comparison record remains evidence, not
 Rex visual acceptance; this record does not claim that visual acceptance or Rex acceptance is complete.
+
+## Current exact-head tab interaction evidence
+
+- Candidate: `ee70048fe84e06854001e399d92b32ee5f55b2b2`.
+- Real Chromium route: authenticated `/foundation/`, accepted member, desktop `1440x1000`, mobile `390x844`, and Arabic RTL mobile `390x844`.
+- Interaction assertions: Overview initially keeps both the workspace record and related-information panel visible; visible desktop/mobile workspace shortcuts activate the matching Records or History tab; direct `#records-panel` navigation selects Records; tab selection and panel visibility update without horizontal overflow.
+- Approved reference: `WDOS Complete UI Review v1`, screen `CORE-01`; reference hashes remain `CORE-01-desktop` `9362fa5555c996cf38f7d2a1dc1672811e82d9149ad3675f17d9a1e5911e0272` and `CORE-01-mobile` `d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252`.
+
+| State | Candidate capture | Side-by-side comparison | Capture SHA-256 |
+|---|---|---|---|
+| Overview/tabs, desktop | [`foundation-tabs-ee70048-desktop.png`](./stage-03-evidence/captures/foundation-tabs-ee70048-desktop.png) | [`foundation-tabs-ee70048-desktop.png`](./stage-03-evidence/comparisons/foundation-tabs-ee70048-desktop.png) | `ac8862ff51fc9b88ef799456f6563f738971b5f9ab7912f74f190d5bd9efcfd0` |
+| Shortcut/tab interaction, mobile | [`foundation-tabs-ee70048-mobile.png`](./stage-03-evidence/captures/foundation-tabs-ee70048-mobile.png) | [`foundation-tabs-ee70048-mobile.png`](./stage-03-evidence/comparisons/foundation-tabs-ee70048-mobile.png) | `38607b97a373b5f2c226462585e1156d80259b14a442121c448679a628921b77` |
+| Shortcut/tab interaction, Arabic RTL mobile | [`foundation-tabs-ee70048-mobile-ar.png`](./stage-03-evidence/captures/foundation-tabs-ee70048-mobile-ar.png) | [`foundation-tabs-ee70048-mobile-ar.png`](./stage-03-evidence/comparisons/foundation-tabs-ee70048-mobile-ar.png) | `f04dc5de266b77eae6a795982aab6f3d6481e1208fd08836022304eebd1716e0` |
+
+The current-head captures and comparisons are committed evidence for the repaired interaction. Rex's versioned visual acceptance remains an owner gate; no deviation approval is claimed.
 
 ## Release status
 

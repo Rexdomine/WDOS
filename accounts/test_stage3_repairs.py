@@ -1,6 +1,7 @@
 from django.test import TestCase, override_settings
 from django.utils.html import escape
 from pathlib import Path
+import json
 
 import pyotp
 
@@ -209,6 +210,16 @@ class Stage3RepairTests(TestCase):
         section = text.split('## Current exact-head tab interaction evidence', 1)[1]
         self.assertNotIn('ee70048fe84e06854001e399d92b32ee5f55b2b2', section.split('## ', 1)[0])
         self.assertIn('Implementation candidate:', section)
+
+    def test_foundation_navigation_evidence_contains_distinct_auditable_states(self):
+        manifest = Path(__file__).parents[1] / 'docs' / 'stage-03-evidence' / 'manifests' / 'foundation-navigation-ecaa21b.json'
+        data = json.loads(manifest.read_text())
+        self.assertEqual(data['candidate'], 'ecaa21bdf8fa76a2e3c9a019ffee6faa95b22831')
+        self.assertEqual({row['state'] for row in data['captures']}, {'meetings', 'messages', 'home-reset'})
+        self.assertEqual(len(data['captures']), 9)
+        self.assertEqual(len({row['sha256'] for row in data['captures']}), 9)
+        for row in data['captures']:
+            self.assertTrue((Path(__file__).parents[1] / row['path']).is_file())
 
     def test_foundation_navigation_evidence_is_bound_to_final_candidate_and_comparisons(self):
         evidence_root = Path(__file__).parents[1]

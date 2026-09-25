@@ -20,7 +20,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from . import forms, services
 from .locale import LANGUAGES, catalog, localize_form, logout_preserving_language as django_logout, translate
-from .models import Account, ActionToken
+from .models import Account, ActionToken, OnboardingDraft
 
 
 LOCALE_COOKIE = 'wdos_language'
@@ -188,6 +188,13 @@ def register(request):
 
 def establish(request, account, mfa=False, remember=False):
     lang = _locale(request)
+    persisted_lang = (
+        OnboardingDraft.objects.filter(
+            account=account, state='accepted', membership__isnull=False,
+        ).values_list('data', flat=True).first() or {}
+    ).get('language')
+    if lang == 'en' and persisted_lang in LANGUAGES and persisted_lang != 'en':
+        lang = persisted_lang
     django_login(request, account.user, backend='django.contrib.auth.backends.ModelBackend')
     request.session[LOCALE_COOKIE] = lang
     now = timezone.now().timestamp()

@@ -58,13 +58,15 @@ def app_shell(request):
         membership__isnull=False,
     )
     persisted_lang = (draft.data or {}).get('language')
+    cookie_lang = request.COOKIES.get('wdos_language')
     lang = next(
         (
             candidate
             for candidate in (
-                request.COOKIES.get('wdos_language'),
+                cookie_lang if cookie_lang in LANGUAGES and cookie_lang != 'en' else None,
                 request.session.get('wdos_language'),
                 persisted_lang,
+                cookie_lang,
             )
             if candidate in LANGUAGES
         ),

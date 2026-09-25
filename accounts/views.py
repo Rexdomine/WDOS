@@ -524,7 +524,7 @@ def mfa(request):
                             'Each code works once. These codes are shown only now. Store them privately.',
                             codes=result,
                         )
-                    return redirect('accounts:status')
+                    return redirect(_workspace_destination(account))
         if form.is_bound:
             form.add_error(None, 'This code could not be verified. Try a fresh authenticator code or an unused recovery code.')
 

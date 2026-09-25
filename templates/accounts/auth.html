@@ -63,7 +63,7 @@
           <h2>{{ status_title }}</h2>
           <p>{{ status_text }}</p>
           <details class="status-explainer" data-status-explainer>
-            <summary aria-label="Why am I seeing this status?">ⓘ</summary>
+            <summary aria-label="{{ translations.status_explainer }}">ⓘ</summary>
             <div class="status-explainer-popup" role="note">{{ status_text }}</div>
           </details>
           {% if onboarding_available %}<a class="btn primary" href="{% url 'onboarding:start' %}">{% include 'accounts/arrow.html' %}{{ translations.continue }}</a>{% endif %}

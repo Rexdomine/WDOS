@@ -29,6 +29,7 @@
     document.documentElement.replaceWith(document.adoptNode(parsed.documentElement));
     // DOMParser scripts are inert: bind the new authoritative form explicitly.
     initializeOnboarding();
+    initializeProfileMenus();
   };
   const recover = async () => {
     if (pending) return;
@@ -92,7 +93,7 @@
 })();
 
 
-(function initializeProfileMenus() {
+function initializeProfileMenus() {
   document.querySelectorAll('[data-profile-menu]').forEach((menu) => {
     const trigger = menu.querySelector('[data-profile-trigger]'); const panel = menu.querySelector('[data-profile-panel]');
     if (!trigger || !panel) return;
@@ -101,4 +102,6 @@
     menu.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); trigger.focus(); } });
     document.addEventListener('click', (event) => { if (!menu.contains(event.target)) close(); });
   });
-})();
+}
+
+initializeProfileMenus();

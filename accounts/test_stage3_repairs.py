@@ -168,6 +168,17 @@ class Stage3RepairTests(TestCase):
             self.assertIn(f'data-workspace-target=\"{target}\"', template)
         self.assertIn('data-workspace-panel', template)
 
+    def test_foundation_named_panels_have_a_real_hidden_display_override(self):
+        css = (Path(__file__).parent / 'static' / 'accounts' / 'design.css').read_text()
+        self.assertIn('.foundation-shell [hidden]{display:none !important}', css)
+
+    def test_foundation_navigation_syncs_selection_for_named_and_keyboard_states(self):
+        script = (Path(__file__).parent / 'static' / 'accounts' / 'onboarding.js').read_text()
+        self.assertIn('syncWorkspaceNavigation', script)
+        self.assertIn('syncWorkspaceNavigation(panel.id)', script)
+        self.assertIn("syncWorkspaceNavigation(tab.getAttribute('aria-controls') ===", script)
+        self.assertIn("window.history.replaceState({}, '', tabs[next].hash)", script)
+
     def test_foundation_tab_evidence_is_bound_to_current_interaction_candidate(self):
         evidence = Path(__file__).parents[1] / 'docs' / 'stage-03-delivery-evidence.md'
         text = evidence.read_text()

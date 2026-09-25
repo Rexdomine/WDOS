@@ -108,6 +108,14 @@ function initializeRecordTabs() {
   if (!tabs.length) return;
   const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls'))).filter(Boolean);
   const namedPanels = Array.from(document.querySelectorAll('[data-workspace-panel]'));
+  const syncWorkspaceNavigation = (stateId) => {
+    document.querySelectorAll('.foundation-shell .navitem, .foundation-shell .mobile-nav a').forEach((link) => {
+      const active = link.getAttribute('href') === `#${stateId}`;
+      link.classList.toggle('active', link.classList.contains('navitem') && active);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+  };
   const hideNamedPanels = () => namedPanels.forEach((panel) => { panel.hidden = true; });
   const activate = (tab, moveFocus = false) => {
     tabs.forEach((candidate) => {
@@ -122,12 +130,14 @@ function initializeRecordTabs() {
       panel.hidden = panel.id === 'records-panel' ? false : panel.id !== tab.getAttribute('aria-controls');
     });
     hideNamedPanels();
+    syncWorkspaceNavigation(tab.getAttribute('aria-controls') === 'overview-panel' ? 'workspace-home' : tab.getAttribute('aria-controls'));
     if (moveFocus) tab.focus();
   };
   const activateNamedPanel = (panel) => {
     panels.forEach((candidate) => { candidate.hidden = true; });
     hideNamedPanels();
     panel.hidden = false;
+    syncWorkspaceNavigation(panel.id);
     tabs.forEach((candidate) => {
       candidate.classList.remove('active');
       candidate.setAttribute('aria-selected', 'false');
@@ -141,6 +151,7 @@ function initializeRecordTabs() {
       event.preventDefault();
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
       activate(tabs[next], true);
+      window.history.replaceState({}, '', tabs[next].hash);
     });
   });
   const activateHash = () => {

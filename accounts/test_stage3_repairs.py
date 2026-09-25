@@ -49,6 +49,49 @@ class Stage3RepairTests(TestCase):
         self.assertContains(shell, 'Workspace actions')
         self.assertContains(shell, 'overflow-x: hidden')
 
+    def test_foundation_shell_has_styled_layout_and_bound_profile_menu(self):
+        account = self.create_active('foundation-controls@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Foundation Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        self.assertIn('data-profile-menu', html)
+        self.assertIn('data-profile-trigger', html)
+        self.assertIn('data-profile-panel', html)
+        self.assertIn('aria-expanded="false"', html)
+        self.assertIn('hidden', html)
+        self.assertIn('/static/accounts/onboarding.', html)
+        css = (Path(__file__).parent / 'static' / 'accounts' / 'design.css').read_text()
+        self.assertIn('.foundation-shell', css)
+        self.assertIn('.foundation-shell .content', css)
+
+    def test_foundation_workspace_actions_have_real_targets(self):
+        account = self.create_active('foundation-actions@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Action Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        self.assertIn('id="activities"', html)
+        self.assertIn('id="support"', html)
+        self.assertIn('href="#activities"', html)
+        self.assertIn('href="#support"', html)
+
     def test_foundation_logout_uses_persisted_locale_and_direction(self):
         account = self.create_active('accepted-locale@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

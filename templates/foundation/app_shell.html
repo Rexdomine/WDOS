@@ -7,9 +7,10 @@
   <title>WDOS · Workspace</title>
   <link rel="stylesheet" href="{% static 'accounts/design.css' %}">
   <link rel="stylesheet" href="{% static 'accounts/refinements.css' %}">
+  <link rel="stylesheet" href="{% static 'accounts/onboarding.css' %}">
   <style>html, body { overflow-x: hidden; }</style>
 </head>
-<body>
+<body class="foundation-shell">
   <aside class="sidebar">
     <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
     <div class="workspace"><div><b>{{ scope_label }}</b><span>Member</span></div><span class="icon" aria-hidden="true">›</span></div>
@@ -25,9 +26,9 @@
   <div class="mobile-head">
     <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
     <div class="right">
-      <div class="profile-menu">
-        <button class="avatar profile-trigger" type="button" aria-haspopup="menu">{{ initials }}</button>
-        <div class="profile-menu-panel" role="menu">
+      <div class="profile-menu" data-profile-menu>
+        <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button>
+        <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
           <strong>{{ display_name }}</strong>
           <form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form>
         </div>
@@ -38,7 +39,7 @@
   <div class="content">
     <div class="topbar">
       <div><span class="crumb">{{ scope_label }}</span><h1>Your workspace</h1></div>
-      <div class="profile-menu"><button class="avatar profile-trigger" type="button" aria-haspopup="menu">{{ initials }}</button><div class="profile-menu-panel" role="menu"><strong>{{ display_name }}</strong><form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form></div></div>
+      <div class="profile-menu" data-profile-menu><button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button><div class="profile-menu-panel" data-profile-panel role="menu" hidden><strong>{{ display_name }}</strong><form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form></div></div>
     </div>
     <main aria-labelledby="page-title">
       <section class="hero-card" aria-labelledby="page-title">
@@ -47,11 +48,12 @@
       </section>
       <section class="section-block" aria-labelledby="records-title">
         <div class="section-heading"><div><p class="eyebrow">OVERVIEW</p><h2 id="records-title">Records</h2></div><a href="#records">View all</a></div>
-        <div class="card-grid" id="records"><article class="data-card"><span class="card-label">MEMBERSHIP</span><strong>{{ scope_label }}</strong><span>Active and in good standing</span></article><article class="data-card"><span class="card-label">ACTIVITIES</span><strong>My activities</strong><span>Keep track of your recent progress</span></article><article class="data-card"><span class="card-label">SUPPORT</span><strong>Related information</strong><span>Find guidance and help when you need it</span></article></div>
+        <div class="card-grid" id="records"><article class="data-card"><span class="card-label">MEMBERSHIP</span><strong>{{ scope_label }}</strong><span>Active and in good standing</span></article><article class="data-card" id="activities"><span class="card-label">ACTIVITIES</span><strong>My activities</strong><span>Keep track of your recent progress</span></article><article class="data-card" id="support"><span class="card-label">SUPPORT</span><strong>Related information</strong><span>Find guidance and help when you need it</span></article></div>
       </section>
       <section class="section-block" aria-labelledby="actions-title"><div class="section-heading"><div><p class="eyebrow">NEXT STEPS</p><h2 id="actions-title">Workspace actions</h2></div></div><div class="action-row"><a class="btn secondary" href="#activities">Open activities</a><a class="btn secondary" href="#support">Contact support</a></div></section>
     </main>
     <footer>WODDI · No Woman Is Left Out</footer>
   </div>
+  <script src="{% static 'accounts/onboarding.js' %}"></script>
 </body>
 </html>

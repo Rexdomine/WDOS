@@ -65,6 +65,7 @@ def app_shell(request):
     initials = ''.join(part[0] for part in display_name.split()[:2]).upper() or 'WD'
     status_label = 'Active membership' if account.status == 'active' else 'Membership status unavailable'
     activity_label = 'No activities are recorded yet'
+    local_home_label = (membership.home or {}).get('label') or 'Local connection unavailable'
     return render(request, "foundation/app_shell.html", {
         "environment": os.getenv("WDOS_ENVIRONMENT", "local"),
         "lang": lang,
@@ -73,6 +74,7 @@ def app_shell(request):
         "display_name": display_name,
         "initials": initials,
         "scope_label": f"{membership.network} / Workspace",
+        "local_home_label": local_home_label,
         "membership_status": status_label,
         "activity_status": activity_label,
     })

@@ -168,7 +168,25 @@ class Stage3RepairTests(TestCase):
         ):
             self.assertIn(f'href="{href}"', html)
             self.assertIn(f'>{label}<', html)
+            self.assertIn(f'id="{href[1:]}"', html)
         self.assertIn('class="mobile-nav"', html)
+
+    def test_foundation_shell_renders_persisted_local_home_label(self):
+        account = self.create_active('foundation-local-home@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Local Home Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Lagos Central Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        self.assertIn('Lagos Central Home', html)
+        self.assertNotIn('WGMN / Workspace</strong>', html)
 
     def test_foundation_workspace_actions_have_real_targets(self):
         account = self.create_active('foundation-actions@example.org')

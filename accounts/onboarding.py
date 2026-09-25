@@ -27,6 +27,7 @@ TITLES = {
 }
 CONFLICT_KEYS = ('onb_notice_title', 'onb_notice_body')
 INVALID_KEYS = ('onb_invalid_title', 'onb_invalid_body')
+PHOTO_THROTTLED_KEYS = ('onb_photo_throttled_title', 'onb_photo_throttled_body')
 
 
 def localized_notice(catalogue, keys):
@@ -136,8 +137,14 @@ def step(request, step):
             'onboarding-photo-attempt', str(locked.pk), limit=MAX_PHOTO_ATTEMPTS,
             seconds=PHOTO_ATTEMPT_WINDOW,
         ):
-            safe_form = form_class(initial=initial_data(locked, draft, lang), account=locked)
-            return render_step(request, step, draft, safe_form, localized_notice(c, INVALID_KEYS), 429)
+            safe_initial = initial_data(locked, draft, lang)
+            safe_initial.update({
+                name: request.POST.get(name)
+                for name in form.fields
+                if name != 'photo' and name in request.POST
+            })
+            safe_form = form_class(initial=safe_initial, account=locked)
+            return render_step(request, step, draft, safe_form, localized_notice(c, PHOTO_THROTTLED_KEYS), 429)
         valid = form.is_valid()
         if step == 7:
             for previous in range(1, 7):

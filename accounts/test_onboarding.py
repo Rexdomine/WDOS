@@ -173,6 +173,21 @@ class OnboardingDraftTests(TestCase):
         self.assertEqual(draft.revision, 1)
         self.assertEqual(draft.events.count(), 1)
 
+    def test_photo_throttle_preserves_safe_fields_and_explains_recovery(self):
+        with patch('accounts.onboarding_forms.Image.open') as image_open:
+            image_open.side_effect = ValueError('rejected test image')
+            for _ in range(10):
+                draft = OnboardingDraft.objects.filter(account=self.account).first()
+                revision = draft.revision if draft else 0
+                self.save(2, {'full_name': 'Candidate', 'preferred_name': 'Amina', 'photo': SimpleUploadedFile('profile.png', b'bad', content_type='image/png')}, revision=revision)
+            draft = OnboardingDraft.objects.get(account=self.account)
+            response = self.save(2, {'full_name': 'Edited safely', 'preferred_name': 'Amina', 'photo': SimpleUploadedFile('profile.png', b'bad', content_type='image/png')}, revision=draft.revision)
+        self.assertEqual(response.status_code, 429)
+        self.assertContains(response, 'Photo attempts are temporarily limited', status_code=429)
+        self.assertContains(response, 'Edited safely', status_code=429)
+        self.assertContains(response, 'Amina', status_code=429)
+        self.assertEqual(image_open.call_count, 10)
+
     def test_post_needs_expected_revision(self):
         response = self.client.post('/onboarding/1/', {'timezone': 'UTC'})
         self.assertEqual(response.status_code, 409)

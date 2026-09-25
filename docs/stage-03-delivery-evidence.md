@@ -4,7 +4,7 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Exact product candidate identity: `d0c745ed0070a592a70dfcb26633d316aee84bbc` (bounded photo-throttle recovery repair). This evidence record is packaged by a later documentation commit; the live PR 4 head, hosted checks, and review verdict remain authoritative for final handoff.
+- Exact product candidate identity: PR 4 head `049e34165486de83a139236b3cab2cdaed34c886` (`docs: record exact stage3 repair evidence`). The product implementation tree is unchanged from the bounded repair candidate `d0c745ed0070a592a70dfcb26633d316aee84bbc`; the intervening commit and this candidate contain documentation-only evidence packaging. The live PR 4 head, hosted checks, and review verdict are recorded below and remain authoritative for final handoff.
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map

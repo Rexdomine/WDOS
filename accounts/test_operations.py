@@ -2,14 +2,16 @@ from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
 import json
+import inspect
 import subprocess
 import sys
 import threading
 from django.core.management import call_command
 from django.test import TransactionTestCase, SimpleTestCase, override_settings
 from django.utils import timezone
-from .models import EmailIntent, Invitation, Person, Account
+from .models import AccessGrant, AuditEvent, EmailIntent, Invitation, Person, Account
 from . import services
+from .management.commands import revoke_reviewer_grant
 from wdos_project.runtime import supervise
 
 
@@ -109,6 +111,71 @@ class OperatorTests(TransactionTestCase):
             call_command('set_account_access',email=account.email,action=action,stdout=StringIO())
             account.refresh_from_db()
             self.assertEqual(account.security_version,old+1)
+
+    def test_operator_can_provision_scoped_reviewer_grant(self):
+        account = services.register('Reviewer', 'reviewer@example.org', 'very long operator test password!')
+        _, secret = services.issue_token(account, 'verify')
+        services.verify_contact(account.pk, secret)
+        policy = {
+            'version': 'operator-v1', 'approval_reference': 'approved',
+            'privacy_notice': 'notice', 'review_role': 'reviewer',
+            'review_function': 'onboarding',
+            'eligibility': [{'code': 'adult', 'label': 'Adult', 'network': 'WGMN', 'basis': 'verified'}],
+            'homes': [{'code': 'lagos', 'label': 'Lagos', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'}],
+        }
+        with override_settings(WDOS_ONBOARDING_POLICY=policy):
+            call_command(
+                'provision_reviewer_grant', email=account.email, role='reviewer',
+                function='onboarding', network='WGMN', geography='Nigeria',
+                expires_hours=4, stdout=StringIO(),
+            )
+        grant = AccessGrant.objects.get(account=account)
+        self.assertEqual((grant.role, grant.function, grant.network, grant.geography),
+                         ('reviewer', 'onboarding', 'WGMN', 'Nigeria'))
+        self.assertGreater(grant.expires_at, timezone.now())
+
+    def test_targeted_reviewer_grant_revocation_is_audited_and_idempotent(self):
+        account = services.register('Revocable Reviewer', 'revocable@example.org', 'very long operator test password!')
+        _, secret = services.issue_token(account, 'verify')
+        services.verify_contact(account.pk, secret)
+        grant = AccessGrant.objects.create(
+            account=account, role='reviewer', function='onboarding', network='WGMN',
+            geography='Nigeria', expires_at=timezone.now() + timedelta(hours=1),
+        )
+        call_command('revoke_reviewer_grant', grant_id=grant.pk, reason='Scope changed', stdout=StringIO())
+        grant.refresh_from_db()
+        self.assertIsNotNone(grant.revoked_at)
+        self.assertTrue(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant', detail={'grant_id': grant.pk, 'reason': 'Scope changed'}).exists())
+        call_command('revoke_reviewer_grant', grant_id=grant.pk, reason='Repeat safely', stdout=StringIO())
+        self.assertEqual(AuditEvent.objects.filter(account=account, event='operator_revoke_reviewer_grant').count(), 1)
+
+    def test_reviewer_grant_revocation_locks_account_before_grant(self):
+        source = inspect.getsource(revoke_reviewer_grant.Command.handle)
+        self.assertLess(
+            source.index('Account.objects.select_for_update'),
+            source.index('AccessGrant.objects.select_for_update'),
+        )
+
+    def test_operator_provisioning_uses_canonicalized_policy_scope(self):
+        account = services.register('Padded Reviewer', 'padded-reviewer@example.org', 'very long operator test password!')
+        _, secret = services.issue_token(account, 'verify')
+        services.verify_contact(account.pk, secret)
+        policy = {
+            'version': ' operator-v1 ', 'approval_reference': ' approved ',
+            'privacy_notice': ' notice ', 'review_role': ' reviewer ',
+            'review_function': ' onboarding ',
+            'eligibility': [{'code': ' adult ', 'label': ' Adult ', 'network': ' WGMN ', 'basis': ' verified '}],
+            'homes': [{'code': ' lagos ', 'label': ' Lagos ', 'network': ' WGMN ', 'country': ' Nigeria ', 'region': ' Lagos ', 'district': ' Ikeja ', 'kind': ' chapter '}],
+        }
+        with override_settings(WDOS_ONBOARDING_POLICY=policy):
+            call_command(
+                'provision_reviewer_grant', email=account.email, role='reviewer',
+                function='onboarding', network='WGMN', geography='Nigeria',
+                expires_hours=4, stdout=StringIO(),
+            )
+        grant = AccessGrant.objects.get(account=account)
+        self.assertEqual((grant.role, grant.function, grant.network, grant.geography),
+                         ('reviewer', 'onboarding', 'WGMN', 'Nigeria'))
 
 
 class SupervisorTests(SimpleTestCase):

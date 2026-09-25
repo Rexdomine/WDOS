@@ -38,7 +38,7 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: wdos_test
         ports:
           - 5432:5432
@@ -48,7 +48,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/wdos_test
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/wdos_test
       DB_SSLMODE: disable
       DJANGO_SECRET_KEY: ci-only-secret
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
@@ -58,11 +58,18 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt playwright==1.63.0
+          python -m playwright install --with-deps chromium
       - name: Frozen approved UI reference integrity
         run: python scripts/check_ui_reference_manifest.py
       - name: Canonical Django verification (PostgreSQL)
-        run: make verify
+        run: |
+          set -o pipefail
+          make verify > /tmp/wdos-make-verify.log 2>&1 || {
+            tail -n 250 /tmp/wdos-make-verify.log
+            exit 1
+          }
       - name: Build and exercise deployment image
         run: |
           docker build -t wdos-stage2-ci .
@@ -76,7 +83,12 @@ jobs:
               try:
                   with urllib.request.urlopen('http://127.0.0.1:18088/health', timeout=2) as response:
                       health = json.load(response)
-                  assert health['database'] == 'ok' and health['migration_rows'] == 21
+                  assert health['database'] == 'ok'
+                  migration_check = subprocess.run(
+                      ['docker', 'exec', 'wdos-stage2-smoke', 'python', 'manage.py', 'migrate', '--check', '--noinput'],
+                      capture_output=True, text=True,
+                  )
+                  assert migration_check.returncode == 0, migration_check.stderr or migration_check.stdout
                   break
               except Exception:
                   if attempt == 29:

@@ -12,6 +12,7 @@ class AccountSecurityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        request._wdos_upload_rejected = bool(request.META.get('wdos.raw_body_rejected'))
         request.wdos_account = None
         if request.user.is_authenticated:
             account = Account.objects.select_related('user').filter(user=request.user).first()
@@ -50,7 +51,7 @@ class AccountSecurityMiddleware:
                 'wdos_language', lang, max_age=31536000,
                 httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax',
             )
-        if request.path.startswith(('/auth/', '/app', '/admin/')) or request.path == '/':
+        if request.path.startswith(('/auth/', '/app', '/admin/', '/onboarding/')) or request.path == '/':
             response['Cache-Control'] = 'no-store, private'
             response['Referrer-Policy'] = 'same-origin'
             response['X-Robots-Tag'] = 'noindex, nofollow'

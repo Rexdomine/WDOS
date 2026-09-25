@@ -37,8 +37,8 @@ def decrypt(value):
     return cipher().decrypt(value.encode()).decode()
 
 
-def audit(account, event):
-    AuditEvent.objects.create(account=account, event=event)
+def audit(account, event, detail=None):
+    AuditEvent.objects.create(account=account, event=event, detail=detail or {})
 
 
 def throttle(scope, identity, limit=10, seconds=900):

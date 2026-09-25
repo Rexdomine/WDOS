@@ -1,0 +1,41 @@
+from django.core.files.uploadhandler import MemoryFileUploadHandler, StopUpload
+
+
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+MAX_MULTIPART_OVERHEAD = 64 * 1024
+MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + MAX_MULTIPART_OVERHEAD
+
+
+class UploadSizeLimitHandler(MemoryFileUploadHandler):
+    """Reject oversized uploads before later handlers spool file content."""
+
+    def __init__(self, request=None):
+        super().__init__(request)
+        self._received = 0
+        self._reject_request = False
+
+    def handle_raw_input(self, input_data, META, content_length, boundary, encoding=None):
+        self._received = 0
+        self._reject_request = bool(content_length and content_length > MAX_REQUEST_BYTES)
+        if self._reject_request and self.request is not None:
+            self.request._wdos_upload_rejected = True
+        self.activated = bool(content_length and content_length <= MAX_REQUEST_BYTES)
+
+    def receive_data_chunk(self, raw_data, start):
+        if self._reject_request:
+            if self.request is not None:
+                self.request._wdos_upload_rejected = True
+            raise StopUpload(connection_reset=True)
+        self._received += len(raw_data)
+        if self._received > MAX_REQUEST_BYTES:
+            if self.request is not None:
+                self.request._wdos_upload_rejected = True
+            raise StopUpload(connection_reset=True)
+        if self.activated:
+            return super().receive_data_chunk(raw_data, start)
+        return raw_data
+
+    def file_complete(self, file_size):
+        if self.activated:
+            return super().file_complete(file_size)
+        return None

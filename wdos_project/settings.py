@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import json
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "wdos-local-development-only")
@@ -21,6 +22,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "wdos_project.request_limits.RawBodyRejectedCsrfBypassMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "accounts.middleware.AccountSecurityMiddleware",
@@ -91,8 +93,20 @@ if os.getenv("WDOS_ENVIRONMENT") == "production":
     WDOS_PUBLIC_ORIGIN = explicit_origin.rstrip("/")
 BREVO_API_KEY = os.getenv("WDOS_BREVO_API_KEY", "")
 WDOS_EMAIL_FROM = os.getenv("WDOS_EMAIL_FROM", "")
+try:
+    # Operator-supplied JSON keeps policy out of source and fails closed when invalid.
+    WDOS_ONBOARDING_POLICY = json.loads(os.getenv("WDOS_ONBOARDING_POLICY_JSON", "null"))
+except (TypeError, ValueError, json.JSONDecodeError):
+    WDOS_ONBOARDING_POLICY = None
 SESSION_COOKIE_SECURE = os.getenv("WDOS_SECURE_COOKIES", "1") == "1"
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+# Reject oversized multipart bodies before Django upload handlers spool files.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
+FILE_UPLOAD_HANDLERS = [
+    "wdos_project.upload_handlers.UploadSizeLimitHandler",
+    "django.core.files.uploadhandler.MemoryFileUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 SESSION_COOKIE_AGE = WDOS_SESSION_TTL

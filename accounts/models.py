@@ -82,6 +82,7 @@ class Throttle(models.Model):
 class AuditEvent(models.Model):
     account = models.ForeignKey(Account, null=True, on_delete=models.PROTECT)
     event = models.CharField(max_length=48)
+    detail = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -93,3 +94,67 @@ class AccessGrant(models.Model):
     function = models.CharField(max_length=64)
     expires_at = models.DateTimeField()
     revoked_at = models.DateTimeField(null=True)
+
+
+class OnboardingDraft(models.Model):
+    """One durable draft per account, never an alternative person identity."""
+    account = models.OneToOneField(Account, on_delete=models.PROTECT)
+    revision = models.PositiveIntegerField(default=0)
+    data = models.JSONField(default=dict)
+    next_step = models.PositiveSmallIntegerField(default=1)
+    state = models.CharField(max_length=24, default='draft')
+    updated_at = models.DateTimeField(auto_now=True)
+    submission_revision = models.PositiveIntegerField(null=True)
+    submitted_at = models.DateTimeField(null=True)
+    photo = models.BinaryField(default=bytes, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(next_step__gte=1, next_step__lte=8), name='onboarding_valid_step'),
+            models.CheckConstraint(condition=models.Q(state__in=['draft', 'review_needed', 'accepted']), name='onboarding_valid_state'),
+        ]
+
+
+class OnboardingEvent(models.Model):
+    draft = models.ForeignKey(OnboardingDraft, related_name='events', on_delete=models.PROTECT)
+    actor = models.ForeignKey(Account, on_delete=models.PROTECT)
+    event = models.CharField(max_length=32)
+    revision = models.PositiveIntegerField()
+    detail = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['draft', 'revision', 'event'], name='onboarding_event_once')]
+        ordering = ['id']
+
+
+class OnboardingConsent(models.Model):
+    draft = models.ForeignKey(OnboardingDraft, related_name='consents', on_delete=models.PROTECT)
+    revision = models.PositiveIntegerField()
+    version = models.CharField(max_length=100)
+    notice = models.TextField()
+    digest = models.CharField(max_length=64)
+    approval_reference = models.CharField(max_length=500)
+    privacy_ack = models.BooleanField()
+    optional_updates = models.BooleanField(default=False)
+    channel = models.CharField(max_length=32)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['draft', 'revision'], name='onboarding_consent_once')]
+        ordering = ['id']
+
+
+class Membership(models.Model):
+    """Ordinary membership only; this record never grants leadership authority."""
+    draft = models.OneToOneField(OnboardingDraft, related_name='membership', on_delete=models.PROTECT)
+    person = models.OneToOneField(Person, on_delete=models.PROTECT)
+    network = models.CharField(max_length=8)
+    home = models.JSONField()
+    consent = models.ForeignKey(OnboardingConsent, on_delete=models.PROTECT)
+    policy_digest = models.CharField(max_length=64)
+    approved_by = models.ForeignKey(Account, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(network__in=['WGMN', 'WNNN']), name='membership_explicit_network')]

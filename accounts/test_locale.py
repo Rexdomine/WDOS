@@ -4,11 +4,21 @@ from .locale import BASE, C, catalog, localize_form, translate
 
 
 class LocaleCatalogTests(SimpleTestCase):
-    def test_all_catalog_keys_are_present_and_distinct(self):
+    def test_all_catalog_keys_are_present_and_unexpected_english_fallbacks_rejected(self):
         for lang in ('fr', 'pt', 'ar', 'sw'):
             self.assertEqual(set(BASE), set(C[lang]))
-            self.assertTrue(all(C[lang][key] != BASE[key] for key in BASE))
+            same = {key for key in BASE if C[lang][key] == BASE[key]}
+            self.assertEqual(same, {'onb_messages'} if lang == 'fr' else set())
             self.assertFalse(any(value.startswith('[') for value in C[lang].values()))
+
+    def test_arabic_motion_preference_has_no_foreign_fragment(self):
+        label = catalog('ar')['motion_preference']
+        self.assertEqual(label, 'تفضيلات الحركة')
+        self.assertNotRegex(label, r'[A-Za-zÀ-ÿ]')
+
+    def test_unrelated_english_fallback_still_fails(self):
+        self.assertNotEqual(translate('fr', 'Preferred name'), 'Preferred name')
+        self.assertNotEqual(translate('ar', 'Profile photo'), 'Profile photo')
 
     def test_static_literals_translate(self):
         literals = ('Welcome back', 'Create account', 'Please wait before trying again.',

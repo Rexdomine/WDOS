@@ -42,6 +42,12 @@ class Stage3RepairTests(TestCase):
         self.assertContains(shell, 'action="/auth/logout/"')
         self.assertContains(shell, 'method="post"')
         self.assertContains(shell, 'name="csrfmiddlewaretoken"')
+        self.assertContains(shell, 'Home')
+        self.assertContains(shell, 'My activities')
+        self.assertContains(shell, 'Records')
+        self.assertContains(shell, 'Related information')
+        self.assertContains(shell, 'Workspace actions')
+        self.assertContains(shell, 'overflow-x: hidden')
 
     def test_foundation_logout_uses_persisted_locale_and_direction(self):
         account = self.create_active('accepted-locale@example.org')

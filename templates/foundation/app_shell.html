@@ -4,31 +4,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#000000">
-  <title>WDOS · Foundation</title>
-  <link rel="stylesheet" href="{% static 'foundation/tokens.css' %}">
+  <title>WDOS · Workspace</title>
+  <link rel="stylesheet" href="{% static 'accounts/design.css' %}">
+  <link rel="stylesheet" href="{% static 'accounts/refinements.css' %}">
+  <style>html, body { overflow-x: hidden; }</style>
 </head>
 <body>
-  <main class="wdos-shell">
-    <header class="wdos-header">
-      <div class="wdos-brand" aria-label="WODDI Digital Operating System">WDOS</div>
-      <span class="wdos-status">{{ environment|upper }}</span>
-      <form method="post" action="/auth/logout/">
-        {% csrf_token %}
-        <button type="submit"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button>
-      </form>
-    </header>
-    <section class="wdos-hero" aria-labelledby="page-title">
-      <p class="eyebrow">WODDI DIGITAL OPERATING SYSTEM</p>
-      <h1 id="page-title">A shared platform foundation.</h1>
-      <p class="lede">The delivery spine for governed, auditable network operations.</p>
-      <div class="wdos-card-grid">
-        <article class="wdos-card"><span class="card-label">FRAMEWORK</span><strong>Django</strong><span>Server-rendered foundation</span></article>
-        <article class="wdos-card"><span class="card-label">ENVIRONMENT</span><strong>{{ environment|upper }}</strong><span>Review deployment boundary</span></article>
-        <article class="wdos-card"><span class="card-label">STATUS</span><strong>Ready</strong><span>Health and migration checks active</span></article>
+  <aside class="sidebar">
+    <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
+    <div class="workspace"><div><b>{{ scope_label }}</b><span>Member</span></div><span class="icon" aria-hidden="true">›</span></div>
+    <div class="nav-label">WORKSPACE</div>
+    <div class="navitem active"><span class="icon" aria-hidden="true">⌂</span>Home</div>
+    <div class="navitem"><span class="icon" aria-hidden="true">▣</span>My activities</div>
+    <div class="navitem"><span class="icon" aria-hidden="true">□</span>Meetings &amp; events</div>
+    <div class="navitem"><span class="icon" aria-hidden="true">✉</span>Messages</div>
+    <div class="navitem"><span class="icon" aria-hidden="true">?</span>Help &amp; support</div>
+    <div class="navitem"><span class="icon" aria-hidden="true">⚙</span>Settings</div>
+  </aside>
+
+  <div class="mobile-head">
+    <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
+    <div class="right">
+      <div class="profile-menu">
+        <button class="avatar profile-trigger" type="button" aria-haspopup="menu">{{ initials }}</button>
+        <div class="profile-menu-panel" role="menu">
+          <strong>{{ display_name }}</strong>
+          <form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form>
+        </div>
       </div>
-    </section>
-    <footer class="wdos-footer">No Woman Is Left Out · Foundation stage</footer>
-  </main>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="topbar">
+      <div><span class="crumb">{{ scope_label }}</span><h1>Your workspace</h1></div>
+      <div class="profile-menu"><button class="avatar profile-trigger" type="button" aria-haspopup="menu">{{ initials }}</button><div class="profile-menu-panel" role="menu"><strong>{{ display_name }}</strong><form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form></div></div>
+    </div>
+    <main aria-labelledby="page-title">
+      <section class="hero-card" aria-labelledby="page-title">
+        <div><p class="eyebrow">MEMBERSHIP</p><h2 id="page-title">Welcome back, {{ display_name }}.</h2><p>Your workspace brings together the records, activities, and support connected to your membership.</p></div>
+        <span class="status-pill">ACTIVE</span>
+      </section>
+      <section class="section-block" aria-labelledby="records-title">
+        <div class="section-heading"><div><p class="eyebrow">OVERVIEW</p><h2 id="records-title">Records</h2></div><a href="#records">View all</a></div>
+        <div class="card-grid" id="records"><article class="data-card"><span class="card-label">MEMBERSHIP</span><strong>{{ scope_label }}</strong><span>Active and in good standing</span></article><article class="data-card"><span class="card-label">ACTIVITIES</span><strong>My activities</strong><span>Keep track of your recent progress</span></article><article class="data-card"><span class="card-label">SUPPORT</span><strong>Related information</strong><span>Find guidance and help when you need it</span></article></div>
+      </section>
+      <section class="section-block" aria-labelledby="actions-title"><div class="section-heading"><div><p class="eyebrow">NEXT STEPS</p><h2 id="actions-title">Workspace actions</h2></div></div><div class="action-row"><a class="btn secondary" href="#activities">Open activities</a><a class="btn secondary" href="#support">Contact support</a></div></section>
+    </main>
+    <footer>WODDI · No Woman Is Left Out</footer>
+  </div>
 </body>
 </html>

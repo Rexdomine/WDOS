@@ -107,6 +107,8 @@ function initializeRecordTabs() {
   const tabs = Array.from(document.querySelectorAll('[data-record-tab]'));
   if (!tabs.length) return;
   const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls'))).filter(Boolean);
+  const namedPanels = Array.from(document.querySelectorAll('[data-workspace-panel]'));
+  const hideNamedPanels = () => namedPanels.forEach((panel) => { panel.hidden = true; });
   const activate = (tab, moveFocus = false) => {
     tabs.forEach((candidate) => {
       const selected = candidate === tab;
@@ -119,7 +121,18 @@ function initializeRecordTabs() {
       // workspace record; only the primary overview/history panels are exclusive.
       panel.hidden = panel.id === 'records-panel' ? false : panel.id !== tab.getAttribute('aria-controls');
     });
+    hideNamedPanels();
     if (moveFocus) tab.focus();
+  };
+  const activateNamedPanel = (panel) => {
+    panels.forEach((candidate) => { candidate.hidden = true; });
+    hideNamedPanels();
+    panel.hidden = false;
+    tabs.forEach((candidate) => {
+      candidate.classList.remove('active');
+      candidate.setAttribute('aria-selected', 'false');
+      candidate.tabIndex = -1;
+    });
   };
   tabs.forEach((tab, index) => {
     tab.addEventListener('click', (event) => { event.preventDefault(); activate(tab); window.history.replaceState({}, '', tab.hash); });
@@ -133,6 +146,11 @@ function initializeRecordTabs() {
   const activateHash = () => {
     const tab = tabs.find((candidate) => candidate.hash === window.location.hash);
     if (tab) activate(tab);
+    else if (window.location.hash === '#workspace-home') activate(tabs[0]);
+    else {
+      const panel = namedPanels.find((candidate) => `#${candidate.id}` === window.location.hash);
+      if (panel) activateNamedPanel(panel);
+    }
   };
   document.querySelectorAll('[data-record-target]').forEach((shortcut) => {
     shortcut.addEventListener('click', (event) => {
@@ -143,9 +161,21 @@ function initializeRecordTabs() {
       window.history.replaceState({}, '', shortcut.hash);
     });
   });
+  document.querySelectorAll('[data-workspace-target]').forEach((shortcut) => {
+    shortcut.addEventListener('click', (event) => {
+      const panel = document.getElementById(shortcut.dataset.workspaceTarget);
+      if (!panel) return;
+      event.preventDefault();
+      activateNamedPanel(panel);
+      window.history.replaceState({}, '', shortcut.hash);
+    });
+  });
   window.addEventListener("hashchange", activateHash);
-  const initial = tabs.find((tab) => tab.hash === window.location.hash) || tabs[0];
-  activate(initial);
+  const initialTab = tabs.find((tab) => tab.hash === window.location.hash) || tabs[0];
+  const initialNamedPanel = namedPanels.find((panel) => `#${panel.id}` === window.location.hash);
+  if (initialNamedPanel) activateNamedPanel(initialNamedPanel);
+  else if (window.location.hash === '#workspace-home') activate(tabs[0]);
+  else activate(initialTab);
 }
 
 initializeProfileMenus();

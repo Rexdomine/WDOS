@@ -159,6 +159,23 @@ class Stage3RepairTests(TestCase):
         self.assertIn('ArrowRight', script)
         self.assertIn('aria-selected', script)
 
+    def test_foundation_navigation_maps_home_and_named_controls_to_matching_states(self):
+        script = (Path(__file__).parent / 'static' / 'accounts' / 'onboarding.js').read_text()
+        template = (Path(__file__).parents[1] / 'templates' / 'foundation' / 'app_shell.html').read_text()
+        self.assertIn("window.location.hash === '#workspace-home'", script)
+        for target in ('meetings-panel', 'messages-panel', 'settings-panel', 'help-panel'):
+            self.assertIn(f'id=\"{target}\"', template)
+            self.assertIn(f'data-workspace-target=\"{target}\"', template)
+        self.assertIn('data-workspace-panel', template)
+
+    def test_foundation_tab_evidence_is_bound_to_current_interaction_candidate(self):
+        evidence = Path(__file__).parents[1] / 'docs' / 'stage-03-delivery-evidence.md'
+        text = evidence.read_text()
+        self.assertIn('## Current exact-head tab interaction evidence', text)
+        section = text.split('## Current exact-head tab interaction evidence', 1)[1]
+        self.assertNotIn('ee70048fe84e06854001e399d92b32ee5f55b2b2', section.split('## ', 1)[0])
+        self.assertIn('Implementation candidate:', section)
+
     def test_foundation_record_shortcuts_activate_tabs_and_preserve_overview_related_information(self):
         account = self.create_active('foundation-record-shortcuts@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
@@ -177,7 +194,8 @@ class Stage3RepairTests(TestCase):
         self.assertIn('window.addEventListener(\"hashchange\"', script)
         self.assertIn('data-record-target', html)
         self.assertIn('data-record-target=\"records-panel\"', html)
-        self.assertIn('data-record-target=\"history-panel\"', html)
+        self.assertIn('data-workspace-target=\"meetings-panel\"', html)
+        self.assertIn('data-workspace-target=\"messages-panel\"', html)
         self.assertNotIn('id=\"records-panel\" role=\"tabpanel\" aria-labelledby=\"records-tab\" tabindex=\"0\" hidden', html)
 
     def test_foundation_shell_contains_core01_workspace_hierarchy(self):

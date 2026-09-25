@@ -77,7 +77,7 @@ Rex visual acceptance; this record does not claim that visual acceptance or Rex 
 
 ## Current exact-head tab interaction evidence
 
-- Candidate: `ee70048fe84e06854001e399d92b32ee5f55b2b2`.
+- Implementation candidate: `c758b635078ebe18bb11e126a5c97c61c10899a5` (interaction code); evidence packaging is updated in the current documentation commit.
 - Real Chromium route: authenticated `/foundation/`, accepted member, desktop `1440x1000`, mobile `390x844`, and Arabic RTL mobile `390x844`.
 - Interaction assertions: Overview initially keeps both the workspace record and related-information panel visible; visible desktop/mobile workspace shortcuts activate the matching Records or History tab; direct `#records-panel` navigation selects Records; tab selection and panel visibility update without horizontal overflow.
 - Approved reference: `WDOS Complete UI Review v1`, screen `CORE-01`; reference hashes remain `CORE-01-desktop` `9362fa5555c996cf38f7d2a1dc1672811e82d9149ad3675f17d9a1e5911e0272` and `CORE-01-mobile` `d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252`.

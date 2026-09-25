@@ -1,4 +1,5 @@
 from django.test import TestCase, override_settings
+from django.utils.html import escape
 from pathlib import Path
 
 import pyotp
@@ -265,6 +266,40 @@ class Stage3RepairTests(TestCase):
     def test_foundation_sidebar_links_preserve_approved_decoration(self):
         css = (Path(__file__).parent / 'static' / 'accounts' / 'design.css').read_text()
         self.assertIn('.foundation-shell .sidebar .navitem{text-decoration:none;', css)
+
+    def test_authenticated_foundation_workspace_copy_uses_each_supported_catalog(self):
+        account = self.create_active('localized-foundation@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Localized Workspace Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        workspace_keys = (
+            'onb_member', 'onb_workspace', 'onb_home', 'onb_activities',
+            'onb_records', 'onb_overview', 'onb_connection', 'onb_support',
+            'onb_meetings', 'onb_messages', 'onb_help', 'onb_settings',
+            'onb_workspace_title',
+            'onb_support_text', 'onb_my_work', 'onb_meetings_short',
+            'onb_more', 'onb_local_connection',
+        )
+        for lang in ('en', 'fr', 'pt', 'ar', 'sw'):
+            self.client.cookies['wdos_language'] = lang
+            response = self.client.get('/foundation/')
+            html = response.content.decode()
+            self.assertContains(response, f'<html lang="{lang}"')
+            for key in workspace_keys:
+                self.assertIn(escape(catalog(lang)[key]), html, msg=f'{lang} missing {key}')
+            if lang != 'en':
+                self.assertNotIn('Your workspace', html)
+                self.assertNotIn('Meetings &amp; events', html)
+                self.assertNotIn('Help &amp; support', html)
+                self.assertNotIn('Settings are not available for this membership yet.', html)
 
     def test_status_explainer_is_localized_and_does_not_leak_restricted_identity(self):
         account = self.create_active('private-status@example.org')

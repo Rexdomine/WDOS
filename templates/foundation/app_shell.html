@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WDOS · Workspace</title>
+  <title>WDOS · {{ translations.onb_workspace_title }}</title>
   <link rel="stylesheet" href="{% static 'accounts/design.css' %}">
   <link rel="stylesheet" href="{% static 'accounts/refinements.css' %}">
   <link rel="stylesheet" href="{% static 'accounts/onboarding.css' %}">
@@ -13,14 +13,14 @@
 <body class="foundation-shell">
   <aside class="sidebar">
     <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
-    <div class="workspace"><div><b>{{ scope_label }}</b><span>Member</span></div><span class="icon" aria-hidden="true">›</span></div>
-    <div class="nav-label">WORKSPACE</div>
-    <a class="navitem active" href="#workspace-home"><span class="icon" aria-hidden="true">⌂</span>Home</a>
-    <a class="navitem" href="#activities"><span class="icon" aria-hidden="true">▣</span>My activities</a>
-    <a class="navitem" href="#meetings"><span class="icon" aria-hidden="true">□</span>Meetings &amp; events</a>
-    <a class="navitem" href="#messages"><span class="icon" aria-hidden="true">✉</span>Messages</a>
-    <a class="navitem" href="#support"><span class="icon" aria-hidden="true">?</span>Help &amp; support</a>
-    <a class="navitem" href="#settings"><span class="icon" aria-hidden="true">⚙</span>Settings</a>
+    <div class="workspace"><div><b>{{ scope_label }}</b><span>{{ translations.onb_member }}</span></div><span class="icon" aria-hidden="true">›</span></div>
+    <div class="nav-label">{{ translations.onb_workspace }}</div>
+    <a class="navitem active" href="#workspace-home"><span class="icon" aria-hidden="true">⌂</span>{{ translations.onb_home }}</a>
+    <a class="navitem" href="#activities"><span class="icon" aria-hidden="true">▣</span>{{ translations.onb_activities }}</a>
+    <a class="navitem" href="#meetings"><span class="icon" aria-hidden="true">□</span>{{ translations.onb_meetings }}</a>
+    <a class="navitem" href="#messages"><span class="icon" aria-hidden="true">✉</span>{{ translations.onb_messages }}</a>
+    <a class="navitem" href="#support"><span class="icon" aria-hidden="true">?</span>{{ translations.onb_help }}</a>
+    <a class="navitem" href="#settings"><span class="icon" aria-hidden="true">⚙</span>{{ translations.onb_settings }}</a>
   </aside>
 
   <div class="mobile-head">
@@ -36,57 +36,57 @@
     </div>
   </div>
 
-  <nav class="mobile-nav" aria-label="Workspace navigation">
-    <a href="#workspace-home" aria-current="page"><span aria-hidden="true">⌂</span>Home</a>
-    <a href="#activities"><span aria-hidden="true">▣</span>My work</a>
-    <a href="#meetings"><span aria-hidden="true">□</span>Meetings</a>
-    <a href="#messages"><span aria-hidden="true">✉</span>Messages</a>
-    <a href="#more"><span aria-hidden="true">⋯</span>More</a>
+  <nav class="mobile-nav" aria-label="{{ translations.onb_workspace }}">
+    <a href="#workspace-home" aria-current="page"><span aria-hidden="true">⌂</span>{{ translations.onb_home }}</a>
+    <a href="#activities"><span aria-hidden="true">▣</span>{{ translations.onb_my_work }}</a>
+    <a href="#meetings"><span aria-hidden="true">□</span>{{ translations.onb_meetings_short }}</a>
+    <a href="#messages"><span aria-hidden="true">✉</span>{{ translations.onb_messages }}</a>
+    <a href="#more"><span aria-hidden="true">⋯</span>{{ translations.onb_more }}</a>
   </nav>
 
   <div class="content">
     <div class="topbar">
-      <div><span class="crumb">{{ scope_label }}</span><h1>Your workspace</h1></div>
+      <div><span class="crumb">{{ scope_label }}</span><h1>{{ translations.onb_workspace_title }}</h1></div>
       <div class="profile-menu" data-profile-menu><button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button><div class="profile-menu-panel" data-profile-panel role="menu" hidden><strong>{{ display_name }}</strong><form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form></div></div>
     </div>
     <main id="workspace-home" aria-labelledby="page-title">
       <section class="hero-card" aria-labelledby="page-title">
-        <div><p class="eyebrow">MEMBERSHIP</p><h2 id="page-title">Welcome back, {{ display_name }}.</h2><p>Your workspace brings together the records, activities, and support connected to your membership.</p></div>
-        <span class="status-pill">ACTIVE</span>
+        <div><p class="eyebrow">{{ translations.onb_membership_eyebrow }}</p><h2 id="page-title">{{ translations.onb_welcome_back }} {{ display_name }}.</h2><p>{{ translations.onb_workspace_description }}</p></div>
+        <span class="status-pill">{{ translations.onb_active }}</span>
       </section>
       <section class="section-block" aria-labelledby="records-title">
-        <div class="section-heading"><div><p class="eyebrow">OVERVIEW</p><h2 id="records-title">Records</h2></div><a href="#records-table">View all</a></div>
-        <div class="record-tabs" id="record-tabs" role="tablist" aria-label="Record tabs"><a href="#records-table" role="tab" aria-selected="true">Overview</a><a href="#local-connection" role="tab" aria-selected="false">Connection</a><a href="#related-information" role="tab" aria-selected="false">Related information</a></div>
+        <div class="section-heading"><div><p class="eyebrow">{{ translations.onb_overview }}</p><h2 id="records-title">{{ translations.onb_records }}</h2></div><a href="#records-table">{{ translations.onb_view_all }}</a></div>
+        <div class="record-tabs" id="record-tabs" role="tablist" aria-label="{{ translations.onb_record_tabs }}"><a href="#records-table" role="tab" aria-selected="true">{{ translations.onb_overview }}</a><a href="#local-connection" role="tab" aria-selected="false">{{ translations.onb_connection }}</a><a href="#related-information" role="tab" aria-selected="false">{{ translations.onb_related_tab }}</a></div>
         <div class="workspace-columns">
           <section class="workspace-record-card" id="records-table" aria-labelledby="workspace-record-title">
-            <span class="card-label">RECORDS</span>
-            <h3 id="workspace-record-title">Your membership record</h3>
-            <p>Review the information connected to your approved membership.</p>
+            <span class="card-label">{{ translations.onb_records }}</span>
+            <h3 id="workspace-record-title">{{ translations.onb_membership_record }}</h3>
+            <p>{{ translations.onb_review_membership_record }}</p>
             <dl class="record-list">
-              <div><dt>Membership</dt><dd>{{ membership_status }}</dd></div>
-              <div><dt>Activities</dt><dd>{{ activity_status }}</dd></div>
+              <div><dt>{{ translations.onb_membership }}</dt><dd>{{ membership_status }}</dd></div>
+              <div><dt>{{ translations.onb_activities }}</dt><dd>{{ activity_status }}</dd></div>
             </dl>
           </section>
           <aside class="related-information-panel" id="related-information" aria-labelledby="related-information-title">
-            <span class="card-label">RELATED INFORMATION</span>
-            <h3 id="related-information-title">Your local connection</h3>
-            <p>Keep your membership context and local support information together.</p>
+            <span class="card-label">{{ translations.onb_related_information }}</span>
+            <h3 id="related-information-title">{{ translations.onb_local_connection }}</h3>
+            <p>{{ translations.onb_keep_membership_context }}</p>
             <strong id="local-connection">{{ local_home_label }}</strong>
-            <a href="#support-links">View support links</a>
+            <a href="#support-links">{{ translations.onb_view_support_links }}</a>
           </aside>
         </div>
         <div class="records-table-wrap" aria-labelledby="workspace-record-title">
-          <table class="records-table"><caption>Workspace records</caption><thead><tr><th scope="col">Record</th><th scope="col">Status</th><th scope="col">Next action</th></tr></thead><tbody><tr><th scope="row">Membership</th><td>{{ membership_status }}</td><td>Review your workspace</td></tr><tr><th scope="row">Activities</th><td>{{ activity_status }}</td><td><a href="#next-action">Open activities</a></td></tr></tbody></table>
+          <table class="records-table"><caption>{{ translations.onb_workspace_records }}</caption><thead><tr><th scope="col">{{ translations.onb_record }}</th><th scope="col">{{ translations.onb_status_label }}</th><th scope="col">{{ translations.onb_next_action }}</th></tr></thead><tbody><tr><th scope="row">{{ translations.onb_membership }}</th><td>{{ membership_status }}</td><td>{{ translations.onb_review_workspace }}</td></tr><tr><th scope="row">{{ translations.onb_activities }}</th><td>{{ activity_status }}</td><td><a href="#next-action">{{ translations.onb_open_activities }}</a></td></tr></tbody></table>
         </div>
       </section>
-      <section class="section-block" id="next-action" aria-labelledby="actions-title"><div class="section-heading"><div><p class="eyebrow">NEXT STEPS</p><h2 id="actions-title">Workspace actions</h2></div></div><div class="action-row"><a class="btn secondary" href="#activities">Open activities</a><a class="btn secondary" href="#support">Contact support</a></div></section>
-      <section class="section-block" id="more" aria-labelledby="support-links-title"><div class="section-heading"><div><p class="eyebrow">SUPPORT</p><h2 id="support-links-title">Support links</h2></div></div><div id="support-links" class="card-grid"><article class="data-card" id="activities"><span class="card-label">ACTIVITIES</span><strong>My activities</strong><span>Keep track of your recent progress</span></article><article class="data-card" id="support"><span class="card-label">SUPPORT</span><strong>Help &amp; support</strong><span>Find guidance and help when you need it</span></article></div></section>
-      <section class="section-block" id="meetings" aria-labelledby="meetings-title"><div class="section-heading"><div><p class="eyebrow">MEETINGS &amp; EVENTS</p><h2 id="meetings-title">Meetings &amp; events</h2></div></div><p>No meetings or events are recorded yet.</p></section>
-      <section class="section-block" id="messages" aria-labelledby="messages-title"><div class="section-heading"><div><p class="eyebrow">MESSAGES</p><h2 id="messages-title">Messages</h2></div></div><p>No messages are available yet.</p></section>
-      <section class="section-block" id="settings" aria-labelledby="settings-title"><div class="section-heading"><div><p class="eyebrow">SETTINGS</p><h2 id="settings-title">Settings</h2></div></div><p>Settings are not available for this membership yet.</p></section>
+      <section class="section-block" id="next-action" aria-labelledby="actions-title"><div class="section-heading"><div><p class="eyebrow">{{ translations.onb_more }}</p><h2 id="actions-title">{{ translations.onb_workspace_actions }}</h2></div></div><div class="action-row"><a class="btn secondary" href="#activities">{{ translations.onb_open_activities }}</a><a class="btn secondary" href="#support">{{ translations.onb_contact_support }}</a></div></section>
+      <section class="section-block" id="more" aria-labelledby="support-links-title"><div class="section-heading"><div><p class="eyebrow">{{ translations.onb_help }}</p><h2 id="support-links-title">{{ translations.onb_support }}</h2></div></div><div id="support-links" class="card-grid"><article class="data-card" id="activities"><span class="card-label">{{ translations.onb_activities }}</span><strong>{{ translations.onb_activities }}</strong><span>{{ translations.onb_keep_progress }}</span></article><article class="data-card" id="support"><span class="card-label">{{ translations.onb_help }}</span><strong>{{ translations.onb_help }}</strong><span>{{ translations.onb_support_text }}</span></article></div></section>
+      <section class="section-block" id="meetings" aria-labelledby="meetings-title"><div class="section-heading"><div><p class="eyebrow">{{ translations.onb_meetings }}</p><h2 id="meetings-title">{{ translations.onb_meetings }}</h2></div></div><p>{{ translations.onb_no_meetings }}</p></section>
+      <section class="section-block" id="messages" aria-labelledby="messages-title"><div class="section-heading"><div><p class="eyebrow">{{ translations.onb_messages }}</p><h2 id="messages-title">{{ translations.onb_messages }}</h2></div></div><p>{{ translations.onb_no_messages }}</p></section>
+      <section class="section-block" id="settings" aria-labelledby="settings-title"><div class="section-heading"><div><p class="eyebrow">{{ translations.onb_settings }}</p><h2 id="settings-title">{{ translations.onb_settings }}</h2></div></div><p>{{ translations.onb_settings_unavailable }}</p></section>
     </main>
 
-    <footer>WODDI · No Woman Is Left Out</footer>
+    <footer>{{ translations.onb_footer }}</footer>
   </div>
   <script src="{% static 'accounts/onboarding.js' %}"></script>
 </body>

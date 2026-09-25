@@ -63,9 +63,10 @@ def app_shell(request):
     membership = draft.membership
     display_name = account.display_name or account.email.split('@', 1)[0]
     initials = ''.join(part[0] for part in display_name.split()[:2]).upper() or 'WD'
-    status_label = 'Active membership' if account.status == 'active' else 'Membership status unavailable'
-    activity_label = 'No activities are recorded yet'
-    local_home_label = (membership.home or {}).get('label') or 'Local connection unavailable'
+    translations = catalog(lang)
+    status_label = translations['onb_active_membership'] if account.status == 'active' else translations['onb_local_connection_unavailable']
+    activity_label = translations['onb_no_activities']
+    local_home_label = (membership.home or {}).get('label') or translations['onb_local_connection_unavailable']
     return render(request, "foundation/app_shell.html", {
         "environment": os.getenv("WDOS_ENVIRONMENT", "local"),
         "lang": lang,

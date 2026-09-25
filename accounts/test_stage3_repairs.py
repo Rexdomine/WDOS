@@ -36,7 +36,12 @@ class Stage3RepairTests(TestCase):
         )
         response = self.login(account)
         self.assertRedirects(response, '/foundation/')
-        self.assertRedirects(self.client.get('/'), '/foundation/')
+        foundation = self.client.get('/')
+        self.assertRedirects(foundation, '/foundation/')
+        shell = self.client.get('/foundation/')
+        self.assertContains(shell, 'action="/auth/logout/"')
+        self.assertContains(shell, 'method="post"')
+        self.assertContains(shell, 'name="csrfmiddlewaretoken"')
 
     def test_status_explainer_is_localized_and_does_not_leak_restricted_identity(self):
         account = self.create_active('private-status@example.org')
@@ -60,6 +65,14 @@ class Stage3RepairTests(TestCase):
                 'sw': 'Kwa nini ninaona hali hii?',
             }
             self.assertContains(response, f'aria-label="{expected[lang]}"')
+
+    def test_status_explainer_contains_distinct_context_from_status_sentence(self):
+        account = self.create_active('status-explainer-context@example.org')
+        self.login(account)
+        response = self.client.get('/auth/status/')
+        html = response.content.decode()
+        popup = html.split('<div class="status-explainer-popup" role="note">', 1)[1].split('</div>', 1)[0]
+        self.assertNotEqual(popup, response.context['status_text'])
 
     def test_enrolled_mfa_success_uses_current_workspace_destination(self):
         account = self.create_active('mfa-destination@example.org')
@@ -115,4 +128,6 @@ class Stage3RepairTests(TestCase):
     def test_profile_menu_preserves_avatar_fill_and_rtl_label_alignment(self):
         css = (Path(__file__).parent / 'static' / 'accounts' / 'onboarding.css').read_text()
         self.assertNotIn('.profile-trigger{border:0;background:transparent', css)
+        self.assertIn('.profile-menu-panel{position:absolute;inset-inline-end:0;', css)
+        self.assertNotIn('.profile-menu-panel{position:absolute;right:0;', css)
         self.assertIn('.profile-menu-panel button{width:100%;padding:9px;border:0;background:transparent;text-align:start;', css)

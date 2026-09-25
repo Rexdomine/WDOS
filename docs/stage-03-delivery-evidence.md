@@ -2,9 +2,9 @@
 
 ## Candidate
 
-- Branch: `feat/stage-03-onboarding`
+- Branch: `fix/stage3-auth-navigation`
 - Target: `staging`
-- Exact product candidate identity before this evidence-only update: PR 4 head `0d2499b7d360a0c932abf319f914f6701b150309` (`fix: preserve review-needed first-use corrections`). The live PR head after this documentation update, hosted checks, and review verdict must be read back from GitHub and are authoritative for final handoff.
+- Exact implementation candidate: PR 5 head `ae773aaf1847fc1e442b4dbab7119b40cb16dfaa` (`fix: close authenticated navigation review findings`). The final PR head after this evidence-only update must be read back from GitHub and is authoritative for final handoff.
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map
@@ -13,9 +13,11 @@
 |---|---|---|
 | Canonical regression | `make verify` with `DATABASE_URL` and provider credentials unset | PASS: 201 tests, 15 expected PostgreSQL/Playwright environment-gated skips, exit 0; system check, migration check, migration and collectstatic passed. |
 | Same-family photo-attempt regression | `accounts.test_onboarding.OnboardingDraftTests` | PASS: rejected photo attempts 1–10 reach the decoder, attempt 11 returns 429 before another decode, and the 429 response preserves safe text fields with localized recovery copy. |
-| Hosted exact-head CI | See the exact-head closeout ledger and live PR 4 checks | PASS/FAIL must be read back against the current PR head; the hosted `ui-browser` job runs Stage 2 only and is not Stage 3 browser/reference evidence. |
+| Hosted exact-head CI | PR 5 live checks | The pre-fix head was green; the pushed `ae773aa` head requires fresh hosted checks before closeout. |
 | Refreshed source integrity | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json`, `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Historical manifests identify capture source tree `e1be979c...ffb1`; they are retained as prior evidence and are not exact-head proof. |
-| Exact-code browser capture | `/opt/data/tmp/wdos-stage3/current-head-visual/manifest.json` and its 18 PNGs | Fresh Chromium captures from exact implementation head `0d2499b7d360a0c932abf319f914f6701b150309`: ONB-01..08 at desktop/mobile, plus Arabic ONB-01 desktop/mobile; route HTTP status, `lang`, and `dir` are recorded. The capture source is the implementation head immediately before this documentation-only update. |
+| Exact-code browser capture | `/opt/data/tmp/wdos-stage3/current-head-ae773aa/` | Fresh Chromium captures from exact implementation head `ae773aaf1847fc1e442b4dbab7119b40cb16dfaa`: authenticated onboarding desktop (`1440×1000`), onboarding mobile (`390×844`), and Arabic status mobile (`390×844`). SHA-256: `2876cc2e75e03b5367c91a4ddf406e56bda741c82c32c0df65bddc1281628920`, `b841514af7ea7fc0100e6b46bf253411b781079173c1da77586f9ccea85cfd18`, `a0d6d3f2cc157c02da1ebf87c933004294115bddf8cac0365bdf3fc08d58d96a`. |
+| Exact interaction evidence | `/opt/data/tmp/wdos-stage3/current-head-ae773aa/` | Chromium asserted desktop profile-menu open, mobile profile-menu open with POST logout form, and Arabic status explainer `aria-label="لماذا أرى هذه الحالة؟"`. |
+| Reference comparison matrix | `docs/ui-acceptance.md`; approved-v1 Stage 2 package under `docs/approved-ui/stage-02/` | Capture identity and exercised states are recorded above. No unapproved deviation is claimed; matched-viewport side-by-side visual disposition and Rex's versioned acceptance remain owner gates. |
 | Arabic/localization repair | `arabic-final-verify.log`; `accounts/test_locale.py` | PASS on the candidate. The catalog fragment `تفضيلات الحركة` was repaired and exercised. |
 | Recovery/lost-response review | `/opt/data/tmp/wdos-stage3/postcommit-independent-closeout.md` | PASS: 7 focused tests. |
 | Visual recovery review | `/opt/data/tmp/wdos-stage3/recovery-final-acceptance.md` | Parent fresh-vision review reports no remaining Arabic fragment or clipping blocker. |
@@ -32,7 +34,7 @@ that visual acceptance or Rex acceptance is complete.
 
 ## Release status
 
-Stage 3 is **not done**. Rex acceptance, independent exact-candidate review, hosted CI/check reconciliation, and the human merge gate remain outstanding. No merge, deployment, production migration, provider configuration, or real email/send was performed. The PR is a review vehicle, not acceptance or release approval.
+Stage 3 is **not done**. Rex acceptance, fresh exact-head hosted checks/review reconciliation, matched-reference visual disposition, and the human merge gate remain outstanding. No merge, deployment, production migration, provider configuration, or real email/send was performed. The PR is a review vehicle, not acceptance or release approval.
 
 ## Review boundaries
 

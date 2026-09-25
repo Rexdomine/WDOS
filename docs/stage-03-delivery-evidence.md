@@ -90,6 +90,21 @@ Rex visual acceptance; this record does not claim that visual acceptance or Rex 
 
 The current-head captures and comparisons are committed evidence for the repaired interaction. Rex's versioned visual acceptance remains an owner gate; no deviation approval is claimed.
 
+### Exact implementation-candidate interaction recapture
+
+- Implementation candidate: `0455ce40e5d629a95e644aa3319d0a160bf71ecf`; documentation and captures are committed afterward.
+- Browser runner manifest: `/opt/data/tmp/wdos-stage3/exact-head-0455ce4/manifest.json`.
+- Real Chromium states: Meetings, Messages, and Home reset at desktop `1440x1000`, English mobile `390x844`, and Arabic RTL mobile `390x844`.
+- Assertions: named destination panel becomes visible; Home returns to Overview and sets `aria-selected=true`; document width does not exceed the viewport.
+
+| Locale / viewport | State captures |
+|---|---|
+| English desktop 1440×1000 | [`meetings`](./stage-03-evidence/captures/foundation-nav-en-desktop-meetings.png), [`messages`](./stage-03-evidence/captures/foundation-nav-en-desktop-messages.png), [`home reset`](./stage-03-evidence/captures/foundation-nav-en-desktop-home.png) |
+| English mobile 390×844 | [`meetings`](./stage-03-evidence/captures/foundation-nav-en-mobile-meetings.png), [`messages`](./stage-03-evidence/captures/foundation-nav-en-mobile-messages.png), [`home reset`](./stage-03-evidence/captures/foundation-nav-en-mobile-home.png) |
+| Arabic RTL mobile 390×844 | [`meetings`](./stage-03-evidence/captures/foundation-nav-ar-mobile-meetings.png), [`messages`](./stage-03-evidence/captures/foundation-nav-ar-mobile-messages.png), [`home reset`](./stage-03-evidence/captures/foundation-nav-ar-mobile-home.png) |
+
+The recapture is bound to the implementation commit rather than the later evidence-packaging commit. Rex's versioned visual acceptance remains open; no deviation approval is claimed.
+
 ## Release status
 
 Stage 3 is **not done**. Rex acceptance, fresh exact-head review reconciliation, matched-reference visual disposition, and the human merge gate remain outstanding. No merge, deployment, production migration, provider configuration, or real email/send was performed. The PR is a review vehicle, not acceptance or release approval.

@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_http_methods, require_POST
@@ -60,6 +61,15 @@ def _masked_email(email):
     if dot:
         masked_domain += dot + suffix
     return (local[:1] + '***' if local else '***') + '@' + masked_domain
+
+
+def _workspace_destination(account):
+    """Route authenticated users without trusting a client-side destination."""
+    from .models import OnboardingDraft
+    draft = OnboardingDraft.objects.filter(account=account).first()
+    if draft and draft.state == 'accepted' and hasattr(draft, 'membership'):
+        return reverse('app-shell')
+    return reverse('onboarding:step', args=[draft.next_step if draft else 1])
 
 
 def page(request, screen, title, lede, form=None, action=None, **extra):
@@ -139,6 +149,9 @@ def _verification_page(request, account, form=None, feedback=None):
 
 @require_http_methods(['GET'])
 def welcome(request):
+    account = getattr(request, 'wdos_account', None)
+    if account:
+        return redirect(_workspace_destination(account))
     return page(request, 'AUTH-01', 'Welcome to WDOS',
                 'Choose how you would like to connect with WODDI today.')
 
@@ -226,7 +239,7 @@ def login(request):
                 else:
                     establish(request, account, remember=form.cleaned_data['remember'])
                     services.audit(account, 'signed_in')
-                    return redirect('accounts:status')
+                    return redirect(_workspace_destination(account))
     return page(
         request, 'AUTH-02', 'Welcome back',
         'Use your WDOS account email and password to continue securely.',

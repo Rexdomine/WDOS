@@ -38,6 +38,34 @@ Required failure proof: concurrent tab/revision conflict; duplicate submit/repla
 ## Completion evidence
 Backend checkpoint 70bdea7 implemented and independently reviewed with a blocking identity race. Earlier focused tests passed; full PostgreSQL regression failed one reset-browser setup test. UI/photo changes remain uncommitted and unaccepted. Two bounded, nonoverlapping backend/presentation workers dispatched on resume. Jira resume evidence posted/read back. No Stage 3 PR/merge/deployment or completion claimed.
 
+---
+## Post-merge repair — authenticated navigation and session UX
+
+### Goal
+Deliver a fresh PR from `origin/staging` that fixes the reported post-login user journey: direct authenticated routing to the right onboarding/dashboard destination, a clear access-status explanation affordance, an available secure sign-out control, and truthful session behavior across the application root. No merge, deployment, production setting change, or policy change is authorized.
+
+### Exact base and branch
+- Base: `origin/staging` at `903f3bf3437186a3d5b43c8c1a91a6705c3729c3`.
+- Branch: `fix/stage3-auth-navigation`.
+- Historical PR #4 was merged; it will not be reopened or reused.
+
+### Boundary and invariants
+- Browser session cookie/authentication remains Django-owned; no client identity or query parameter can select an account or bypass onboarding approval.
+- Login/root/status/onboarding/app routes must converge safely: unauthenticated users go to login; active users with no accepted membership go to onboarding; accepted members go to the permitted app shell.
+- The status explainer is informational only and cannot disclose restricted records.
+- Sign-out remains POST + CSRF and must invalidate the authenticated browser session while preserving only the allowed language preference.
+- Secure cookies must remain enabled for HTTPS production. Local HTTP behavior must be diagnosed/tested separately, never weakened in production defaults.
+
+### Phases
+1. [complete] Read live PR/base state and diagnose navigation/session/UI boundaries.
+2. [in_progress] RED: write route/session/logout and accessible explainer contract regressions.
+3. [pending] GREEN: implement the narrowest server/template/CSS changes; verify real browser desktop/mobile behavior.
+4. [pending] Run focused plus canonical regression, exact-head visual QA, then commit/push fresh PR to `staging`.
+5. [pending] Read back PR/head/checks; await Rex’s review and explicit merge authorization.
+
+### Next step
+Write and execute failing tests that prove authenticated root redirect, post-login destination, accessible explainer, and secure shell logout before changing production code.
+
 
 ---
 ## Preserved Stage 2 history — superseded by Stage 3 record above

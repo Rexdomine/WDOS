@@ -90,3 +90,15 @@
   });
   interrupted.querySelector("[data-recovery-retry]").addEventListener("click", recover);
 })();
+
+
+(function initializeProfileMenus() {
+  document.querySelectorAll('[data-profile-menu]').forEach((menu) => {
+    const trigger = menu.querySelector('[data-profile-trigger]'); const panel = menu.querySelector('[data-profile-panel]');
+    if (!trigger || !panel) return;
+    const close = () => { panel.hidden = true; trigger.setAttribute('aria-expanded', 'false'); };
+    trigger.addEventListener('click', () => { panel.hidden = !panel.hidden; trigger.setAttribute('aria-expanded', String(!panel.hidden)); if (!panel.hidden) panel.querySelector('button')?.focus(); });
+    menu.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); trigger.focus(); } });
+    document.addEventListener('click', (event) => { if (!menu.contains(event.target)) close(); });
+  });
+})();

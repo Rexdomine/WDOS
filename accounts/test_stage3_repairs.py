@@ -229,18 +229,20 @@ class Stage3RepairTests(TestCase):
         for name in (
             'foundation-nav-en-desktop-meetings-ecaa21b.png',
             'foundation-nav-en-desktop-messages-ecaa21b.png',
-            'foundation-nav-en-desktop-home-ecaa21b.png',
+            'foundation-nav-en-desktop-home-reset-ecaa21b.png',
             'foundation-nav-en-mobile-meetings-ecaa21b.png',
             'foundation-nav-en-mobile-messages-ecaa21b.png',
-            'foundation-nav-en-mobile-home-ecaa21b.png',
+            'foundation-nav-en-mobile-home-reset-ecaa21b.png',
             'foundation-nav-ar-mobile-meetings-ecaa21b.png',
+            'foundation-nav-ar-mobile-messages-ecaa21b.png',
+            'foundation-nav-ar-mobile-home-reset-ecaa21b.png',
         ):
             self.assertIn(name, section)
             self.assertTrue((evidence_root / 'docs' / 'stage-03-evidence' / 'captures' / name).is_file(), name)
         for name in (
-            'foundation-nav-en-desktop-meetings-ecaa21b.png',
-            'foundation-nav-en-mobile-meetings-ecaa21b.png',
-            'foundation-nav-ar-mobile-meetings-ecaa21b.png',
+            'foundation-nav-en-desktop-meetings-ecaa21b-comparison.png',
+            'foundation-nav-en-mobile-meetings-ecaa21b-comparison.png',
+            'foundation-nav-ar-mobile-meetings-ecaa21b-comparison.png',
         ):
             self.assertTrue((evidence_root / 'docs' / 'stage-03-evidence' / 'comparisons' / name).is_file(), name)
 

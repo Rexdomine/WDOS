@@ -10,7 +10,10 @@ from .locale import catalog
 from .models import Membership, OnboardingConsent, OnboardingDraft, Person
 
 
-@override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
+@override_settings(
+    PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'],
+    STORAGES={'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}},
+)
 class Stage3RepairTests(TestCase):
     password = 'a genuinely long WDOS example passphrase!'
 
@@ -90,6 +93,34 @@ class Stage3RepairTests(TestCase):
         response = self.client.get('/foundation/')
         self.assertEqual(response['Cache-Control'], 'no-store, private')
         self.assertEqual(response['Referrer-Policy'], 'same-origin')
+
+    def test_foundation_desktop_topbar_preserves_approved_utility_controls(self):
+        account = self.create_active('foundation-utility-controls@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Utility Controls Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        self.assertIn('class="breadcrumb"', html)
+        self.assertIn('class="toptools"', html)
+        self.assertIn('data-foundation-search', html)
+        self.assertIn('data-foundation-notifications', html)
+        self.assertIn('data-foundation-language', html)
+        self.assertIn(catalog('en')['onb_search'], html)
+        self.assertIn(catalog('en')['account_notifications'], html)
+        self.assertIn(catalog('en')['onb_language'], html)
+
+    def test_foundation_named_panel_keeps_record_tablist_keyboard_reachable(self):
+        script = (Path(__file__).parent / 'static' / 'accounts' / 'onboarding.js').read_text()
+        self.assertIn("candidate.tabIndex = selected ? 0 : -1", script)
+        self.assertIn("tabs[0].tabIndex = 0", script)
 
     def test_foundation_shell_has_styled_layout_and_bound_profile_menu(self):
         account = self.create_active('foundation-controls@example.org')

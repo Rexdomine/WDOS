@@ -143,6 +143,9 @@ function initializeRecordTabs() {
       candidate.setAttribute('aria-selected', 'false');
       candidate.tabIndex = -1;
     });
+    // Keep the visible record tablist in the document's sequential tab order
+    // while a named workspace panel is active.
+    tabs[0].tabIndex = 0;
   };
   tabs.forEach((tab, index) => {
     tab.addEventListener('click', (event) => { event.preventDefault(); activate(tab); window.history.replaceState({}, '', tab.hash); });

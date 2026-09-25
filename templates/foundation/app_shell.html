@@ -46,8 +46,13 @@
 
   <div class="content">
     <div class="topbar">
-      <div><span class="crumb">{{ scope_label }}</span><h1>{{ translations.onb_workspace_title }}</h1></div>
-      <div class="profile-menu" data-profile-menu><button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button><div class="profile-menu-panel" data-profile-panel role="menu" hidden><strong>{{ display_name }}</strong><form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form></div></div>
+      <div class="breadcrumb">{{ translations.onb_breadcrumb }} <span aria-hidden="true"> / </span>{{ scope_label }}</div>
+      <div class="toptools">
+        <button class="search" data-foundation-search type="button" aria-label="{{ translations.onb_search }}"><span class="icon" aria-hidden="true">⌕</span>{{ translations.onb_search }} <small aria-hidden="true">⌘ K</small></button>
+        <button class="icon" data-foundation-notifications type="button" aria-label="{{ translations.account_notifications }}">♧</button>
+        <span class="language" data-foundation-language aria-label="{{ translations.interface_language }}">{{ translations.onb_language }} ▾</span>
+        <div class="profile-menu" data-profile-menu><button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button><div class="profile-menu-panel" data-profile-panel role="menu" hidden><strong>{{ display_name }}</strong><form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form></div></div>
+      </div>
     </div>
     <main id="workspace-home" aria-labelledby="page-title">
       <div class="pagehead">

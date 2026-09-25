@@ -253,8 +253,12 @@ class Stage3RepairTests(TestCase):
         for lang, (html_lang, direction, label) in expected.items():
             self.client.cookies['wdos_language'] = lang
             shell = self.client.get('/foundation/')
-            self.assertContains(shell, '<html lang="en" dir="ltr">')
+            self.assertContains(shell, f'<html lang="{html_lang}" dir="{direction}">')
             self.assertContains(shell, f'<span lang="{html_lang}" dir="{direction}">{label}</span>')
+
+    def test_foundation_sidebar_links_preserve_approved_decoration(self):
+        css = (Path(__file__).parent / 'static' / 'accounts' / 'design.css').read_text()
+        self.assertIn('.foundation-shell .sidebar .navitem{text-decoration:none;', css)
 
     def test_status_explainer_is_localized_and_does_not_leak_restricted_identity(self):
         account = self.create_active('private-status@example.org')

@@ -210,6 +210,29 @@ class Stage3RepairTests(TestCase):
         self.assertNotIn('ee70048fe84e06854001e399d92b32ee5f55b2b2', section.split('## ', 1)[0])
         self.assertIn('Implementation candidate:', section)
 
+    def test_foundation_navigation_evidence_is_bound_to_final_candidate_and_comparisons(self):
+        evidence_root = Path(__file__).parents[1]
+        text = (evidence_root / 'docs' / 'stage-03-delivery-evidence.md').read_text()
+        section = text.split('### Exact implementation-candidate interaction recapture', 1)[1].split('## Release status', 1)[0]
+        self.assertIn('ecaa21bdf8fa76a2e3c9a019ffee6faa95b22831', section)
+        for name in (
+            'foundation-nav-en-desktop-meetings-ecaa21b.png',
+            'foundation-nav-en-desktop-messages-ecaa21b.png',
+            'foundation-nav-en-desktop-home-ecaa21b.png',
+            'foundation-nav-en-mobile-meetings-ecaa21b.png',
+            'foundation-nav-en-mobile-messages-ecaa21b.png',
+            'foundation-nav-en-mobile-home-ecaa21b.png',
+            'foundation-nav-ar-mobile-meetings-ecaa21b.png',
+        ):
+            self.assertIn(name, section)
+            self.assertTrue((evidence_root / 'docs' / 'stage-03-evidence' / 'captures' / name).is_file(), name)
+        for name in (
+            'foundation-nav-en-desktop-meetings-ecaa21b.png',
+            'foundation-nav-en-mobile-meetings-ecaa21b.png',
+            'foundation-nav-ar-mobile-meetings-ecaa21b.png',
+        ):
+            self.assertTrue((evidence_root / 'docs' / 'stage-03-evidence' / 'comparisons' / name).is_file(), name)
+
     def test_foundation_record_shortcuts_activate_tabs_and_preserve_overview_related_information(self):
         account = self.create_active('foundation-record-shortcuts@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

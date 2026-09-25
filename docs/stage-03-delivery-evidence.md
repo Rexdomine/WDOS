@@ -92,18 +92,18 @@ The current-head captures and comparisons are committed evidence for the repaire
 
 ### Exact implementation-candidate interaction recapture
 
-- Implementation candidate: `0455ce40e5d629a95e644aa3319d0a160bf71ecf`; documentation and captures are committed afterward.
-- Browser runner manifest: `/opt/data/tmp/wdos-stage3/exact-head-0455ce4/manifest.json`.
+- Implementation candidate: `ecaa21bdf8fa76a2e3c9a019ffee6faa95b22831`; these captures were regenerated from the exact public PR head before this evidence-packaging commit.
 - Real Chromium states: Meetings, Messages, and Home reset at desktop `1440x1000`, English mobile `390x844`, and Arabic RTL mobile `390x844`.
-- Assertions: named destination panel becomes visible; Home returns to Overview and sets `aria-selected=true`; document width does not exceed the viewport.
+- Assertions: named destination panel becomes visible; Home returns to Overview and sets `aria-selected=true`; desktop/mobile document width does not exceed the viewport.
+- Approved reference: `WDOS Complete UI Review v1`, screen `CORE-01`; desktop reference SHA-256 `9362fa5555c996cf38f7d2a1dc1672811e82d9149ad3675f17d9a1e5911e0272`, mobile reference SHA-256 `d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252`.
 
-| Locale / viewport | State captures |
-|---|---|
-| English desktop 1440×1000 | [`meetings`](./stage-03-evidence/captures/foundation-nav-en-desktop-meetings.png), [`messages`](./stage-03-evidence/captures/foundation-nav-en-desktop-messages.png), [`home reset`](./stage-03-evidence/captures/foundation-nav-en-desktop-home.png) |
-| English mobile 390×844 | [`meetings`](./stage-03-evidence/captures/foundation-nav-en-mobile-meetings.png), [`messages`](./stage-03-evidence/captures/foundation-nav-en-mobile-messages.png), [`home reset`](./stage-03-evidence/captures/foundation-nav-en-mobile-home.png) |
-| Arabic RTL mobile 390×844 | [`meetings`](./stage-03-evidence/captures/foundation-nav-ar-mobile-meetings.png), [`messages`](./stage-03-evidence/captures/foundation-nav-ar-mobile-messages.png), [`home reset`](./stage-03-evidence/captures/foundation-nav-ar-mobile-home.png) |
+| Locale / viewport | State captures | Side-by-side comparison |
+|---|---|---|
+| English desktop 1440×1000 | [`meetings`](./stage-03-evidence/captures/foundation-nav-en-desktop-meetings-ecaa21b.png), [`messages`](./stage-03-evidence/captures/foundation-nav-en-desktop-messages-ecaa21b.png), [`home reset`](./stage-03-evidence/captures/foundation-nav-en-desktop-home-ecaa21b.png) | [`meetings`](./stage-03-evidence/comparisons/foundation-nav-en-desktop-meetings-ecaa21b.png) |
+| English mobile 390×844 | [`meetings`](./stage-03-evidence/captures/foundation-nav-en-mobile-meetings-ecaa21b.png), [`messages`](./stage-03-evidence/captures/foundation-nav-en-mobile-messages-ecaa21b.png), [`home reset`](./stage-03-evidence/captures/foundation-nav-en-mobile-home-ecaa21b.png) | [`meetings`](./stage-03-evidence/comparisons/foundation-nav-en-mobile-meetings-ecaa21b.png) |
+| Arabic RTL mobile 390×844 | [`meetings`](./stage-03-evidence/captures/foundation-nav-ar-mobile-meetings-ecaa21b.png) | [`meetings`](./stage-03-evidence/comparisons/foundation-nav-ar-mobile-meetings-ecaa21b.png) |
 
-The recapture is bound to the implementation commit rather than the later evidence-packaging commit. Rex's versioned visual acceptance remains open; no deviation approval is claimed.
+The recapture is bound to the exact public implementation head. Rex's versioned visual acceptance remains open; no deviation approval is claimed.
 
 ## Release status
 

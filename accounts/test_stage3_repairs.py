@@ -49,6 +49,23 @@ class Stage3RepairTests(TestCase):
         self.assertContains(shell, 'Workspace actions')
         self.assertContains(shell, 'overflow-x: hidden')
 
+    def test_foundation_response_is_private_and_uncacheable(self):
+        account = self.create_active('foundation-cache@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Cached Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        response = self.client.get('/foundation/')
+        self.assertEqual(response['Cache-Control'], 'no-store, private')
+        self.assertEqual(response['Referrer-Policy'], 'same-origin')
+
     def test_foundation_shell_has_styled_layout_and_bound_profile_menu(self):
         account = self.create_active('foundation-controls@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

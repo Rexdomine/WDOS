@@ -52,14 +52,20 @@ def app_shell(request):
         ).exists()
     ):
         return redirect('/auth/status/')
-    lang = request.COOKIES.get('wdos_language') or request.session.get('wdos_language', 'en')
-    if lang not in LANGUAGES:
-        lang = 'en'
     draft = OnboardingDraft.objects.select_related('membership').get(
         account=account,
         state='accepted',
         membership__isnull=False,
     )
+    persisted_lang = (draft.data or {}).get('language')
+    lang = (
+        request.COOKIES.get('wdos_language')
+        or request.session.get('wdos_language')
+        or persisted_lang
+        or 'en'
+    )
+    if lang not in LANGUAGES:
+        lang = 'en'
     membership = draft.membership
     display_name = account.display_name or account.email.split('@', 1)[0]
     initials = ''.join(part[0] for part in display_name.split()[:2]).upper() or 'WD'

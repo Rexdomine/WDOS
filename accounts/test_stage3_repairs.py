@@ -23,6 +23,29 @@ class Stage3RepairTests(TestCase):
     def login(self, account):
         return self.client.post('/auth/login/', {'email': account.email, 'password': self.password})
 
+    def test_foundation_uses_persisted_language_when_browser_has_no_locale_cookie(self):
+        account = self.create_active('persisted-language@example.org')
+        draft = OnboardingDraft.objects.create(
+            account=account, state='accepted', next_step=6, data={'language': 'fr'}
+        )
+        person = Person.objects.create(display_name='Persisted Language Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        self.client.cookies.pop('wdos_language', None)
+        session = self.client.session
+        session.pop('wdos_language', None)
+        session.save()
+        response = self.client.get('/foundation/')
+        self.assertContains(response, 'lang="fr"')
+        self.assertContains(response, catalog('fr')['onb_workspace_title'])
+
     def test_accepted_membership_login_and_root_open_foundation_shell(self):
         account = self.create_active('accepted-nav@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

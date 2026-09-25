@@ -4,15 +4,15 @@
 
 - Branch: `feat/stage-03-onboarding`
 - Target: `staging`
-- Exact candidate identity: verify the live PR 4 head and `/opt/data/tmp/wdos-stage3/automatic-closeout-state.json` at handoff time. This document intentionally avoids embedding a self-invalidating commit hash; every review, CI result, and visual record is SHA-scoped in the closeout ledger.
+- Exact product candidate identity: `d0c745ed0070a592a70dfcb26633d316aee84bbc` (bounded photo-throttle recovery repair). This evidence record is packaged by a later documentation commit; the live PR 4 head, hosted checks, and review verdict remain authoritative for final handoff.
 - This record is evidence packaging only; it does not grant acceptance, merge, deployment, provider changes, real sends, or Jira completion.
 
 ## Verification map
 
 | Gate | Evidence | Result / limit |
 |---|---|---|
-| Canonical regression | `/opt/data/tmp/wdos-stage3/arabic-final-verify.log` | PASS: 169 tests, 73.348s, canonical exit 0. |
-| Same-family quota regression | `accounts.test_onboarding` + `accounts.test_configuration` | PASS: 34 tests under isolated SQLite; full-draft quota returns 429 before Pillow image decoding, with revision/history unchanged. |
+| Canonical regression | `make verify` with `DATABASE_URL` and provider credentials unset | PASS: 201 tests, 15 expected PostgreSQL/Playwright environment-gated skips, exit 0; system check, migration check, migration and collectstatic passed. |
+| Same-family photo-attempt regression | `accounts.test_onboarding.OnboardingDraftTests` | PASS: rejected photo attempts 1–10 reach the decoder, attempt 11 returns 429 before another decode, and the 429 response preserves safe text fields with localized recovery copy. |
 | Hosted exact-head CI | See the exact-head closeout ledger and live PR 4 checks | PASS/FAIL must be read back against the current PR head; the hosted `ui-browser` job runs Stage 2 only and is not Stage 3 browser/reference evidence. |
 | Refreshed source integrity | `/opt/data/tmp/wdos-stage3/verified-ui/manifest.json`, `/opt/data/tmp/wdos-stage3/recovery-visual/machine-capture-manifest.json` | Both manifests identify the capture source tree as `e1be979c...ffb1`; this is pre-packaging evidence and does not prove exact-head equivalence. The implementation delta after capture includes server-side review/consent/route hardening, operator audit provenance, locale precedence, request-body upload protection, focused regressions, and the accepted-state template correction; these changes require exact-candidate acceptance evidence. |
 | Arabic/localization repair | `arabic-final-verify.log`; `accounts/test_locale.py` | PASS on the candidate. The catalog fragment `تفضيلات الحركة` was repaired and exercised. |

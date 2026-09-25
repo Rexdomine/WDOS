@@ -29,6 +29,7 @@ VERIFY_RESEND_SECONDS = 60
 SUPPORT_URL = 'https://thewoddi.org/contact.html'
 RESET_RETRY_SESSION_KEY = 'reset_retry_proof'
 RESET_FLOW_QUERY_KEY = 'reset_flow'
+EXPLICIT_LOCALE_SESSION_KEY = 'explicit_locale_selection'
 
 
 def _locale(request):
@@ -74,6 +75,8 @@ def _workspace_destination(account):
 
 def page(request, screen, title, lede, form=None, action=None, **extra):
     lang = _locale(request)
+    if request.GET.get('lang') in LANGUAGES:
+        request.session[EXPLICIT_LOCALE_SESSION_KEY] = request.GET['lang']
     translations = catalog(lang)
     if form is not None:
         form.label_suffix = ''
@@ -188,12 +191,18 @@ def register(request):
 
 def establish(request, account, mfa=False, remember=False):
     lang = _locale(request)
+    explicit_lang = request.session.pop(EXPLICIT_LOCALE_SESSION_KEY, None)
     persisted_lang = (
         OnboardingDraft.objects.filter(
             account=account, state='accepted', membership__isnull=False,
         ).values_list('data', flat=True).first() or {}
     ).get('language')
-    if lang == 'en' and persisted_lang in LANGUAGES and persisted_lang != 'en':
+    if (
+        lang == 'en'
+        and explicit_lang != 'en'
+        and persisted_lang in LANGUAGES
+        and persisted_lang != 'en'
+    ):
         lang = persisted_lang
     django_login(request, account.user, backend='django.contrib.auth.backends.ModelBackend')
     request.session[LOCALE_COOKIE] = lang

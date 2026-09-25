@@ -97,6 +97,28 @@ class Stage3RepairTests(TestCase):
         self.assertContains(response, 'lang="ar"')
         self.assertContains(response, catalog('ar')['onb_workspace_title'])
 
+    def test_foundation_preserves_explicit_english_locale_selection_on_login(self):
+        account = self.create_active('explicit-english@example.org')
+        draft = OnboardingDraft.objects.create(
+            account=account, state='accepted', next_step=6, data={'language': 'ar'}
+        )
+        person = Person.objects.create(display_name='Explicit English Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.client.get('/auth/login/?lang=en')
+
+        self.login(account)
+
+        response = self.client.get('/foundation/')
+        self.assertContains(response, 'lang="en"')
+        self.assertContains(response, catalog('en')['onb_workspace_title'])
+
     def test_accepted_membership_login_and_root_open_foundation_shell(self):
         account = self.create_active('accepted-nav@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)

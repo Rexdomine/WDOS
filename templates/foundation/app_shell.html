@@ -15,12 +15,12 @@
     <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
     <div class="workspace"><div><b>{{ scope_label }}</b><span>Member</span></div><span class="icon" aria-hidden="true">›</span></div>
     <div class="nav-label">WORKSPACE</div>
-    <div class="navitem active"><span class="icon" aria-hidden="true">⌂</span>Home</div>
-    <div class="navitem"><span class="icon" aria-hidden="true">▣</span>My activities</div>
-    <div class="navitem"><span class="icon" aria-hidden="true">□</span>Meetings &amp; events</div>
-    <div class="navitem"><span class="icon" aria-hidden="true">✉</span>Messages</div>
-    <div class="navitem"><span class="icon" aria-hidden="true">?</span>Help &amp; support</div>
-    <div class="navitem"><span class="icon" aria-hidden="true">⚙</span>Settings</div>
+    <a class="navitem active" href="#workspace-home"><span class="icon" aria-hidden="true">⌂</span>Home</a>
+    <a class="navitem" href="#activities"><span class="icon" aria-hidden="true">▣</span>My activities</a>
+    <a class="navitem" href="#meetings"><span class="icon" aria-hidden="true">□</span>Meetings &amp; events</a>
+    <a class="navitem" href="#messages"><span class="icon" aria-hidden="true">✉</span>Messages</a>
+    <a class="navitem" href="#support"><span class="icon" aria-hidden="true">?</span>Help &amp; support</a>
+    <a class="navitem" href="#settings"><span class="icon" aria-hidden="true">⚙</span>Settings</a>
   </aside>
 
   <div class="mobile-head">
@@ -39,8 +39,8 @@
   <nav class="mobile-nav" aria-label="Workspace navigation">
     <a href="#workspace-home" aria-current="page"><span aria-hidden="true">⌂</span>Home</a>
     <a href="#activities"><span aria-hidden="true">▣</span>My work</a>
-    <a href="#records-table"><span aria-hidden="true">□</span>Meetings</a>
-    <a href="#support-links"><span aria-hidden="true">✉</span>Messages</a>
+    <a href="#meetings"><span aria-hidden="true">□</span>Meetings</a>
+    <a href="#messages"><span aria-hidden="true">✉</span>Messages</a>
     <a href="#more"><span aria-hidden="true">⋯</span>More</a>
   </nav>
 
@@ -81,7 +81,11 @@
       </section>
       <section class="section-block" id="next-action" aria-labelledby="actions-title"><div class="section-heading"><div><p class="eyebrow">NEXT STEPS</p><h2 id="actions-title">Workspace actions</h2></div></div><div class="action-row"><a class="btn secondary" href="#activities">Open activities</a><a class="btn secondary" href="#support">Contact support</a></div></section>
       <section class="section-block" id="more" aria-labelledby="support-links-title"><div class="section-heading"><div><p class="eyebrow">SUPPORT</p><h2 id="support-links-title">Support links</h2></div></div><div id="support-links" class="card-grid"><article class="data-card" id="activities"><span class="card-label">ACTIVITIES</span><strong>My activities</strong><span>Keep track of your recent progress</span></article><article class="data-card" id="support"><span class="card-label">SUPPORT</span><strong>Help &amp; support</strong><span>Find guidance and help when you need it</span></article></div></section>
+      <section class="section-block" id="meetings" aria-labelledby="meetings-title"><div class="section-heading"><div><p class="eyebrow">MEETINGS &amp; EVENTS</p><h2 id="meetings-title">Meetings &amp; events</h2></div></div><p>No meetings or events are recorded yet.</p></section>
+      <section class="section-block" id="messages" aria-labelledby="messages-title"><div class="section-heading"><div><p class="eyebrow">MESSAGES</p><h2 id="messages-title">Messages</h2></div></div><p>No messages are available yet.</p></section>
+      <section class="section-block" id="settings" aria-labelledby="settings-title"><div class="section-heading"><div><p class="eyebrow">SETTINGS</p><h2 id="settings-title">Settings</h2></div></div><p>Settings are not available for this membership yet.</p></section>
     </main>
+
     <footer>WODDI · No Woman Is Left Out</footer>
   </div>
   <script src="{% static 'accounts/onboarding.js' %}"></script>

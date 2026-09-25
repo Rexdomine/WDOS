@@ -24,6 +24,14 @@
 | Exact-head changed interaction states | `docs/stage-03-evidence/captures/` and `/opt/data/tmp/wdos_foundation_qa_current.py` | PASS on implementation head `21bf1ff`: real Chromium authenticated `/foundation/` at 1440×1000 and 390×844, asserted the five-control mobile CORE-01 navigation, opened the mobile profile menu, asserted two CSRF logout forms, honest membership/activity state, hidden initial panels, and no horizontal overflow. Capture hashes are recorded in the comparison rows below. |
 | Oversized-photo 422 state | `/opt/data/tmp/wdos-stage3/oversized-photo/manifest.json` and `/opt/data/tmp/wdos-stage3/oversized-photo/ONB-02-oversized-photo-422-*.png` | Historical PASS: 10/10 real Playwright captures at prior candidate `4c94e77840e4b05c3016b7c5d81507bdc9f0b9d8`; not exact-head evidence for `28990f6`. |
 
+## Latest exact-head foundation evidence
+
+- Candidate: `bf197f3aebdc4a7e4020c547269fcd314851bd36`.
+- Route/state: authenticated `/foundation/`, accepted member, desktop `1440x1000` and mobile `390x844`; Chromium asserted the CORE-01 shell, five-control mobile navigation, opened mobile profile menu, persisted local-home projection, truthful empty activity state, and no horizontal overflow.
+- Candidate captures: [`foundation-bf197f3-desktop.png`](./stage-03-evidence/captures/foundation-bf197f3-desktop.png) (`3d319507fb6e47cbeb5e2d097ec8f4daf0c0ce51df3da17e0cdfeeb19ea85aeb`) and [`foundation-bf197f3-mobile.png`](./stage-03-evidence/captures/foundation-bf197f3-mobile.png) (`03a343bce1a070dfb6f1883b28460cca8e794e152a750f7c382ba5061246a0c0`).
+- Approved reference: `WDOS Complete UI Review v1`, `CORE-01-desktop.png` / `CORE-01-mobile.png` from `/opt/data/projects/WDOS/design-review/v1/renders/`; side-by-side sheets: [`foundation-bf197f3-desktop.png`](./stage-03-evidence/comparisons/foundation-bf197f3-desktop.png) (`a989a4ba11df4df5ac00bb9b9f659d3de9effbbf4fa41b3b81812d2da01b4424`) and [`foundation-bf197f3-mobile.png`](./stage-03-evidence/comparisons/foundation-bf197f3-mobile.png) (`f97ed1567a40be088f45ad5baf0b1a10c039a0e38ed72f8dd5fbe18b6b603304`).
+- Disposition: exact-head evidence is recorded; Rex's versioned visual acceptance remains open. No deviation approval is claimed.
+
 ## Exact-head approved-v1 comparison matrix
 
 Comparison record produced for the exact current-head capture set and the unchanged profile-menu capture set. Each pair was rendered into a reproducible side-by-side sheet at the approved viewport dimensions; the sheet contains the frozen approved-v1 render on the left and the exact candidate capture on the right. The candidate screenshots are not being treated as hosted proof: they are bound to the implementation heads stated in each row, while this documentation commit records the evidence.

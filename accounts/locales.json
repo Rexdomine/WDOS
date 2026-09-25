@@ -336,7 +336,10 @@
     "onb_no_activities": "No activities are recorded yet",
     "onb_record_tabs": "Record tabs",
     "onb_related_tab": "Related information",
-    "onb_workspace_actions": "Workspace actions"
+    "onb_workspace_actions": "Workspace actions",
+    "onb_next_steps_eyebrow": "NEXT STEPS",
+    "onb_support_eyebrow": "SUPPORT",
+    "onb_support_links_title": "Support links"
   },
   "fr": {
     "welcome": "Bienvenue sur WDOS",
@@ -675,7 +678,10 @@
     "onb_no_activities": "Aucune activité n’est encore enregistrée",
     "onb_record_tabs": "Onglets des dossiers",
     "onb_related_tab": "Informations associées",
-    "onb_workspace_actions": "Actions de l’espace de travail"
+    "onb_workspace_actions": "Actions de l’espace de travail",
+    "onb_next_steps_eyebrow": "PROCHAINES ÉTAPES",
+    "onb_support_eyebrow": "ASSISTANCE",
+    "onb_support_links_title": "Liens d’assistance"
   },
   "pt": {
     "welcome": "Bem-vinda ao WDOS",
@@ -1014,7 +1020,10 @@
     "onb_no_activities": "Ainda não existem atividades registadas",
     "onb_record_tabs": "Separadores de registos",
     "onb_related_tab": "Informações relacionadas",
-    "onb_workspace_actions": "Ações do espaço de trabalho"
+    "onb_workspace_actions": "Ações do espaço de trabalho",
+    "onb_next_steps_eyebrow": "PRÓXIMOS PASSOS",
+    "onb_support_eyebrow": "SUPORTE",
+    "onb_support_links_title": "Ligações de apoio"
   },
   "ar": {
     "welcome": "مرحبًا بكِ في WDOS",
@@ -1353,7 +1362,10 @@
     "onb_no_activities": "لا توجد أنشطة مسجلة بعد",
     "onb_record_tabs": "علامات تبويب السجلات",
     "onb_related_tab": "معلومات ذات صلة",
-    "onb_workspace_actions": "إجراءات مساحة العمل"
+    "onb_workspace_actions": "إجراءات مساحة العمل",
+    "onb_next_steps_eyebrow": "الخطوات التالية",
+    "onb_support_eyebrow": "الدعم",
+    "onb_support_links_title": "روابط الدعم"
   },
   "sw": {
     "welcome": "Karibu WDOS",
@@ -1692,6 +1704,9 @@
     "onb_no_activities": "Hakuna shughuli zilizorekodiwa bado",
     "onb_record_tabs": "Vichupo vya rekodi",
     "onb_related_tab": "Taarifa zinazohusiana",
-    "onb_workspace_actions": "Vitendo vya eneo la kazi"
+    "onb_workspace_actions": "Vitendo vya eneo la kazi",
+    "onb_next_steps_eyebrow": "HATUA ZINAZOFUATA",
+    "onb_support_eyebrow": "USAIDIZI",
+    "onb_support_links_title": "Viungo vya usaidizi"
   }
 }

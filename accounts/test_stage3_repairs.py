@@ -282,9 +282,10 @@ class Stage3RepairTests(TestCase):
         self.login(account)
         workspace_keys = (
             'onb_member', 'onb_workspace', 'onb_home', 'onb_activities',
-            'onb_records', 'onb_overview', 'onb_connection', 'onb_support',
+            'onb_records', 'onb_overview', 'onb_connection',
             'onb_meetings', 'onb_messages', 'onb_help', 'onb_settings',
             'onb_workspace_title',
+            'onb_next_steps_eyebrow', 'onb_support_eyebrow', 'onb_support_links_title',
             'onb_support_text', 'onb_my_work', 'onb_meetings_short',
             'onb_more', 'onb_local_connection',
         )

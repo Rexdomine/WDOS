@@ -623,7 +623,9 @@ def status(request):
         'login': translations.get('sign_in_again', ''),
         'invitation': translations.get('claim', ''),
     }
-    next_step = action_labels.get(status_action) or translations.get('continue', '')
+    next_step = action_labels.get(status_action) or translations.get(
+        'continue_account' if account and account.person_id else 'continue', ''
+    )
     status_explainer_text = (
         f"{translations.get('status_explainer', '')} {translate(lang, status_title)}. "
         f"{next_step}"

@@ -48,13 +48,27 @@
       </section>
       <section class="section-block" aria-labelledby="records-title">
         <div class="section-heading"><div><p class="eyebrow">OVERVIEW</p><h2 id="records-title">Records</h2></div><a href="#records-table">View all</a></div>
-        <div class="record-tabs" id="record-tabs" role="tablist" aria-label="Workspace record views"><a href="#records-table" role="tab" aria-selected="true">Overview</a><a href="#local-connection" role="tab" aria-selected="false">Connection</a><a href="#related-information" role="tab" aria-selected="false">Related information</a></div>
-        <div class="workspace-grid">
-          <section class="data-card" id="local-connection" aria-labelledby="local-connection-title"><span class="card-label">LOCAL CONNECTION</span><h3 id="local-connection-title">Your local connection</h3><p>Keep your membership context and local support information together.</p><strong>{{ scope_label }}</strong></section>
-          <section class="data-card" id="related-information" aria-labelledby="related-information-title"><span class="card-label">RELATED INFORMATION</span><h3 id="related-information-title">Related information</h3><p>Find the guidance and information connected to your membership.</p><a href="#support-links">View support links</a></section>
+        <div class="record-tabs" id="record-tabs" role="tablist" aria-label="Record tabs"><a href="#records-table" role="tab" aria-selected="true">Overview</a><a href="#local-connection" role="tab" aria-selected="false">Connection</a><a href="#related-information" role="tab" aria-selected="false">Related information</a></div>
+        <div class="workspace-columns">
+          <section class="workspace-record-card" id="records-table" aria-labelledby="workspace-record-title">
+            <span class="card-label">RECORDS</span>
+            <h3 id="workspace-record-title">Your membership record</h3>
+            <p>Review the information connected to your approved membership.</p>
+            <dl class="record-list">
+              <div><dt>Membership</dt><dd>{{ membership_status }}</dd></div>
+              <div><dt>Activities</dt><dd>{{ activity_status }}</dd></div>
+            </dl>
+          </section>
+          <aside class="related-information-panel" id="related-information" aria-labelledby="related-information-title">
+            <span class="card-label">RELATED INFORMATION</span>
+            <h3 id="related-information-title">Your local connection</h3>
+            <p>Keep your membership context and local support information together.</p>
+            <strong id="local-connection">{{ scope_label }}</strong>
+            <a href="#support-links">View support links</a>
+          </aside>
         </div>
-        <div class="records-table-wrap" id="records-table">
-          <table class="records-table"><caption>Workspace records</caption><thead><tr><th scope="col">Record</th><th scope="col">Status</th><th scope="col">Next action</th></tr></thead><tbody><tr><th scope="row">Membership</th><td>Active and in good standing</td><td>Review your workspace</td></tr><tr><th scope="row">Activities</th><td>Available</td><td><a href="#next-action">Open activities</a></td></tr></tbody></table>
+        <div class="records-table-wrap" aria-labelledby="workspace-record-title">
+          <table class="records-table"><caption>Workspace records</caption><thead><tr><th scope="col">Record</th><th scope="col">Status</th><th scope="col">Next action</th></tr></thead><tbody><tr><th scope="row">Membership</th><td>{{ membership_status }}</td><td>Review your workspace</td></tr><tr><th scope="row">Activities</th><td>{{ activity_status }}</td><td><a href="#next-action">Open activities</a></td></tr></tbody></table>
         </div>
       </section>
       <section class="section-block" id="next-action" aria-labelledby="actions-title"><div class="section-heading"><div><p class="eyebrow">NEXT STEPS</p><h2 id="actions-title">Workspace actions</h2></div></div><div class="action-row"><a class="btn secondary" href="#activities">Open activities</a><a class="btn secondary" href="#support">Contact support</a></div></section>

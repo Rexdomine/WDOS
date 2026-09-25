@@ -110,6 +110,44 @@ class Stage3RepairTests(TestCase):
         ):
             self.assertIn(f'id="{landmark}"', html)
 
+    def test_foundation_shell_does_not_fabricate_unmodeled_workspace_state(self):
+        account = self.create_active('foundation-honest-state@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Honest State Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        response = self.client.get('/foundation/')
+        self.assertContains(response, 'Active membership')
+        self.assertContains(response, 'No activities are recorded yet')
+        self.assertNotContains(response, 'Active and in good standing')
+        self.assertNotContains(response, '>Available<')
+
+    def test_foundation_shell_uses_approved_two_column_workspace_composition(self):
+        account = self.create_active('foundation-two-column@example.org')
+        draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
+        person = Person.objects.create(display_name='Two Column Member')
+        consent = OnboardingConsent.objects.create(
+            draft=draft, revision=0, version='v1', notice='notice', digest='d',
+            approval_reference='ref', privacy_ack=True, channel='web',
+        )
+        Membership.objects.create(
+            draft=draft, person=person, network='WGMN', home={'label': 'Home'},
+            consent=consent, policy_digest='p', approved_by=account,
+        )
+        self.login(account)
+        html = self.client.get('/foundation/').content.decode()
+        self.assertIn('class="workspace-columns"', html)
+        self.assertIn('class="workspace-record-card"', html)
+        self.assertIn('class="related-information-panel"', html)
+        self.assertIn('Record tabs', html)
+
     def test_foundation_workspace_actions_have_real_targets(self):
         account = self.create_active('foundation-actions@example.org')
         draft = OnboardingDraft.objects.create(account=account, state='accepted', next_step=6)
@@ -186,6 +224,16 @@ class Stage3RepairTests(TestCase):
                 response.context['status_explainer_text'],
                 response.context['status_text'],
             )
+
+    def test_status_explainer_uses_localized_next_step_for_linked_active_account(self):
+        account = self.create_active('linked-active-next-step@example.org')
+        account.person = Person.objects.create(display_name='Linked Active Member')
+        account.save(update_fields=['person'])
+        self.login(account)
+        for lang in ('en', 'fr', 'pt', 'ar', 'sw'):
+            response = self.client.get('/auth/status/?lang=' + lang)
+            self.assertContains(response, catalog(lang)['continue_account'])
+            self.assertIsNone(response.context['status_action'])
 
     def test_status_explainer_contains_distinct_context_from_status_sentence(self):
         account = self.create_active('status-explainer-context@example.org')

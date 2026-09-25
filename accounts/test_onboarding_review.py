@@ -108,10 +108,19 @@ class ReviewTests(TestCase):
         self.login(self.account)
         response = self.client.get('/onboarding/8/')
         self.assertContains(response, 'href="/app"')
+        self.assertContains(response, 'href="/onboarding/8/?tab=records"')
+        self.assertNotContains(response, 'href="/onboarding/7/"')
         self.assertNotContains(response, 'disabled aria-disabled="true"')
         dashboard = self.client.get('/app')
         self.assertEqual(dashboard.status_code, 200)
         self.assertContains(dashboard, 'A shared platform foundation.')
+
+    def test_review_needed_first_use_keeps_correction_links_editable(self):
+        self.login(self.account)
+        response = self.client.get('/onboarding/8/')
+        self.assertContains(response, 'href="/onboarding/4/"')
+        self.assertContains(response, 'href="/onboarding/2/"')
+        self.assertContains(response, 'href="/onboarding/7/"')
 
     def test_accepted_first_use_actions_open_read_only_records(self):
         self.assertEqual(self.approve().status_code, 200)

@@ -29,7 +29,7 @@ VERIFY_RESEND_SECONDS = 60
 SUPPORT_URL = 'https://thewoddi.org/contact.html'
 RESET_RETRY_SESSION_KEY = 'reset_retry_proof'
 RESET_FLOW_QUERY_KEY = 'reset_flow'
-EXPLICIT_LOCALE_SESSION_KEY = 'explicit_locale_selection'
+EXPLICIT_LOCALE_COOKIE = 'wdos_explicit_language'
 
 
 def _locale(request):
@@ -75,8 +75,6 @@ def _workspace_destination(account):
 
 def page(request, screen, title, lede, form=None, action=None, **extra):
     lang = _locale(request)
-    if request.GET.get('lang') in LANGUAGES:
-        request.session[EXPLICIT_LOCALE_SESSION_KEY] = request.GET['lang']
     translations = catalog(lang)
     if form is not None:
         form.label_suffix = ''
@@ -95,7 +93,11 @@ def page(request, screen, title, lede, form=None, action=None, **extra):
         'translations': translations,
         **extra,
     }
-    return _set_locale_cookie(render(request, 'accounts/auth.html', values), lang)
+    response = _set_locale_cookie(render(request, 'accounts/auth.html', values), lang)
+    if request.GET.get('lang') in LANGUAGES:
+        response.set_cookie(EXPLICIT_LOCALE_COOKIE, request.GET['lang'], max_age=LOCALE_COOKIE_AGE,
+                            httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax')
+    return response
 
 
 def rate(request, scope, identity=''):
@@ -191,7 +193,7 @@ def register(request):
 
 def establish(request, account, mfa=False, remember=False):
     lang = _locale(request)
-    explicit_lang = request.session.pop(EXPLICIT_LOCALE_SESSION_KEY, None)
+    explicit_lang = request.COOKIES.get(EXPLICIT_LOCALE_COOKIE)
     persisted_lang = (
         OnboardingDraft.objects.filter(
             account=account, state='accepted', membership__isnull=False,

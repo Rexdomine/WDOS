@@ -1,0 +1,114 @@
+{
+  "candidate": "ecaa21bdf8fa76a2e3c9a019ffee6faa95b22831",
+  "reference": "WDOS Complete UI Review v1 CORE-01",
+  "captures": [
+    {
+      "state": "meetings",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "locale": "en-desktop",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-en-desktop-meetings-ecaa21b.png",
+      "sha256": "60fae5b730c7a5e958bc50adcc6e866611bab82b0cdd606e82bed546de8371ea",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-en-desktop-meetings-ecaa21b-comparison.png",
+      "reference_sha256": "9362fa5555c996cf38f7d2a1dc1672811e82d9149ad3675f17d9a1e5911e0272"
+    },
+    {
+      "state": "messages",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "locale": "en-desktop",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-en-desktop-messages-ecaa21b.png",
+      "sha256": "2cf366f7d95fde57cfa2adfa8f904c2d9299c8e9989b9ece41c05ca922ad74dc",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-en-desktop-messages-ecaa21b-comparison.png",
+      "reference_sha256": "9362fa5555c996cf38f7d2a1dc1672811e82d9149ad3675f17d9a1e5911e0272"
+    },
+    {
+      "state": "home-reset",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "locale": "en-desktop",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-en-desktop-home-reset-ecaa21b.png",
+      "sha256": "89d16ee6601965c0c6651e0bf362517d131ecc1b624482b2ff486a316e47f4d1",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-en-desktop-home-reset-ecaa21b-comparison.png",
+      "reference_sha256": "9362fa5555c996cf38f7d2a1dc1672811e82d9149ad3675f17d9a1e5911e0272"
+    },
+    {
+      "state": "meetings",
+      "viewport": [
+        390,
+        844
+      ],
+      "locale": "en-mobile",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-en-mobile-meetings-ecaa21b.png",
+      "sha256": "2a5a868092398eaee2984effcad1a0703fc2440b93621ebd5cfa10223e459f95",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-en-mobile-meetings-ecaa21b-comparison.png",
+      "reference_sha256": "d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252"
+    },
+    {
+      "state": "messages",
+      "viewport": [
+        390,
+        844
+      ],
+      "locale": "en-mobile",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-en-mobile-messages-ecaa21b.png",
+      "sha256": "8259dd66c8d809efdc7e25a69f95357b480cef3d1ae04a79d6073af3b16643d8",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-en-mobile-messages-ecaa21b-comparison.png",
+      "reference_sha256": "d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252"
+    },
+    {
+      "state": "home-reset",
+      "viewport": [
+        390,
+        844
+      ],
+      "locale": "en-mobile",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-en-mobile-home-reset-ecaa21b.png",
+      "sha256": "b3da21459ae6f99cefab251bc91b495c62beb85eac464711393082393f30c648",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-en-mobile-home-reset-ecaa21b-comparison.png",
+      "reference_sha256": "d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252"
+    },
+    {
+      "state": "meetings",
+      "viewport": [
+        390,
+        844
+      ],
+      "locale": "ar-mobile",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-ar-mobile-meetings-ecaa21b.png",
+      "sha256": "73fa73760b0244a144ffe6413b904b9d4e2c991cf4b2560869cf1b9fec0b2c6f",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-ar-mobile-meetings-ecaa21b-comparison.png",
+      "reference_sha256": "d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252"
+    },
+    {
+      "state": "messages",
+      "viewport": [
+        390,
+        844
+      ],
+      "locale": "ar-mobile",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-ar-mobile-messages-ecaa21b.png",
+      "sha256": "a09c09367efdd74999ac12f1d73c5ade6c52df270e7bd001d745732b0958d6a8",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-ar-mobile-messages-ecaa21b-comparison.png",
+      "reference_sha256": "d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252"
+    },
+    {
+      "state": "home-reset",
+      "viewport": [
+        390,
+        844
+      ],
+      "locale": "ar-mobile",
+      "path": "docs/stage-03-evidence/captures/foundation-nav-ar-mobile-home-reset-ecaa21b.png",
+      "sha256": "affb627cdfeecda2565535c640357a46ccdbdf3849c6b07c0f121f33e01acb08",
+      "comparison": "docs/stage-03-evidence/comparisons/foundation-nav-ar-mobile-home-reset-ecaa21b-comparison.png",
+      "reference_sha256": "d34274fc7e33d568c2a0becd8d46aeda0af6cce271d916d172ed4a2d3a905252"
+    }
+  ]
+}

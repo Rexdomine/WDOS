@@ -1,5 +1,7 @@
 import io
+from pathlib import Path
 from PIL import Image
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from . import test_flows as helpers
@@ -13,6 +15,10 @@ class OnboardingUITests(TestCase):
 
     def setUp(self):
         self.account=self.create(); self.login(self.account)
+
+    def test_motion_preference_has_breathing_room_after_checkbox(self):
+        css = (Path(settings.BASE_DIR) / 'accounts/static/accounts/onboarding.css').read_text()
+        self.assertIn('.checkbox-control{min-height:44px;padding:12px;display:flex;align-items:center;gap:16px', css)
 
     def test_supported_locale_renders_onboarding_copy_direction_and_persists(self):
         from .locale import LANGUAGES, catalog

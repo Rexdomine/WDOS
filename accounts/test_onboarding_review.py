@@ -113,7 +113,7 @@ class ReviewTests(TestCase):
         self.assertNotContains(response, 'disabled aria-disabled="true"')
         dashboard = self.client.get('/app')
         self.assertEqual(dashboard.status_code, 200)
-        self.assertContains(dashboard, 'A shared platform foundation.')
+        self.assertContains(dashboard, 'Your workspace')
 
     def test_review_needed_first_use_keeps_correction_links_editable(self):
         self.login(self.account)

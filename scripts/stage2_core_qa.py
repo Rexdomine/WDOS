@@ -144,7 +144,7 @@ def run(browser,base,out,record,fixtures):
             assert p.locator('main a[href*="help"]').count()>0,'no actionable lost-factor support'
             capture(p,'mfa-challenge-'+label)
             p.locator('#id_code').fill(recovery[0]);submit(p)
-            assert '/auth/status/' in p.url
+            assert '/onboarding/' in p.url
             assert RecoveryCode.objects.get(account=staff,digest=services.digest(recovery[0])).used_at
             capture(p,'mfa-recovered-'+label)
             sessionid=next(x['value'] for x in c.cookies() if x['name']=='sessionid')

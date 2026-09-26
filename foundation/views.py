@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from .models import Role
 from accounts.models import OnboardingDraft
+from accounts.locale import LANGUAGES, catalog
 
 
 def health(request):
@@ -51,6 +52,42 @@ def app_shell(request):
         ).exists()
     ):
         return redirect('/auth/status/')
+    draft = OnboardingDraft.objects.select_related('membership').get(
+        account=account,
+        state='accepted',
+        membership__isnull=False,
+    )
+    persisted_lang = (draft.data or {}).get('language')
+    cookie_lang = request.COOKIES.get('wdos_language')
+    lang = next(
+        (
+            candidate
+            for candidate in (
+                cookie_lang if cookie_lang in LANGUAGES and cookie_lang != 'en' else None,
+                request.session.get('wdos_language'),
+                persisted_lang,
+                cookie_lang,
+            )
+            if candidate in LANGUAGES
+        ),
+        'en',
+    )
+    membership = draft.membership
+    display_name = account.display_name or account.email.split('@', 1)[0]
+    initials = ''.join(part[0] for part in display_name.split()[:2]).upper() or 'WD'
+    translations = catalog(lang)
+    status_label = translations['onb_active_membership'] if account.status == 'active' else translations['onb_local_connection_unavailable']
+    activity_label = translations['onb_no_activities']
+    local_home_label = (membership.home or {}).get('label') or translations['onb_local_connection_unavailable']
     return render(request, "foundation/app_shell.html", {
         "environment": os.getenv("WDOS_ENVIRONMENT", "local"),
+        "lang": lang,
+        "direction": LANGUAGES[lang]['dir'],
+        "translations": catalog(lang),
+        "display_name": display_name,
+        "initials": initials,
+        "scope_label": f"{membership.network} / Workspace",
+        "local_home_label": local_home_label,
+        "membership_status": status_label,
+        "activity_status": activity_label,
     })

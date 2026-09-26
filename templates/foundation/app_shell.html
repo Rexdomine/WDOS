@@ -1,30 +1,100 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}" dir="{{ direction }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#000000">
-  <title>WDOS · Foundation</title>
-  <link rel="stylesheet" href="{% static 'foundation/tokens.css' %}">
+  <title>WDOS · {{ translations.onb_workspace_title }}</title>
+  <link rel="stylesheet" href="{% static 'accounts/design.css' %}">
+  <link rel="stylesheet" href="{% static 'accounts/refinements.css' %}">
+  <link rel="stylesheet" href="{% static 'accounts/onboarding.css' %}">
+  <style>html, body { overflow-x: hidden; }</style>
 </head>
-<body>
-  <main class="wdos-shell">
-    <header class="wdos-header">
-      <div class="wdos-brand" aria-label="WODDI Digital Operating System">WDOS</div>
-      <span class="wdos-status">{{ environment|upper }}</span>
-    </header>
-    <section class="wdos-hero" aria-labelledby="page-title">
-      <p class="eyebrow">WODDI DIGITAL OPERATING SYSTEM</p>
-      <h1 id="page-title">A shared platform foundation.</h1>
-      <p class="lede">The delivery spine for governed, auditable network operations.</p>
-      <div class="wdos-card-grid">
-        <article class="wdos-card"><span class="card-label">FRAMEWORK</span><strong>Django</strong><span>Server-rendered foundation</span></article>
-        <article class="wdos-card"><span class="card-label">ENVIRONMENT</span><strong>{{ environment|upper }}</strong><span>Review deployment boundary</span></article>
-        <article class="wdos-card"><span class="card-label">STATUS</span><strong>Ready</strong><span>Health and migration checks active</span></article>
+<body class="foundation-shell">
+  <aside class="sidebar">
+    <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
+    <div class="workspace"><div><b>{{ scope_label }}</b><span>{{ translations.onb_member }}</span></div><span class="icon" aria-hidden="true">›</span></div>
+    <div class="nav-label">{{ translations.onb_workspace }}</div>
+    <a class="navitem active" href="#workspace-home"><span class="icon" aria-hidden="true">⌂</span>{{ translations.onb_home }}</a>
+    <a class="navitem" href="#records-panel" data-record-target="records-panel"><span class="icon" aria-hidden="true">▣</span>{{ translations.onb_activities }}</a>
+    <a class="navitem" href="#meetings-panel" data-workspace-target="meetings-panel"><span class="icon" aria-hidden="true">□</span>{{ translations.onb_meetings }}</a>
+    <a class="navitem" href="#messages-panel" data-workspace-target="messages-panel"><span class="icon" aria-hidden="true">✉</span>{{ translations.onb_messages }}</a>
+    <a class="navitem" href="#help-panel" data-workspace-target="help-panel"><span class="icon" aria-hidden="true">?</span>{{ translations.onb_help }}</a>
+    <a class="navitem" href="#settings-panel" data-workspace-target="settings-panel"><span class="icon" aria-hidden="true">⚙</span>{{ translations.onb_settings }}</a>
+  </aside>
+
+  <div class="mobile-head">
+    <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
+    <div class="right">
+      <div class="profile-menu" data-profile-menu>
+        <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button>
+        <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
+          <strong>{{ display_name }}</strong>
+          <form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form>
+        </div>
       </div>
-    </section>
-    <footer class="wdos-footer">No Woman Is Left Out · Foundation stage</footer>
-  </main>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" aria-label="{{ translations.onb_workspace }}">
+    <a href="#workspace-home" aria-current="page"><span aria-hidden="true">⌂</span>{{ translations.onb_home }}</a>
+    <a href="#records-panel" data-record-target="records-panel"><span aria-hidden="true">▣</span>{{ translations.onb_my_work }}</a>
+    <a href="#meetings-panel" data-workspace-target="meetings-panel"><span aria-hidden="true">□</span>{{ translations.onb_meetings_short }}</a>
+    <a href="#messages-panel" data-workspace-target="messages-panel"><span aria-hidden="true">✉</span>{{ translations.onb_messages }}</a>
+    <a href="#help-panel" data-workspace-target="help-panel"><span aria-hidden="true">⋯</span>{{ translations.onb_more }}</a>
+  </nav>
+
+  <div class="content">
+    <div class="topbar">
+      <div class="breadcrumb">{{ translations.onb_breadcrumb }} <span aria-hidden="true"> / </span>{{ scope_label }}</div>
+      <div class="toptools">
+        <span class="search" data-foundation-search aria-label="{{ translations.onb_search }}"><span class="icon" aria-hidden="true">⌕</span>{{ translations.onb_search }} <small aria-hidden="true">⌘ K</small></span>
+        <span class="icon" data-foundation-notifications role="img" aria-label="{{ translations.account_notifications }}">♧</span>
+        <span class="language" data-foundation-language aria-label="{{ translations.interface_language }}">{{ translations.onb_language }} ▾</span>
+        <div class="profile-menu" data-profile-menu><button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button><div class="profile-menu-panel" data-profile-panel role="menu" hidden><strong>{{ display_name }}</strong><form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out }}</span></button></form></div></div>
+      </div>
+    </div>
+    <main id="workspace-home" aria-labelledby="page-title">
+      <div class="pagehead">
+        <div><div class="eyebrow">{{ scope_label }}</div><h1 id="page-title">{{ translations.onb_workspace_title }}</h1><p>{{ translations.onb_workspace_description }}</p></div>
+        <div class="actions"><a class="btn" href="#workspace-home">{{ translations.onb_view_all }}</a><a class="btn primary" href="#records-panel" data-record-target="records-panel">{{ translations.onb_open_activities }}</a></div>
+      </div>
+      <div class="tabs" id="record-tabs" role="tablist" aria-label="{{ translations.onb_record_tabs }}">
+        <a class="tab active" data-record-tab href="#overview-panel" id="overview-tab" role="tab" aria-selected="true" aria-controls="overview-panel" tabindex="0">{{ translations.onb_overview }}</a>
+        <a class="tab" data-record-tab href="#records-panel" id="records-tab" role="tab" aria-selected="false" aria-controls="records-panel" tabindex="-1">{{ translations.onb_records }}</a>
+        <a class="tab" data-record-tab href="#history-panel" id="history-tab" role="tab" aria-selected="false" aria-controls="history-panel" tabindex="-1">{{ translations.onb_history }}</a>
+      </div>
+      <div class="grid">
+        <section class="panel" id="overview-panel" role="tabpanel" aria-labelledby="overview-tab" tabindex="0">
+          <div class="record-summary"><span class="avatar" aria-hidden="true">⌑</span><div><h2>{{ translations.onb_workspace_title }}</h2><p>{{ scope_label }}</p></div></div>
+          <dl class="definition"><div><dt>{{ translations.onb_membership }}</dt><dd>{{ membership_status }}</dd></div><div><dt>{{ translations.onb_activities }}</dt><dd>{{ activity_status }}</dd></div><div><dt>{{ translations.onb_local_connection }}</dt><dd>{{ local_home_label }}</dd></div><div><dt>{{ translations.interface_language }}</dt><dd>{{ lang }}</dd></div></dl>
+          <div class="records-table-wrap"><table class="records-table"><caption>{{ translations.onb_workspace_records }}</caption><thead><tr><th scope="col">{{ translations.onb_record }}</th><th scope="col">{{ translations.onb_status_label }}</th><th scope="col">{{ translations.onb_next_action }}</th></tr></thead><tbody><tr><th scope="row">{{ translations.onb_membership }}</th><td>{{ membership_status }}</td><td>{{ translations.onb_review_workspace }}</td></tr><tr><th scope="row">{{ translations.onb_activities }}</th><td>{{ activity_status }}</td><td>{{ translations.onb_open_activities }}</td></tr></tbody></table></div>
+          <p class="notice">{{ translations.onb_keep_membership_context }}</p>
+        </section>
+        <section class="panel related-information-panel" id="records-panel" role="tabpanel" aria-labelledby="records-tab" tabindex="0">
+          <div class="panelhead"><h2>{{ translations.onb_related_information }}</h2></div>
+          <div class="mini-item"><div><h3>{{ translations.onb_local_connection }}</h3><p>{{ local_home_label }}</p><div class="meta">{{ translations.onb_membership }}</div></div></div>
+          <div class="mini-item"><div><h3>{{ translations.onb_help }}</h3><p>{{ translations.onb_support_text }}</p><div class="meta">{{ translations.onb_contact_support }}</div></div></div>
+        </section>
+        <section class="panel" id="history-panel" role="tabpanel" aria-labelledby="history-tab" tabindex="0" hidden>
+          <div class="panelhead"><h2>{{ translations.onb_history }}</h2></div><p>{{ translations.onb_no_messages }}</p>
+        </section>
+        <section class="panel" id="meetings-panel" data-workspace-panel tabindex="0" hidden>
+          <div class="panelhead"><h2>{{ translations.onb_meetings }}</h2></div><p>{{ translations.onb_no_meetings }}</p>
+        </section>
+        <section class="panel" id="messages-panel" data-workspace-panel tabindex="0" hidden>
+          <div class="panelhead"><h2>{{ translations.onb_messages }}</h2></div><p>{{ translations.onb_no_messages }}</p>
+        </section>
+        <section class="panel" id="settings-panel" data-workspace-panel tabindex="0" hidden>
+          <div class="panelhead"><h2>{{ translations.onb_settings }}</h2></div><p>{{ translations.onb_settings_unavailable }}</p>
+        </section>
+        <section class="panel" id="help-panel" data-workspace-panel tabindex="0" hidden>
+          <div class="panelhead"><h2>{{ translations.onb_help }}</h2></div><p>{{ translations.onb_support_text }}</p><div class="meta">{{ translations.onb_contact_support }}</div>
+        </section>
+      </div>
+    </main>
+    <footer>{{ translations.onb_footer }}</footer>
+  </div>
+  <script src="{% static 'accounts/onboarding.js' %}"></script>
 </body>
 </html>

@@ -32,6 +32,17 @@ class AuthFlows(TestCase):
     def login(self, account, client=None):
         return (client or self.client).post('/auth/login/',{'email':account.email,'password':self.password})
 
+    def test_active_login_redirects_directly_to_onboarding(self):
+        account = self.create('direct-onboarding@example.org')
+        response = self.login(account)
+        self.assertRedirects(response, '/onboarding/1/')
+
+    def test_authenticated_root_redirects_to_current_onboarding_step(self):
+        account = self.create('root-session@example.org')
+        self.login(account)
+        response = self.client.get('/')
+        self.assertRedirects(response, '/onboarding/1/')
+
     def test_cookie_less_public_gets_do_not_create_sessions(self):
         before = Session.objects.count()
         paths = ['/', '/auth/login/', '/auth/register/', '/auth/recover/', '/auth/reset/', '/auth/status/']
@@ -417,7 +428,7 @@ class AuthFlows(TestCase):
         b=self.client.post('/auth/recover/',{'email':'unknown@example.org'})
         self.assertEqual(a.context['lede'],b.context['lede'])
         r=self.client.post('/auth/login/?next=https://evil.invalid',{'email':account.email,'password':self.password})
-        self.assertEqual(r.url,'/auth/status/')
+        self.assertEqual(r.url,'/onboarding/1/')
 
     def test_rate_limit_shared_and_resets_at_boundary(self):
         for _ in range(2): self.assertTrue(services.throttle('test','person',limit=2))

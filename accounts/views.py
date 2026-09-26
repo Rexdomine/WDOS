@@ -13,13 +13,14 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_http_methods, require_POST
 
 from . import forms, services
 from .locale import LANGUAGES, catalog, localize_form, logout_preserving_language as django_logout, translate
-from .models import Account, ActionToken
+from .models import Account, ActionToken, OnboardingDraft
 
 
 LOCALE_COOKIE = 'wdos_language'
@@ -28,6 +29,7 @@ VERIFY_RESEND_SECONDS = 60
 SUPPORT_URL = 'https://thewoddi.org/contact.html'
 RESET_RETRY_SESSION_KEY = 'reset_retry_proof'
 RESET_FLOW_QUERY_KEY = 'reset_flow'
+EXPLICIT_LOCALE_COOKIE = 'wdos_explicit_language'
 
 
 def _locale(request):
@@ -62,6 +64,15 @@ def _masked_email(email):
     return (local[:1] + '***' if local else '***') + '@' + masked_domain
 
 
+def _workspace_destination(account):
+    """Route authenticated users without trusting a client-side destination."""
+    from .models import OnboardingDraft
+    draft = OnboardingDraft.objects.filter(account=account).first()
+    if draft and draft.state == 'accepted' and hasattr(draft, 'membership'):
+        return reverse('app-shell')
+    return reverse('onboarding:step', args=[draft.next_step if draft else 1])
+
+
 def page(request, screen, title, lede, form=None, action=None, **extra):
     lang = _locale(request)
     translations = catalog(lang)
@@ -82,7 +93,11 @@ def page(request, screen, title, lede, form=None, action=None, **extra):
         'translations': translations,
         **extra,
     }
-    return _set_locale_cookie(render(request, 'accounts/auth.html', values), lang)
+    response = _set_locale_cookie(render(request, 'accounts/auth.html', values), lang)
+    if request.GET.get('lang') in LANGUAGES:
+        response.set_cookie(EXPLICIT_LOCALE_COOKIE, request.GET['lang'], max_age=LOCALE_COOKIE_AGE,
+                            httponly=False, secure=settings.SESSION_COOKIE_SECURE, samesite='Lax')
+    return response
 
 
 def rate(request, scope, identity=''):
@@ -139,6 +154,9 @@ def _verification_page(request, account, form=None, feedback=None):
 
 @require_http_methods(['GET'])
 def welcome(request):
+    account = getattr(request, 'wdos_account', None)
+    if account:
+        return redirect(_workspace_destination(account))
     return page(request, 'AUTH-01', 'Welcome to WDOS',
                 'Choose how you would like to connect with WODDI today.')
 
@@ -175,6 +193,19 @@ def register(request):
 
 def establish(request, account, mfa=False, remember=False):
     lang = _locale(request)
+    explicit_lang = request.COOKIES.get(EXPLICIT_LOCALE_COOKIE)
+    persisted_lang = (
+        OnboardingDraft.objects.filter(
+            account=account, state='accepted', membership__isnull=False,
+        ).values_list('data', flat=True).first() or {}
+    ).get('language')
+    if (
+        lang == 'en'
+        and explicit_lang != 'en'
+        and persisted_lang in LANGUAGES
+        and persisted_lang != 'en'
+    ):
+        lang = persisted_lang
     django_login(request, account.user, backend='django.contrib.auth.backends.ModelBackend')
     request.session[LOCALE_COOKIE] = lang
     now = timezone.now().timestamp()
@@ -226,7 +257,7 @@ def login(request):
                 else:
                     establish(request, account, remember=form.cleaned_data['remember'])
                     services.audit(account, 'signed_in')
-                    return redirect('accounts:status')
+                    return redirect(_workspace_destination(account))
     return page(
         request, 'AUTH-02', 'Welcome back',
         'Use your WDOS account email and password to continue securely.',
@@ -509,9 +540,9 @@ def mfa(request):
                         return page(
                             request, 'AUTH-08', 'Save your recovery codes',
                             'Each code works once. These codes are shown only now. Store them privately.',
-                            codes=result,
+                            codes=result, workspace_url=_workspace_destination(account),
                         )
-                    return redirect('accounts:status')
+                    return redirect(_workspace_destination(account))
         if form.is_bound:
             form.add_error(None, 'This code could not be verified. Try a fresh authenticator code or an unused recovery code.')
 
@@ -602,12 +633,28 @@ def status(request):
         'signed_out': ('Sign in required', 'Sign in to check your account. Restricted records are never shown here.', 'login'),
     }
     status_title, status_text, status_action = variants.get(notice, variants['signed_out'])
+    lang = _locale(request)
+    translations = catalog(lang)
+    action_labels = {
+        'verify': translations.get('verify_action', ''),
+        'help': translations.get('get_support', ''),
+        'login': translations.get('sign_in_again', ''),
+        'invitation': translations.get('claim', ''),
+    }
+    next_step = action_labels.get(status_action) or translations.get(
+        'continue_account' if account and account.person_id else 'continue', ''
+    )
+    status_explainer_text = (
+        f"{translations.get('status_explainer', '')} {translate(lang, status_title)}. "
+        f"{next_step}"
+    )
     return page(
         request, 'AUTH-09', 'Check your access status',
         'Your account status and safest next step are shown without exposing restricted records.',
         account=account, status_kind=notice,
-        status_title=translate(_locale(request), status_title),
-        status_text=translate(_locale(request), status_text),
+        status_title=translate(lang, status_title),
+        status_text=translate(lang, status_text),
+        status_explainer_text=status_explainer_text,
         status_action=status_action, onboarding_available=bool(account),
     )
 

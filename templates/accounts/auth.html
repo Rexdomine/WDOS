@@ -62,6 +62,10 @@
           <span class="state-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l9 4c0 8-3 12-9 15C6 19 3 15 3 7z M8 12l3 3 5-6"/></svg></span>
           <h2>{{ status_title }}</h2>
           <p>{{ status_text }}</p>
+          <details class="status-explainer" data-status-explainer>
+            <summary aria-label="{{ translations.status_explainer }}">ⓘ</summary>
+            <div class="status-explainer-popup" role="note">{{ status_explainer_text }}</div>
+          </details>
           {% if onboarding_available %}<a class="btn primary" href="{% url 'onboarding:start' %}">{% include 'accounts/arrow.html' %}{{ translations.continue }}</a>{% endif %}
           {% if status_action == 'verify' %}
             <a class="btn primary" href="{% url 'accounts:verify' %}">{% include 'accounts/arrow.html' %}{{ translations.verify_action }}</a>
@@ -187,7 +191,7 @@
 
       {% if codes %}
         <ul class="recovery-codes">{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
-        <a class="btn primary" href="{% url 'accounts:status' %}">{% include 'accounts/arrow.html' %}{{ translations.saved_codes }}</a>
+        <a class="btn primary" href="{{ workspace_url|default_if_none:'' }}">{% include 'accounts/arrow.html' %}{{ translations.saved_codes }}</a>
       {% endif %}
 
       {% if recovery_requested %}

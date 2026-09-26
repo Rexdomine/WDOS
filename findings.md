@@ -8,6 +8,15 @@
 
 ## Resume evidence
 NightWing report /opt/data/cache/delegation/subagent-summary-0-20260924_113820_791999.txt identifies onboarding_review.py account lock versus invite_person.py person lock: concurrent invitation issuance can strand identity. Minimum proof is real PostgreSQL two-connection race in both winning orders. Earlier gap-audit base-only snapshot is stale. Approved-reference visual deviations and policy-input blockers remain unresolved.
+
+## Post-merge auth navigation diagnosis — 2026-09-25
+- Live GitHub readback: historical Stage 3 PR #4 is merged/closed; current `origin/staging` is `903f3bf3437186a3d5b43c8c1a91a6705c3729c3`. A fresh `fix/stage3-auth-navigation` branch is required for the user-requested repair.
+- `accounts.views.login` establishes a real Django session, then redirects every active non-MFA user to `/auth/status/`; `accounts.views.status` exposes the onboarding link only via a generic status card. This produces the reported extra click and unclear post-login handoff.
+- `/` always renders public `AUTH-01` (`accounts.views.welcome`) without checking an existing authenticated account, so an active session can appear to be lost when it is actually ignored by root routing.
+- `/foundation/`/`/app` correctly deny the app shell until an accepted onboarding draft with membership exists, then redirect to `/auth/status/`; this approval boundary must remain intact.
+- The secure server-side logout endpoint exists (`POST /auth/logout/` with CSRF) but the onboarding shell/profile UI exposes no logout control; the profile label is not an account menu.
+- Production session cookies are intentionally `Secure`, `HttpOnly`, `SameSite=Lax`; a plain HTTP test origin will not send that cookie. Do not loosen production cookie defaults to mask local routing behavior.
+- User requested: branded access-status explainer, direct correct post-login route, visible logout, session-aware root behavior, fresh PR for Rex review/merge.
 - WDOS-21 / WDOS-3 verified In Progress; kickoff comment 10102. Stage2 WDOS-20 verified Done.
 - Base staging bc9d346d800aa1b1bb244026d3448992ca288869; isolated branch feat/stage-03-onboarding.
 - Drax CLI sandbox denied namespace creation. Rex explicitly authorized direct Groot implementation; no sandbox/kernel policy changed.

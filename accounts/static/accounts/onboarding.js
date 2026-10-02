@@ -30,6 +30,8 @@
     // DOMParser scripts are inert: bind the new authoritative form explicitly.
     initializeOnboarding();
     initializeProfileMenus();
+    initializePhotoControls();
+    initializeGeographyDropdowns();
   };
   const recover = async () => {
     if (pending) return;
@@ -192,5 +194,159 @@ function initializeRecordTabs() {
   else activate(initialTab);
 }
 
+function initializePhotoControls() {
+  document.querySelectorAll('.photo-control').forEach((control) => {
+    const input = control.querySelector('input[type="file"]');
+    const preview = control.querySelector('[data-photo-preview]');
+    const nameLabel = control.querySelector('[data-photo-name]');
+    if (!input || !nameLabel) return;
+
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (file) {
+        nameLabel.textContent = file.name;
+        if (preview && file.type.startsWith('image/')) {
+          try {
+            preview.src = URL.createObjectURL(file);
+            preview.hidden = false;
+          } catch (_) {}
+        }
+      } else {
+        nameLabel.textContent = control.getAttribute('data-default-label') || 'Choose a photo';
+        if (preview && !preview.getAttribute('data-saved-src')) {
+          preview.hidden = true;
+          preview.src = '';
+        } else if (preview && preview.getAttribute('data-saved-src')) {
+          preview.src = preview.getAttribute('data-saved-src');
+        }
+      }
+    });
+  });
+}
+
+function initializeGeographyDropdowns() {
+  const geoScript = document.getElementById("geo-data");
+  if (!geoScript) return;
+
+  let geoData = [];
+  try {
+    geoData = JSON.parse(geoScript.textContent);
+  } catch (_) {
+    return;
+  }
+  if (!Array.isArray(geoData) || geoData.length === 0) return;
+
+  const countrySelect = document.getElementById("id_country");
+  const regionSelect = document.getElementById("id_region");
+  const districtSelect = document.getElementById("id_district");
+  const localHomeInput = document.getElementById("id_local_home");
+
+  if (!countrySelect || !regionSelect || !districtSelect) return;
+
+  const placeholder = "—";
+
+  function populateSelect(select, values, preferredValue) {
+    const prevValue = preferredValue !== undefined ? preferredValue : select.value;
+    select.innerHTML = "";
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = placeholder;
+    select.appendChild(defaultOption);
+
+    let found = false;
+    values.forEach((val) => {
+      const option = document.createElement("option");
+      option.value = val;
+      option.textContent = val;
+      if (val === prevValue) {
+        option.selected = true;
+        found = true;
+      }
+      select.appendChild(option);
+    });
+
+    if (!found && prevValue && !values.includes(prevValue)) {
+      select.value = "";
+    }
+  }
+
+  function updateRegions(preserveSelected) {
+    const selectedCountry = countrySelect.value;
+    const currentRegion = preserveSelected ? regionSelect.value : "";
+    const matchingRegions = Array.from(
+      new Set(
+        geoData
+          .filter((h) => !selectedCountry || h.country === selectedCountry)
+          .map((h) => h.region)
+          .filter(Boolean)
+      )
+    ).sort();
+
+    populateSelect(regionSelect, matchingRegions, currentRegion);
+    updateDistricts(preserveSelected);
+  }
+
+  function updateDistricts(preserveSelected) {
+    const selectedCountry = countrySelect.value;
+    const selectedRegion = regionSelect.value;
+    const currentDistrict = preserveSelected ? districtSelect.value : "";
+    const matchingDistricts = Array.from(
+      new Set(
+        geoData
+          .filter(
+            (h) =>
+              (!selectedCountry || h.country === selectedCountry) &&
+              (!selectedRegion || h.region === selectedRegion)
+          )
+          .map((h) => h.district)
+          .filter(Boolean)
+      )
+    ).sort();
+
+    populateSelect(districtSelect, matchingDistricts, currentDistrict);
+    updateLocalHome();
+  }
+
+  function updateLocalHome() {
+    if (!localHomeInput) return;
+    const selectedCountry = countrySelect.value;
+    const selectedRegion = regionSelect.value;
+    const selectedDistrict = districtSelect.value;
+
+    const matched = geoData.find(
+      (h) =>
+        h.country === selectedCountry &&
+        h.region === selectedRegion &&
+        h.district === selectedDistrict
+    );
+
+    if (matched && matched.label) {
+      localHomeInput.value = matched.label;
+    } else {
+      localHomeInput.value = localHomeInput.getAttribute("data-default-value") || "Pending assignment";
+    }
+  }
+
+  countrySelect.addEventListener("change", () => {
+    updateRegions(false);
+  });
+
+  regionSelect.addEventListener("change", () => {
+    updateDistricts(false);
+  });
+
+  districtSelect.addEventListener("change", () => {
+    updateLocalHome();
+  });
+
+  if (localHomeInput && !localHomeInput.getAttribute("data-default-value")) {
+    localHomeInput.setAttribute("data-default-value", localHomeInput.value || "Pending assignment");
+  }
+
+  updateRegions(true);
+}
+
 initializeProfileMenus();
 initializeRecordTabs();
+initializePhotoControls();
+initializeGeographyDropdowns();

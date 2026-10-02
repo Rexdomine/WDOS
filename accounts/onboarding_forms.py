@@ -72,10 +72,74 @@ class NetworkForm(BaseForm):
 
 
 class GeographyForm(BaseForm):
-    country = forms.CharField(label='Country', max_length=100)
-    region = forms.CharField(label='State / FCT', max_length=100)
-    district = forms.CharField(label='LGA', max_length=100)
+    country = forms.ChoiceField(label='Country', choices=[('', '—')])
+    region = forms.ChoiceField(label='State / FCT', choices=[('', '—')])
+    district = forms.ChoiceField(label='LGA', choices=[('', '—')])
     local_home = forms.CharField(label='Local connection', max_length=150, required=False, disabled=True, initial='Pending assignment')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        policy = current_policy()
+        if policy:
+            homes = policy.get('homes', [])
+            network = None
+            if self.initial and self.initial.get('network'):
+                network = self.initial.get('network')
+            elif self.data and self.data.get('network'):
+                network = self.data.get('network')
+
+            network_homes = [h for h in homes if not network or h.get('network') == network]
+            if not network_homes:
+                network_homes = homes
+
+            countries = sorted(set(h['country'] for h in network_homes if h.get('country')))
+            regions = sorted(set(h['region'] for h in network_homes if h.get('region')))
+            districts = sorted(set(h['district'] for h in network_homes if h.get('district')))
+
+            self.fields['country'].choices = [('', '—')] + [(c, c) for c in countries]
+            self.fields['region'].choices = [('', '—')] + [(r, r) for r in regions]
+            self.fields['district'].choices = [('', '—')] + [(d, d) for d in districts]
+        else:
+            self.fields['country'].choices = [('', '—')]
+            self.fields['region'].choices = [('', '—')]
+            self.fields['district'].choices = [('', '—')]
+            for name in ('country', 'region', 'district'):
+                val = None
+                if self.data and self.data.get(name):
+                    val = self.data.get(name)
+                elif self.initial and self.initial.get(name):
+                    val = self.initial.get(name)
+                if val and (val, val) not in self.fields[name].choices:
+                    self.fields[name].choices.append((val, val))
+
+    def clean(self):
+        data = super().clean()
+        policy = current_policy()
+        if policy:
+            homes = policy.get('homes', [])
+            network = None
+            if self.initial and self.initial.get('network'):
+                network = self.initial.get('network')
+            elif self.data and self.data.get('network'):
+                network = self.data.get('network')
+
+            network_homes = [h for h in homes if not network or h.get('network') == network]
+            if not network_homes:
+                network_homes = homes
+
+            country = data.get('country')
+            region = data.get('region')
+            district = data.get('district')
+
+            matching = [
+                h for h in network_homes
+                if h.get('country') == country
+                and h.get('region') == region
+                and h.get('district') == district
+            ]
+            if not matching and country and region and district:
+                self.add_error('district', 'More information needed')
+        return data
 
 
 class InterestsForm(BaseForm):

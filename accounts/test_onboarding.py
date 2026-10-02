@@ -211,6 +211,47 @@ class OnboardingDraftTests(TestCase):
         self.assertNotContains(response, 'Ikeja')
         self.assertNotContains(response, 'Lagos')
 
+    def test_geography_dropdowns_render_from_policy(self):
+        policy = {
+            'version': 'test-geo-v1', 'approval_reference': 'TEST-GEO',
+            'privacy_notice': 'Test notice', 'review_role': 'reviewer', 'review_function': 'onboarding',
+            'eligibility': [{'code': 'adult', 'label': 'Adult', 'network': 'WGMN', 'basis': 'Attestation'}],
+            'homes': [
+                {'code': 'lagos-1', 'label': 'Lagos Ikeja Chapter', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'},
+                {'code': 'abuja-1', 'label': 'Abuja Chapter', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'FCT', 'district': 'Abuja Municipal', 'kind': 'chapter'},
+            ],
+        }
+        with self.settings(WDOS_ONBOARDING_POLICY=policy):
+            response = self.client.get('/onboarding/4/')
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, '<select name="country"')
+            self.assertContains(response, '<select name="region"')
+            self.assertContains(response, '<select name="district"')
+            self.assertContains(response, '<option value="Nigeria">Nigeria</option>')
+            self.assertContains(response, '<option value="Lagos">Lagos</option>')
+            self.assertContains(response, '<option value="Ikeja">Ikeja</option>')
+            self.assertContains(response, 'id="geo-data"')
+
+    def test_geography_form_validates_matching_home_combination(self):
+        policy = {
+            'version': 'test-geo-v1', 'approval_reference': 'TEST-GEO',
+            'privacy_notice': 'Test notice', 'review_role': 'reviewer', 'review_function': 'onboarding',
+            'eligibility': [{'code': 'adult', 'label': 'Adult', 'network': 'WGMN', 'basis': 'Attestation'}],
+            'homes': [
+                {'code': 'lagos-1', 'label': 'Lagos Ikeja Chapter', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'},
+            ],
+        }
+        with self.settings(WDOS_ONBOARDING_POLICY=policy):
+            # Valid combination advances
+            valid_res = self.save(4, {'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja'})
+            self.assertEqual(valid_res.status_code, 302)
+            draft = OnboardingDraft.objects.get(account=self.account)
+            self.assertEqual(draft.data['district'], 'Ikeja')
+
+            # Invalid combination fails validation
+            invalid_res = self.save(4, {'country': 'Nigeria', 'region': 'Lagos', 'district': 'NonexistentDistrict'}, revision=draft.revision)
+            self.assertEqual(invalid_res.status_code, 422)
+
     def test_optional_consent_not_preselected(self):
         response = self.client.get('/onboarding/6/')
         self.assertContains(response, 'Your preferences, your choice')

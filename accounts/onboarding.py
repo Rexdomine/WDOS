@@ -50,13 +50,32 @@ def render_step(request, number, draft, form, notice=None, status=200):
     if form is not None:
         localize_form(form, lang)
     c = catalog(lang)
+    geo_data = []
+    policy = current_policy()
+    if number == 4 and policy:
+        homes = policy.get('homes', [])
+        network = draft.data.get('network') if draft else None
+        network_homes = [h for h in homes if not network or h.get('network') == network]
+        if not network_homes:
+            network_homes = homes
+        geo_data = [
+            {
+                'country': h['country'],
+                'region': h['region'],
+                'district': h['district'],
+                'label': h.get('label', '')
+            }
+            for h in network_homes
+            if h.get('country') and h.get('region') and h.get('district')
+        ]
     response = render(request, 'onboarding/wizard.html', {
         'account': account, 'form': form, 'step': number,
         'revision': draft.revision if draft else 0,
         'lang': lang, 'direction': LANGUAGES[lang]['dir'], 'screen_id': f'ONB-{number:02d}',
         'initials': ''.join(n[0] for n in account.display_name.split()[:2]),
         'scope_label': c['onb_membership'], 'state_label': c['onb_more_needed'] if draft and draft.state == 'review_needed' else c['onb_ready'] if draft and draft.state == 'accepted' else c['onb_in_progress'],
-        'draft': draft, 'policy': current_policy(), 'tab': tab,
+        'draft': draft, 'policy': policy, 'tab': tab,
+        'geo_data': geo_data,
         'events': draft.events.order_by('-id')[:100] if draft and tab == 'history' else [],
         'consents': draft.consents.order_by('-id')[:100] if draft and tab == 'history' else [],
         'profile_name': (draft.data.get('full_name') or account.display_name) if draft else account.display_name,

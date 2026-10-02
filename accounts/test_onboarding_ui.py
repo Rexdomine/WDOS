@@ -86,6 +86,9 @@ class OnboardingUITests(TestCase):
         self.assertContains(response, 'Amara Ézè')
         self.assertContains(response, 'Local home')
         self.assertContains(response, 'Decision context')
+        self.assertContains(response, 'class="checkbox-control"')
+        self.assertContains(response, 'class="checkbox-box"')
+        self.assertContains(response, 'name="review_confirmed"')
 
     def test_profile_photo_is_private_and_persists(self):
         image=io.BytesIO(); Image.new('RGB',(24,24),'green').save(image,format='PNG')

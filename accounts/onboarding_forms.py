@@ -71,6 +71,76 @@ class NetworkForm(BaseForm):
     eligibility_confirmed = forms.BooleanField(label='Confirm eligibility', help_text='I confirm this information is accurate.')
 
 
+NIGERIA_LOCATIONS = {
+    "Anambra": [
+        "Aguata", "Anambra East", "Anambra West", "Anaocha", "Awka North", "Awka South",
+        "Ayamelum", "Dunukofia", "Ekwusigo", "Idemili North", "Idemili South", "Ihiala",
+        "Njikoka", "Nnewi North", "Nnewi South", "Ogbaru", "Onitsha North", "Onitsha South",
+        "Orumba North", "Orumba South", "Oyi",
+    ],
+    "Delta": [
+        "Aniocha North", "Aniocha South", "Bomadi", "Burutu", "Ethiope East", "Ethiope West",
+        "Ika North East", "Ika South", "Isoko North", "Isoko South", "Ndokwa East", "Ndokwa West",
+        "Okpe", "Oshimili North", "Oshimili South", "Patani", "Sapele", "Udu", "Ughelli North",
+        "Ughelli South", "Ukwuani", "Uvwie", "Warri North", "Warri South", "Warri South West",
+    ],
+    "Edo": [
+        "Akoko-Edo", "Egor", "Esan Central", "Esan North-East", "Esan South-East", "Esan West",
+        "Etsako Central", "Etsako East", "Etsako West", "Igueben", "Ikpoba-Okha", "Orhionmwon",
+        "Oredo", "Ovia North-East", "Ovia South-West", "Owan East", "Owan West", "Uhunmwonde",
+    ],
+    "Enugu": [
+        "Aninri", "Awgu", "Enugu East", "Enugu North", "Enugu South", "Ezeagu", "Igbo Etiti",
+        "Igbo Eze North", "Igbo Eze South", "Isi Uzo", "Nkanu East", "Nkanu West", "Nsukka",
+        "Oji River", "Udenu", "Udi", "Uzo Uwani",
+    ],
+    "FCT (Abuja)": [
+        "Abaji", "Abuja Municipal", "Bwari", "Gwagwalada", "Kuje", "Kwali",
+    ],
+    "Kaduna": [
+        "Birnin Gwari", "Chikun", "Giwa", "Igabi", "Ikara", "Jaba", "Jema'a", "Kachia",
+        "Kaduna North", "Kaduna South", "Kagarko", "Kajuru", "Kaura", "Kauru", "Kubau",
+        "Kudan", "Lere", "Makarfi", "Sabon Gari", "Sanga", "Soba", "Zangon Kataf", "Zaria",
+    ],
+    "Kano": [
+        "Ajingi", "Albasu", "Bagwai", "Bebeji", "Bichi", "Bunkure", "Dala", "Dambatta",
+        "Dawakin Kudu", "Dawakin Tofa", "Doguwa", "Fagge", "Gabasawa", "Garko", "Garun Mallam",
+        "Gaya", "Gezawa", "Gwale", "Gwarzo", "Kabo", "Kano Municipal", "Karaye", "Kibiya",
+        "Kiru", "Kumbotso", "Kunchi", "Kura", "Madobi", "Makoda", "Minjibir", "Nassarawa",
+        "Rano", "Rimin Gado", "Rogo", "Shanono", "Sumaila", "Takai", "Tarauni", "Tofa",
+        "Tsanyawa", "Tudun Wada", "Ungogo", "Warawa", "Wudil",
+    ],
+    "Lagos": [
+        "Agege", "Ajeromi-Ifelodun", "Alimosho", "Amuwo-Odofin", "Apapa", "Badagry", "Epe",
+        "Eti-Osa", "Ibeju-Lekki", "Ifako-Ijaiye", "Ikeja", "Ikorodu", "Kosofe", "Lagos Island",
+        "Lagos Mainland", "Mushin", "Ojo", "Oshodi-Isolo", "Shomolu", "Surulere",
+    ],
+    "Ogun": [
+        "Abeokuta North", "Abeokuta South", "Ado-Odo/Ota", "Ewekoro", "Ifo", "Ijebu East",
+        "Ijebu North", "Ijebu North East", "Ijebu Ode", "Ikenne", "Imeko Afon", "Ipokia",
+        "Obafemi Owode", "Odeda", "Odogbolu", "Ogun Waterside", "Remo North", "Sagamu",
+        "Yewa North", "Yewa South",
+    ],
+    "Oyo": [
+        "Afijio", "Akinyele", "Atiba", "Atisbo", "Egbeda", "Ibadan North", "Ibadan North-East",
+        "Ibadan North-West", "Ibadan South-East", "Ibadan South-West", "Ibarapa Central",
+        "Ibarapa East", "Ibarapa North", "Ido", "Irepo", "Iseyin", "Itesiwaju", "Iwajowa",
+        "Ogbomosho North", "Ogbomosho South", "Ogo Oluwa", "Olorunsogo", "Oluyole", "Ona Ara",
+        "Orelope", "Ori Ire", "Oyo East", "Oyo West", "Saki East", "Saki West", "Surulere",
+    ],
+    "Rivers": [
+        "Abua/Odual", "Ahoada East", "Ahoada West", "Akuku-Toru", "Andoni", "Asari-Toru",
+        "Bonny", "Degema", "Eleme", "Emuoha", "Etche", "Gokana", "Ikwerre", "Khana",
+        "Obio/Akpor", "Ogba/Egbema/Ndoni", "Ogu/Bolo", "Okrika", "Omuma", "Opobo/Nkoro",
+        "Oyigbo", "Port Harcourt", "Tai",
+    ],
+}
+
+DEFAULT_COUNTRIES = [("Nigeria", "Nigeria")]
+DEFAULT_REGIONS = [(s, s) for s in sorted(NIGERIA_LOCATIONS.keys())]
+DEFAULT_DISTRICTS = sorted({lga for lgas in NIGERIA_LOCATIONS.values() for lga in lgas})
+
+
 class GeographyForm(BaseForm):
     country = forms.ChoiceField(label='Country', choices=[('', '—')])
     region = forms.ChoiceField(label='State / FCT', choices=[('', '—')])
@@ -80,65 +150,67 @@ class GeographyForm(BaseForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         policy = current_policy()
-        if policy:
-            homes = policy.get('homes', [])
-            network = None
-            if self.initial and self.initial.get('network'):
-                network = self.initial.get('network')
-            elif self.data and self.data.get('network'):
-                network = self.data.get('network')
+        homes = policy.get('homes', []) if policy else []
+        network = None
+        if self.initial and self.initial.get('network'):
+            network = self.initial.get('network')
+        elif self.data and self.data.get('network'):
+            network = self.data.get('network')
 
-            network_homes = [h for h in homes if not network or h.get('network') == network]
-            if not network_homes:
-                network_homes = homes
+        network_homes = [h for h in homes if not network or h.get('network') == network] if homes else []
+        if not network_homes and homes:
+            network_homes = homes
 
-            countries = sorted(set(h['country'] for h in network_homes if h.get('country')))
-            regions = sorted(set(h['region'] for h in network_homes if h.get('region')))
-            districts = sorted(set(h['district'] for h in network_homes if h.get('district')))
+        countries = sorted(set(h['country'] for h in network_homes if h.get('country'))) if network_homes else []
+        regions = sorted(set(h['region'] for h in network_homes if h.get('region'))) if network_homes else []
+        districts = sorted(set(h['district'] for h in network_homes if h.get('district'))) if network_homes else []
 
+        if countries:
             self.fields['country'].choices = [('', '—')] + [(c, c) for c in countries]
             self.fields['region'].choices = [('', '—')] + [(r, r) for r in regions]
             self.fields['district'].choices = [('', '—')] + [(d, d) for d in districts]
         else:
-            self.fields['country'].choices = [('', '—')]
-            self.fields['region'].choices = [('', '—')]
-            self.fields['district'].choices = [('', '—')]
-            for name in ('country', 'region', 'district'):
-                val = None
-                if self.data and self.data.get(name):
-                    val = self.data.get(name)
-                elif self.initial and self.initial.get(name):
-                    val = self.initial.get(name)
-                if val and (val, val) not in self.fields[name].choices:
-                    self.fields[name].choices.append((val, val))
+            self.fields['country'].choices = [('', '—')] + DEFAULT_COUNTRIES
+            self.fields['region'].choices = [('', '—')] + DEFAULT_REGIONS
+            self.fields['district'].choices = [('', '—')] + [(d, d) for d in DEFAULT_DISTRICTS]
+
+        for name in ('country', 'region', 'district'):
+            val = None
+            if self.data and self.data.get(name):
+                val = self.data.get(name)
+            elif self.initial and self.initial.get(name):
+                val = self.initial.get(name)
+            if val and (val, val) not in self.fields[name].choices:
+                self.fields[name].choices.append((val, val))
 
     def clean(self):
         data = super().clean()
         policy = current_policy()
         if policy:
             homes = policy.get('homes', [])
-            network = None
-            if self.initial and self.initial.get('network'):
-                network = self.initial.get('network')
-            elif self.data and self.data.get('network'):
-                network = self.data.get('network')
+            if homes:
+                network = None
+                if self.initial and self.initial.get('network'):
+                    network = self.initial.get('network')
+                elif self.data and self.data.get('network'):
+                    network = self.data.get('network')
 
-            network_homes = [h for h in homes if not network or h.get('network') == network]
-            if not network_homes:
-                network_homes = homes
+                network_homes = [h for h in homes if not network or h.get('network') == network]
+                if not network_homes:
+                    network_homes = homes
 
-            country = data.get('country')
-            region = data.get('region')
-            district = data.get('district')
+                country = data.get('country')
+                region = data.get('region')
+                district = data.get('district')
 
-            matching = [
-                h for h in network_homes
-                if h.get('country') == country
-                and h.get('region') == region
-                and h.get('district') == district
-            ]
-            if not matching and country and region and district:
-                self.add_error('district', 'More information needed')
+                matching = [
+                    h for h in network_homes
+                    if h.get('country') == country
+                    and h.get('region') == region
+                    and h.get('district') == district
+                ]
+                if not matching and country and region and district:
+                    self.add_error('district', 'More information needed')
         return data
 
 

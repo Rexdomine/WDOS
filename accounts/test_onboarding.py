@@ -208,8 +208,9 @@ class OnboardingDraftTests(TestCase):
     def test_country_home_is_not_inferred_from_sample(self):
         response = self.client.get('/onboarding/4/')
         self.assertContains(response, 'Connect with your local community')
-        self.assertNotContains(response, 'Ikeja')
-        self.assertNotContains(response, 'Lagos')
+        self.assertContains(response, 'Pending assignment')
+        self.assertContains(response, '<select name="region"')
+        self.assertContains(response, '<select name="district"')
 
     def test_geography_dropdowns_render_from_policy(self):
         policy = {

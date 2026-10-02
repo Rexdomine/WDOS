@@ -52,22 +52,35 @@ def render_step(request, number, draft, form, notice=None, status=200):
     c = catalog(lang)
     geo_data = []
     policy = current_policy()
-    if number == 4 and policy:
-        homes = policy.get('homes', [])
-        network = draft.data.get('network') if draft else None
-        network_homes = [h for h in homes if not network or h.get('network') == network]
-        if not network_homes:
-            network_homes = homes
-        geo_data = [
-            {
-                'country': h['country'],
-                'region': h['region'],
-                'district': h['district'],
-                'label': h.get('label', '')
-            }
-            for h in network_homes
-            if h.get('country') and h.get('region') and h.get('district')
-        ]
+    if number == 4:
+        if policy and policy.get('homes'):
+            homes = policy.get('homes', [])
+            network = draft.data.get('network') if draft else None
+            network_homes = [h for h in homes if not network or h.get('network') == network]
+            if not network_homes:
+                network_homes = homes
+            geo_data = [
+                {
+                    'country': h['country'],
+                    'region': h['region'],
+                    'district': h['district'],
+                    'label': h.get('label', '')
+                }
+                for h in network_homes
+                if h.get('country') and h.get('region') and h.get('district')
+            ]
+        if not geo_data:
+            from .onboarding_forms import NIGERIA_LOCATIONS
+            geo_data = [
+                {
+                    'country': 'Nigeria',
+                    'region': state,
+                    'district': lga,
+                    'label': f'{state} Chapter ({lga})'
+                }
+                for state, lgas in NIGERIA_LOCATIONS.items()
+                for lga in lgas
+            ]
     response = render(request, 'onboarding/wizard.html', {
         'account': account, 'form': form, 'step': number,
         'revision': draft.revision if draft else 0,

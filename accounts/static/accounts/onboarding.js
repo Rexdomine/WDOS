@@ -343,6 +343,10 @@ function initializeGeographyDropdowns() {
     localHomeInput.setAttribute("data-default-value", localHomeInput.value || "Pending assignment");
   }
 
+  if (countrySelect && !countrySelect.value && countrySelect.options.length === 2) {
+    countrySelect.selectedIndex = 1;
+  }
+
   updateRegions(true);
 }
 

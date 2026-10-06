@@ -228,29 +228,54 @@ function initializeGeographyDropdowns() {
   const geoScript = document.getElementById("geo-data");
   if (!geoScript) return;
 
-  let geoData = [];
+  let parsedData = null;
   try {
-    geoData = JSON.parse(geoScript.textContent);
+    parsedData = JSON.parse(geoScript.textContent);
   } catch (_) {
     return;
   }
-  if (!Array.isArray(geoData) || geoData.length === 0) return;
+  if (!parsedData) return;
 
   const countrySelect = document.getElementById("id_country");
   const regionSelect = document.getElementById("id_region");
   const districtSelect = document.getElementById("id_district");
   const localHomeInput = document.getElementById("id_local_home");
+  const regionLabel = document.querySelector('label[for="id_region"]');
+  const districtLabel = document.querySelector('label[for="id_district"]');
 
-  if (!countrySelect || !regionSelect || !districtSelect) return;
+  if (!countrySelect || !regionSelect) return;
+
+  const countriesList = parsedData.countries || [];
+  const nigeriaDistricts = parsedData.nigeria_districts || {};
+  const homesList = Array.isArray(parsedData) ? parsedData : (parsedData.homes || []);
 
   const placeholder = "—";
 
-  function populateSelect(select, values, preferredValue) {
+  function getCountryRecord(countryVal) {
+    if (!countryVal) return null;
+    const lower = countryVal.toLowerCase();
+    return countriesList.find((c) => c.name.toLowerCase() === lower || c.code.toLowerCase() === lower) || null;
+  }
+
+  function updateFieldLabels(countryRecord) {
+    if (regionLabel) {
+      regionLabel.textContent = countryRecord && countryRecord.admin_label
+        ? countryRecord.admin_label
+        : "State / Region / Province";
+    }
+    if (districtLabel) {
+      districtLabel.textContent = countryRecord && countryRecord.local_label
+        ? countryRecord.local_label
+        : "Local government / District";
+    }
+  }
+
+  function populateSelect(select, values, preferredValue, emptyPlaceholder) {
     const prevValue = preferredValue !== undefined ? preferredValue : select.value;
     select.innerHTML = "";
     const defaultOption = document.createElement("option");
     defaultOption.value = "";
-    defaultOption.textContent = placeholder;
+    defaultOption.textContent = emptyPlaceholder !== undefined ? emptyPlaceholder : placeholder;
     select.appendChild(defaultOption);
 
     let found = false;
@@ -272,38 +297,77 @@ function initializeGeographyDropdowns() {
 
   function updateRegions(preserveSelected) {
     const selectedCountry = countrySelect.value;
-    const currentRegion = preserveSelected ? regionSelect.value : "";
-    const matchingRegions = Array.from(
-      new Set(
-        geoData
-          .filter((h) => !selectedCountry || h.country === selectedCountry)
-          .map((h) => h.region)
-          .filter(Boolean)
-      )
-    ).sort();
+    const countryRecord = getCountryRecord(selectedCountry);
+    updateFieldLabels(countryRecord);
 
-    populateSelect(regionSelect, matchingRegions, currentRegion);
+    const currentRegion = preserveSelected ? regionSelect.value : "";
+
+    if (!selectedCountry) {
+      populateSelect(regionSelect, [], "", "— Select country first —");
+      if (districtSelect) {
+        populateSelect(districtSelect, [], "", "—");
+      }
+      updateLocalHome();
+      return;
+    }
+
+    let matchingRegions = [];
+    if (countryRecord && countryRecord.regions && countryRecord.regions.length > 0) {
+      matchingRegions = countryRecord.regions.map((r) => r.name);
+    } else {
+      matchingRegions = Array.from(
+        new Set(
+          homesList
+            .filter((h) => !selectedCountry || h.country === selectedCountry)
+            .map((h) => h.region)
+            .filter(Boolean)
+        )
+      ).sort();
+    }
+
+    if (matchingRegions.length === 0) {
+      populateSelect(regionSelect, [], "", "— No administrative divisions available —");
+    } else {
+      populateSelect(regionSelect, matchingRegions, currentRegion, placeholder);
+    }
+
     updateDistricts(preserveSelected);
   }
 
   function updateDistricts(preserveSelected) {
+    if (!districtSelect) return;
     const selectedCountry = countrySelect.value;
     const selectedRegion = regionSelect.value;
     const currentDistrict = preserveSelected ? districtSelect.value : "";
-    const matchingDistricts = Array.from(
-      new Set(
-        geoData
-          .filter(
-            (h) =>
-              (!selectedCountry || h.country === selectedCountry) &&
-              (!selectedRegion || h.region === selectedRegion)
-          )
-          .map((h) => h.district)
-          .filter(Boolean)
-      )
-    ).sort();
 
-    populateSelect(districtSelect, matchingDistricts, currentDistrict);
+    if (!selectedRegion) {
+      populateSelect(districtSelect, [], "", "—");
+      updateLocalHome();
+      return;
+    }
+
+    let matchingDistricts = [];
+    if (selectedCountry && selectedCountry.toLowerCase() === "nigeria" && nigeriaDistricts[selectedRegion]) {
+      matchingDistricts = nigeriaDistricts[selectedRegion];
+    }
+
+    const homeDistricts = homesList
+      .filter(
+        (h) =>
+          (!selectedCountry || h.country === selectedCountry) &&
+          (!selectedRegion || h.region === selectedRegion)
+      )
+      .map((h) => h.district)
+      .filter(Boolean);
+
+    const allDistricts = Array.from(new Set([...matchingDistricts, ...homeDistricts])).sort();
+
+    if (allDistricts.length === 0) {
+      populateSelect(districtSelect, [], "", "— None available —");
+    } else {
+      populateSelect(districtSelect, allDistricts, currentDistrict, placeholder);
+    }
+
     updateLocalHome();
   }
 
@@ -311,13 +375,13 @@ function initializeGeographyDropdowns() {
     if (!localHomeInput) return;
     const selectedCountry = countrySelect.value;
     const selectedRegion = regionSelect.value;
-    const selectedDistrict = districtSelect.value;
+    const selectedDistrict = districtSelect ? districtSelect.value : "";
 
-    const matched = geoData.find(
+    const matched = homesList.find(
       (h) =>
         h.country === selectedCountry &&
         h.region === selectedRegion &&
-        h.district === selectedDistrict
+        (!selectedDistrict || h.district === selectedDistrict)
     );
 
     if (matched && matched.label) {
@@ -335,16 +399,14 @@ function initializeGeographyDropdowns() {
     updateDistricts(false);
   });
 
-  districtSelect.addEventListener("change", () => {
-    updateLocalHome();
-  });
+  if (districtSelect) {
+    districtSelect.addEventListener("change", () => {
+      updateLocalHome();
+    });
+  }
 
   if (localHomeInput && !localHomeInput.getAttribute("data-default-value")) {
     localHomeInput.setAttribute("data-default-value", localHomeInput.value || "Pending assignment");
-  }
-
-  if (countrySelect && !countrySelect.value && countrySelect.options.length === 2) {
-    countrySelect.selectedIndex = 1;
   }
 
   updateRegions(true);

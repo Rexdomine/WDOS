@@ -5,6 +5,13 @@ from PIL import Image, UnidentifiedImageError
 from django import forms
 from .onboarding_policy import current_policy
 from .locale import LANGUAGES
+from .african_geography import (
+    AFRICAN_COUNTRIES,
+    find_region_in_country,
+    get_african_countries_choices,
+    get_country,
+    get_country_regions,
+)
 
 
 class BaseForm(forms.Form):
@@ -136,16 +143,28 @@ NIGERIA_LOCATIONS = {
     ],
 }
 
-DEFAULT_COUNTRIES = [("Nigeria", "Nigeria")]
+DEFAULT_COUNTRIES = get_african_countries_choices()
+NIGERIA_LOCATIONS["FCT"] = NIGERIA_LOCATIONS.get("FCT (Abuja)", [])
 DEFAULT_REGIONS = [(s, s) for s in sorted(NIGERIA_LOCATIONS.keys())]
 DEFAULT_DISTRICTS = sorted({lga for lgas in NIGERIA_LOCATIONS.values() for lga in lgas})
 
 
 class GeographyForm(BaseForm):
     country = forms.ChoiceField(label='Country', choices=[('', '—')])
-    region = forms.ChoiceField(label='State / FCT', choices=[('', '—')])
-    district = forms.ChoiceField(label='LGA', choices=[('', '—')])
+    region = forms.ChoiceField(label='State / Region / Province', choices=[('', '—')])
+    district = forms.ChoiceField(label='Local government / District', choices=[('', '—')], required=False)
+    community_cluster = forms.CharField(
+        label='Community cluster',
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'e.g. Central Community Cluster'}),
+        help_text='Your local community cluster or neighborhood',
+    )
     local_home = forms.CharField(label='Local connection', max_length=150, required=False, disabled=True, initial='Pending assignment')
+    country_id = forms.CharField(widget=forms.HiddenInput(), required=False)
+    country_name = forms.CharField(widget=forms.HiddenInput(), required=False)
+    region_id = forms.CharField(widget=forms.HiddenInput(), required=False)
+    region_name = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -161,19 +180,72 @@ class GeographyForm(BaseForm):
         if not network_homes and homes:
             network_homes = homes
 
-        countries = sorted(set(h['country'] for h in network_homes if h.get('country'))) if network_homes else []
-        regions = sorted(set(h['region'] for h in network_homes if h.get('region'))) if network_homes else []
-        districts = sorted(set(h['district'] for h in network_homes if h.get('district'))) if network_homes else []
+        policy_countries = sorted(set(h['country'] for h in network_homes if h.get('country'))) if network_homes else []
+        policy_regions = sorted(set(h['region'] for h in network_homes if h.get('region'))) if network_homes else []
+        policy_districts = sorted(set(h['district'] for h in network_homes if h.get('district'))) if network_homes else []
 
-        if countries:
-            self.fields['country'].choices = [('', '—')] + [(c, c) for c in countries]
-            self.fields['region'].choices = [('', '—')] + [(r, r) for r in regions]
-            self.fields['district'].choices = [('', '—')] + [(d, d) for d in districts]
+        # All 55 African countries selectable plus any custom policy countries
+        all_countries = list(DEFAULT_COUNTRIES)
+        known_country_names = set(c[0] for c in all_countries)
+        for pc in policy_countries:
+            if pc and pc not in known_country_names:
+                all_countries.append((pc, pc))
+        all_countries.sort(key=lambda x: x[0])
+        self.fields['country'].choices = [('', '—')] + all_countries
+
+        # Check currently selected country
+        selected_country = None
+        if self.data and self.data.get('country'):
+            selected_country = self.data.get('country')
+        elif self.initial and self.initial.get('country'):
+            selected_country = self.initial.get('country')
+
+        # Populate region choices and country-appropriate labels
+        if selected_country:
+            c_record = get_country(selected_country)
+            if c_record:
+                self.fields['region'].label = c_record['admin_label']
+                self.fields['district'].label = c_record['local_label']
+                c_regions = [r[1] for r in c_record['regions']]
+                c_policy_regions = [h['region'] for h in network_homes if h.get('region') and (not h.get('country') or h.get('country') in (selected_country, c_record['name'], c_record['code']))]
+                combined_regions = sorted(set(c_regions + c_policy_regions))
+                self.fields['region'].choices = [('', '—')] + [(r, r) for r in combined_regions]
+            else:
+                combined_regions = sorted(set(policy_regions))
+                self.fields['region'].choices = [('', '—')] + [(r, r) for r in combined_regions]
         else:
-            self.fields['country'].choices = [('', '—')] + DEFAULT_COUNTRIES
-            self.fields['region'].choices = [('', '—')] + DEFAULT_REGIONS
-            self.fields['district'].choices = [('', '—')] + [(d, d) for d in DEFAULT_DISTRICTS]
+            self.fields['region'].label = 'State / Region / Province'
+            self.fields['district'].label = 'Local government / District'
+            combined_regions = sorted(set(policy_regions + [s for s in NIGERIA_LOCATIONS.keys()]))
+            self.fields['region'].choices = [('', '—')] + [(r, r) for r in combined_regions]
 
+        # Determine currently selected region
+        selected_region = None
+        if self.data and self.data.get('region'):
+            selected_region = self.data.get('region')
+        elif self.initial and self.initial.get('region'):
+            selected_region = self.initial.get('region')
+
+        # Populate district choices
+        matching_policy_districts = [
+            h['district'] for h in network_homes
+            if h.get('district') and (not selected_region or h.get('region') == selected_region)
+        ]
+        if selected_country and str(selected_country).lower() in ('nigeria', 'ng'):
+            if selected_region and selected_region in NIGERIA_LOCATIONS:
+                districts_list = sorted(set(NIGERIA_LOCATIONS[selected_region] + matching_policy_districts))
+            else:
+                districts_list = sorted(set(DEFAULT_DISTRICTS + matching_policy_districts))
+        elif matching_policy_districts:
+            districts_list = sorted(set(matching_policy_districts))
+        elif not selected_country:
+            districts_list = DEFAULT_DISTRICTS
+        else:
+            districts_list = []
+
+        self.fields['district'].choices = [('', '—')] + [(d, d) for d in districts_list]
+
+        # Ensure submitted or initial values are always in choices (preserves test payloads)
         for name in ('country', 'region', 'district'):
             val = None
             if self.data and self.data.get(name):
@@ -183,8 +255,54 @@ class GeographyForm(BaseForm):
             if val and (val, val) not in self.fields[name].choices:
                 self.fields[name].choices.append((val, val))
 
+    def clean_community_cluster(self):
+        val = self.cleaned_data.get('community_cluster', '')
+        if val is None:
+            return ''
+        val = str(val).strip()
+        if val:
+            if len(val) < 2:
+                raise forms.ValidationError('Check the highlighted information')
+            if '<' in val or '>' in val:
+                raise forms.ValidationError('Check the highlighted information')
+        return val
+
     def clean(self):
         data = super().clean()
+        country_input = data.get('country')
+        region_input = data.get('region')
+
+        # Persist stable IDs plus display names
+        country_obj = get_country(country_input) if country_input else None
+        if country_obj:
+            data['country_id'] = country_obj['code']
+            data['country_name'] = country_obj['name']
+            data['country'] = country_obj['name']
+
+            # Validate first-level administrative data
+            if region_input:
+                region_match = find_region_in_country(country_obj['code'], region_input)
+                if region_match:
+                    data['region_id'] = region_match['code']
+                    data['region_name'] = region_match['name']
+                    data['region'] = region_match['name']
+                else:
+                    policy = current_policy()
+                    homes = policy.get('homes', []) if policy else []
+                    policy_regions = [
+                        h.get('region') for h in homes
+                        if h.get('country') in (country_input, country_obj['name'], country_obj['code'])
+                    ]
+                    if region_input not in policy_regions and not any(h.get('region') == region_input for h in homes):
+                        self.add_error('region', 'Check the highlighted information')
+        elif country_input:
+            data['country_id'] = country_input.lower().replace(' ', '-')
+            data['country_name'] = country_input
+            if region_input:
+                data['region_id'] = region_input.lower().replace(' ', '-')
+                data['region_name'] = region_input
+
+        # Policy homes validation
         policy = current_policy()
         if policy:
             homes = policy.get('homes', [])
@@ -207,7 +325,7 @@ class GeographyForm(BaseForm):
                     h for h in network_homes
                     if h.get('country') == country
                     and h.get('region') == region
-                    and h.get('district') == district
+                    and (not h.get('district') or h.get('district') == district)
                 ]
                 if not matching and country and region and district:
                     self.add_error('district', 'More information needed')

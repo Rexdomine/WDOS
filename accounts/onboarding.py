@@ -50,37 +50,45 @@ def render_step(request, number, draft, form, notice=None, status=200):
     if form is not None:
         localize_form(form, lang)
     c = catalog(lang)
-    geo_data = []
+    geo_data = {}
     policy = current_policy()
     if number == 4:
-        if policy and policy.get('homes'):
-            homes = policy.get('homes', [])
-            network = draft.data.get('network') if draft else None
-            network_homes = [h for h in homes if not network or h.get('network') == network]
-            if not network_homes:
-                network_homes = homes
-            geo_data = [
-                {
-                    'country': h['country'],
-                    'region': h['region'],
-                    'district': h['district'],
-                    'label': h.get('label', '')
-                }
-                for h in network_homes
-                if h.get('country') and h.get('region') and h.get('district')
-            ]
-        if not geo_data:
-            from .onboarding_forms import NIGERIA_LOCATIONS
-            geo_data = [
-                {
-                    'country': 'Nigeria',
-                    'region': state,
-                    'district': lga,
-                    'label': f'{state} Chapter ({lga})'
-                }
-                for state, lgas in NIGERIA_LOCATIONS.items()
-                for lga in lgas
-            ]
+        from .african_geography import AFRICAN_COUNTRIES
+        from .onboarding_forms import NIGERIA_LOCATIONS
+
+        homes = policy.get('homes', []) if policy else []
+        network = draft.data.get('network') if draft else None
+        network_homes = [h for h in homes if not network or h.get('network') == network] if homes else []
+        if not network_homes and homes:
+            network_homes = homes
+
+        countries_list = [
+            {
+                'code': c['code'],
+                'name': c['name'],
+                'admin_label': c['admin_label'],
+                'local_label': c['local_label'],
+                'regions': [{'code': r[0], 'name': r[1]} for r in c['regions']],
+            }
+            for c in sorted(AFRICAN_COUNTRIES.values(), key=lambda x: x['name'])
+        ]
+
+        homes_data = [
+            {
+                'country': h['country'],
+                'region': h['region'],
+                'district': h.get('district', ''),
+                'label': h.get('label', ''),
+            }
+            for h in network_homes
+            if h.get('country') and h.get('region')
+        ]
+
+        geo_data = {
+            'countries': countries_list,
+            'nigeria_districts': NIGERIA_LOCATIONS,
+            'homes': homes_data,
+        }
     response = render(request, 'onboarding/wizard.html', {
         'account': account, 'form': form, 'step': number,
         'revision': draft.revision if draft else 0,
@@ -189,7 +197,11 @@ def step(request, step):
         if not draft:
             draft = OnboardingDraft(account=locked)
         # Partial drafts retain validated fields only. Browser-supplied role/person/email are not writable.
-        changes = {key: value for key, value in form.cleaned_data.items() if not form.fields[key].disabled and key != 'photo'}
+        changes = {
+            key: value
+            for key, value in form.cleaned_data.items()
+            if not getattr(form.fields.get(key), 'disabled', False) and key != 'photo'
+        }
         unchanged = bool(draft) and draft.data == {**draft.data, **changes} and not (
             step == 2 and form.cleaned_data.get('photo') is not None
         )

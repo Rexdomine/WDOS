@@ -234,7 +234,7 @@ class Stage3RepairTests(TestCase):
 
     def test_localization_evidence_commits_current_head_desktop_and_mobile_comparisons(self):
         evidence = Path(__file__).parents[1] / 'docs' / 'stage-03-delivery-evidence.md'
-        text = evidence.read_text()
+        text = evidence.read_text(encoding='utf-8')
         self.assertIn('7ddcca2e48bca29d9f31b49585093f94b5315485', text)
         for locale in ('en', 'fr', 'pt', 'ar', 'sw'):
             for viewport in ('desktop', 'mobile'):
@@ -316,7 +316,7 @@ class Stage3RepairTests(TestCase):
 
     def test_foundation_tab_evidence_is_bound_to_current_interaction_candidate(self):
         evidence = Path(__file__).parents[1] / 'docs' / 'stage-03-delivery-evidence.md'
-        text = evidence.read_text()
+        text = evidence.read_text(encoding='utf-8')
         self.assertIn('## Current exact-head tab interaction evidence', text)
         section = text.split('## Current exact-head tab interaction evidence', 1)[1]
         self.assertNotIn('ee70048fe84e06854001e399d92b32ee5f55b2b2', section.split('## ', 1)[0])
@@ -324,7 +324,7 @@ class Stage3RepairTests(TestCase):
 
     def test_foundation_navigation_evidence_contains_distinct_auditable_states(self):
         manifest = Path(__file__).parents[1] / 'docs' / 'stage-03-evidence' / 'manifests' / 'foundation-navigation-ecaa21b.json'
-        data = json.loads(manifest.read_text())
+        data = json.loads(manifest.read_text(encoding='utf-8'))
         self.assertEqual(data['candidate'], 'ecaa21bdf8fa76a2e3c9a019ffee6faa95b22831')
         self.assertEqual({row['state'] for row in data['captures']}, {'meetings', 'messages', 'home-reset'})
         self.assertEqual(len(data['captures']), 9)
@@ -334,7 +334,7 @@ class Stage3RepairTests(TestCase):
 
     def test_foundation_navigation_evidence_is_bound_to_final_candidate_and_comparisons(self):
         evidence_root = Path(__file__).parents[1]
-        text = (evidence_root / 'docs' / 'stage-03-delivery-evidence.md').read_text()
+        text = (evidence_root / 'docs' / 'stage-03-delivery-evidence.md').read_text(encoding='utf-8')
         section = text.split('### Exact implementation-candidate interaction recapture', 1)[1].split('## Release status', 1)[0]
         self.assertIn('ecaa21bdf8fa76a2e3c9a019ffee6faa95b22831', section)
         for name in (

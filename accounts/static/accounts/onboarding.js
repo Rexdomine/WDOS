@@ -438,7 +438,21 @@ function createSearchableSelect(nativeSelect, defaultPlaceholder) {
     if (filtered.length === 0) {
       const empty = document.createElement("div");
       empty.className = "searchable-select-empty";
-      empty.textContent = "No results found";
+      const totalNonEmpty = rawOptions.filter((opt) => opt.value !== "").length;
+      if (totalNonEmpty === 0) {
+        if (nativeSelect.id === "id_district") {
+          const regionEl = document.getElementById("id_region");
+          if (!regionEl || !regionEl.value) {
+            empty.textContent = "Please select a state first";
+          } else {
+            empty.textContent = "No options available";
+          }
+        } else {
+          empty.textContent = "No options available";
+        }
+      } else {
+        empty.textContent = "No results found";
+      }
       optionsList.appendChild(empty);
       return;
     }
@@ -717,8 +731,22 @@ function initializeGeographyDropdowns() {
     }
 
     let matchingDistricts = [];
-    if (selectedCountry && (selectedCountry.toLowerCase() === "nigeria" || selectedCountry.toUpperCase() === "NG") && (nigeriaDistricts[selectedRegion] || nigeriaDistricts[selectedRegion.replace(/ State$/i, "")])) {
-      matchingDistricts = nigeriaDistricts[selectedRegion] || nigeriaDistricts[selectedRegion.replace(/ State$/i, "")];
+    const isNigeria = selectedCountry && (selectedCountry.toLowerCase() === "nigeria" || selectedCountry.toUpperCase() === "NG");
+    if (isNigeria && selectedRegion) {
+      if (nigeriaDistricts[selectedRegion]) {
+        matchingDistricts = nigeriaDistricts[selectedRegion];
+      } else {
+        const cleanReg = selectedRegion.replace(/\s+State$/i, "").trim().toLowerCase();
+        for (const [k, v] of Object.entries(nigeriaDistricts)) {
+          if (k.toLowerCase() === cleanReg || k.replace(/\s+State$/i, "").trim().toLowerCase() === cleanReg) {
+            matchingDistricts = v;
+            break;
+          }
+        }
+        if (matchingDistricts.length === 0 && ["fct", "abuja", "fct (abuja)", "federal capital territory"].includes(cleanReg)) {
+          matchingDistricts = nigeriaDistricts["FCT (Abuja)"] || nigeriaDistricts["FCT"] || [];
+        }
+      }
     }
 
     const homeDistricts = homesList

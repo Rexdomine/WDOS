@@ -410,5 +410,80 @@ class OnboardingGeographyIntegrationTests(TestCase):
         self.assertContains(page4, "Read-only")
         self.assertContains(page4, "Automatically assigned based on your location")
 
+    def test_all_nigerian_states_and_774_lgas_present_in_locations_and_geo_data(self):
+        from .onboarding_forms import NIGERIA_LOCATIONS, get_nigeria_lgas
+        from .african_geography import AFRICAN_COUNTRIES
+        ng_regions = [r[1] for r in AFRICAN_COUNTRIES["Nigeria"]["regions"]]
+        self.assertEqual(len(ng_regions), 37)
+        for state in ng_regions:
+            lgas = get_nigeria_lgas(state)
+            self.assertTrue(len(lgas) > 0, f"State {state} should have LGAs")
+
+        # Verify Akwa Ibom has 31 LGAs including Uyo, Eket, Ikot Ekpene
+        akwa_ibom_lgas = get_nigeria_lgas("Akwa Ibom")
+        self.assertEqual(len(akwa_ibom_lgas), 31)
+        self.assertIn("Uyo", akwa_ibom_lgas)
+        self.assertIn("Eket", akwa_ibom_lgas)
+        self.assertIn("Ikot Ekpene", akwa_ibom_lgas)
+
+        # Total canonical LGAs across all 37 regions must be 774
+        canonical_states = [r[1] for r in AFRICAN_COUNTRIES["Nigeria"]["regions"]]
+        total_lgas = sum(len(NIGERIA_LOCATIONS[s]) for s in canonical_states)
+        self.assertEqual(total_lgas, 774)
+
+        # GET /onboarding/4/ contains Nigeria districts with Akwa Ibom in geo-data
+        page4 = self.client.get("/onboarding/4/")
+        self.assertEqual(page4.status_code, 200)
+        self.assertContains(page4, "Akwa Ibom")
+        self.assertContains(page4, "Uyo")
+
+    def test_step_4_akwa_ibom_populates_lgas_and_saves_valid_submission(self):
+        # Steps 1 to 3
+        self.save(1, {"language": "en", "timezone": "Africa/Lagos", "reading": "standard"}, revision=0)
+        self.save(2, {"full_name": "Idris Elba", "preferred_name": "Idris"}, revision=1)
+        self.save(3, {"network": "WGMN", "eligibility": "pending", "eligibility_confirmed": "on"}, revision=2)
+
+        # GET Step 4 with Akwa Ibom initial data
+        from .onboarding_forms import GeographyForm
+        form = GeographyForm(initial={"country": "Nigeria", "region": "Akwa Ibom"})
+        district_choices = [c[0] for c in form.fields["district"].choices]
+        self.assertIn("Uyo", district_choices)
+        self.assertIn("Eket", district_choices)
+
+        # Step 4 save with Nigeria + Akwa Ibom + Uyo
+        draft = OnboardingDraft.objects.get(account=self.account)
+        response = self.save(
+            4,
+            {
+                "country": "Nigeria",
+                "region": "Akwa Ibom",
+                "district": "Uyo",
+                "community_cluster": "Uyo Central Cluster",
+            },
+            revision=draft.revision,
+        )
+        self.assertRedirects(response, "/onboarding/5/")
+
+        # Verify draft saved Akwa Ibom and Uyo without 422 error
+        draft.refresh_from_db()
+        self.assertEqual(draft.data["country"], "Nigeria")
+        self.assertEqual(draft.data["region"], "Akwa Ibom")
+        self.assertEqual(draft.data["district"], "Uyo")
+        self.assertEqual(draft.data["community_cluster"], "Uyo Central Cluster")
+
+        # Navigate back from Step 5 to Step 4
+        back_res = self.client.post("/onboarding/5/", {
+            "revision": draft.revision,
+            "action": "back",
+        })
+        self.assertRedirects(back_res, "/onboarding/4/")
+
+        # Verify LGA is preserved in draft and in pre-populated HTML
+        draft.refresh_from_db()
+        self.assertEqual(draft.data.get("district"), "Uyo")
+        page4 = self.client.get("/onboarding/4/")
+        self.assertEqual(page4.status_code, 200)
+        self.assertContains(page4, 'value="Uyo" selected')
+
 
 

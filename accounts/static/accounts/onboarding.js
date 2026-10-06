@@ -303,7 +303,7 @@ function createSearchableSelect(nativeSelect, defaultPlaceholder) {
   wrapper.appendChild(dropdown);
   nativeSelect.after(wrapper);
 
-  const fieldLabel = parent ? parent.querySelector(`label[for="${nativeSelect.id}"]`) : null;
+  const fieldLabel = (parent ? parent.querySelector(`label[for="${nativeSelect.id}"]`) : null) || document.querySelector(`label[for="${nativeSelect.id}"]`);
   if (fieldLabel) {
     fieldLabel.addEventListener("click", (e) => {
       e.preventDefault();
@@ -514,6 +514,12 @@ function createSearchableSelect(nativeSelect, defaultPlaceholder) {
     if (!wrapper.contains(e.target) && (!fieldLabel || !fieldLabel.contains(e.target))) {
       close();
     }
+  });
+
+  nativeSelect.addEventListener("change", syncFromNative);
+  nativeSelect.addEventListener("invalid", (e) => {
+    e.preventDefault();
+    open();
   });
 
   wrapper._searchableInstance = {
@@ -753,8 +759,15 @@ function initializeEligibilityWatcher() {
   function updateBasis() {
     const val = elSelect.value;
     const match = elList.find((r) => r.code === val);
-    if (match && match.basis) {
-      basisInput.value = match.basis;
+    if (match) {
+      if (match.basis) {
+        basisInput.value = match.basis;
+      }
+      const netSelect = document.getElementById("id_network");
+      if (netSelect && match.network && !netSelect.value) {
+        netSelect.value = match.network;
+        netSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     } else {
       basisInput.value = "Pending review";
     }
@@ -766,8 +779,45 @@ function initializeEligibilityWatcher() {
   }
 }
 
+function initializeSearchableDropdowns() {
+  const form = document.getElementById("onboarding-form");
+  const selects = form ? form.querySelectorAll("select") : document.querySelectorAll(".fields select");
+  selects.forEach((sel) => {
+    if (sel.classList.contains("searchable-select-native")) return;
+
+    let placeholder = "Select";
+    const labelEl = (sel.parentElement ? sel.parentElement.querySelector(`label[for="${sel.id}"]`) : null) || document.querySelector(`label[for="${sel.id}"]`);
+    if (labelEl) {
+      const cleanLabel = labelEl.textContent.replace(/\[🔒.*\]/g, "").replace(/\*/g, "").trim();
+      if (cleanLabel) {
+        placeholder = `Select ${cleanLabel.toLowerCase()}`;
+      }
+    }
+
+    const placeholderMap = {
+      id_eligibility: "Select age eligibility",
+      id_network: "Select network",
+      id_language: "Select language",
+      id_timezone: "Select timezone",
+      id_reading: "Select reading preference",
+      id_channel: "Select channel",
+    };
+    if (placeholderMap[sel.id]) {
+      placeholder = placeholderMap[sel.id];
+    } else if (sel.options.length > 0 && sel.options[0].value === "") {
+      const firstOptText = sel.options[0].textContent.trim();
+      if (firstOptText && firstOptText !== "—" && firstOptText !== "-") {
+        placeholder = firstOptText;
+      }
+    }
+
+    createSearchableSelect(sel, placeholder);
+  });
+}
+
 initializeProfileMenus();
 initializeRecordTabs();
 initializePhotoControls();
 initializeGeographyDropdowns();
 initializeEligibilityWatcher();
+initializeSearchableDropdowns();

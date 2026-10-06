@@ -60,8 +60,8 @@ class ProfileForm(BaseForm):
 
 
 class NetworkForm(BaseForm):
-    eligibility = forms.ChoiceField(label='Age eligibility', choices=[('pending', 'More information needed')])
-    network = forms.ChoiceField(label='Proposed network', choices=[('', '—'), ('WGMN', 'WGMN — Good Mother Network'), ('WNNN', 'WNNN')])
+    eligibility = forms.ChoiceField(label='Age eligibility', choices=[('', 'Select age eligibility'), ('pending', 'More information needed')])
+    network = forms.ChoiceField(label='Proposed network', choices=[('', 'Select network'), ('WGMN', 'WGMN — Good Mother Network'), ('WNNN', 'WNNN')])
     verification_basis = forms.CharField(
         label='Verification basis',
         disabled=True,
@@ -74,7 +74,7 @@ class NetworkForm(BaseForm):
         super().__init__(*args, **kwargs)
         policy = current_policy()
         if policy:
-            self.fields['eligibility'].choices = [('', '—')] + [(r['code'], r['label']) for r in policy['eligibility']]
+            self.fields['eligibility'].choices = [('', 'Select age eligibility')] + [(r['code'], r['label']) for r in policy['eligibility']]
             selected_el = None
             if self.data and self.data.get('eligibility'):
                 selected_el = self.data.get('eligibility')

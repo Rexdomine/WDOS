@@ -168,3 +168,23 @@ class OnboardingUITests(TestCase):
         css = (Path(settings.BASE_DIR) / 'accounts/static/accounts/onboarding.css').read_text()
         self.assertIn('.checkbox-text{display:inline-block;line-height:1.4;color:#544758}', css)
         self.assertIn('.checkbox-control input[type=checkbox]{position:absolute !important;', css)
+
+    def test_other_dropdowns_align_with_search_dropdown(self):
+        from .onboarding_forms import NetworkForm
+        form = NetworkForm()
+        eligibility_choices = [c[1] for c in form.fields['eligibility'].choices]
+        network_choices = [c[1] for c in form.fields['network'].choices]
+        self.assertIn('Select age eligibility', eligibility_choices)
+        self.assertNotIn('—', eligibility_choices)
+        self.assertIn('Select network', network_choices)
+        self.assertNotIn('—', network_choices)
+
+        js = (Path(settings.BASE_DIR) / 'accounts/static/accounts/onboarding.js').read_text()
+        self.assertIn('function initializeSearchableDropdowns()', js)
+        self.assertIn('initializeSearchableDropdowns();', js)
+
+        response = self.client.get('/onboarding/3/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="eligibility"')
+        self.assertContains(response, 'name="network"')
+

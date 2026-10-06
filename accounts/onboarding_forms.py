@@ -150,9 +150,9 @@ DEFAULT_DISTRICTS = sorted({lga for lgas in NIGERIA_LOCATIONS.values() for lga i
 
 
 class GeographyForm(BaseForm):
-    country = forms.ChoiceField(label='Country', choices=[('', '—')])
-    region = forms.ChoiceField(label='State / Region / Province', choices=[('', '—')])
-    district = forms.ChoiceField(label='Local government / District', choices=[('', '—')], required=False)
+    country = forms.ChoiceField(label='Country', choices=[('', 'Select country')])
+    region = forms.ChoiceField(label='State / Region / Province', choices=[('', 'Select state')])
+    district = forms.ChoiceField(label='Local government / District', choices=[('', 'Select LGA')], required=False)
     community_cluster = forms.CharField(
         label='Community cluster',
         max_length=150,
@@ -191,7 +191,7 @@ class GeographyForm(BaseForm):
             if pc and pc not in known_country_names:
                 all_countries.append((pc, pc))
         all_countries.sort(key=lambda x: x[0])
-        self.fields['country'].choices = [('', '—')] + all_countries
+        self.fields['country'].choices = [('', 'Select country')] + all_countries
 
         # Check currently selected country
         selected_country = None
@@ -209,15 +209,15 @@ class GeographyForm(BaseForm):
                 c_regions = [r[1] for r in c_record['regions']]
                 c_policy_regions = [h['region'] for h in network_homes if h.get('region') and (not h.get('country') or h.get('country') in (selected_country, c_record['name'], c_record['code']))]
                 combined_regions = sorted(set(c_regions + c_policy_regions))
-                self.fields['region'].choices = [('', '—')] + [(r, r) for r in combined_regions]
+                self.fields['region'].choices = [('', 'Select state')] + [(r, r) for r in combined_regions]
             else:
                 combined_regions = sorted(set(policy_regions))
-                self.fields['region'].choices = [('', '—')] + [(r, r) for r in combined_regions]
+                self.fields['region'].choices = [('', 'Select state')] + [(r, r) for r in combined_regions]
         else:
             self.fields['region'].label = 'State / Region / Province'
             self.fields['district'].label = 'Local government / District'
             combined_regions = sorted(set(policy_regions + [s for s in NIGERIA_LOCATIONS.keys()]))
-            self.fields['region'].choices = [('', '—')] + [(r, r) for r in combined_regions]
+            self.fields['region'].choices = [('', 'Select state')] + [(r, r) for r in combined_regions]
 
         # Determine currently selected region
         selected_region = None
@@ -243,7 +243,7 @@ class GeographyForm(BaseForm):
         else:
             districts_list = []
 
-        self.fields['district'].choices = [('', '—')] + [(d, d) for d in districts_list]
+        self.fields['district'].choices = [('', 'Select LGA')] + [(d, d) for d in districts_list]
 
         # Ensure submitted or initial values are always in choices (preserves test payloads)
         for name in ('country', 'region', 'district'):

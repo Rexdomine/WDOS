@@ -361,11 +361,11 @@ function createSearchableSelect(nativeSelect, defaultPlaceholder) {
     const text = selectedOpt ? selectedOpt.textContent.trim() : "";
     const val = selectedOpt ? selectedOpt.value : "";
 
-    if (val && text && text !== "—") {
+    if (val && text && text !== "—" && !text.toLowerCase().startsWith("select ")) {
       labelSpan.textContent = text;
       labelSpan.classList.remove("is-placeholder");
     } else {
-      labelSpan.textContent = text || defaultPlaceholder || "—";
+      labelSpan.textContent = defaultPlaceholder || text || "Select";
       labelSpan.classList.add("is-placeholder");
     }
 
@@ -390,10 +390,7 @@ function createSearchableSelect(nativeSelect, defaultPlaceholder) {
 
     const rawOptions = Array.from(nativeSelect.options);
     const filtered = rawOptions.filter((opt) => {
-      if (!cleanQuery && opt.value === "" && opt.textContent.trim() === "—") {
-        return true;
-      }
-      if (cleanQuery && opt.value === "") return false;
+      if (opt.value === "") return false;
       return opt.textContent.toLowerCase().includes(cleanQuery);
     });
 
@@ -554,11 +551,13 @@ function initializeGeographyDropdowns() {
   const nigeriaDistricts = parsedData.nigeria_districts || {};
   const homesList = Array.isArray(parsedData) ? parsedData : (parsedData.homes || []);
 
-  const placeholder = "—";
+  const countryPlaceholder = "Select country";
+  const regionPlaceholder = "Select state";
+  const districtPlaceholder = "Select LGA";
 
-  const countryCustom = createSearchableSelect(countrySelect, "— Select country —");
-  const regionCustom = createSearchableSelect(regionSelect, "— Select state / region —");
-  const districtCustom = districtSelect ? createSearchableSelect(districtSelect, "— Select LGA / district —") : null;
+  const countryCustom = createSearchableSelect(countrySelect, countryPlaceholder);
+  const regionCustom = createSearchableSelect(regionSelect, regionPlaceholder);
+  const districtCustom = districtSelect ? createSearchableSelect(districtSelect, districtPlaceholder) : null;
 
   function getCountryRecord(countryVal) {
     if (!countryVal) return null;
@@ -584,7 +583,7 @@ function initializeGeographyDropdowns() {
     select.innerHTML = "";
     const defaultOption = document.createElement("option");
     defaultOption.value = "";
-    defaultOption.textContent = emptyPlaceholder !== undefined ? emptyPlaceholder : placeholder;
+    defaultOption.textContent = emptyPlaceholder !== undefined ? emptyPlaceholder : "Select";
     select.appendChild(defaultOption);
 
     let found = false;
@@ -612,10 +611,10 @@ function initializeGeographyDropdowns() {
     const currentRegion = preserveSelected ? regionSelect.value : "";
 
     if (!selectedCountry) {
-      populateSelect(regionSelect, [], "", "— Select country first —");
+      populateSelect(regionSelect, [], "", "Select state");
       if (regionCustom) regionCustom.syncFromNative();
       if (districtSelect) {
-        populateSelect(districtSelect, [], "", "—");
+        populateSelect(districtSelect, [], "", "Select LGA");
         if (districtCustom) districtCustom.syncFromNative();
       }
       updateLocalHome();
@@ -644,7 +643,7 @@ function initializeGeographyDropdowns() {
     if (matchingRegions.length === 0) {
       populateSelect(regionSelect, [], "", "— No administrative divisions available —");
     } else {
-      populateSelect(regionSelect, matchingRegions, currentRegion, placeholder);
+      populateSelect(regionSelect, matchingRegions, currentRegion, "Select state");
     }
 
     if (regionCustom) regionCustom.syncFromNative();
@@ -658,7 +657,7 @@ function initializeGeographyDropdowns() {
     const currentDistrict = preserveSelected ? districtSelect.value : "";
 
     if (!selectedRegion) {
-      populateSelect(districtSelect, [], "", "—");
+      populateSelect(districtSelect, [], "", "Select LGA");
       if (districtCustom) districtCustom.syncFromNative();
       updateLocalHome();
       return;
@@ -687,12 +686,12 @@ function initializeGeographyDropdowns() {
 
     if (allDistricts.length === 0) {
       if (currentDistrict) {
-        populateSelect(districtSelect, [currentDistrict], currentDistrict, placeholder);
+        populateSelect(districtSelect, [currentDistrict], currentDistrict, "Select LGA");
       } else {
         populateSelect(districtSelect, [], "", "— None available —");
       }
     } else {
-      populateSelect(districtSelect, allDistricts, currentDistrict, placeholder);
+      populateSelect(districtSelect, allDistricts, currentDistrict, "Select LGA");
     }
 
     if (districtCustom) districtCustom.syncFromNative();

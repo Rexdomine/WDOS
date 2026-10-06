@@ -103,7 +103,9 @@ def render_step(request, number, draft, form, notice=None, status=200):
             'multi_timezone_countries': MULTI_TIMEZONE_COUNTRIES,
         }
     eligibility_data = []
-    if number == 3 and policy:
+    if number == 3:
+        from .onboarding_forms import DEFAULT_ELIGIBILITY
+        eligibility_list = (policy.get('eligibility') if policy and policy.get('eligibility') else None) or DEFAULT_ELIGIBILITY
         eligibility_data = [
             {
                 'code': r['code'],
@@ -111,7 +113,7 @@ def render_step(request, number, draft, form, notice=None, status=200):
                 'network': r['network'],
                 'basis': r.get('basis', 'Pending review'),
             }
-            for r in policy.get('eligibility', [])
+            for r in eligibility_list
         ]
 
     # Activate user's persisted timezone so template date formatting uses their time zone

@@ -66,8 +66,29 @@ class ProfileForm(BaseForm):
             raise forms.ValidationError('Check the highlighted information') from error
 
 
+DEFAULT_ELIGIBILITY = [
+    {
+        'code': 'adult',
+        'label': 'Adult Member (18+)',
+        'network': 'WGMN',
+        'basis': 'Identity verification on file',
+    },
+    {
+        'code': 'youth',
+        'label': 'Youth Member (15–24)',
+        'network': 'WNNN',
+        'basis': 'Self attestation with guarantor',
+    },
+]
+
+
 class NetworkForm(BaseForm):
-    eligibility = forms.ChoiceField(label='Age eligibility', choices=[('', 'Select age eligibility'), ('pending', 'More information needed')])
+    eligibility = forms.ChoiceField(
+        label='Age eligibility',
+        choices=[('', 'Select age eligibility')]
+        + [(r['code'], r['label']) for r in DEFAULT_ELIGIBILITY]
+        + [('pending', 'More information needed')],
+    )
     network = forms.ChoiceField(label='Proposed network', choices=[('', 'Select network'), ('WGMN', 'WGMN — Good Mother Network'), ('WNNN', 'WNNN')])
     verification_basis = forms.CharField(
         label='Verification basis',
@@ -80,23 +101,31 @@ class NetworkForm(BaseForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         policy = current_policy()
-        if policy:
-            self.fields['eligibility'].choices = [('', 'Select age eligibility')] + [(r['code'], r['label']) for r in policy['eligibility']]
-            selected_el = None
-            if self.data and self.data.get('eligibility'):
-                selected_el = self.data.get('eligibility')
-            elif self.initial and self.initial.get('eligibility'):
-                selected_el = self.initial.get('eligibility')
-            for r in policy['eligibility']:
-                if r['code'] == selected_el and r.get('basis'):
-                    self.fields['verification_basis'].initial = r['basis']
-                    break
+        eligibility_list = (policy.get('eligibility') if policy and policy.get('eligibility') else None) or DEFAULT_ELIGIBILITY
+        self.fields['eligibility'].choices = (
+            [('', 'Select age eligibility')]
+            + [(r['code'], r['label']) for r in eligibility_list]
+            + [('pending', 'More information needed')]
+        )
+        selected_el = None
+        if self.data and self.data.get('eligibility'):
+            selected_el = self.data.get('eligibility')
+        elif self.initial and self.initial.get('eligibility'):
+            selected_el = self.initial.get('eligibility')
+        for r in eligibility_list:
+            if r['code'] == selected_el and r.get('basis'):
+                self.fields['verification_basis'].initial = r['basis']
+                break
 
     def clean(self):
         data = super().clean()
         policy = current_policy()
-        if policy and not any(r['code'] == data.get('eligibility') and r['network'] == data.get('network') for r in policy['eligibility']):
-            self.add_error('eligibility', 'More information needed')
+        eligibility_list = (policy.get('eligibility') if policy and policy.get('eligibility') else None) or DEFAULT_ELIGIBILITY
+        selected_el = data.get('eligibility')
+        selected_net = data.get('network')
+        if selected_el and selected_el != 'pending':
+            if not any(r['code'] == selected_el and r['network'] == selected_net for r in eligibility_list):
+                self.add_error('eligibility', 'More information needed')
         return data
     eligibility_confirmed = forms.BooleanField(label='Confirm eligibility', help_text='I confirm this information is accurate.')
 

@@ -852,7 +852,7 @@ function initializeEligibilityWatcher() {
         basisInput.value = match.basis;
       }
       const netSelect = document.getElementById("id_network");
-      if (netSelect && match.network && !netSelect.value) {
+      if (netSelect && match.network) {
         netSelect.value = match.network;
         netSelect.dispatchEvent(new Event("change", { bubbles: true }));
       }

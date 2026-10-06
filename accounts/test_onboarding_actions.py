@@ -273,3 +273,48 @@ class OnboardingButtonAndActionAuditTests(TestCase):
         # Recover pending guard prevents spamming try-again
         self.assertIn('pending = true', js)
         self.assertIn('finally {', js)
+
+    def test_search_input_padding_prevents_text_overlapping_icon(self):
+        """Search input has explicit 40px left padding to prevent typed text overlapping the search icon."""
+        css = (Path(settings.BASE_DIR) / 'accounts/static/accounts/onboarding.css').read_text(encoding='utf-8')
+        self.assertIn('.field .searchable-select-search-wrap input.searchable-select-search-input', css)
+        self.assertIn('padding:6px 36px 6px 40px !important', css)
+        self.assertIn('padding-inline-start:40px !important', css)
+        self.assertIn('.searchable-select-search-icon{position:absolute;left:20px;top:50%', css)
+        self.assertIn('z-index:3', css)
+
+    def test_age_eligibility_shows_adult_and_youth_options_without_policy(self):
+        """When policy is unconfigured, Step 3 provides Adult and Youth member tiers instead of only 'More information needed'."""
+        with override_settings(WDOS_ONBOARDING_POLICY=None):
+            from .onboarding_forms import NetworkForm
+            form = NetworkForm()
+            labels = [c[1] for c in form.fields['eligibility'].choices]
+            self.assertIn('Select age eligibility', labels)
+            self.assertIn('Adult Member (18+)', labels)
+            self.assertIn('Youth Member (15–24)', labels)
+            self.assertIn('More information needed', labels)
+
+            # Step 3 GET response contains adult and youth choices in HTML and JSON script
+            response = self.client.get('/onboarding/3/')
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'Adult Member (18+)')
+            self.assertContains(response, 'Youth Member (15–24)')
+            self.assertContains(response, 'id="eligibility-data"')
+
+            # Form submission succeeds with adult tier and WGMN network
+            valid_form = NetworkForm(data={
+                'eligibility': 'adult',
+                'network': 'WGMN',
+                'eligibility_confirmed': True,
+            })
+            self.assertTrue(valid_form.is_valid())
+
+            # Mismatched network/eligibility triggers validation error
+            mismatched_form = NetworkForm(data={
+                'eligibility': 'adult',
+                'network': 'WNNN',
+                'eligibility_confirmed': True,
+            })
+            self.assertFalse(mismatched_form.is_valid())
+            self.assertIn('More information needed', mismatched_form.errors.get('eligibility', []))
+

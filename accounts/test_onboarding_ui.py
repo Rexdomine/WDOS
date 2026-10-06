@@ -188,3 +188,16 @@ class OnboardingUITests(TestCase):
         self.assertContains(response, 'name="eligibility"')
         self.assertContains(response, 'name="network"')
 
+    def test_sidebar_fixed_full_height_and_scrollable_page_content(self):
+        """Side navigation stays fixed full-height without stopping halfway while page content scrolls."""
+        css = (Path(settings.BASE_DIR) / 'accounts/static/accounts/onboarding.css').read_text()
+        self.assertIn('.sidebar {', css)
+        self.assertIn('position: fixed !important', css)
+        self.assertIn('height: 100vh !important', css)
+        self.assertIn('overflow-y: auto !important', css)
+        self.assertIn('.topbar {', css)
+        self.assertIn('position: sticky !important', css)
+        self.assertIn('.main {', css)
+        self.assertIn('margin-left: 232px !important', css)
+
+

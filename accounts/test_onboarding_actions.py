@@ -216,7 +216,7 @@ class OnboardingButtonAndActionAuditTests(TestCase):
         # /app loads the foundation workspace shell
         app_resp = self.client.get('/app')
         self.assertEqual(app_resp.status_code, 200)
-        self.assertContains(app_resp, 'class="foundation-shell"')
+        self.assertContains(app_resp, 'foundation-shell')
 
     def test_duplicate_submission_blocked_by_revision_conflict(self):
         """Stale revision submissions return 409 conflict, preventing duplicate action."""

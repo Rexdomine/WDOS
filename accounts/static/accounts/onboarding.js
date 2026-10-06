@@ -617,7 +617,7 @@ function initializeGeographyDropdowns() {
         populateSelect(districtSelect, [], "", "Select LGA");
         if (districtCustom) districtCustom.syncFromNative();
       }
-      updateLocalHome();
+      updateLocalHome(true);
       return;
     }
 
@@ -659,7 +659,7 @@ function initializeGeographyDropdowns() {
     if (!selectedRegion) {
       populateSelect(districtSelect, [], "", "Select LGA");
       if (districtCustom) districtCustom.syncFromNative();
-      updateLocalHome();
+      updateLocalHome(!preserveSelected);
       return;
     }
 
@@ -695,10 +695,10 @@ function initializeGeographyDropdowns() {
     }
 
     if (districtCustom) districtCustom.syncFromNative();
-    updateLocalHome();
+    updateLocalHome(!preserveSelected);
   }
 
-  function updateLocalHome() {
+  function updateLocalHome(fromDropdownChange = false) {
     if (!localHomeInput) return;
     const selectedCountry = countrySelect.value;
     const selectedRegion = regionSelect.value;
@@ -713,8 +713,15 @@ function initializeGeographyDropdowns() {
 
     if (matched && matched.label) {
       localHomeInput.value = matched.label;
+      localHomeInput.removeAttribute("data-user-custom");
+    } else if (fromDropdownChange) {
+      if (localHomeInput.getAttribute("data-user-custom") !== "true") {
+        localHomeInput.value = "Pending assignment";
+      }
     } else {
-      localHomeInput.value = localHomeInput.getAttribute("data-default-value") || "Pending assignment";
+      if (!localHomeInput.value) {
+        localHomeInput.value = localHomeInput.getAttribute("data-default-value") || "Pending assignment";
+      }
     }
   }
 
@@ -728,12 +735,17 @@ function initializeGeographyDropdowns() {
 
   if (districtSelect) {
     districtSelect.addEventListener("change", () => {
-      updateLocalHome();
+      updateLocalHome(true);
     });
   }
 
-  if (localHomeInput && !localHomeInput.getAttribute("data-default-value")) {
-    localHomeInput.setAttribute("data-default-value", localHomeInput.value || "Pending assignment");
+  if (localHomeInput) {
+    if (!localHomeInput.getAttribute("data-default-value")) {
+      localHomeInput.setAttribute("data-default-value", localHomeInput.value || "Pending assignment");
+    }
+    localHomeInput.addEventListener("input", () => {
+      localHomeInput.setAttribute("data-user-custom", "true");
+    });
   }
 
   if (countryCustom) countryCustom.syncFromNative();

@@ -39,3 +39,8 @@ html[dir=rtl] .searchable-select-clear-search{right:auto;left:18px}
 html[dir=rtl] .searchable-select-search-input{padding:6px 32px 6px 30px;direction:rtl}
 html[dir=rtl] .searchable-select-option-check{margin-left:0;margin-right:8px}
 .profile-menu{position:relative}.profile-trigger{border:0;padding:0;cursor:pointer}.profile-menu-panel{position:absolute;inset-inline-end:0;top:calc(100% + 8px);z-index:10;min-width:150px;padding:10px;background:#fff;border:1px solid #ded5df;border-radius:9px;box-shadow:0 8px 24px #35233822}.profile-menu-panel[hidden]{display:none}.profile-menu-panel form{margin:0}.profile-menu-panel button{width:100%;padding:9px;border:0;background:transparent;text-align:start;cursor:pointer}
+.field input:not([type=checkbox]):not([type=file]){display:block;width:100%;min-height:44px;padding:10px 14px;box-sizing:border-box;background:#fdfcfd;border:1px solid #dfd9e2;border-radius:8px;color:#26212a;font:inherit;font-size:13px;line-height:20px;transition:border-color 0.15s ease,box-shadow 0.15s ease,background-color 0.15s ease}
+.field input:not([type=checkbox]):not([type=file]):hover{background:#ffffff;border-color:#cfc6d4}
+.field input:not([type=checkbox]):not([type=file]):focus{outline:3px solid #7cb518;outline-offset:2px;background:#ffffff;border-color:#d4006a}
+.field input#id_local_home{background:#ffffff}
+.field small{display:block;color:#746d78;font-size:11px;margin-top:6px;line-height:1.4}

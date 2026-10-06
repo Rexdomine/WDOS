@@ -160,7 +160,17 @@ class GeographyForm(BaseForm):
         widget=forms.TextInput(attrs={'placeholder': 'e.g. Central Community Cluster'}),
         help_text='Your local community cluster or neighborhood',
     )
-    local_home = forms.CharField(label='Local connection', max_length=150, required=False, disabled=True, initial='Pending assignment')
+    local_home = forms.CharField(
+        label='Local connection',
+        max_length=150,
+        required=False,
+        initial='Pending assignment',
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Pending assignment',
+            'autocomplete': 'off',
+        }),
+        help_text='Automatically assigned based on your location, or enter your local chapter / connection.',
+    )
     country_id = forms.CharField(widget=forms.HiddenInput(), required=False)
     country_name = forms.CharField(widget=forms.HiddenInput(), required=False)
     region_id = forms.CharField(widget=forms.HiddenInput(), required=False)
@@ -267,6 +277,13 @@ class GeographyForm(BaseForm):
                 raise forms.ValidationError('Check the highlighted information')
         return val
 
+    def clean_local_home(self):
+        val = self.cleaned_data.get('local_home', '')
+        if val is None:
+            return 'Pending assignment'
+        val = str(val).strip()
+        return val or 'Pending assignment'
+
     def clean(self):
         data = super().clean()
         country_input = data.get('country')
@@ -327,7 +344,14 @@ class GeographyForm(BaseForm):
                     and h.get('region') == region
                     and (not h.get('district') or h.get('district') == district)
                 ]
-                if not matching and country and region and district:
+                is_known_district = False
+                is_ng = str(country).lower() in ('nigeria', 'ng') or (country_obj and country_obj.get('code') == 'NG')
+                if is_ng:
+                    lga_list = NIGERIA_LOCATIONS.get(region) or NIGERIA_LOCATIONS.get(str(region).replace(' State', '')) or []
+                    if district in lga_list:
+                        is_known_district = True
+
+                if not matching and not is_known_district and country and region and district:
                     self.add_error('district', 'More information needed')
         return data
 

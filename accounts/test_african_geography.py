@@ -340,4 +340,81 @@ class OnboardingGeographyIntegrationTests(TestCase):
         page4_again = self.client.get("/onboarding/4/")
         self.assertContains(page4_again, 'value="Aniocha North" selected')
 
+    def test_kaduna_giwa_advances_when_policy_has_unrelated_chapters(self):
+        # Policy with only Lagos Ikeja chapter (mimicking staging environment)
+        staging_policy = {
+            'version': 'staging-v1', 'approval_reference': 'STAGING-APP',
+            'privacy_notice': 'Notice', 'review_role': 'reviewer', 'review_function': 'onboarding',
+            'eligibility': [{'code': 'adult', 'label': 'Adult', 'network': 'WGMN', 'basis': 'Attestation'}],
+            'homes': [
+                {'code': 'chapter-1', 'label': 'Lagos Chapter (Ikeja)', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'},
+            ],
+        }
+        with self.settings(WDOS_ONBOARDING_POLICY=staging_policy):
+            # Steps 1 to 3
+            self.save(1, {"language": "en", "timezone": "Africa/Lagos", "reading": "standard"}, revision=0)
+            self.save(2, {"full_name": "Amina Mohammed", "preferred_name": "Amina"}, revision=1)
+            self.save(3, {"network": "WGMN", "eligibility": "pending", "eligibility_confirmed": "on"}, revision=2)
+
+            # Step 4: Valid LGA in Kaduna (Giwa) advances without "More information needed"
+            res = self.client.post("/onboarding/4/", {
+                "revision": 3,
+                "action": "continue",
+                "country": "Nigeria",
+                "region": "Kaduna",
+                "district": "Giwa",
+                "community_cluster": "Giwa Central",
+                "local_home": "Pending assignment",
+            })
+            self.assertRedirects(res, "/onboarding/5/")
+
+            draft = OnboardingDraft.objects.get(account=self.account)
+            self.assertEqual(draft.data.get("country"), "Nigeria")
+            self.assertEqual(draft.data.get("region"), "Kaduna")
+            self.assertEqual(draft.data.get("district"), "Giwa")
+            self.assertEqual(draft.data.get("local_home"), "Pending assignment")
+
+            # Invalid LGA in Kaduna fails validation
+            invalid_res = self.client.post("/onboarding/4/", {
+                "revision": draft.revision,
+                "action": "continue",
+                "country": "Nigeria",
+                "region": "Kaduna",
+                "district": "NonexistentDistrict",
+            })
+            self.assertEqual(invalid_res.status_code, 422)
+            self.assertContains(invalid_res, "More information needed", status_code=422)
+
+    def test_local_connection_field_is_editable_and_persists_custom_value(self):
+        # Step 4 GET check: field is not disabled and renders editable with help text
+        page = self.client.get("/onboarding/4/")
+        self.assertEqual(page.status_code, 200)
+        form = page.context["form"]
+        self.assertFalse(form.fields["local_home"].disabled)
+        self.assertIn("Automatically assigned based on your location", form.fields["local_home"].help_text)
+        self.assertContains(page, 'id="id_local_home"')
+        self.assertNotContains(page, 'id="id_local_home" disabled')
+        self.assertContains(page, "Automatically assigned based on your location")
+
+        # Step 1-3 setup
+        self.save(1, {"language": "en", "timezone": "Africa/Lagos", "reading": "standard"}, revision=0)
+        self.save(2, {"full_name": "Custom Home Member", "preferred_name": "Custom"}, revision=1)
+        self.save(3, {"network": "WGMN", "eligibility": "pending", "eligibility_confirmed": "on"}, revision=2)
+
+        # Step 4 save with custom local connection
+        res = self.client.post("/onboarding/4/", {
+            "revision": 3,
+            "action": "continue",
+            "country": "Nigeria",
+            "region": "Kaduna",
+            "district": "Giwa",
+            "community_cluster": "Giwa North Cluster",
+            "local_home": "Kaduna Central Local Chapter",
+        })
+        self.assertRedirects(res, "/onboarding/5/")
+
+        draft = OnboardingDraft.objects.get(account=self.account)
+        self.assertEqual(draft.data.get("local_home"), "Kaduna Central Local Chapter")
+
+
 

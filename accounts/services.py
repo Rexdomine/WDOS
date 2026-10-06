@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import secrets
+import sys
 import uuid
 from datetime import timedelta
 import pyotp
@@ -91,6 +92,11 @@ def _email_locked(account, purpose):
     payload = {'to':[{'email':account.email}], 'subject':subject, 'textContent':text, 'htmlContent':html_content}
     intent = EmailIntent.objects.create(account=account, token=token, encrypted_payload=encrypt(json.dumps(payload)), expires_at=token.expires_at)
     # A supervised outbox worker sends after commit; request timing never waits on Brevo.
+    if 'test' not in sys.argv and (getattr(settings, 'DEBUG', False) or not getattr(settings, 'BREVO_API_KEY', None)):
+        if purpose == 'verify':
+            print(f'\n============================================================\n[LOCAL DEV] Verification code for {account.email}: {secret}\n============================================================\n', flush=True)
+        else:
+            print(f'\n============================================================\n[LOCAL DEV] Password reset link for {account.email}: {url}\n============================================================\n', flush=True)
     return intent
 
 

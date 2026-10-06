@@ -830,3 +830,273 @@ def find_region_in_country(country_identifier, region_identifier):
         if name == "FCT (Abuja)" and reg_id_upper in ("FCT", "ABUJA", "FCT (ABUJA)"):
             return {"code": code, "name": name}
     return None
+
+
+# ==============================================================================
+# IANA Timezone Data for African Countries (Complies with standard zoneinfo)
+# ==============================================================================
+
+DEFAULT_COUNTRY_TIMEZONES = {
+    # 2-letter ISO 3166-1 codes
+    "DZ": "Africa/Algiers",
+    "AO": "Africa/Luanda",
+    "BJ": "Africa/Porto-Novo",
+    "BW": "Africa/Gaborone",
+    "BF": "Africa/Ouagadougou",
+    "BI": "Africa/Bujumbura",
+    "CV": "Atlantic/Cape_Verde",
+    "CM": "Africa/Douala",
+    "CF": "Africa/Bangui",
+    "TD": "Africa/Ndjamena",
+    "KM": "Indian/Comoro",
+    "CG": "Africa/Brazzaville",
+    "CD": "Africa/Kinshasa",
+    "CI": "Africa/Abidjan",
+    "DJ": "Africa/Djibouti",
+    "EG": "Africa/Cairo",
+    "GQ": "Africa/Malabo",
+    "ER": "Africa/Asmara",
+    "SZ": "Africa/Mbabane",
+    "ET": "Africa/Addis_Ababa",
+    "GA": "Africa/Libreville",
+    "GM": "Africa/Banjul",
+    "GH": "Africa/Accra",
+    "GN": "Africa/Conakry",
+    "GW": "Africa/Bissau",
+    "KE": "Africa/Nairobi",
+    "LS": "Africa/Maseru",
+    "LR": "Africa/Monrovia",
+    "LY": "Africa/Tripoli",
+    "MG": "Indian/Antananarivo",
+    "MW": "Africa/Blantyre",
+    "ML": "Africa/Bamako",
+    "MR": "Africa/Nouakchott",
+    "MU": "Indian/Mauritius",
+    "MA": "Africa/Casablanca",
+    "MZ": "Africa/Maputo",
+    "NA": "Africa/Windhoek",
+    "NE": "Africa/Niamey",
+    "NG": "Africa/Lagos",
+    "RW": "Africa/Kigali",
+    "EH": "Africa/El_Aaiun",
+    "ST": "Africa/Sao_Tome",
+    "SN": "Africa/Dakar",
+    "SC": "Indian/Mahe",
+    "SL": "Africa/Freetown",
+    "SO": "Africa/Mogadishu",
+    "ZA": "Africa/Johannesburg",
+    "SS": "Africa/Juba",
+    "SD": "Africa/Khartoum",
+    "TZ": "Africa/Dar_es_Salaam",
+    "TG": "Africa/Lome",
+    "TN": "Africa/Tunis",
+    "UG": "Africa/Kampala",
+    "ZM": "Africa/Lusaka",
+    "ZW": "Africa/Harare",
+
+    # Canonical full names
+    "Algeria": "Africa/Algiers",
+    "Angola": "Africa/Luanda",
+    "Benin": "Africa/Porto-Novo",
+    "Botswana": "Africa/Gaborone",
+    "Burkina Faso": "Africa/Ouagadougou",
+    "Burundi": "Africa/Bujumbura",
+    "Cabo Verde": "Atlantic/Cape_Verde",
+    "Cameroon": "Africa/Douala",
+    "Central African Republic": "Africa/Bangui",
+    "Chad": "Africa/Ndjamena",
+    "Comoros": "Indian/Comoro",
+    "Congo (Republic of the)": "Africa/Brazzaville",
+    "Congo (Democratic Republic of the)": "Africa/Kinshasa",
+    "Côte d'Ivoire": "Africa/Abidjan",
+    "Djibouti": "Africa/Djibouti",
+    "Egypt": "Africa/Cairo",
+    "Equatorial Guinea": "Africa/Malabo",
+    "Eritrea": "Africa/Asmara",
+    "Eswatini": "Africa/Mbabane",
+    "Ethiopia": "Africa/Addis_Ababa",
+    "Gabon": "Africa/Libreville",
+    "Gambia": "Africa/Banjul",
+    "Ghana": "Africa/Accra",
+    "Guinea": "Africa/Conakry",
+    "Guinea-Bissau": "Africa/Bissau",
+    "Kenya": "Africa/Nairobi",
+    "Lesotho": "Africa/Maseru",
+    "Liberia": "Africa/Monrovia",
+    "Libya": "Africa/Tripoli",
+    "Madagascar": "Indian/Antananarivo",
+    "Malawi": "Africa/Blantyre",
+    "Mali": "Africa/Bamako",
+    "Mauritania": "Africa/Nouakchott",
+    "Mauritius": "Indian/Mauritius",
+    "Morocco": "Africa/Casablanca",
+    "Mozambique": "Africa/Maputo",
+    "Namibia": "Africa/Windhoek",
+    "Niger": "Africa/Niamey",
+    "Nigeria": "Africa/Lagos",
+    "Rwanda": "Africa/Kigali",
+    "Sahrawi Arab Democratic Republic": "Africa/El_Aaiun",
+    "São Tomé and Príncipe": "Africa/Sao_Tome",
+    "Senegal": "Africa/Dakar",
+    "Seychelles": "Indian/Mahe",
+    "Sierra Leone": "Africa/Freetown",
+    "Somalia": "Africa/Mogadishu",
+    "South Africa": "Africa/Johannesburg",
+    "South Sudan": "Africa/Juba",
+    "Sudan": "Africa/Khartoum",
+    "Tanzania": "Africa/Dar_es_Salaam",
+    "Togo": "Africa/Lome",
+    "Tunisia": "Africa/Tunis",
+    "Uganda": "Africa/Kampala",
+    "Zambia": "Africa/Lusaka",
+    "Zimbabwe": "Africa/Harare",
+}
+
+# Multi-timezone country definitions.
+# The Democratic Republic of the Congo (CD) spans two IANA time zones:
+# 1. West Africa Time (UTC+1, Africa/Kinshasa) for western provinces.
+# 2. Central Africa Time (UTC+2, Africa/Lubumbashi) for eastern provinces.
+MULTI_TIMEZONE_COUNTRIES = {
+    "CD": {
+        "name": "Congo (Democratic Republic of the)",
+        "default": "Africa/Kinshasa",
+        "timezones": ["Africa/Kinshasa", "Africa/Lubumbashi"],
+        "region_timezones": {
+            # Western provinces (UTC+1 / Africa/Kinshasa)
+            "CD-KN": "Africa/Kinshasa", "Kinshasa": "Africa/Kinshasa",
+            "CD-BC": "Africa/Kinshasa", "Kongo Central": "Africa/Kinshasa",
+            "CD-KG": "Africa/Kinshasa", "Kwango": "Africa/Kinshasa",
+            "CD-KL": "Africa/Kinshasa", "Kwilu": "Africa/Kinshasa",
+            "CD-MN": "Africa/Kinshasa", "Mai-Ndombe": "Africa/Kinshasa",
+            "CD-EQ": "Africa/Kinshasa", "Équateur": "Africa/Kinshasa", "Equateur": "Africa/Kinshasa",
+            "CD-MO": "Africa/Kinshasa", "Mongala": "Africa/Kinshasa",
+            "CD-NU": "Africa/Kinshasa", "Nord-Ubangi": "Africa/Kinshasa",
+            "CD-SU": "Africa/Kinshasa", "Sud-Ubangi": "Africa/Kinshasa",
+            "CD-TU": "Africa/Kinshasa", "Tshuapa": "Africa/Kinshasa",
+
+            # Eastern provinces (UTC+2 / Africa/Lubumbashi)
+            "CD-BU": "Africa/Lubumbashi", "Bas-Uélé": "Africa/Lubumbashi", "Bas-Uele": "Africa/Lubumbashi",
+            "CD-HK": "Africa/Lubumbashi", "Haut-Katanga": "Africa/Lubumbashi",
+            "CD-HL": "Africa/Lubumbashi", "Haut-Lomami": "Africa/Lubumbashi",
+            "CD-HU": "Africa/Lubumbashi", "Haut-Uélé": "Africa/Lubumbashi", "Haut-Uele": "Africa/Lubumbashi",
+            "CD-IT": "Africa/Lubumbashi", "Ituri": "Africa/Lubumbashi",
+            "CD-KS": "Africa/Lubumbashi", "Kasaï": "Africa/Lubumbashi", "Kasai": "Africa/Lubumbashi",
+            "CD-KC": "Africa/Lubumbashi", "Kasaï-Central": "Africa/Lubumbashi", "Kasai-Central": "Africa/Lubumbashi",
+            "CD-KO": "Africa/Lubumbashi", "Kasaï-Oriental": "Africa/Lubumbashi", "Kasai-Oriental": "Africa/Lubumbashi",
+            "CD-LO": "Africa/Lubumbashi", "Lomami": "Africa/Lubumbashi",
+            "CD-LU": "Africa/Lubumbashi", "Lualaba": "Africa/Lubumbashi",
+            "CD-MA": "Africa/Lubumbashi", "Maniema": "Africa/Lubumbashi",
+            "CD-NK": "Africa/Lubumbashi", "Nord-Kivu": "Africa/Lubumbashi",
+            "CD-SA": "Africa/Lubumbashi", "Sankuru": "Africa/Lubumbashi",
+            "CD-SK": "Africa/Lubumbashi", "Sud-Kivu": "Africa/Lubumbashi",
+            "CD-TA": "Africa/Lubumbashi", "Tanganyika": "Africa/Lubumbashi",
+            "CD-TO": "Africa/Lubumbashi", "Tshopo": "Africa/Lubumbashi",
+        },
+    },
+}
+MULTI_TIMEZONE_COUNTRIES["Congo (Democratic Republic of the)"] = MULTI_TIMEZONE_COUNTRIES["CD"]
+
+
+def get_country_default_timezone(country_identifier):
+    """Return default IANA timezone for a given country code or name."""
+    country = get_country(country_identifier)
+    if not country:
+        return None
+    code = country["code"].upper()
+    name = country["name"]
+    return DEFAULT_COUNTRY_TIMEZONES.get(code) or DEFAULT_COUNTRY_TIMEZONES.get(name)
+
+
+def get_country_timezones(country_identifier):
+    """Return all valid IANA timezones for a given country."""
+    country = get_country(country_identifier)
+    if not country:
+        return []
+    code = country["code"].upper()
+    if code in MULTI_TIMEZONE_COUNTRIES:
+        return list(MULTI_TIMEZONE_COUNTRIES[code]["timezones"])
+    default_tz = get_country_default_timezone(code)
+    return [default_tz] if default_tz else []
+
+
+def is_multi_timezone_country(country_identifier):
+    """Check if country has multiple distinct time zones."""
+    country = get_country(country_identifier)
+    if not country:
+        return False
+    return country["code"].upper() in MULTI_TIMEZONE_COUNTRIES
+
+
+def resolve_timezone_for_location(country_identifier, region_identifier=None, current_timezone=None, has_manual_override=False):
+    """
+    Deterministically resolve the IANA timezone for a country and optional region.
+    - If has_manual_override is True and current_timezone is given, preserves explicit user choice.
+    - Otherwise, returns the country's agreed default timezone.
+    - For multi-timezone countries (e.g. DRC), resolves according to region/province.
+    """
+    if has_manual_override and current_timezone:
+        return current_timezone
+
+    country = get_country(country_identifier)
+    if not country:
+        return current_timezone or "UTC"
+
+    code = country["code"].upper()
+    if code in MULTI_TIMEZONE_COUNTRIES:
+        multi_cfg = MULTI_TIMEZONE_COUNTRIES[code]
+        if region_identifier:
+            reg_match = find_region_in_country(code, region_identifier)
+            reg_key = reg_match["name"] if reg_match else str(region_identifier).strip()
+            reg_tz = multi_cfg["region_timezones"].get(reg_key)
+            if not reg_tz and reg_match:
+                reg_tz = multi_cfg["region_timezones"].get(reg_match["code"])
+            if not reg_tz:
+                reg_lower = reg_key.lower()
+                for k, tz in multi_cfg["region_timezones"].items():
+                    if k.lower() == reg_lower:
+                        reg_tz = tz
+                        break
+            if reg_tz:
+                return reg_tz
+        return multi_cfg["default"]
+
+    default_tz = get_country_default_timezone(code)
+    return default_tz or current_timezone or "UTC"
+
+
+def format_user_datetime(dt, tz_name=None, fmt="c"):
+    """
+    Format datetime consistently using the user's active/persisted timezone or specified timezone.
+    Consistently formats dates, reminders, and timestamps across the platform.
+    """
+    if not dt:
+        return ""
+    import zoneinfo
+    from django.utils import timezone
+
+    tz = None
+    if tz_name:
+        try:
+            tz = zoneinfo.ZoneInfo(tz_name)
+        except Exception:
+            pass
+    if tz:
+        try:
+            local_dt = timezone.localtime(dt, tz)
+        except Exception:
+            local_dt = dt.astimezone(tz) if hasattr(dt, "astimezone") else dt
+    else:
+        try:
+            local_dt = timezone.localtime(dt)
+        except Exception:
+            local_dt = dt
+    try:
+        from django.template.defaultfilters import date as django_date
+        res = django_date(local_dt, fmt)
+        if res:
+            return res
+    except Exception:
+        pass
+    return local_dt.isoformat()
+
+

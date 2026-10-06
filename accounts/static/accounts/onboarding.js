@@ -549,6 +549,8 @@ function initializeGeographyDropdowns() {
   const regionSelect = document.getElementById("id_region");
   const districtSelect = document.getElementById("id_district");
   const localHomeInput = document.getElementById("id_local_home");
+  const timezoneInput = document.getElementById("id_timezone");
+  const timezoneOverrideInput = document.getElementById("id_timezone_override");
   const regionLabel = document.querySelector('label[for="id_region"]');
   const districtLabel = document.querySelector('label[for="id_district"]');
 
@@ -557,6 +559,8 @@ function initializeGeographyDropdowns() {
   const countriesList = parsedData.countries || [];
   const nigeriaDistricts = parsedData.nigeria_districts || {};
   const homesList = Array.isArray(parsedData) ? parsedData : (parsedData.homes || []);
+  const countryTimezones = parsedData.country_timezones || {};
+  const multiTimezoneCountries = parsedData.multi_timezone_countries || {};
 
   const countryPlaceholder = "Select country";
   const regionPlaceholder = "Select state";
@@ -725,12 +729,51 @@ function initializeGeographyDropdowns() {
     }
   }
 
+  function updateTimezone() {
+    if (!timezoneInput) return;
+    if (timezoneOverrideInput && (timezoneOverrideInput.value === "true" || timezoneOverrideInput.value === "True")) {
+      return;
+    }
+    const selectedCountry = countrySelect.value;
+    if (!selectedCountry) return;
+    const countryRecord = getCountryRecord(selectedCountry);
+    const code = countryRecord ? countryRecord.code.toUpperCase() : selectedCountry.toUpperCase();
+    const selectedRegion = regionSelect.value;
+
+    if (multiTimezoneCountries && (multiTimezoneCountries[code] || multiTimezoneCountries[selectedCountry])) {
+      const multiCfg = multiTimezoneCountries[code] || multiTimezoneCountries[selectedCountry];
+      if (selectedRegion && multiCfg.region_timezones) {
+        const regTz = multiCfg.region_timezones[selectedRegion];
+        if (regTz) {
+          timezoneInput.value = regTz;
+          return;
+        }
+        const lowerReg = selectedRegion.toLowerCase();
+        for (const [k, tz] of Object.entries(multiCfg.region_timezones)) {
+          if (k.toLowerCase() === lowerReg) {
+            timezoneInput.value = tz;
+            return;
+          }
+        }
+      }
+      timezoneInput.value = multiCfg.default || "Africa/Kinshasa";
+      return;
+    }
+
+    const defaultTz = countryTimezones[selectedCountry] || countryTimezones[code] || (countryRecord && countryTimezones[countryRecord.name]);
+    if (defaultTz) {
+      timezoneInput.value = defaultTz;
+    }
+  }
+
   countrySelect.addEventListener("change", () => {
     updateRegions(false);
+    updateTimezone();
   });
 
   regionSelect.addEventListener("change", () => {
     updateDistricts(false);
+    updateTimezone();
   });
 
   if (districtSelect) {
@@ -741,6 +784,9 @@ function initializeGeographyDropdowns() {
 
   if (countryCustom) countryCustom.syncFromNative();
   updateRegions(true);
+  if (timezoneInput && !timezoneInput.value) {
+    updateTimezone();
+  }
 }
 
 function initializeEligibilityWatcher() {

@@ -7,10 +7,17 @@ from .onboarding_policy import current_policy
 from .locale import LANGUAGES
 from .african_geography import (
     AFRICAN_COUNTRIES,
+    DEFAULT_COUNTRY_TIMEZONES,
+    MULTI_TIMEZONE_COUNTRIES,
     find_region_in_country,
+    format_user_datetime,
     get_african_countries_choices,
     get_country,
+    get_country_default_timezone,
     get_country_regions,
+    get_country_timezones,
+    is_multi_timezone_country,
+    resolve_timezone_for_location,
 )
 
 
@@ -188,6 +195,8 @@ class GeographyForm(BaseForm):
     country_name = forms.CharField(widget=forms.HiddenInput(), required=False)
     region_id = forms.CharField(widget=forms.HiddenInput(), required=False)
     region_name = forms.CharField(widget=forms.HiddenInput(), required=False)
+    timezone = forms.CharField(widget=forms.HiddenInput(), required=False)
+    timezone_override = forms.BooleanField(widget=forms.HiddenInput(), required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -291,6 +300,16 @@ class GeographyForm(BaseForm):
         else:
             self.fields['local_home'].initial = 'Pending assignment'
 
+        # Initialize timezone values
+        init_tz = (self.data and self.data.get('timezone')) or (self.initial and self.initial.get('timezone'))
+        init_override = (self.data and self.data.get('timezone_override')) or (self.initial and self.initial.get('timezone_override'))
+        if init_tz:
+            self.fields['timezone'].initial = init_tz
+        elif selected_country:
+            self.fields['timezone'].initial = resolve_timezone_for_location(selected_country, selected_region)
+        if init_override:
+            self.fields['timezone_override'].initial = True
+
     def clean_community_cluster(self):
         val = self.cleaned_data.get('community_cluster', '')
         if val is None:
@@ -340,6 +359,27 @@ class GeographyForm(BaseForm):
             if region_input:
                 data['region_id'] = region_input.lower().replace(' ', '-')
                 data['region_name'] = region_input
+
+        # Deterministic timezone resolution & manual override preservation
+        has_override_in_data = bool(self.data and 'timezone_override' in self.data)
+        if has_override_in_data:
+            val = self.data.get('timezone_override')
+            is_override = bool(val) and val not in (False, 'false', 'False', '0', 0, '')
+        else:
+            is_override = bool(self.initial and self.initial.get('timezone_override'))
+
+        submitted_tz = (self.data and self.data.get('timezone')) or data.get('timezone') or (self.initial and self.initial.get('timezone'))
+
+        if is_override and submitted_tz:
+            data['timezone'] = submitted_tz
+            data['timezone_override'] = True
+        else:
+            resolved_tz = resolve_timezone_for_location(country_input, region_input)
+            if resolved_tz:
+                data['timezone'] = resolved_tz
+                data['timezone_override'] = False
+            elif submitted_tz:
+                data['timezone'] = submitted_tz
 
         # Policy homes validation
         policy = current_policy()

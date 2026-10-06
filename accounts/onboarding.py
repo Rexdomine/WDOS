@@ -38,6 +38,13 @@ def initial_data(account, draft, language='en'):
     return {'full_name': account.display_name, 'email': account.email, 'timezone': 'UTC', 'reading': 'standard', **(draft.data if draft else {}), 'language': language}
 
 
+def get_draft_timezone(draft):
+    """Retrieve persisted timezone from onboarding draft with UTC fallback."""
+    if draft and draft.data and draft.data.get('timezone'):
+        return draft.data['timezone']
+    return 'UTC'
+
+
 def render_step(request, number, draft, form, notice=None, status=200):
     account = request.wdos_account
     tab = request.GET.get('tab', 'overview')
@@ -53,7 +60,11 @@ def render_step(request, number, draft, form, notice=None, status=200):
     geo_data = {}
     policy = current_policy()
     if number == 4:
-        from .african_geography import AFRICAN_COUNTRIES
+        from .african_geography import (
+            AFRICAN_COUNTRIES,
+            DEFAULT_COUNTRY_TIMEZONES,
+            MULTI_TIMEZONE_COUNTRIES,
+        )
         from .onboarding_forms import NIGERIA_LOCATIONS
 
         homes = policy.get('homes', []) if policy else []
@@ -88,6 +99,8 @@ def render_step(request, number, draft, form, notice=None, status=200):
             'countries': countries_list,
             'nigeria_districts': NIGERIA_LOCATIONS,
             'homes': homes_data,
+            'country_timezones': {c['name']: DEFAULT_COUNTRY_TIMEZONES.get(c['name']) for c in AFRICAN_COUNTRIES.values()},
+            'multi_timezone_countries': MULTI_TIMEZONE_COUNTRIES,
         }
     eligibility_data = []
     if number == 3 and policy:
@@ -100,25 +113,39 @@ def render_step(request, number, draft, form, notice=None, status=200):
             }
             for r in policy.get('eligibility', [])
         ]
-    response = render(request, 'onboarding/wizard.html', {
-        'account': account, 'form': form, 'step': number,
-        'revision': draft.revision if draft else 0,
-        'lang': lang, 'direction': LANGUAGES[lang]['dir'], 'screen_id': f'ONB-{number:02d}',
-        'initials': ''.join(n[0] for n in account.display_name.split()[:2]),
-        'scope_label': c['onb_membership'], 'state_label': c['onb_more_needed'] if draft and draft.state == 'review_needed' else c['onb_ready'] if draft and draft.state == 'accepted' else c['onb_in_progress'],
-        'draft': draft, 'policy': policy, 'tab': tab,
-        'geo_data': geo_data,
-        'eligibility_data': eligibility_data,
-        'events': draft.events.order_by('-id')[:100] if draft and tab == 'history' else [],
-        'consents': draft.consents.order_by('-id')[:100] if draft and tab == 'history' else [],
-        'profile_name': (draft.data.get('full_name') or account.display_name) if draft else account.display_name,
-        'network': draft.data.get('network', '—') if draft else '—',
-        'local_home': membership.home['label'] if membership else c['onb_pending'],
-        'title': c[f'onb_title_{number}'], 'notice': notice,
-        'subtitle': c['onb_subtitle'],
-        'action_label': c[f'onb_action_{number}'],
-        'ui': c,
-    }, status=status)
+
+    # Activate user's persisted timezone so template date formatting uses their time zone
+    user_tz_name = get_draft_timezone(draft)
+    try:
+        import zoneinfo
+        timezone.activate(zoneinfo.ZoneInfo(user_tz_name))
+    except Exception:
+        pass
+
+    try:
+        response = render(request, 'onboarding/wizard.html', {
+            'account': account, 'form': form, 'step': number,
+            'revision': draft.revision if draft else 0,
+            'lang': lang, 'direction': LANGUAGES[lang]['dir'], 'screen_id': f'ONB-{number:02d}',
+            'initials': ''.join(n[0] for n in account.display_name.split()[:2]),
+            'scope_label': c['onb_membership'], 'state_label': c['onb_more_needed'] if draft and draft.state == 'review_needed' else c['onb_ready'] if draft and draft.state == 'accepted' else c['onb_in_progress'],
+            'draft': draft, 'policy': policy, 'tab': tab,
+            'geo_data': geo_data,
+            'eligibility_data': eligibility_data,
+            'events': draft.events.order_by('-id')[:100] if draft and tab == 'history' else [],
+            'consents': draft.consents.order_by('-id')[:100] if draft and tab == 'history' else [],
+            'profile_name': (draft.data.get('full_name') or account.display_name) if draft else account.display_name,
+            'network': draft.data.get('network', '—') if draft else '—',
+            'local_home': membership.home['label'] if membership else c['onb_pending'],
+            'user_timezone': user_tz_name,
+            'timezone_display': user_tz_name,
+            'title': c[f'onb_title_{number}'], 'notice': notice,
+            'subtitle': c['onb_subtitle'],
+            'action_label': c[f'onb_action_{number}'],
+            'ui': c,
+        }, status=status)
+    finally:
+        timezone.deactivate()
     response['Cache-Control'] = 'no-store, private'
     response['Referrer-Policy'] = 'same-origin'
     response['X-Robots-Tag'] = 'noindex, nofollow'
@@ -182,6 +209,12 @@ def step(request, step):
                     for key, value in form.cleaned_data.items()
                     if not getattr(form.fields.get(key), 'disabled', False) and key != 'photo'
                 }
+                if step == 1:
+                    submitted_tz = form.cleaned_data.get('timezone')
+                    if request.POST.get('timezone_override') in ('true', '1', 'True', True):
+                        changes['timezone_override'] = True
+                    elif submitted_tz and (submitted_tz != 'UTC' or (draft and draft.data.get('timezone_override'))):
+                        changes['timezone_override'] = True
                 if not draft:
                     draft = OnboardingDraft(account=locked)
                 draft.data = {**draft.data, **changes}
@@ -224,6 +257,12 @@ def step(request, step):
             for key, value in form.cleaned_data.items()
             if not getattr(form.fields.get(key), 'disabled', False) and key != 'photo'
         }
+        if step == 1:
+            submitted_tz = form.cleaned_data.get('timezone')
+            if request.POST.get('timezone_override') in ('true', '1', 'True', True):
+                changes['timezone_override'] = True
+            elif submitted_tz and (submitted_tz != 'UTC' or (draft and draft.data.get('timezone_override'))):
+                changes['timezone_override'] = True
         unchanged = bool(draft) and draft.data == {**draft.data, **changes} and not (
             step == 2 and form.cleaned_data.get('photo') is not None
         )

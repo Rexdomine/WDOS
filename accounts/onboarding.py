@@ -218,7 +218,10 @@ def step(request, step):
                 if not draft:
                     draft = OnboardingDraft(account=locked)
                 draft.data = {**draft.data, **changes}
-                draft.save(update_fields=['data', 'updated_at'])
+                if draft.pk:
+                    draft.save(update_fields=['data', 'updated_at'])
+                else:
+                    draft.save()
             if step == 1:
                 return redirect('accounts:status')
             return redirect('onboarding:step', step=step - 1)

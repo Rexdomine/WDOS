@@ -14,7 +14,12 @@
   const hide = (el) => { el.hidden = true; };
   // Never unlock this DOM after an uncertain write. Only fresh server HTML
   // restores controls, including their authoritative disabled attributes.
-  const lockControls = () => controls().forEach((control) => { control.disabled = true; });
+  const lockControls = () => {
+    controls().forEach((control) => { control.disabled = true; });
+    document.querySelectorAll(".searchable-select.is-open").forEach((el) => {
+      if (el._searchableInstance) el._searchableInstance.close();
+    });
+  };
   const sameOrigin = (url) => new URL(url, window.location.href).origin === window.location.origin;
   const replaceWithResponse = async (response) => {
     const target = response.url || window.location.href;
@@ -33,9 +38,12 @@
     initializePhotoControls();
     initializeGeographyDropdowns();
     initializeEligibilityWatcher();
+    initializeSearchableDropdowns();
+    initializeRecordTabs();
   };
   const recover = async () => {
     if (pending) return;
+    pending = true;
     busy = true;
     form.setAttribute("aria-busy", "true");
     hide(interrupted); show(loading); lockControls();
@@ -48,11 +56,25 @@
     } catch (_) {
       // A failed readback is still uncertain: never unlock or permit another write.
       show(interrupted); hide(loading);
+    } finally {
+      pending = false;
     }
   };
 
+  let activeSubmitter = null;
+  form.querySelectorAll('button[type="submit"], button:not([type])').forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      if (busy) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      activeSubmitter = btn;
+    });
+  });
+
   form.addEventListener("submit", async (event) => {
-    const submitter = event.submitter;
+    const submitter = event.submitter || activeSubmitter;
     if (busy) { event.preventDefault(); return; }
     if (!(submitter && submitter.formNoValidate) && !form.checkValidity()) return;
 
@@ -61,6 +83,11 @@
     event.preventDefault();
     busy = true;
     form.setAttribute("aria-busy", "true");
+    if (submitter) {
+      submitter.setAttribute("aria-busy", "true");
+      submitter.setAttribute("data-loading", "true");
+      submitter.classList.add("is-loading");
+    }
     hide(interrupted); show(loading); lockControls();
     pending = true;
     try {
@@ -98,6 +125,8 @@
 
 function initializeProfileMenus() {
   document.querySelectorAll('[data-profile-menu]').forEach((menu) => {
+    if (menu._profileInitialized) return;
+    menu._profileInitialized = true;
     const trigger = menu.querySelector('[data-profile-trigger]'); const panel = menu.querySelector('[data-profile-panel]');
     if (!trigger || !panel) return;
     const close = () => { panel.hidden = true; trigger.setAttribute('aria-expanded', 'false'); };
@@ -109,6 +138,8 @@ function initializeProfileMenus() {
 function initializeRecordTabs() {
   const tabs = Array.from(document.querySelectorAll('[data-record-tab]'));
   if (!tabs.length) return;
+  if (tabs[0]._tabsInitialized) return;
+  tabs[0]._tabsInitialized = true;
   const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls'))).filter(Boolean);
   const namedPanels = Array.from(document.querySelectorAll('[data-workspace-panel]'));
   const syncWorkspaceNavigation = (stateId) => {
@@ -187,6 +218,13 @@ function initializeRecordTabs() {
       window.history.replaceState({}, '', shortcut.hash);
     });
   });
+  document.querySelectorAll('.foundation-shell a[href="#workspace-home"]').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      activate(tabs[0]);
+      window.history.replaceState({}, '', '#workspace-home');
+    });
+  });
   window.addEventListener("hashchange", activateHash);
   const initialTab = tabs.find((tab) => tab.hash === window.location.hash) || tabs[0];
   const initialNamedPanel = namedPanels.find((panel) => `#${panel.id}` === window.location.hash);
@@ -197,6 +235,8 @@ function initializeRecordTabs() {
 
 function initializePhotoControls() {
   document.querySelectorAll('.photo-control').forEach((control) => {
+    if (control._photoInitialized) return;
+    control._photoInitialized = true;
     const input = control.querySelector('input[type="file"]');
     const preview = control.querySelector('[data-photo-preview]');
     const nameLabel = control.querySelector('[data-photo-name]');
@@ -470,7 +510,9 @@ function createSearchableSelect(nativeSelect, defaultPlaceholder) {
     renderOptions(searchInput.value);
   });
 
-  clearBtn.addEventListener("click", () => {
+  clearBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     searchInput.value = "";
     clearBtn.hidden = true;
     renderOptions("");

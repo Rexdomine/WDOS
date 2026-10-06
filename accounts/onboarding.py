@@ -164,6 +164,16 @@ def step(request, step):
         if revision != (draft.revision if draft else 0) or (draft and draft.state == 'accepted'):
             return render_step(request, step, draft, form, localized_notice(c, CONFLICT_KEYS), 409)
         if request.POST.get('action') == 'back':
+            if form.is_valid():
+                changes = {
+                    key: value
+                    for key, value in form.cleaned_data.items()
+                    if not getattr(form.fields.get(key), 'disabled', False) and key != 'photo'
+                }
+                if not draft:
+                    draft = OnboardingDraft(account=locked)
+                draft.data = {**draft.data, **changes}
+                draft.save(update_fields=['data', 'updated_at'])
             if step == 1:
                 return redirect('accounts:status')
             return redirect('onboarding:step', step=step - 1)
@@ -210,7 +220,11 @@ def step(request, step):
         if unchanged:
             if not valid:
                 return render_step(request, step, draft, form, localized_notice(c, INVALID_KEYS), 422)
-            return redirect('onboarding:step', step=draft.next_step)
+            target_step = max(draft.next_step, min(step + 1, 7))
+            if target_step != draft.next_step:
+                draft.next_step = target_step
+                draft.save(update_fields=['next_step', 'updated_at'])
+            return redirect('onboarding:step', step=target_step)
         draft.data = {**draft.data, **changes}
         if step == 1 and form.cleaned_data.get('language') in LANGUAGES:
             request.session['wdos_language'] = form.cleaned_data['language']

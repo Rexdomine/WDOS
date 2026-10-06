@@ -275,3 +275,69 @@ class OnboardingGeographyIntegrationTests(TestCase):
         self.assertEqual(draft.data["region_id"], "ZA-GP")
         self.assertEqual(draft.data["community_cluster"], "Johannesburg Central")
 
+    def test_step_4_back_and_forward_saves_and_preserves_lga(self):
+        # Steps 1 to 3
+        self.save(1, {"language": "en", "timezone": "Africa/Lagos", "reading": "standard"}, revision=0)
+        self.save(2, {"full_name": "Funmilayo Ransome-Kuti", "preferred_name": "Funmilayo"}, revision=1)
+        self.save(3, {"network": "WGMN", "eligibility": "pending", "eligibility_confirmed": "on"}, revision=2)
+
+        # On Step 4, user selects Country, State, and LGA, then navigates back to Step 3
+        back_res = self.client.post("/onboarding/4/", {
+            "revision": 3,
+            "action": "back",
+            "country": "Nigeria",
+            "region": "Delta",
+            "district": "Aniocha North",
+            "community_cluster": "Delta West Cluster",
+        })
+        self.assertRedirects(back_res, "/onboarding/3/")
+
+        # Verify draft preserved the LGA and all fields
+        draft = OnboardingDraft.objects.get(account=self.account)
+        self.assertEqual(draft.data.get("district"), "Aniocha North")
+        self.assertEqual(draft.data.get("region"), "Delta")
+        self.assertEqual(draft.data.get("country"), "Nigeria")
+        self.assertEqual(draft.data.get("community_cluster"), "Delta West Cluster")
+
+        # Now navigate forward from Step 3 to Step 4
+        forward_step3 = self.client.post("/onboarding/3/", {
+            "revision": draft.revision,
+            "action": "continue",
+            "network": "WGMN",
+            "eligibility": "pending",
+            "eligibility_confirmed": "on",
+        })
+        self.assertRedirects(forward_step3, "/onboarding/4/")
+
+        # GET Step 4 and verify LGA is pre-populated in the HTML form
+        page4 = self.client.get("/onboarding/4/")
+        self.assertEqual(page4.status_code, 200)
+        self.assertContains(page4, 'value="Aniocha North" selected')
+
+        # Now save and continue to Step 5
+        draft.refresh_from_db()
+        cont_res = self.client.post("/onboarding/4/", {
+            "revision": draft.revision,
+            "action": "continue",
+            "country": "Nigeria",
+            "region": "Delta",
+            "district": "Aniocha North",
+            "community_cluster": "Delta West Cluster",
+        })
+        self.assertRedirects(cont_res, "/onboarding/5/")
+
+        # On Step 5, navigate back to Step 4
+        draft.refresh_from_db()
+        back_step5 = self.client.post("/onboarding/5/", {
+            "revision": draft.revision,
+            "action": "back",
+        })
+        self.assertRedirects(back_step5, "/onboarding/4/")
+
+        # Step 4 still preserves the LGA
+        draft.refresh_from_db()
+        self.assertEqual(draft.data.get("district"), "Aniocha North")
+        page4_again = self.client.get("/onboarding/4/")
+        self.assertContains(page4_again, 'value="Aniocha North" selected')
+
+

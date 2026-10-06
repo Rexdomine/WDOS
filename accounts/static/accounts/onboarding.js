@@ -224,6 +224,311 @@ function initializePhotoControls() {
   });
 }
 
+function createSearchableSelect(nativeSelect, defaultPlaceholder) {
+  if (!nativeSelect) return null;
+
+  const parent = nativeSelect.parentElement;
+  const existingWrapper = parent ? parent.querySelector(`.searchable-select[data-for="${nativeSelect.id}"]`) : null;
+  if (existingWrapper) {
+    existingWrapper.remove();
+  }
+
+  nativeSelect.classList.add("searchable-select-native");
+  nativeSelect.tabIndex = -1;
+  nativeSelect.setAttribute("aria-hidden", "true");
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "searchable-select";
+  wrapper.setAttribute("data-for", nativeSelect.id);
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "searchable-select-trigger";
+  trigger.setAttribute("aria-haspopup", "listbox");
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.setAttribute("id", `trigger_${nativeSelect.id}`);
+
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "searchable-select-label";
+
+  const chevronSpan = document.createElement("span");
+  chevronSpan.className = "searchable-select-chevron";
+  chevronSpan.setAttribute("aria-hidden", "true");
+  chevronSpan.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
+
+  trigger.appendChild(labelSpan);
+  trigger.appendChild(chevronSpan);
+  wrapper.appendChild(trigger);
+
+  const dropdown = document.createElement("div");
+  dropdown.className = "searchable-select-dropdown";
+  dropdown.hidden = true;
+  dropdown.setAttribute("role", "listbox");
+  dropdown.setAttribute("aria-labelledby", trigger.id);
+
+  const searchWrap = document.createElement("div");
+  searchWrap.className = "searchable-select-search-wrap";
+
+  const searchIcon = document.createElement("span");
+  searchIcon.className = "searchable-select-search-icon";
+  searchIcon.setAttribute("aria-hidden", "true");
+  searchIcon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14 M15 15l6 6"/></svg>';
+
+  const searchInput = document.createElement("input");
+  searchInput.type = "text";
+  searchInput.className = "searchable-select-search-input";
+  searchInput.placeholder = "Type to search...";
+  searchInput.setAttribute("aria-label", "Search options");
+  searchInput.autocomplete = "off";
+  searchInput.spellcheck = false;
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "searchable-select-clear-search";
+  clearBtn.setAttribute("aria-label", "Clear search");
+  clearBtn.innerHTML = "&times;";
+  clearBtn.hidden = true;
+
+  searchWrap.appendChild(searchIcon);
+  searchWrap.appendChild(searchInput);
+  searchWrap.appendChild(clearBtn);
+  dropdown.appendChild(searchWrap);
+
+  const optionsList = document.createElement("div");
+  optionsList.className = "searchable-select-options";
+  optionsList.tabIndex = -1;
+  dropdown.appendChild(optionsList);
+
+  wrapper.appendChild(dropdown);
+  nativeSelect.after(wrapper);
+
+  const fieldLabel = parent ? parent.querySelector(`label[for="${nativeSelect.id}"]`) : null;
+  if (fieldLabel) {
+    fieldLabel.addEventListener("click", (e) => {
+      e.preventDefault();
+      trigger.focus();
+      toggle();
+    });
+  }
+
+  let focusedIndex = -1;
+
+  function isOpen() {
+    return !dropdown.hidden;
+  }
+
+  function open() {
+    document.querySelectorAll(".searchable-select.is-open").forEach((el) => {
+      if (el !== wrapper && el._searchableInstance) {
+        el._searchableInstance.close();
+      }
+    });
+
+    if (nativeSelect.disabled) return;
+
+    dropdown.hidden = false;
+    wrapper.classList.add("is-open");
+    trigger.setAttribute("aria-expanded", "true");
+    searchInput.value = "";
+    clearBtn.hidden = true;
+    renderOptions("");
+
+    setTimeout(() => {
+      searchInput.focus();
+      const selectedEl = optionsList.querySelector(".is-selected");
+      if (selectedEl) {
+        selectedEl.scrollIntoView({ block: "nearest" });
+      }
+    }, 10);
+  }
+
+  function close() {
+    if (dropdown.hidden) return;
+    dropdown.hidden = true;
+    wrapper.classList.remove("is-open");
+    trigger.setAttribute("aria-expanded", "false");
+    focusedIndex = -1;
+  }
+
+  function toggle() {
+    if (isOpen()) close();
+    else open();
+  }
+
+  function syncFromNative() {
+    trigger.disabled = nativeSelect.disabled;
+    const selectedOpt = nativeSelect.selectedOptions && nativeSelect.selectedOptions[0];
+    const text = selectedOpt ? selectedOpt.textContent.trim() : "";
+    const val = selectedOpt ? selectedOpt.value : "";
+
+    if (val && text && text !== "—") {
+      labelSpan.textContent = text;
+      labelSpan.classList.remove("is-placeholder");
+    } else {
+      labelSpan.textContent = text || defaultPlaceholder || "—";
+      labelSpan.classList.add("is-placeholder");
+    }
+
+    if (isOpen()) {
+      renderOptions(searchInput.value);
+    }
+  }
+
+  function selectOption(val, text) {
+    nativeSelect.value = val;
+    nativeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    nativeSelect.dispatchEvent(new Event("input", { bubbles: true }));
+    syncFromNative();
+    close();
+    trigger.focus();
+  }
+
+  function renderOptions(query) {
+    optionsList.innerHTML = "";
+    focusedIndex = -1;
+    const cleanQuery = (query || "").trim().toLowerCase();
+
+    const rawOptions = Array.from(nativeSelect.options);
+    const filtered = rawOptions.filter((opt) => {
+      if (!cleanQuery && opt.value === "" && opt.textContent.trim() === "—") {
+        return true;
+      }
+      if (cleanQuery && opt.value === "") return false;
+      return opt.textContent.toLowerCase().includes(cleanQuery);
+    });
+
+    if (filtered.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "searchable-select-empty";
+      empty.textContent = "No results found";
+      optionsList.appendChild(empty);
+      return;
+    }
+
+    filtered.forEach((opt, idx) => {
+      const item = document.createElement("div");
+      item.className = "searchable-select-option";
+      item.setAttribute("role", "option");
+      item.setAttribute("data-value", opt.value);
+      item.setAttribute("data-index", String(idx));
+
+      const isSel = opt.selected || opt.value === nativeSelect.value;
+      if (isSel) {
+        item.classList.add("is-selected");
+        item.setAttribute("aria-selected", "true");
+      } else {
+        item.setAttribute("aria-selected", "false");
+      }
+
+      const textSpan = document.createElement("span");
+      textSpan.textContent = opt.textContent;
+      item.appendChild(textSpan);
+
+      if (isSel && opt.value !== "") {
+        const check = document.createElement("span");
+        check.className = "searchable-select-option-check";
+        check.setAttribute("aria-hidden", "true");
+        check.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
+        item.appendChild(check);
+      }
+
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+      });
+
+      item.addEventListener("click", () => {
+        selectOption(opt.value, opt.textContent);
+      });
+
+      optionsList.appendChild(item);
+    });
+  }
+
+  function updateHighlight(items) {
+    items.forEach((it, i) => {
+      if (i === focusedIndex) {
+        it.classList.add("is-focused");
+        it.scrollIntoView({ block: "nearest" });
+      } else {
+        it.classList.remove("is-focused");
+      }
+    });
+  }
+
+  trigger.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggle();
+  });
+
+  trigger.addEventListener("keydown", (e) => {
+    if (["ArrowDown", "ArrowUp", "Enter", " "].includes(e.key)) {
+      e.preventDefault();
+      open();
+    }
+  });
+
+  searchInput.addEventListener("input", () => {
+    clearBtn.hidden = !searchInput.value;
+    renderOptions(searchInput.value);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    searchInput.value = "";
+    clearBtn.hidden = true;
+    renderOptions("");
+    searchInput.focus();
+  });
+
+  searchInput.addEventListener("keydown", (e) => {
+    const items = optionsList.querySelectorAll(".searchable-select-option");
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (items.length > 0) {
+        focusedIndex = (focusedIndex + 1) % items.length;
+        updateHighlight(items);
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (items.length > 0) {
+        focusedIndex = (focusedIndex - 1 + items.length) % items.length;
+        updateHighlight(items);
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (focusedIndex >= 0 && items[focusedIndex]) {
+        items[focusedIndex].click();
+      } else if (items.length === 1) {
+        items[0].click();
+      } else {
+        const firstNonEmpty = Array.from(items).find((it) => it.getAttribute("data-value") !== "");
+        if (firstNonEmpty) firstNonEmpty.click();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+      trigger.focus();
+    } else if (e.key === "Tab") {
+      close();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!wrapper.contains(e.target) && (!fieldLabel || !fieldLabel.contains(e.target))) {
+      close();
+    }
+  });
+
+  wrapper._searchableInstance = {
+    open,
+    close,
+    toggle,
+    syncFromNative,
+  };
+
+  syncFromNative();
+  return wrapper._searchableInstance;
+}
+
 function initializeGeographyDropdowns() {
   const geoScript = document.getElementById("geo-data");
   if (!geoScript) return;
@@ -250,6 +555,10 @@ function initializeGeographyDropdowns() {
   const homesList = Array.isArray(parsedData) ? parsedData : (parsedData.homes || []);
 
   const placeholder = "—";
+
+  const countryCustom = createSearchableSelect(countrySelect, "— Select country —");
+  const regionCustom = createSearchableSelect(regionSelect, "— Select state / region —");
+  const districtCustom = districtSelect ? createSearchableSelect(districtSelect, "— Select LGA / district —") : null;
 
   function getCountryRecord(countryVal) {
     if (!countryVal) return null;
@@ -304,8 +613,10 @@ function initializeGeographyDropdowns() {
 
     if (!selectedCountry) {
       populateSelect(regionSelect, [], "", "— Select country first —");
+      if (regionCustom) regionCustom.syncFromNative();
       if (districtSelect) {
         populateSelect(districtSelect, [], "", "—");
+        if (districtCustom) districtCustom.syncFromNative();
       }
       updateLocalHome();
       return;
@@ -318,11 +629,16 @@ function initializeGeographyDropdowns() {
       matchingRegions = Array.from(
         new Set(
           homesList
-            .filter((h) => !selectedCountry || h.country === selectedCountry)
+            .filter((h) => !selectedCountry || h.country === selectedCountry || h.country === "NG" || h.country === "Nigeria")
             .map((h) => h.region)
             .filter(Boolean)
         )
       ).sort();
+    }
+
+    if (currentRegion && !matchingRegions.includes(currentRegion)) {
+      matchingRegions.push(currentRegion);
+      matchingRegions.sort();
     }
 
     if (matchingRegions.length === 0) {
@@ -331,6 +647,7 @@ function initializeGeographyDropdowns() {
       populateSelect(regionSelect, matchingRegions, currentRegion, placeholder);
     }
 
+    if (regionCustom) regionCustom.syncFromNative();
     updateDistricts(preserveSelected);
   }
 
@@ -342,19 +659,20 @@ function initializeGeographyDropdowns() {
 
     if (!selectedRegion) {
       populateSelect(districtSelect, [], "", "—");
+      if (districtCustom) districtCustom.syncFromNative();
       updateLocalHome();
       return;
     }
 
     let matchingDistricts = [];
-    if (selectedCountry && selectedCountry.toLowerCase() === "nigeria" && nigeriaDistricts[selectedRegion]) {
-      matchingDistricts = nigeriaDistricts[selectedRegion];
+    if (selectedCountry && (selectedCountry.toLowerCase() === "nigeria" || selectedCountry.toUpperCase() === "NG") && (nigeriaDistricts[selectedRegion] || nigeriaDistricts[selectedRegion.replace(/ State$/i, "")])) {
+      matchingDistricts = nigeriaDistricts[selectedRegion] || nigeriaDistricts[selectedRegion.replace(/ State$/i, "")];
     }
 
     const homeDistricts = homesList
       .filter(
         (h) =>
-          (!selectedCountry || h.country === selectedCountry) &&
+          (!selectedCountry || h.country === selectedCountry || h.country === "NG" || h.country === "Nigeria") &&
           (!selectedRegion || h.region === selectedRegion)
       )
       .map((h) => h.district)
@@ -362,12 +680,22 @@ function initializeGeographyDropdowns() {
 
     const allDistricts = Array.from(new Set([...matchingDistricts, ...homeDistricts])).sort();
 
+    if (currentDistrict && !allDistricts.includes(currentDistrict)) {
+      allDistricts.push(currentDistrict);
+      allDistricts.sort();
+    }
+
     if (allDistricts.length === 0) {
-      populateSelect(districtSelect, [], "", "— None available —");
+      if (currentDistrict) {
+        populateSelect(districtSelect, [currentDistrict], currentDistrict, placeholder);
+      } else {
+        populateSelect(districtSelect, [], "", "— None available —");
+      }
     } else {
       populateSelect(districtSelect, allDistricts, currentDistrict, placeholder);
     }
 
+    if (districtCustom) districtCustom.syncFromNative();
     updateLocalHome();
   }
 
@@ -409,6 +737,7 @@ function initializeGeographyDropdowns() {
     localHomeInput.setAttribute("data-default-value", localHomeInput.value || "Pending assignment");
   }
 
+  if (countryCustom) countryCustom.syncFromNative();
   updateRegions(true);
 }
 

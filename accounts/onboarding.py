@@ -89,6 +89,17 @@ def render_step(request, number, draft, form, notice=None, status=200):
             'nigeria_districts': NIGERIA_LOCATIONS,
             'homes': homes_data,
         }
+    eligibility_data = []
+    if number == 3 and policy:
+        eligibility_data = [
+            {
+                'code': r['code'],
+                'label': r['label'],
+                'network': r['network'],
+                'basis': r.get('basis', 'Pending review'),
+            }
+            for r in policy.get('eligibility', [])
+        ]
     response = render(request, 'onboarding/wizard.html', {
         'account': account, 'form': form, 'step': number,
         'revision': draft.revision if draft else 0,
@@ -97,6 +108,7 @@ def render_step(request, number, draft, form, notice=None, status=200):
         'scope_label': c['onb_membership'], 'state_label': c['onb_more_needed'] if draft and draft.state == 'review_needed' else c['onb_ready'] if draft and draft.state == 'accepted' else c['onb_in_progress'],
         'draft': draft, 'policy': policy, 'tab': tab,
         'geo_data': geo_data,
+        'eligibility_data': eligibility_data,
         'events': draft.events.order_by('-id')[:100] if draft and tab == 'history' else [],
         'consents': draft.consents.order_by('-id')[:100] if draft and tab == 'history' else [],
         'profile_name': (draft.data.get('full_name') or account.display_name) if draft else account.display_name,

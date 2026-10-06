@@ -32,6 +32,7 @@
     initializeProfileMenus();
     initializePhotoControls();
     initializeGeographyDropdowns();
+    initializeEligibilityWatcher();
   };
   const recover = async () => {
     if (pending) return;
@@ -659,7 +660,7 @@ function initializeGeographyDropdowns() {
     if (!selectedRegion) {
       populateSelect(districtSelect, [], "", "Select LGA");
       if (districtCustom) districtCustom.syncFromNative();
-      updateLocalHome(!preserveSelected);
+      updateLocalHome();
       return;
     }
 
@@ -695,10 +696,10 @@ function initializeGeographyDropdowns() {
     }
 
     if (districtCustom) districtCustom.syncFromNative();
-    updateLocalHome(!preserveSelected);
+    updateLocalHome();
   }
 
-  function updateLocalHome(fromDropdownChange = false) {
+  function updateLocalHome() {
     if (!localHomeInput) return;
     const selectedCountry = countrySelect.value;
     const selectedRegion = regionSelect.value;
@@ -713,15 +714,8 @@ function initializeGeographyDropdowns() {
 
     if (matched && matched.label) {
       localHomeInput.value = matched.label;
-      localHomeInput.removeAttribute("data-user-custom");
-    } else if (fromDropdownChange) {
-      if (localHomeInput.getAttribute("data-user-custom") !== "true") {
-        localHomeInput.value = "Pending assignment";
-      }
     } else {
-      if (!localHomeInput.value) {
-        localHomeInput.value = localHomeInput.getAttribute("data-default-value") || "Pending assignment";
-      }
+      localHomeInput.value = "Pending assignment";
     }
   }
 
@@ -735,16 +729,7 @@ function initializeGeographyDropdowns() {
 
   if (districtSelect) {
     districtSelect.addEventListener("change", () => {
-      updateLocalHome(true);
-    });
-  }
-
-  if (localHomeInput) {
-    if (!localHomeInput.getAttribute("data-default-value")) {
-      localHomeInput.setAttribute("data-default-value", localHomeInput.value || "Pending assignment");
-    }
-    localHomeInput.addEventListener("input", () => {
-      localHomeInput.setAttribute("data-user-custom", "true");
+      updateLocalHome();
     });
   }
 
@@ -752,7 +737,37 @@ function initializeGeographyDropdowns() {
   updateRegions(true);
 }
 
+function initializeEligibilityWatcher() {
+  const elScript = document.getElementById("eligibility-data");
+  const elSelect = document.getElementById("id_eligibility");
+  const basisInput = document.getElementById("id_verification_basis");
+  if (!elScript || !elSelect || !basisInput) return;
+
+  let elList = [];
+  try {
+    elList = JSON.parse(elScript.textContent);
+  } catch (_) {
+    return;
+  }
+
+  function updateBasis() {
+    const val = elSelect.value;
+    const match = elList.find((r) => r.code === val);
+    if (match && match.basis) {
+      basisInput.value = match.basis;
+    } else {
+      basisInput.value = "Pending review";
+    }
+  }
+
+  elSelect.addEventListener("change", updateBasis);
+  if (elSelect.value) {
+    updateBasis();
+  }
+}
+
 initializeProfileMenus();
 initializeRecordTabs();
 initializePhotoControls();
 initializeGeographyDropdowns();
+initializeEligibilityWatcher();

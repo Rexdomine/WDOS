@@ -364,7 +364,6 @@ class OnboardingGeographyIntegrationTests(TestCase):
                 "region": "Kaduna",
                 "district": "Giwa",
                 "community_cluster": "Giwa Central",
-                "local_home": "Pending assignment",
             })
             self.assertRedirects(res, "/onboarding/5/")
 
@@ -372,7 +371,6 @@ class OnboardingGeographyIntegrationTests(TestCase):
             self.assertEqual(draft.data.get("country"), "Nigeria")
             self.assertEqual(draft.data.get("region"), "Kaduna")
             self.assertEqual(draft.data.get("district"), "Giwa")
-            self.assertEqual(draft.data.get("local_home"), "Pending assignment")
 
             # Invalid LGA in Kaduna fails validation
             invalid_res = self.client.post("/onboarding/4/", {
@@ -385,36 +383,32 @@ class OnboardingGeographyIntegrationTests(TestCase):
             self.assertEqual(invalid_res.status_code, 422)
             self.assertContains(invalid_res, "More information needed", status_code=422)
 
-    def test_local_connection_field_is_editable_and_persists_custom_value(self):
-        # Step 4 GET check: field is not disabled and renders editable with help text
-        page = self.client.get("/onboarding/4/")
-        self.assertEqual(page.status_code, 200)
-        form = page.context["form"]
-        self.assertFalse(form.fields["local_home"].disabled)
-        self.assertIn("Automatically assigned based on your location", form.fields["local_home"].help_text)
-        self.assertContains(page, 'id="id_local_home"')
-        self.assertNotContains(page, 'id="id_local_home" disabled')
-        self.assertContains(page, "Automatically assigned based on your location")
+    def test_local_connection_and_verification_basis_are_disabled_with_clear_readonly_states(self):
+        # Step 3 check: verification_basis is disabled, has read-only badge and explanatory help text
+        page3 = self.client.get("/onboarding/3/")
+        self.assertEqual(page3.status_code, 200)
+        form3 = page3.context["form"]
+        self.assertTrue(form3.fields["verification_basis"].disabled)
+        self.assertIn("System assigned based on your selected eligibility tier", form3.fields["verification_basis"].help_text)
+        self.assertContains(page3, 'id="id_verification_basis"')
+        self.assertContains(page3, 'name="verification_basis"')
+        self.assertContains(page3, 'disabled')
+        self.assertContains(page3, "field-readonly-badge")
+        self.assertContains(page3, "Read-only")
+        self.assertContains(page3, "System assigned based on your selected eligibility tier")
 
-        # Step 1-3 setup
-        self.save(1, {"language": "en", "timezone": "Africa/Lagos", "reading": "standard"}, revision=0)
-        self.save(2, {"full_name": "Custom Home Member", "preferred_name": "Custom"}, revision=1)
-        self.save(3, {"network": "WGMN", "eligibility": "pending", "eligibility_confirmed": "on"}, revision=2)
-
-        # Step 4 save with custom local connection
-        res = self.client.post("/onboarding/4/", {
-            "revision": 3,
-            "action": "continue",
-            "country": "Nigeria",
-            "region": "Kaduna",
-            "district": "Giwa",
-            "community_cluster": "Giwa North Cluster",
-            "local_home": "Kaduna Central Local Chapter",
-        })
-        self.assertRedirects(res, "/onboarding/5/")
-
-        draft = OnboardingDraft.objects.get(account=self.account)
-        self.assertEqual(draft.data.get("local_home"), "Kaduna Central Local Chapter")
+        # Step 4 check: local_home is disabled, has read-only badge and explanatory help text
+        page4 = self.client.get("/onboarding/4/")
+        self.assertEqual(page4.status_code, 200)
+        form4 = page4.context["form"]
+        self.assertTrue(form4.fields["local_home"].disabled)
+        self.assertIn("Automatically assigned based on your location", form4.fields["local_home"].help_text)
+        self.assertContains(page4, 'id="id_local_home"')
+        self.assertContains(page4, 'name="local_home"')
+        self.assertContains(page4, 'disabled')
+        self.assertContains(page4, "field-readonly-badge")
+        self.assertContains(page4, "Read-only")
+        self.assertContains(page4, "Automatically assigned based on your location")
 
 
 

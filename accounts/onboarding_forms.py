@@ -61,13 +61,28 @@ class ProfileForm(BaseForm):
 class NetworkForm(BaseForm):
     eligibility = forms.ChoiceField(label='Age eligibility', choices=[('pending', 'More information needed')])
     network = forms.ChoiceField(label='Proposed network', choices=[('', '—'), ('WGMN', 'WGMN — Good Mother Network'), ('WNNN', 'WNNN')])
-    verification_basis = forms.CharField(label='Verification basis', disabled=True, required=False, initial='Pending review')
+    verification_basis = forms.CharField(
+        label='Verification basis',
+        disabled=True,
+        required=False,
+        initial='Pending review',
+        help_text='System assigned based on your selected eligibility tier. This field cannot be edited.',
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         policy = current_policy()
         if policy:
             self.fields['eligibility'].choices = [('', '—')] + [(r['code'], r['label']) for r in policy['eligibility']]
+            selected_el = None
+            if self.data and self.data.get('eligibility'):
+                selected_el = self.data.get('eligibility')
+            elif self.initial and self.initial.get('eligibility'):
+                selected_el = self.initial.get('eligibility')
+            for r in policy['eligibility']:
+                if r['code'] == selected_el and r.get('basis'):
+                    self.fields['verification_basis'].initial = r['basis']
+                    break
 
     def clean(self):
         data = super().clean()
@@ -164,12 +179,9 @@ class GeographyForm(BaseForm):
         label='Local connection',
         max_length=150,
         required=False,
+        disabled=True,
         initial='Pending assignment',
-        widget=forms.TextInput(attrs={
-            'placeholder': 'Pending assignment',
-            'autocomplete': 'off',
-        }),
-        help_text='Automatically assigned based on your location, or enter your local chapter / connection.',
+        help_text='Automatically assigned based on your location. This field cannot be edited.',
     )
     country_id = forms.CharField(widget=forms.HiddenInput(), required=False)
     country_name = forms.CharField(widget=forms.HiddenInput(), required=False)
@@ -265,6 +277,19 @@ class GeographyForm(BaseForm):
             if val and (val, val) not in self.fields[name].choices:
                 self.fields[name].choices.append((val, val))
 
+        # Set initial local_home based on matching policy homes
+        selected_dist = (self.data and self.data.get('district')) or (self.initial and self.initial.get('district'))
+        matching_init_homes = [
+            h for h in network_homes
+            if (not selected_country or h.get('country') in (selected_country, getattr(c_record, 'get', lambda k: '')('name') if c_record else '', getattr(c_record, 'get', lambda k: '')('code') if c_record else ''))
+            and (not selected_region or h.get('region') == selected_region)
+            and (not selected_dist or h.get('district') == selected_dist)
+        ]
+        if matching_init_homes and matching_init_homes[0].get('label'):
+            self.fields['local_home'].initial = matching_init_homes[0]['label']
+        else:
+            self.fields['local_home'].initial = 'Pending assignment'
+
     def clean_community_cluster(self):
         val = self.cleaned_data.get('community_cluster', '')
         if val is None:
@@ -278,11 +303,7 @@ class GeographyForm(BaseForm):
         return val
 
     def clean_local_home(self):
-        val = self.cleaned_data.get('local_home', '')
-        if val is None:
-            return 'Pending assignment'
-        val = str(val).strip()
-        return val or 'Pending assignment'
+        return self.initial.get('local_home', 'Pending assignment')
 
     def clean(self):
         data = super().clean()

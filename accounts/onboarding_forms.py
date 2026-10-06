@@ -19,7 +19,8 @@ class BaseForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.account = account
         for field in self.fields.values():
-            field.widget.attrs['class'] = 'input'
+            if not isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs['class'] = 'input'
 
 
 class WelcomeForm(BaseForm):

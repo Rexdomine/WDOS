@@ -156,3 +156,15 @@ class OnboardingUITests(TestCase):
         self.assertContains(shell, catalog('fr')['onb_workspace'])
         self.assertContains(shell, catalog('fr')['onb_search'])
         self.assertNotContains(shell, 'Search WDOS')
+
+    def test_confirm_eligibility_checkbox_has_space_and_text_separation(self):
+        from .onboarding_forms import NetworkForm
+        form = NetworkForm()
+        self.assertNotIn('input', form.fields['eligibility_confirmed'].widget.attrs.get('class', ''))
+        response = self.client.get('/onboarding/3/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="checkbox-control"')
+        self.assertContains(response, '<span class="checkbox-box" aria-hidden="true">✓</span> <span class="checkbox-text">I confirm this information is accurate.</span>')
+        css = (Path(settings.BASE_DIR) / 'accounts/static/accounts/onboarding.css').read_text()
+        self.assertIn('.checkbox-text{display:inline-block;line-height:1.4;color:#544758}', css)
+        self.assertIn('.checkbox-control input[type=checkbox]{position:absolute !important;', css)

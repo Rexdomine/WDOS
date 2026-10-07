@@ -158,3 +158,68 @@ class Membership(models.Model):
 
     class Meta:
         constraints = [models.CheckConstraint(condition=models.Q(network__in=['WGMN', 'WNNN']), name='membership_explicit_network')]
+
+
+class CountryCatalogue(models.Model):
+    """Normalized country catalogue for all 55 African nations."""
+    iso3 = models.CharField(max_length=3, primary_key=True)
+    iso2 = models.CharField(max_length=2, unique=True, db_index=True)
+    name = models.CharField(max_length=100, unique=True, db_index=True)
+    admin1_label = models.CharField(max_length=100)
+    admin2_label = models.CharField(max_length=100)
+    level2_reliable = models.BooleanField(default=False)
+    source = models.CharField(max_length=100, default='geoBoundaries gbOpen')
+    source_version = models.CharField(max_length=50, default='gbOpen-v4.0')
+    last_verified_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = 'Country Catalogue'
+
+    def __str__(self):
+        return f"{self.name} ({self.iso3})"
+
+
+class AdministrativeDivision(models.Model):
+    """Normalized Level 1 and reliable Level 2 administrative divisions."""
+    id = models.CharField(max_length=64, primary_key=True)
+    level = models.PositiveSmallIntegerField(choices=[(1, 'Level 1'), (2, 'Level 2')], db_index=True)
+    country = models.ForeignKey(CountryCatalogue, on_delete=models.CASCADE, related_name='divisions')
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')
+    display_name = models.CharField(max_length=150, db_index=True)
+    local_unit_type = models.CharField(max_length=100)
+    source = models.CharField(max_length=100)
+    source_version = models.CharField(max_length=50)
+    last_verified_date = models.DateField()
+
+    class Meta:
+        ordering = ['display_name']
+        constraints = [
+            models.UniqueConstraint(fields=['country', 'parent', 'display_name'], name='unique_division_per_parent'),
+        ]
+
+    def __str__(self):
+        return f"{self.display_name} ({self.local_unit_type}, {self.id})"
+
+
+class DataImprovementFlag(models.Model):
+    """Flags unlisted subdivisions typed by users for subsequent catalogue enhancement."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    draft = models.ForeignKey(OnboardingDraft, null=True, blank=True, on_delete=models.SET_NULL, related_name='data_improvement_flags')
+    account = models.ForeignKey(Account, null=True, blank=True, on_delete=models.SET_NULL, related_name='geography_flags')
+    country_iso3 = models.CharField(max_length=3)
+    region_id = models.CharField(max_length=64, blank=True)
+    region_name = models.CharField(max_length=150, blank=True)
+    unlisted_subdivision = models.CharField(max_length=150)
+    unit_type = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=20, default='pending', choices=[('pending', 'Pending Review'), ('reviewed', 'Reviewed'), ('catalogued', 'Added to Catalogue')])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Flag: {self.unlisted_subdivision} ({self.country_iso3} / {self.region_name})"
+

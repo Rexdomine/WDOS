@@ -778,18 +778,33 @@ COUNTRY_ALIASES = {
 }
 
 
+# Decorate countries with ISO3, ISO2, source metadata, and normalized label aliases
+for _cname, _cdata in AFRICAN_COUNTRIES.items():
+    _code = _cdata["code"].upper()
+    from .geography_catalogue import ISO2_TO_ISO3, get_source_for_country
+    _iso3 = ISO2_TO_ISO3.get(_code, _code)
+    _src = get_source_for_country(_iso3)
+    _cdata["iso3"] = _iso3
+    _cdata["iso2"] = _code
+    _cdata["admin1_label"] = _cdata["admin_label"]
+    _cdata["admin2_label"] = _cdata["local_label"]
+    _cdata["source"] = _src["name"]
+    _cdata["source_version"] = _src["version"]
+    _cdata["last_verified_date"] = _src["last_verified_date"]
+
+
 def get_country(identifier):
-    """Lookup country record by code or name."""
+    """Lookup country record by ISO3, ISO2, or name (case-insensitive)."""
     if not identifier:
         return None
     ident = str(identifier).strip()
     # Check exact name
     if ident in AFRICAN_COUNTRIES:
         return AFRICAN_COUNTRIES[ident]
-    # Check by 2-letter ISO code
     ident_upper = ident.upper()
+    # Check by 3-letter ISO3 or 2-letter ISO2 code
     for country in AFRICAN_COUNTRIES.values():
-        if country["code"].upper() == ident_upper:
+        if country.get("iso3") == ident_upper or country["code"].upper() == ident_upper:
             return country
     # Check case-insensitive name or alias
     ident_lower = ident.lower()

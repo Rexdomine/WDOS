@@ -126,7 +126,9 @@ class GeographyFormTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         cleaned = form.cleaned_data
         self.assertEqual(cleaned["country"], "Kenya")
-        self.assertEqual(cleaned["country_id"], "KE")
+        self.assertEqual(cleaned["country_id"], "KEN")
+        self.assertEqual(cleaned["country_iso3"], "KEN")
+        self.assertEqual(cleaned["country_iso2"], "KE")
         self.assertEqual(cleaned["country_name"], "Kenya")
         self.assertEqual(cleaned["region"], "Nairobi")
         self.assertEqual(cleaned["region_id"], "KE-30")
@@ -207,7 +209,9 @@ class OnboardingGeographyIntegrationTests(TestCase):
 
         draft = OnboardingDraft.objects.get(account=self.account)
         self.assertEqual(draft.data["country"], "Kenya")
-        self.assertEqual(draft.data["country_id"], "KE")
+        self.assertEqual(draft.data["country_id"], "KEN")
+        self.assertEqual(draft.data["country_iso3"], "KEN")
+        self.assertEqual(draft.data["country_iso2"], "KE")
         self.assertEqual(draft.data["country_name"], "Kenya")
         self.assertEqual(draft.data["region"], "Nairobi")
         self.assertEqual(draft.data["region_id"], "KE-30")
@@ -270,7 +274,9 @@ class OnboardingGeographyIntegrationTests(TestCase):
         draft = OnboardingDraft.objects.get(account=self.account)
         self.assertEqual(draft.state, "review_needed")
         self.assertEqual(draft.data["country"], "South Africa")
-        self.assertEqual(draft.data["country_id"], "ZA")
+        self.assertEqual(draft.data["country_id"], "ZAF")
+        self.assertEqual(draft.data["country_iso3"], "ZAF")
+        self.assertEqual(draft.data["country_iso2"], "ZA")
         self.assertEqual(draft.data["region"], "Gauteng")
         self.assertEqual(draft.data["region_id"], "ZA-GP")
         self.assertEqual(draft.data["community_cluster"], "Johannesburg Central")
@@ -484,6 +490,102 @@ class OnboardingGeographyIntegrationTests(TestCase):
         page4 = self.client.get("/onboarding/4/")
         self.assertEqual(page4.status_code, 200)
         self.assertContains(page4, 'value="Uyo" selected')
+
+    def test_geography_catalogue_completeness_and_validation(self):
+        from .geography_catalogue import check_geography_completeness, AFRICAN_GEOGRAPHY_CATALOGUE
+        result = check_geography_completeness()
+        self.assertTrue(result["valid"], f"Geography catalogue completeness errors: {result['errors']}")
+        self.assertEqual(result["country_count"], 55)
+        self.assertEqual(len(result["errors"]), 0)
+        self.assertGreaterEqual(result["total_level1"], 800)
+        self.assertGreaterEqual(result["total_level2"], 900)
+
+        # Check metadata for specific sources
+        self.assertEqual(AFRICAN_GEOGRAPHY_CATALOGUE["NGA"]["source"], "UN OCHA/HDX COD-AB")
+        self.assertEqual(AFRICAN_GEOGRAPHY_CATALOGUE["DZA"]["source"], "geoBoundaries gbOpen")
+        self.assertEqual(AFRICAN_GEOGRAPHY_CATALOGUE["CPV"]["source"], "GeoNames")
+
+    def test_catalogue_database_import_and_models(self):
+        from .geography_catalogue import import_catalogue_to_database
+        from .models import CountryCatalogue, AdministrativeDivision
+        stats = import_catalogue_to_database()
+        self.assertEqual(stats["total_countries"], 55)
+        self.assertEqual(CountryCatalogue.objects.count(), 55)
+        self.assertGreaterEqual(AdministrativeDivision.objects.filter(level=1).count(), 800)
+        self.assertGreaterEqual(AdministrativeDivision.objects.filter(level=2).count(), 900)
+
+        nga = CountryCatalogue.objects.get(iso3="NGA")
+        self.assertEqual(nga.name, "Nigeria")
+        self.assertEqual(nga.admin1_label, "State / FCT")
+        self.assertEqual(nga.admin2_label, "Local Government Area (LGA)")
+        self.assertTrue(nga.level2_reliable)
+
+    def test_unlisted_subdivision_saves_and_flags_data_improvement(self):
+        # Steps 1 to 3
+        self.save(1, {"language": "en", "timezone": "Africa/Nairobi", "reading": "standard"}, revision=0)
+        self.save(2, {"full_name": "Wangari Muta", "preferred_name": "Wangari"}, revision=1)
+        self.save(3, {"network": "WGMN", "eligibility": "pending", "eligibility_confirmed": "on"}, revision=2)
+
+        draft = OnboardingDraft.objects.get(account=self.account)
+        from .models import DataImprovementFlag
+
+        # Submit Step 4 with explicit "Not listed, I will type it" and custom subdivision name
+        res = self.client.post("/onboarding/4/", {
+            "revision": draft.revision,
+            "action": "continue",
+            "country": "Kenya",
+            "region": "Uasin Gishu",
+            "district": "__not_listed__",
+            "district_custom": "Sergoit Rural Sub-County",
+            "district_not_listed": "true",
+            "community_cluster": "Eldoret Cluster",
+        })
+        self.assertRedirects(res, "/onboarding/5/")
+
+        # Verify draft metadata
+        draft.refresh_from_db()
+        self.assertEqual(draft.data["country"], "Kenya")
+        self.assertEqual(draft.data["country_iso3"], "KEN")
+        self.assertEqual(draft.data["region"], "Uasin Gishu")
+        self.assertEqual(draft.data["region_id"], "KE-44")
+        self.assertEqual(draft.data["district"], "Sergoit Rural Sub-County")
+        self.assertEqual(draft.data["district_not_listed"], True)
+        self.assertEqual(draft.data["data_improvement_flag"], True)
+        self.assertIn("Sergoit Rural Sub-County", draft.data.get("data_improvement_note", ""))
+        self.assertEqual(draft.data["geography_source"], "UN OCHA/HDX COD-AB")
+
+        # Verify DataImprovementFlag database record
+        flags = DataImprovementFlag.objects.filter(country_iso3="KEN", unlisted_subdivision="Sergoit Rural Sub-County")
+        self.assertTrue(flags.exists())
+        flag = flags.first()
+        self.assertEqual(flag.region_name, "Uasin Gishu")
+        self.assertEqual(flag.region_id, "KE-44")
+        self.assertEqual(flag.unit_type, "Sub-county")
+        self.assertEqual(flag.status, "pending")
+
+    def test_step_4_reliable_level2_choices_for_multiple_african_countries(self):
+        from .onboarding_forms import GeographyForm
+        # Kenya Nairobi has subcounties like Westlands, Kibra, Lang'ata
+        ke_form = GeographyForm(initial={"country": "Kenya", "region": "Nairobi"})
+        ke_choices = [c[0] for c in ke_form.fields["district"].choices]
+        self.assertIn("Westlands", ke_choices)
+        self.assertIn("Langata", ke_choices)
+        self.assertIn("__not_listed__", ke_choices)
+
+        # South Africa Gauteng has City of Johannesburg, City of Tshwane
+        za_form = GeographyForm(initial={"country": "South Africa", "region": "Gauteng"})
+        za_choices = [c[0] for c in za_form.fields["district"].choices]
+        self.assertIn("City of Johannesburg", za_choices)
+        self.assertIn("City of Tshwane", za_choices)
+        self.assertIn("__not_listed__", za_choices)
+
+        # Ghana Greater Accra has Accra Metropolitan, Tema Metropolitan
+        gh_form = GeographyForm(initial={"country": "Ghana", "region": "Greater Accra"})
+        gh_choices = [c[0] for c in gh_form.fields["district"].choices]
+        self.assertIn("Accra Metropolitan", gh_choices)
+        self.assertIn("Tema Metropolitan", gh_choices)
+        self.assertIn("__not_listed__", gh_choices)
+
 
 
 

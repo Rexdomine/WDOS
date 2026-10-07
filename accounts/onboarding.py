@@ -73,15 +73,30 @@ def render_step(request, number, draft, form, notice=None, status=200):
         if not network_homes and homes:
             network_homes = homes
 
+        from .geography_catalogue import get_all_countries
+
+        level2_catalogue = {}
+        for c_entry in get_all_countries():
+            if c_entry.get("level2_reliable") and c_entry.get("level2"):
+                reg_map = {}
+                for rk, rlist in c_entry["level2"].items():
+                    reg_map[rk] = [u["display_name"] for u in rlist]
+                level2_catalogue[c_entry["name"]] = reg_map
+                level2_catalogue[c_entry["iso3"]] = reg_map
+                level2_catalogue[c_entry["iso2"]] = reg_map
+
         countries_list = [
             {
-                'code': c['code'],
-                'name': c['name'],
-                'admin_label': c['admin_label'],
-                'local_label': c['local_label'],
-                'regions': [{'code': r[0], 'name': r[1]} for r in c['regions']],
+                'code': item['code'],
+                'iso3': item.get('iso3', item['code']),
+                'iso2': item['code'],
+                'name': item['name'],
+                'admin1_label': item['admin1_label'],
+                'local_label': item['local_label'],
+                'level2_reliable': item.get('level2_reliable', False),
+                'regions': [{'code': r[0], 'name': r[1]} for r in item['regions']],
             }
-            for c in sorted(AFRICAN_COUNTRIES.values(), key=lambda x: x['name'])
+            for item in sorted(AFRICAN_COUNTRIES.values(), key=lambda x: x['name'])
         ]
 
         homes_data = [
@@ -98,6 +113,7 @@ def render_step(request, number, draft, form, notice=None, status=200):
         geo_data = {
             'countries': countries_list,
             'nigeria_districts': NIGERIA_LOCATIONS,
+            'level2_catalogue': level2_catalogue,
             'homes': homes_data,
             'country_timezones': {c['name']: DEFAULT_COUNTRY_TIMEZONES.get(c['name']) for c in AFRICAN_COUNTRIES.values()},
             'multi_timezone_countries': MULTI_TIMEZONE_COUNTRIES,

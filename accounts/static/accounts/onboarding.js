@@ -406,7 +406,9 @@ function createSearchableSelect(nativeSelect, defaultPlaceholder) {
       labelSpan.textContent = text;
       labelSpan.classList.remove("is-placeholder");
     } else {
-      labelSpan.textContent = defaultPlaceholder || text || "Select";
+      labelSpan.textContent = (text && (text.toLowerCase().startsWith("select ") || text.startsWith("—")))
+        ? text
+        : (defaultPlaceholder || text || "Select");
       labelSpan.classList.add("is-placeholder");
     }
 
@@ -583,6 +585,10 @@ function createSearchableSelect(nativeSelect, defaultPlaceholder) {
     close,
     toggle,
     syncFromNative,
+    setPlaceholder: (ph) => {
+      defaultPlaceholder = ph;
+      syncFromNative();
+    },
   };
 
   syncFromNative();
@@ -637,21 +643,17 @@ function initializeGeographyDropdowns() {
   }
 
   function updateFieldLabels(countryRecord) {
+    const admin1 = countryRecord ? (countryRecord.admin1_label || countryRecord.admin_label) : "";
+    const admin2 = countryRecord ? (countryRecord.admin2_label || countryRecord.local_label) : "";
     if (regionLabel) {
-      regionLabel.textContent = countryRecord && countryRecord.admin_label
-        ? countryRecord.admin_label
-        : "State / Region / Province";
+      regionLabel.textContent = admin1 || "State / Region / Province";
     }
     if (districtLabel) {
-      districtLabel.textContent = countryRecord && countryRecord.local_label
-        ? countryRecord.local_label
-        : "Local government / District";
+      districtLabel.textContent = admin2 || "Local government / District";
     }
     const customLabel = document.querySelector('label[for="id_district_custom"]');
     if (customLabel) {
-      customLabel.textContent = countryRecord && countryRecord.local_label
-        ? `Unlisted ${countryRecord.local_label}`
-        : "Subdivision name";
+      customLabel.textContent = admin2 ? `Unlisted ${admin2}` : "Subdivision name";
     }
   }
 
@@ -741,7 +743,11 @@ function initializeGeographyDropdowns() {
       matchingRegions.sort();
     }
 
-    const regPlaceholder = countryRecord && countryRecord.admin_label ? `Select ${countryRecord.admin_label}` : "Select state";
+    const admin1 = countryRecord ? (countryRecord.admin1_label || countryRecord.admin_label) : "";
+    const regPlaceholder = admin1 ? `Select ${admin1}` : "Select state";
+    if (regionCustom && typeof regionCustom.setPlaceholder === "function") {
+      regionCustom.setPlaceholder(regPlaceholder);
+    }
     if (matchingRegions.length === 0) {
       populateSelect(regionSelect, [], "", "— No administrative divisions available —");
     } else {
@@ -758,7 +764,11 @@ function initializeGeographyDropdowns() {
     const countryRecord = getCountryRecord(selectedCountry);
     const selectedRegion = regionSelect.value;
     const currentDistrict = preserveSelected ? districtSelect.value : "";
-    const distPlaceholder = countryRecord && countryRecord.local_label ? `Select ${countryRecord.local_label}` : "Select LGA";
+    const admin2 = countryRecord ? (countryRecord.admin2_label || countryRecord.local_label) : "";
+    const distPlaceholder = admin2 ? `Select ${admin2}` : "Select LGA";
+    if (districtCustom && typeof districtCustom.setPlaceholder === "function") {
+      districtCustom.setPlaceholder(distPlaceholder);
+    }
 
     if (!preserveSelected) {
       districtSelect.value = "";

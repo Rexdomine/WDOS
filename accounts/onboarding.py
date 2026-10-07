@@ -92,7 +92,9 @@ def render_step(request, number, draft, form, notice=None, status=200):
                 'iso2': item['code'],
                 'name': item['name'],
                 'admin1_label': item['admin1_label'],
+                'admin_label': item['admin1_label'],
                 'local_label': item['local_label'],
+                'admin2_label': item['local_label'],
                 'level2_reliable': item.get('level2_reliable', False),
                 'regions': [{'code': r[0], 'name': r[1]} for r in item['regions']],
             }

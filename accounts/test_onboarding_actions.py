@@ -318,3 +318,69 @@ class OnboardingButtonAndActionAuditTests(TestCase):
             self.assertFalse(mismatched_form.is_valid())
             self.assertIn('More information needed', mismatched_form.errors.get('eligibility', []))
 
+    def test_step_5_save_interests_then_back_preserves_values_and_revision(self):
+        """Saving Step 5 interests and then navigating Back preserves all values in rendered HTML."""
+        self._complete_steps_up_to(5)
+        draft = OnboardingDraft.objects.get(account=self.account)
+
+        # Save interests on Step 5
+        step5_payload = {
+            'revision': draft.revision,
+            'action': 'continue',
+            'interests': 'Youth empowerment and digital literacy',
+            'skills': 'Mentorship and technical training',
+            'community_connection': 'Local grassroots coordinator',
+            'availability': 'Evenings and weekends',
+        }
+        resp = self.client.post('/onboarding/5/', step5_payload)
+        self.assertRedirects(resp, '/onboarding/6/')
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.data.get('interests'), 'Youth empowerment and digital literacy')
+        self.assertEqual(draft.data.get('skills'), 'Mentorship and technical training')
+        self.assertEqual(draft.data.get('community_connection'), 'Local grassroots coordinator')
+        self.assertEqual(draft.data.get('availability'), 'Evenings and weekends')
+
+        # Click Back button on Step 6
+        back_resp = self.client.post('/onboarding/6/', {
+            'revision': draft.revision,
+            'action': 'back',
+        })
+        self.assertRedirects(back_resp, '/onboarding/5/')
+
+        # GET Step 5 renders all fields with their saved values
+        page = self.client.get('/onboarding/5/')
+        self.assertEqual(page.status_code, 200)
+        content = page.content.decode('utf-8')
+        self.assertIn('value="Youth empowerment and digital literacy"', content)
+        self.assertIn('value="Mentorship and technical training"', content)
+        self.assertIn('value="Local grassroots coordinator"', content)
+        self.assertIn('value="Evenings and weekends"', content)
+        self.assertIn('autocomplete="off"', content)
+
+        # Step 5 Back button directly also preserves edits to draft
+        draft.refresh_from_db()
+        step5_back_resp = self.client.post('/onboarding/5/', {
+            'revision': draft.revision,
+            'action': 'back',
+            'interests': 'Updated advocacy and digital skills',
+            'skills': 'Python and project leadership',
+            'community_connection': 'Regional organizer',
+            'availability': 'Flexible hours',
+        })
+        self.assertRedirects(step5_back_resp, '/onboarding/4/')
+        draft.refresh_from_db()
+        self.assertEqual(draft.data.get('interests'), 'Updated advocacy and digital skills')
+        self.assertEqual(draft.data.get('skills'), 'Python and project leadership')
+
+    def test_onboarding_form_and_js_have_autocomplete_off_and_bfcache_protection(self):
+        """Onboarding form has autocomplete="off" and onboarding.js handles BFCache / popstate cleanly."""
+        response = self.client.get('/onboarding/5/')
+        self.assertContains(response, 'id="onboarding-form" autocomplete="off"')
+
+        js = (Path(settings.BASE_DIR) / 'accounts/static/accounts/onboarding.js').read_text(encoding='utf-8')
+        self.assertIn('window.addEventListener("pageshow"', js)
+        self.assertIn('event.persisted', js)
+        self.assertIn('window.location.reload();', js)
+        self.assertIn('window.addEventListener("popstate"', js)
+

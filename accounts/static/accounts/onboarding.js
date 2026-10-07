@@ -30,7 +30,11 @@
     const html = await response.text();
     const parsed = new DOMParser().parseFromString(html, "text/html");
     if (!parsed.querySelector("main")) throw new Error("invalid HTML response");
-    window.history.replaceState({}, "", target);
+    if (target !== window.location.href) {
+      window.history.pushState({}, "", target);
+    } else {
+      window.history.replaceState({}, "", target);
+    }
     document.documentElement.replaceWith(document.adoptNode(parsed.documentElement));
     // DOMParser scripts are inert: bind the new authoritative form explicitly.
     initializeOnboarding();
@@ -120,6 +124,24 @@
     if (!pending) recover();
   });
   interrupted.querySelector("[data-recovery-retry]").addEventListener("click", recover);
+
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      window.location.reload();
+      return;
+    }
+    const navEntries = window.performance && window.performance.getEntriesByType && window.performance.getEntriesByType("navigation");
+    if (navEntries && navEntries.length > 0 && navEntries[0].type === "back_forward") {
+      const loadingCard = document.querySelector("#onboarding-loading");
+      if (busy || (loadingCard && !loadingCard.hidden)) {
+        window.location.reload();
+      }
+    }
+  });
+
+  window.addEventListener("popstate", () => {
+    window.location.reload();
+  });
 })();
 
 

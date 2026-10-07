@@ -28,6 +28,7 @@ class BaseForm(forms.Form):
         for field in self.fields.values():
             if not isinstance(field.widget, forms.CheckboxInput):
                 field.widget.attrs['class'] = 'input'
+                field.widget.attrs['autocomplete'] = 'off'
 
 
 class WelcomeForm(BaseForm):
@@ -738,10 +739,10 @@ class GeographyForm(BaseForm):
 
 
 class InterestsForm(BaseForm):
-    interests = forms.CharField(label='Interests', max_length=1000, required=False)
-    skills = forms.CharField(label='Skills to share', max_length=1000, required=False)
-    community_connection = forms.CharField(label='Community connection', max_length=250, required=False)
-    availability = forms.CharField(label='Availability', max_length=250, required=False)
+    interests = forms.CharField(label='Interests', max_length=1000, required=False, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+    skills = forms.CharField(label='Skills to share', max_length=1000, required=False, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+    community_connection = forms.CharField(label='Community connection', max_length=250, required=False, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+    availability = forms.CharField(label='Availability', max_length=250, required=False, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
 
 
 class ConsentForm(BaseForm):

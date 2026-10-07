@@ -1,0 +1,77 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}Notifications · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">COMMUNICATIONS & NOTIFICATIONS</div>
+    <h1>Notifications Center</h1>
+    <p>System alerts, work item notices, and privacy request updates scoped to your account.</p>
+  </div>
+  <div class="actions">
+    <form method="post" action="/foundation/api/notifications/mark-all-read/">
+      {% csrf_token %}
+      <button type="submit" class="btn small">Mark All as Read</button>
+    </form>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panelhead">
+    <h2>All Alerts ({{ notifications|length }})</h2>
+    <span class="scope-badge">Active Channel</span>
+  </div>
+
+  {% if notifications %}
+  <div style="display:flex; flex-direction:column;">
+    {% for notif in notifications %}
+    <div class="notification-card {% if not notif.is_read %}unread{% endif %} {% if notif.delivery_status == 'failed' %}failed{% endif %}">
+      <div style="font-size:20px; line-height:1;">
+        {% if notif.delivery_status == 'failed' %}⚠️{% elif not notif.is_read %}📫{% else %}✉{% endif %}
+      </div>
+      <div style="flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+          <h3 style="margin:0 0 4px; font-size:14px; font-weight:700;">
+            {{ notif.title }}
+            {% if not notif.is_read %}
+            <span class="badge pending" style="font-size:9px; vertical-align:middle;">New</span>
+            {% endif %}
+          </h3>
+          <span style="font-size:11px; color:var(--wdos-muted); white-space:nowrap;">{{ notif.created_at|timesince }} ago</span>
+        </div>
+        <p style="margin:4px 0 8px; font-size:13px; color:var(--wdos-ink); line-height:1.5;">{{ notif.message }}</p>
+
+        <!-- Failed Delivery Recovery Banner -->
+        {% if notif.delivery_status == 'failed' %}
+        <div class="notice" style="margin:8px 0; background:#FFF1F0; border-color:#FFA39E; color:#CF1322; padding:8px 12px; font-size:12px;">
+          <span>Delivery Failure: Notification could not be dispatched to your external alert channel.</span>
+          <form method="post" action="/foundation/api/notifications/{{ notif.id }}/retry/" style="margin-left:auto;">
+            {% csrf_token %}
+            <button type="submit" class="btn small" style="padding:2px 8px; min-height:26px; font-size:11px;">Retry Delivery</button>
+          </form>
+        </div>
+        {% endif %}
+
+        <div style="display:flex; gap:12px; align-items:center; margin-top:6px;">
+          {% if notif.target_url %}
+          <a href="{{ notif.target_url }}" class="textlink" style="font-size:11.5px;">View Related Record ›</a>
+          {% endif %}
+          {% if not notif.is_read %}
+          <button type="button" class="btn small ghost" data-mark-read="{{ notif.id }}" style="font-size:11px; padding:2px 8px; min-height:26px;">
+            Mark as read
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">♧</div>
+    <h3>No notifications right now</h3>
+    <p>You are completely caught up with all tasks and communications in your workspace.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

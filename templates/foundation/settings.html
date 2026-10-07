@@ -1,0 +1,140 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}Settings & Accessibility · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">PREFERENCES & ACCESSIBILITY</div>
+    <h1>Settings & Preferences</h1>
+    <p>Customize your language, accessibility display, and communication preferences. Settings are saved permanently to your profile.</p>
+  </div>
+  <div class="actions">
+    <form method="post" action="/foundation/settings/reset-preferences/">
+      {% csrf_token %}
+      <button type="submit" class="btn small" onclick="return confirm('Reset all settings to default values?');">
+        Reset to Safe Defaults
+      </button>
+    </form>
+  </div>
+</div>
+
+<form method="post" action="/foundation/api/preferences/">
+  {% csrf_token %}
+
+  <div class="grid">
+    <!-- Left Column: Language & Accessibility -->
+    <div class="stack">
+      <!-- Language Section -->
+      <section class="panel">
+        <div class="panelhead">
+          <div>
+            <h2>Interface Language</h2>
+            <p>Select your preferred language across navigation, forms, and alerts.</p>
+          </div>
+          <span class="scope-badge">{{ lang|upper }}</span>
+        </div>
+
+        <div class="fields" style="display:block;">
+          <div class="field">
+            <label for="language-select">Supported Languages</label>
+            <select name="language" id="language-select" class="input" style="width:100%;">
+              {% for code, info in languages.items %}
+              <option value="{{ code }}" {% if code == lang %}selected{% endif %}>
+                {{ info.name }} ({{ code|upper }}) {% if info.dir == 'rtl' %}— Right-to-Left (RTL){% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Accessibility Section -->
+      <section class="panel">
+        <div class="panelhead">
+          <div>
+            <h2>Accessibility & Visual Comfort</h2>
+            <p>Tailor high-contrast readability and vestibular motion settings.</p>
+          </div>
+          <span class="badge completed">WCAG AAA</span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div class="switch-control">
+            <input type="checkbox" name="high_contrast" value="true" id="high_contrast_toggle" {% if user_pref.high_contrast %}checked{% endif %}>
+            <div>
+              <label for="high_contrast_toggle" style="font-weight:650; cursor:pointer;">High Contrast Mode</label>
+              <p style="margin:2px 0 0; font-size:12px; color:var(--wdos-muted);">Increases text and border contrast to maximum readability ratios.</p>
+            </div>
+          </div>
+
+          <div class="switch-control">
+            <input type="checkbox" name="reduced_motion" value="true" id="reduced_motion_toggle" {% if user_pref.reduced_motion %}checked{% endif %}>
+            <div>
+              <label for="reduced_motion_toggle" style="font-weight:650; cursor:pointer;">Reduced Motion</label>
+              <p style="margin:2px 0 0; font-size:12px; color:var(--wdos-muted);">Disables animations, transitions, and motion effects.</p>
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:8px;">
+            <label for="font-size-select">Display Text Size</label>
+            <select name="font_size" id="font-size-select" class="input" style="width:100%;">
+              <option value="standard" {% if user_pref.font_size == 'standard' %}selected{% endif %}>Standard (14px baseline)</option>
+              <option value="large" {% if user_pref.font_size == 'large' %}selected{% endif %}>Large (16px baseline)</option>
+              <option value="xlarge" {% if user_pref.font_size == 'xlarge' %}selected{% endif %}>Extra Large (18px baseline)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Right Column: Notifications & Recovery -->
+    <div class="stack">
+      <section class="panel">
+        <div class="panelhead">
+          <div>
+            <h2>Notification Channels</h2>
+            <p>Choose how and when to receive alerts.</p>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div class="switch-control">
+            <input type="checkbox" name="in_app_notifications" value="true" id="in_app_toggle" {% if user_pref.in_app_notifications %}checked{% endif %}>
+            <div>
+              <label for="in_app_toggle" style="font-weight:650; cursor:pointer;">In-App Alert Center</label>
+              <p style="margin:2px 0 0; font-size:12px; color:var(--wdos-muted);">Show notifications in the top bar and alerts drawer.</p>
+            </div>
+          </div>
+
+          <div class="switch-control">
+            <input type="checkbox" name="email_notifications" value="true" id="email_toggle" {% if user_pref.email_notifications %}checked{% endif %}>
+            <div>
+              <label for="email_toggle" style="font-weight:650; cursor:pointer;">Email Updates</label>
+              <p style="margin:2px 0 0; font-size:12px; color:var(--wdos-muted);">Send critical task and security alerts to your verified email.</p>
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:8px;">
+            <label for="digest-select">Activity Digest Cadence</label>
+            <select name="activity_digest" id="digest-select" class="input" style="width:100%;">
+              <option value="realtime" {% if user_pref.activity_digest == 'realtime' %}selected{% endif %}>Real-time delivery</option>
+              <option value="daily" {% if user_pref.activity_digest == 'daily' %}selected{% endif %}>Daily Summary</option>
+              <option value="weekly" {% if user_pref.activity_digest == 'weekly' %}selected{% endif %}>Weekly Summary</option>
+              <option value="none" {% if user_pref.activity_digest == 'none' %}selected{% endif %}>None (Critical only)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panelhead">
+          <h2>Apply Changes</h2>
+        </div>
+        <button type="submit" class="btn primary" style="width:100%; justify-content:center;">
+          Save All Preferences
+        </button>
+      </section>
+    </div>
+  </div>
+</form>
+{% endblock %}

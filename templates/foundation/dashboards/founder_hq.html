@@ -1,0 +1,270 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}Founder & HQ Executive Dashboard · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ scope_label }} · GLOBAL OVERSIGHT</div>
+    <h1 id="page-title">Executive Headquarters Dashboard</h1>
+    <p>Strategic cross-network pulse, country hub performance, governance alerts, and high-level reports.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    {% if available_roles|length > 1 %}
+    <div class="role-selector-wrap" style="display:flex; align-items:center; gap:6px; background:white; padding:4px 10px; border-radius:8px; border:1px solid var(--wdos-line);">
+      <span style="font-size:11px; font-weight:700; color:var(--wdos-muted);">TEST ROLE:</span>
+      <select onchange="window.location.href='/foundation/?role=' + this.value" aria-label="Switch test role" style="border:none; font-size:12px; font-weight:700; color:var(--wdos-magenta); background:transparent; cursor:pointer;">
+        {% for r in available_roles %}
+        <option value="{{ r }}" {% if r == active_role %}selected{% endif %}>{{ r|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <a class="btn" href="/foundation/dashboard/export/?type=summary&network={{ active_network }}&country={{ active_country }}" download>
+      <span aria-hidden="true">⬇</span> Export Executive Summary
+    </a>
+    <a class="btn primary" href="/foundation/dashboard/drilldown/reports/?network={{ active_network }}&country={{ active_country }}">
+      Strategic Reports
+    </a>
+  </div>
+</div>
+
+<!-- Scoped KPIs Header Bar (Reconciles to Source Records) -->
+<div class="stats" role="region" aria-label="Key Performance Indicators">
+  <a href="/foundation/dashboard/drilldown/members/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>TOTAL NETWORK MEMBERSHIP</span><span class="icon" aria-hidden="true">👤</span></div>
+    <div class="stat-value">{{ kpis.total_members|default:"0" }}</div>
+    <div class="stat-detail">{{ kpis.wgmn_members|default:"0" }} WGMN · {{ kpis.wnnn_members|default:"0" }} WNNN</div>
+  </a>
+  <a href="/foundation/dashboard/drilldown/chapters/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>ACTIVE CHAPTERS</span><span class="icon" aria-hidden="true">⌑</span></div>
+    <div class="stat-value">{{ kpis.active_chapters|default:"0" }}</div>
+    <div class="stat-detail">{{ kpis.wgmn_chapters|default:"0" }} WGMN · {{ kpis.wnnn_chapters|default:"0" }} WNNN</div>
+  </a>
+  <a href="/foundation/dashboard/drilldown/alerts/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>OPEN GOVERNANCE ALERTS</span><span class="icon" aria-hidden="true">♧</span></div>
+    <div class="stat-value">{{ kpis.active_alerts|default:"0" }}</div>
+    <div class="stat-detail">Actionable items requiring attention</div>
+  </a>
+  <a href="/foundation/dashboard/drilldown/meetings/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>SCHEDULED SUMMITS</span><span class="icon" aria-hidden="true">□</span></div>
+    <div class="stat-value">{{ kpis.scheduled_meetings|default:"0" }}</div>
+    <div class="stat-detail">Upcoming executive & field gatherings</div>
+  </a>
+</div>
+
+<!-- Dual Network Breakdown Comparison -->
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom:24px;">
+  <div class="panel" style="border-top:4px solid var(--wdos-magenta);">
+    <div class="panelhead">
+      <div>
+        <h2>WGMN · Good Mother Network</h2>
+        <p>Maternal leadership, family empowerment, community stewardship</p>
+      </div>
+      <a href="/foundation/network/WGMN/" class="textlink">Open Workspace ›</a>
+    </div>
+    <div style="display:flex; justify-content:space-around; margin:16px 0; text-align:center;">
+      <div>
+        <strong style="font-size:24px; color:var(--wdos-ink);">{{ kpis.wgmn_members|default:"0" }}</strong>
+        <div style="font-size:12px; color:var(--wdos-muted);">Enrolled Members</div>
+      </div>
+      <div>
+        <strong style="font-size:24px; color:var(--wdos-ink);">{{ kpis.wgmn_chapters|default:"0" }}</strong>
+        <div style="font-size:12px; color:var(--wdos-muted);">Active Chapters</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="border-top:4px solid var(--wdos-lemon);">
+    <div class="panelhead">
+      <div>
+        <h2>WNNN · Next-Gen Nurturers</h2>
+        <p>Youth leadership development, digital education, mentorship</p>
+      </div>
+      <a href="/foundation/network/WNNN/" class="textlink">Open Workspace ›</a>
+    </div>
+    <div style="display:flex; justify-content:space-around; margin:16px 0; text-align:center;">
+      <div>
+        <strong style="font-size:24px; color:var(--wdos-ink);">{{ kpis.wnnn_members|default:"0" }}</strong>
+        <div style="font-size:12px; color:var(--wdos-muted);">Youth Members</div>
+      </div>
+      <div>
+        <strong style="font-size:24px; color:var(--wdos-ink);">{{ kpis.wnnn_chapters|default:"0" }}</strong>
+        <div style="font-size:12px; color:var(--wdos-muted);">Active Chapters</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Executive Grid -->
+<div class="grid">
+  <!-- Left Column: Country Hub Performance & Executive Reports -->
+  <div class="stack">
+    <!-- Country Hubs Summary Table -->
+    <section class="panel" aria-labelledby="country-hubs-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="country-hubs-heading">Country Hub Regional Operations</h2>
+          <p>Pan-African national hubs coordinating state, regional, and chapter structures.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/chapters/" class="textlink">All chapters ›</a>
+      </div>
+      {% if hub_summaries %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Country Hub</th>
+              <th scope="col">Region</th>
+              <th scope="col">Status</th>
+              <th scope="col">Active Chapters</th>
+              <th scope="col">Lead Officer</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in hub_summaries %}
+            <tr>
+              <td>
+                <a href="/foundation/network/{{ active_network }}/country/{{ item.hub.code }}/" style="font-weight:700; color:var(--wdos-ink); text-decoration:none;">
+                  {{ item.hub.name }} ({{ item.hub.code }})
+                </a>
+              </td>
+              <td>{{ item.hub.region|default:"Africa" }}</td>
+              <td><span class="badge completed">{{ item.hub.status|title }}</span></td>
+              <td><strong>{{ item.chapter_count }}</strong></td>
+              <td>{{ item.hub.lead_name|default:"Coordinator Assigned" }}</td>
+              <td><a href="/foundation/network/{{ active_network }}/country/{{ item.hub.code }}/" class="textlink">View Hub ›</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">⌑</div>
+        <h3>No Country Hubs Seeded</h3>
+        <p>No active country hubs found matching your active scope.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Executive Reports -->
+    <section class="panel" aria-labelledby="reports-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="reports-heading">Executive & Audit Reports</h2>
+          <p>Validated operational and compliance assessments.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/reports/?network={{ active_network }}&country={{ active_country }}" class="textlink">View all reports ›</a>
+      </div>
+      {% if reports %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Report Title</th>
+              <th scope="col">Type</th>
+              <th scope="col">Period</th>
+              <th scope="col">Scope</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rep in reports %}
+            <tr>
+              <td>
+                <a href="/foundation/dashboard/reports/{{ rep.id }}/" style="font-weight:650; color:var(--wdos-ink); text-decoration:none;">
+                  {{ rep.title }}
+                </a>
+              </td>
+              <td><span class="badge">{{ rep.get_report_type_display }}</span></td>
+              <td>{{ rep.period }}</td>
+              <td><span class="scope-badge" style="font-size:10px;">{{ rep.network }}/{{ rep.country }}</span></td>
+              <td><a href="/foundation/dashboard/reports/{{ rep.id }}/" class="textlink">Read Summary ›</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">📄</div>
+        <h3>No Reports in Active Scope</h3>
+        <p>No reports currently published for {{ active_network }} in {{ active_country }}.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Right Column: Governance Alerts & Strategic Meetings -->
+  <div class="stack">
+    <!-- Governance & System Alerts -->
+    <section class="panel" aria-labelledby="alerts-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="alerts-heading">Governance & Strategic Alerts</h2>
+          <p>Real alerts requiring executive oversight.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/alerts/?network={{ active_network }}&country={{ active_country }}" class="textlink">All alerts ({{ alerts|length }})</a>
+      </div>
+      {% if alerts %}
+        {% for al in alerts %}
+        <div class="mini-item" style="border-left: 3px solid {% if al.severity == 'critical' %}#CF1322{% elif al.severity == 'warning' %}#D46B08{% else %}var(--wdos-magenta){% endif %}; padding-left:12px;">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="priority-pill {{ al.severity }}">{{ al.severity }}</span>
+              <small style="color:var(--wdos-muted);">{{ al.created_at|timesince }} ago</small>
+            </div>
+            <h3 style="margin-bottom:4px;"><a href="/foundation/dashboard/alerts/{{ al.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ al.title }}</a></h3>
+            <p style="font-size:12px; color:var(--wdos-muted); margin-bottom:6px;">{{ al.message|truncatewords:15 }}</p>
+            <div class="meta" style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="scope-badge" style="font-size:10px;">{{ al.network }} / {{ al.country }}</span>
+              <a href="/foundation/dashboard/alerts/{{ al.id }}/" class="textlink">View Alert ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <div class="empty-state-icon" style="width:36px; height:36px; font-size:18px;">✓</div>
+        <h3>No Open Governance Alerts</h3>
+        <p>All compliance standards and governance checks are clear in {{ active_network }}.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Strategic Gatherings & Summits -->
+    <section class="panel" aria-labelledby="meetings-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="meetings-heading">Strategic Summits & Assemblies</h2>
+          <p>Executive gatherings and country council sessions.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/meetings/?network={{ active_network }}&country={{ active_country }}" class="textlink">All events</a>
+      </div>
+      {% if meetings %}
+        {% for m in meetings %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="badge" style="background:#F0F5FF; color:#1D39C4;">{{ m.get_meeting_type_display }}</span>
+              <small style="font-weight:600; color:var(--wdos-ink);">{{ m.scheduled_at|date:"M j, Y · H:i" }}</small>
+            </div>
+            <h3 style="margin-bottom:4px;"><a href="/foundation/dashboard/meetings/{{ m.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ m.title }}</a></h3>
+            <p style="font-size:12px; color:var(--wdos-muted);">Location: {{ m.location|default:"Virtual Executive Council" }} · {{ m.attendees_count }} Confirmed</p>
+            <div class="meta" style="margin-top:6px;">
+              <a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">Meeting Details & RSVP ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No strategic summits currently scheduled in this scope.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

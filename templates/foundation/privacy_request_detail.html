@@ -1,0 +1,68 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}Privacy Request #{{ pr.id|stringformat:".8s" }} · Details{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">DATA SUBJECT REQUEST · {{ pr.status|upper }}</div>
+    <h1>{{ pr.get_request_type_display }}</h1>
+    <p>Detailed compliance log, lifecycle status, and fulfillment data for privacy request #{{ pr.id }}.</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/privacy-requests/" class="btn">‹ Back to Privacy Requests</a>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Left Column: Request Details -->
+  <section class="panel">
+    <div class="panelhead">
+      <div>
+        <h2>Request Summary</h2>
+        <p>Reference ID: <code>{{ pr.id }}</code></p>
+      </div>
+      <span class="badge {{ pr.status }}">{{ pr.get_status_display }}</span>
+    </div>
+
+    <dl class="definition" style="margin-top:16px;">
+      <div><dt>Request Type</dt><dd>{{ pr.get_request_type_display }}</dd></div>
+      <div><dt>Current Status</dt><dd>{{ pr.get_status_display }}</dd></div>
+      <div><dt>Submitted Date</dt><dd>{{ pr.created_at|date:"d M Y H:i" }}</dd></div>
+      <div><dt>Completed Date</dt><dd>{{ pr.completed_at|date:"d M Y H:i"|default:"Pending Review" }}</dd></div>
+      <div><dt>Requester Account</dt><dd>{{ pr.account.email }}</dd></div>
+    </dl>
+
+    <div style="margin-top:24px;">
+      <h3>Reason & Notes</h3>
+      <p style="font-size:13px; color:var(--wdos-ink); margin-top:6px; white-space:pre-wrap;">{{ pr.reason|default:"No additional notes submitted by user." }}</p>
+    </div>
+
+    {% if pr.resolution_notes %}
+    <div style="margin-top:20px; padding:16px; background:#F6F5F7; border-radius:8px;">
+      <h3 style="font-size:13px;">Compliance Officer Resolution Notes</h3>
+      <p style="font-size:13px; margin-top:4px;">{{ pr.resolution_notes }}</p>
+    </div>
+    {% endif %}
+
+    {% if pr.status == 'completed' and pr.request_type == 'export' %}
+    <div style="margin-top:24px;">
+      <a href="/foundation/privacy-requests/{{ pr.id }}/export/" class="btn primary">
+        ⬇ Download Personal Data Archive (.JSON)
+      </a>
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- Right Column: Statutory Rights Info -->
+  <div class="stack">
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Your Rights</h2>
+      </div>
+      <p style="font-size:12px; color:var(--wdos-muted); line-height:1.5;">
+        Under WODDI Data Protection Guidelines, you have the right to transparent information, access, rectification, erasure, and objection. Requests are typically processed within 30 statutory days.
+      </p>
+    </section>
+  </div>
+</div>
+{% endblock %}

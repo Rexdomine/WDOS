@@ -1,0 +1,197 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}{{ chapter.name|default:"Local Chapter" }} Dashboard · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ active_network }} · {{ country_name }} · CHAPTER LEADERSHIP</div>
+    <h1 id="page-title">{{ chapter.name|default:"Local Chapter Dashboard" }}</h1>
+    <p>Local chapter mobilization, membership roster management, and grassroots community gatherings.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    {% if available_roles|length > 1 %}
+    <div class="role-selector-wrap" style="display:flex; align-items:center; gap:6px; background:white; padding:4px 10px; border-radius:8px; border:1px solid var(--wdos-line);">
+      <span style="font-size:11px; font-weight:700; color:var(--wdos-muted);">TEST ROLE:</span>
+      <select onchange="window.location.href='/foundation/?role=' + this.value" aria-label="Switch test role" style="border:none; font-size:12px; font-weight:700; color:var(--wdos-magenta); background:transparent; cursor:pointer;">
+        {% for r in available_roles %}
+        <option value="{{ r }}" {% if r == active_role %}selected{% endif %}>{{ r|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if chapter %}
+    <a class="btn" href="/foundation/dashboard/chapters/{{ chapter.id }}/">
+      Chapter Profile
+    </a>
+    {% endif %}
+    <a class="btn primary" href="/foundation/dashboard/drilldown/meetings/?network={{ active_network }}&country={{ active_country }}">
+      Schedule Chapter Meetup
+    </a>
+  </div>
+</div>
+
+<!-- Scoped Chapter KPIs (Reconciles to Source Records) -->
+<div class="stats" role="region" aria-label="Chapter Indicators">
+  <div class="stat">
+    <div class="stat-label"><span>CHAPTER MEMBERS</span><span class="icon" aria-hidden="true">👥</span></div>
+    <div class="stat-value">{{ kpis.chapter_members|default:"0" }}</div>
+    <div class="stat-detail">Enrolled in {{ chapter.name|default:"this Chapter" }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>UPCOMING MEETUPS</span><span class="icon" aria-hidden="true">□</span></div>
+    <div class="stat-value">{{ kpis.chapter_meetings|default:"0" }}</div>
+    <div class="stat-detail">Bi-weekly fellowships & workshops</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>LOCAL NOTICES</span><span class="icon" aria-hidden="true">♧</span></div>
+    <div class="stat-value">{{ kpis.chapter_notices|default:"0" }}</div>
+    <div class="stat-detail">Bulletins for chapter members</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>CHAPTER ACTIVITIES</span><span class="icon" aria-hidden="true">▣</span></div>
+    <div class="stat-value">{{ kpis.chapter_activities|default:"0" }}</div>
+    <div class="stat-detail">Milestones logged this cycle</div>
+  </div>
+</div>
+
+<!-- Main Chapter Grid -->
+<div class="grid">
+  <!-- Left Column: Chapter Member Roster & Recent Activity -->
+  <div class="stack">
+    <!-- Chapter Member Roster -->
+    <section class="panel" aria-labelledby="chapter-roster-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="chapter-roster-heading">Chapter Member Roster</h2>
+          <p>Verified members affiliated with {{ chapter.name|default:"this Chapter" }}.</p>
+        </div>
+        <span class="scope-badge">{{ chapter_roster|length }} Enrolled</span>
+      </div>
+      {% if chapter_roster %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Member Name</th>
+              <th scope="col">Network</th>
+              <th scope="col">Local Connection</th>
+              <th scope="col">Status</th>
+              <th scope="col">Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for mem in chapter_roster %}
+            <tr>
+              <td><strong>{{ mem.person.display_name }}</strong></td>
+              <td><span class="scope-badge" style="font-size:10px;">{{ mem.network }}</span></td>
+              <td>{{ mem.home.label|default:chapter.name|default:"Local Chapter" }}</td>
+              <td><span class="badge completed">Active Member</span></td>
+              <td>{{ mem.created_at|date:"M j, Y" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">👥</div>
+        <h3>No Members Enrolled Yet</h3>
+        <p>No members currently registered under this chapter home.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Chapter Activity Timeline -->
+    <section class="panel" aria-labelledby="chapter-activity-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="chapter-activity-heading">Recent Chapter Activities</h2>
+          <p>Logged milestones and community engagements.</p>
+        </div>
+      </div>
+      {% if activities %}
+        {% for act in activities %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="badge">{{ act.activity_type|title }}</span>
+              <small style="color:var(--wdos-muted);">{{ act.created_at|timesince }} ago</small>
+            </div>
+            <h3>{{ act.title }}</h3>
+            <p style="font-size:12px; color:var(--wdos-muted);">Actor: {{ act.actor_name|default:"Chapter Lead" }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status">
+        <p>No recent activities recorded for this chapter.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Right Column: Chapter Meetups & Bulletins -->
+  <div class="stack">
+    <!-- Chapter Meetups -->
+    <section class="panel" aria-labelledby="chapter-meetups-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="chapter-meetups-heading">Upcoming Chapter Meetups</h2>
+          <p>Local member gatherings & service projects.</p>
+        </div>
+      </div>
+      {% if meetings %}
+        {% for m in meetings %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="badge" style="background:#FFF0F6; color:var(--wdos-magenta);">Chapter Meetup</span>
+              <small style="font-weight:600; color:var(--wdos-ink);">{{ m.scheduled_at|date:"M j · H:i" }}</small>
+            </div>
+            <h3 style="margin-bottom:4px;"><a href="/foundation/dashboard/meetings/{{ m.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ m.title }}</a></h3>
+            <p style="font-size:12px; color:var(--wdos-muted);">Location: {{ m.location|default:"Local Center" }} · {{ m.attendees_count }} RSVPs</p>
+            <div class="meta" style="margin-top:6px;">
+              <a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">RSVP & Details ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No upcoming meetups scheduled for this chapter.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Chapter Bulletins -->
+    <section class="panel" aria-labelledby="chapter-bulletins-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="chapter-bulletins-heading">Chapter Bulletins & Notices</h2>
+          <p>Local announcements for members.</p>
+        </div>
+      </div>
+      {% if communications %}
+        {% for comm in communications %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="priority-pill {{ comm.priority }}">{{ comm.priority }}</span>
+              <small style="color:var(--wdos-muted);">{{ comm.sent_at|timesince }} ago</small>
+            </div>
+            <h3 style="margin-bottom:4px;">{{ comm.subject }}</h3>
+            <p style="font-size:12px; color:var(--wdos-muted);">{{ comm.body|truncatewords:14 }}</p>
+            <div class="meta" style="margin-top:6px; color:var(--wdos-muted);">From: {{ comm.sender_name }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No active bulletins for this chapter.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

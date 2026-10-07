@@ -1,0 +1,87 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}{{ network }} Network Workspace{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">NETWORK WORKSPACE</div>
+    <h1>{{ network_full_name }} ({{ network }})</h1>
+    <p>Network boundary and dedicated workspace for {{ network }}. Geographic hubs, operational teams, and initiatives are isolated to this network.</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/work-queue/?network={{ network }}" class="btn">View Network Work</a>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Left Column: Country Hubs in this Network -->
+  <section class="panel">
+    <div class="panelhead">
+      <h2>Country Hubs in {{ network }}</h2>
+      <span class="scope-badge">{{ country_hubs|length }} Hubs</span>
+    </div>
+    <p style="font-size:13px; margin-bottom:18px;">Select a geographic hub to view country leadership, local chapters, and localized work items:</p>
+
+    <div class="cards" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+      {% for hub in country_hubs %}
+      <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <div class="card-icon" style="font-size:18px; font-weight:800;">{{ hub.code }}</div>
+          <h3 style="margin-bottom:6px;">{{ hub.name }}</h3>
+          <p style="margin-bottom:12px; font-size:12px;">{{ hub.region|default:"Africa" }}<br>Lead: {{ hub.lead_name|default:"Coordinator Assigned" }}</p>
+        </div>
+        <a href="/foundation/network/{{ network }}/country/{{ hub.code }}/" class="btn small primary" style="width:100%;">
+          Enter {{ hub.name }} Hub ›
+        </a>
+      </div>
+      {% empty %}
+      <div class="empty-state" style="grid-column: 1/-1;">
+        <div class="empty-state-icon">⌑</div>
+        <h3>No Country Hubs Available</h3>
+        <p>No country hubs are currently configured or accessible within your authorized geographic scope.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Right Column: Network Overview & Work Items -->
+  <div class="stack">
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Network Scope Status</h2>
+        <span class="scope-badge">{{ network }}</span>
+      </div>
+      <dl class="definition" style="margin-top:12px;">
+        <div><dt>Network Code</dt><dd>{{ network }}</dd></div>
+        <div><dt>Your Clearance</dt><dd>{{ user_scope.leadership_level|title }}</dd></div>
+        <div><dt>Network Security</dt><dd>Isolated Workspace</dd></div>
+        <div><dt>Separation Policy</dt><dd>WGMN/WNNN Enforced</dd></div>
+      </dl>
+      <div class="notice" style="margin-top:16px;">
+        <span class="icon">ℹ</span>
+        <span>Cross-network data transfer is strictly prohibited. Records in {{ network }} cannot be queried from another network.</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Recent {{ network }} Tasks</h2>
+        <a href="/foundation/work-queue/" class="textlink">All tasks</a>
+      </div>
+      {% for item in work_items %}
+      <div class="mini-item">
+        <div>
+          <h3><a href="/foundation/work-queue/{{ item.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a></h3>
+          <p>{{ item.summary|truncatewords:10 }}</p>
+          <div class="meta">{{ item.country }} · <span class="priority-pill {{ item.priority }}">{{ item.priority }}</span></div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state" style="padding:20px;">
+        <p>No tasks currently assigned in {{ network }}.</p>
+      </div>
+      {% endfor %}
+    </section>
+  </div>
+</div>
+{% endblock %}

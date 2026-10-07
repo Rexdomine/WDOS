@@ -1,0 +1,178 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}Member Workspace Dashboard · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ active_network }} WORKSPACE · {{ country_name }} · INDIVIDUAL MEMBER</div>
+    <h1 id="page-title">Welcome to Your Member Workspace</h1>
+    <p>Your personal WDOS hub: membership status, chapter connection, upcoming gatherings, and announcements.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    {% if available_roles|length > 1 %}
+    <div class="role-selector-wrap" style="display:flex; align-items:center; gap:6px; background:white; padding:4px 10px; border-radius:8px; border:1px solid var(--wdos-line);">
+      <span style="font-size:11px; font-weight:700; color:var(--wdos-muted);">TEST ROLE:</span>
+      <select onchange="window.location.href='/foundation/?role=' + this.value" aria-label="Switch test role" style="border:none; font-size:12px; font-weight:700; color:var(--wdos-magenta); background:transparent; cursor:pointer;">
+        {% for r in available_roles %}
+        <option value="{{ r }}" {% if r == active_role %}selected{% endif %}>{{ r|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <a class="btn" href="/foundation/profile/">My Full Profile</a>
+    <a class="btn primary" href="#upcoming-gatherings">Upcoming Meetups</a>
+  </div>
+</div>
+
+<!-- Personal Membership Verification Card -->
+<div class="panel" style="margin-bottom:24px; border-left: 6px solid var(--wdos-magenta);">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+    <div>
+      <span class="scope-badge" style="margin-bottom:8px;">{{ active_network }} Verified Member</span>
+      <h2 style="font-size:22px; margin-bottom:4px;">{{ display_name }}</h2>
+      <p style="color:var(--wdos-muted); font-size:13px; margin:0;">
+        Member of <strong>{{ my_home.label|default:"Lagos Mainland Chapter" }}</strong> · {{ country_name }} Country Hub
+      </p>
+    </div>
+    <div style="text-align:right;">
+      <span class="badge completed" style="font-size:12px; padding:6px 12px;">Active Member</span>
+      <div style="font-size:11px; color:var(--wdos-muted); margin-top:6px;">
+        Enrolled Since: {{ membership.created_at|date:"F Y"|default:"2026" }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Member Stats -->
+<div class="stats" role="region" aria-label="Member Indicators">
+  <div class="stat">
+    <div class="stat-label"><span>UPCOMING MEETINGS</span><span class="icon" aria-hidden="true">□</span></div>
+    <div class="stat-value">{{ kpis.upcoming_meetings|default:"0" }}</div>
+    <div class="stat-detail">Local chapter & network events</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>NETWORK CIRCULARS</span><span class="icon" aria-hidden="true">✉</span></div>
+    <div class="stat-value">{{ communications|length }}</div>
+    <div class="stat-detail">Bulletins from leadership</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>COMMUNITY MILESTONES</span><span class="icon" aria-hidden="true">▣</span></div>
+    <div class="stat-value">{{ kpis.chapter_activities|default:"0" }}</div>
+    <div class="stat-detail">Recent initiatives in your hub</div>
+  </div>
+</div>
+
+<!-- Main Member Grid -->
+<div class="grid">
+  <!-- Left Column: Upcoming Meetups & Personal Activity -->
+  <div class="stack">
+    <!-- Upcoming Gatherings Section -->
+    <section class="panel" id="upcoming-gatherings" aria-labelledby="member-meetups-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="member-meetups-heading">Upcoming Gatherings & Fellowships</h2>
+          <p>Attend local chapter meetups, workshops, and network assemblies.</p>
+        </div>
+      </div>
+      {% if meetings %}
+        {% for m in meetings %}
+        <div class="mini-item" style="padding:14px; border:1px solid var(--wdos-line); border-radius:8px; margin-bottom:10px;">
+          <div style="width:100%;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span class="badge" style="background:#FFF0F6; color:var(--wdos-magenta);">{{ m.get_meeting_type_display }}</span>
+              <strong style="color:var(--wdos-ink); font-size:13px;">{{ m.scheduled_at|date:"l, M j · H:i" }}</strong>
+            </div>
+            <h3 style="margin-bottom:4px; font-size:16px;">{{ m.title }}</h3>
+            <p style="font-size:13px; color:var(--wdos-muted); margin-bottom:8px;">
+              Location: {{ m.location|default:"Local Chapter Center" }} · {{ m.attendees_count }} Attending
+            </p>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <form method="post" action="/foundation/dashboard/meetings/{{ m.id }}/rsvp/">
+                {% csrf_token %}
+                <button type="submit" class="btn small primary">RSVP / Register Attendance</button>
+              </form>
+              <a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">Event Details ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">□</div>
+        <h3>No Upcoming Meetings</h3>
+        <p>No gatherings currently scheduled for your chapter. Check back soon!</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- My Chapter & Local Connection Details -->
+    <section class="panel" aria-labelledby="member-chapter-heading">
+      <div class="panelhead">
+        <h2 id="member-chapter-heading">Your Local Connection</h2>
+      </div>
+      <dl class="definition">
+        <div>
+          <dt>Assigned Network</dt>
+          <dd><strong>{{ active_network }}</strong> ({% if active_network == 'WGMN' %}Women of Divine Destiny Network{% else %}Next-Gen Nurturers Network{% endif %})</dd>
+        </div>
+        <div>
+          <dt>Local Chapter Home</dt>
+          <dd>{{ my_home.label|default:"Lagos Mainland Chapter" }}</dd>
+        </div>
+        <div>
+          <dt>Country Hub</dt>
+          <dd>{{ country_name }} ({{ active_country }})</dd>
+        </div>
+        <div>
+          <dt>Membership Clearance</dt>
+          <dd><span class="badge completed">Standard Member Access</span></dd>
+        </div>
+      </dl>
+    </section>
+  </div>
+
+  <!-- Right Column: Member Announcements & Learning Resources -->
+  <div class="stack">
+    <!-- Member Announcements -->
+    <section class="panel" aria-labelledby="member-bulletins-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="member-bulletins-heading">Member Circulars & Notices</h2>
+          <p>Updates from leadership and coordinators.</p>
+        </div>
+      </div>
+      {% if communications %}
+        {% for comm in communications %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="priority-pill {{ comm.priority }}">{{ comm.priority }}</span>
+              <small style="color:var(--wdos-muted);">{{ comm.sent_at|timesince }} ago</small>
+            </div>
+            <h3 style="margin-bottom:4px;">{{ comm.subject }}</h3>
+            <p style="font-size:12.5px; color:var(--wdos-muted); line-height:1.4;">{{ comm.body }}</p>
+            <div class="meta" style="margin-top:6px; color:var(--wdos-muted);">From: {{ comm.sender_name }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No new member circulars at this time.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Support & Guidance -->
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Support & Help</h2>
+      </div>
+      <p style="font-size:13px; color:var(--wdos-muted); margin-bottom:12px;">
+        Need assistance with your membership record, meeting attendance, or chapter connection?
+      </p>
+      <a href="/auth/help/" class="btn small" style="width:100%; justify-content:center;">Contact Member Support</a>
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}Access Restricted · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow" style="color:#9B164B;">PERMISSION BOUNDARY · ACCESS RESTRICTED</div>
+    <h1>Access Restricted</h1>
+    <p>The requested destination or record is not available within your current authorized scope.</p>
+  </div>
+</div>
+
+<div class="error-state">
+  <h2>{{ error_message|default:"You do not have permission to access this resource." }}</h2>
+  
+  <p>
+    WDOS enforces server-side separation across networks (WGMN vs WNNN), geographic Country Hubs, and role clearances.
+    If you require access to this network workspace or country hub, contact your authorized leadership coordinator or IT administrator.
+  </p>
+
+  <dl class="definition" style="margin:20px 0; background:white; padding:16px; border-radius:8px; border:1px solid #F8CCD7;">
+    <div><dt>Your Authorized Networks</dt><dd>{{ user_scope.allowed_networks|join:", "|default:"None" }}</dd></div>
+    <div><dt>Your Authorized Geographies</dt><dd>{% if "*" in user_scope.allowed_countries %}All Countries{% else %}{{ user_scope.allowed_countries|join:", "|default:"None" }}{% endif %}</dd></div>
+    <div><dt>Your Leadership Level</dt><dd>{{ user_scope.leadership_level|title }}</dd></div>
+    <div><dt>Reason Code</dt><dd><code>{{ reason_code|default:"forbidden" }}</code></dd></div>
+  </dl>
+
+  <div class="actions" style="margin-top:24px;">
+    <a href="{{ recovery_url|default:'/foundation/' }}" class="btn primary">
+      Return to Authorized Workspace ›
+    </a>
+    <a href="/foundation/work-queue/" class="btn">
+      View Your Work Queue
+    </a>
+    <a href="/auth/help/" class="btn ghost">
+      Contact Support
+    </a>
+  </div>
+</div>
+{% endblock %}

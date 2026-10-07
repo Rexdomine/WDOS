@@ -1,0 +1,207 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}Candidate Application Dashboard · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ active_network }} CANDIDATE · {{ country_name }} · ONBOARDING</div>
+    <h1 id="page-title">Candidate Application Dashboard</h1>
+    <p>Track your membership verification progress, upcoming orientation sessions, and required onboarding steps.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    {% if available_roles|length > 1 %}
+    <div class="role-selector-wrap" style="display:flex; align-items:center; gap:6px; background:white; padding:4px 10px; border-radius:8px; border:1px solid var(--wdos-line);">
+      <span style="font-size:11px; font-weight:700; color:var(--wdos-muted);">TEST ROLE:</span>
+      <select onchange="window.location.href='/foundation/?role=' + this.value" aria-label="Switch test role" style="border:none; font-size:12px; font-weight:700; color:var(--wdos-magenta); background:transparent; cursor:pointer;">
+        {% for r in available_roles %}
+        <option value="{{ r }}" {% if r == active_role %}selected{% endif %}>{{ r|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if candidate_draft and candidate_draft.next_step < 8 %}
+    <a class="btn primary" href="/onboarding/{{ candidate_draft.next_step }}/">
+      Continue Application (Step {{ candidate_draft.next_step }})
+    </a>
+    {% else %}
+    <a class="btn" href="/onboarding/8/">Review Application Status</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Candidate Application Progress Card -->
+<div class="panel" style="margin-bottom:24px; border-left: 6px solid #D46B08;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+    <div>
+      <span class="scope-badge" style="background:#FFF7E6; color:#D46B08; margin-bottom:8px;">
+        Application Status: {% if candidate_state == 'review_needed' %}Under Review{% elif candidate_state == 'accepted' %}Approved{% else %}In Progress{% endif %}
+      </span>
+      <h2 style="font-size:22px; margin-bottom:4px;">Application for {{ display_name }}</h2>
+      <p style="color:var(--wdos-muted); font-size:13px; margin:0;">
+        Proposed Network: <strong>{{ active_network }}</strong> · Country Hub: <strong>{{ country_name }}</strong>
+      </p>
+    </div>
+    <div style="text-align:right;">
+      <span class="badge pending" style="font-size:12px; padding:6px 12px;">Step {{ candidate_step }} of 8 Completed</span>
+      <div style="font-size:11px; color:var(--wdos-muted); margin-top:6px;">
+        {% if candidate_state == 'review_needed' %}
+        Reviewer Assigned · Estimated 24–48 hours
+        {% else %}
+        Draft in progress
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--wdos-line);">
+    <strong style="font-size:13px; color:var(--wdos-ink);">Next Required Step:</strong>
+    <p style="font-size:13px; color:var(--wdos-muted); margin-top:4px;">
+      {% if candidate_state == 'review_needed' %}
+      Your identity credentials and verification basis are on file and currently awaiting validation by an authorized onboarding reviewer. You do not need to resubmit. You will receive an email update once verified.
+      {% else %}
+      Please complete your profile details and chapter selection in the onboarding wizard to submit your candidate file for approval.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- Candidate Stats -->
+<div class="stats" role="region" aria-label="Candidate Indicators">
+  <div class="stat">
+    <div class="stat-label"><span>ONBOARDING STEP</span><span class="icon" aria-hidden="true">📋</span></div>
+    <div class="stat-value">Step {{ candidate_step }}/8</div>
+    <div class="stat-detail">Identity & local home recorded</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>ORIENTATION WEBINARS</span><span class="icon" aria-hidden="true">□</span></div>
+    <div class="stat-value">{{ orientation_meetings|length }}</div>
+    <div class="stat-detail">Upcoming onboarding sessions</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>CANDIDATE GUIDES</span><span class="icon" aria-hidden="true">📖</span></div>
+    <div class="stat-value">4</div>
+    <div class="stat-detail">Network rules & FAQ available</div>
+  </div>
+</div>
+
+<!-- Main Candidate Grid -->
+<div class="grid">
+  <!-- Left Column: Upcoming Orientation Sessions & Milestones -->
+  <div class="stack">
+    <!-- Orientation Sessions -->
+    <section class="panel" aria-labelledby="orientation-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="orientation-heading">Candidate Orientation Sessions</h2>
+          <p>Join an interactive welcome and onboarding session with our coordinators.</p>
+        </div>
+      </div>
+      {% if orientation_meetings %}
+        {% for m in orientation_meetings %}
+        <div class="mini-item" style="padding:14px; border:1px solid var(--wdos-line); border-radius:8px; margin-bottom:10px;">
+          <div style="width:100%;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span class="badge" style="background:#E6F4FF; color:#0958D9;">Orientation Webinar</span>
+              <strong style="color:var(--wdos-ink); font-size:13px;">{{ m.scheduled_at|date:"l, M j · H:i" }}</strong>
+            </div>
+            <h3 style="margin-bottom:4px; font-size:16px;">{{ m.title }}</h3>
+            <p style="font-size:13px; color:var(--wdos-muted); margin-bottom:8px;">
+              Location: {{ m.location|default:"Online Video Stream" }} · Open to all candidates
+            </p>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <form method="post" action="/foundation/dashboard/meetings/{{ m.id }}/rsvp/">
+                {% csrf_token %}
+                <button type="submit" class="btn small primary">Register for Orientation</button>
+              </form>
+              <a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">Event Details ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">□</div>
+        <h3>No Orientation Sessions Scheduled</h3>
+        <p>New orientation dates for {{ active_network }} will be announced shortly.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Onboarding Journey Steps Overview -->
+    <section class="panel" aria-labelledby="journey-heading">
+      <div class="panelhead">
+        <h2 id="journey-heading">Your Onboarding Path</h2>
+      </div>
+      <ol class="timeline" style="margin:0; padding-left:16px;">
+        <li class="timeline-item" style="margin-bottom:14px;">
+          <div class="eyebrow" style="color:var(--wdos-lemon);">COMPLETED</div>
+          <h3 style="margin:2px 0;">1. Welcome & Language Selection</h3>
+          <p style="font-size:12px; color:var(--wdos-muted);">Configured interface language and motion preferences.</p>
+        </li>
+        <li class="timeline-item" style="margin-bottom:14px;">
+          <div class="eyebrow" style="color:var(--wdos-lemon);">COMPLETED</div>
+          <h3 style="margin:2px 0;">2. Profile & Identification</h3>
+          <p style="font-size:12px; color:var(--wdos-muted);">Submitted legal name, preferred name, and photo.</p>
+        </li>
+        <li class="timeline-item" style="margin-bottom:14px;">
+          <div class="eyebrow" style="color:var(--wdos-lemon);">COMPLETED</div>
+          <h3 style="margin:2px 0;">3. Network & Eligibility Tier</h3>
+          <p style="font-size:12px; color:var(--wdos-muted);">Selected {{ active_network }} with verified basis.</p>
+        </li>
+        <li class="timeline-item" style="margin-bottom:14px;">
+          <div class="eyebrow" style="color:var(--wdos-lemon);">COMPLETED</div>
+          <h3 style="margin:2px 0;">4. Local Home Chapter Assignment</h3>
+          <p style="font-size:12px; color:var(--wdos-muted);">Connected to {{ country_name }} local chapter.</p>
+        </li>
+        <li class="timeline-item">
+          <div class="eyebrow" style="color:#D46B08;">IN PROGRESS</div>
+          <h3 style="margin:2px 0;">5. Review & Membership Approval</h3>
+          <p style="font-size:12px; color:var(--wdos-muted);">Under review by chapter coordinator. Dashboard will unlock upon approval.</p>
+        </li>
+      </ol>
+    </section>
+  </div>
+
+  <!-- Right Column: Candidate Guidance & Coordinator Contact -->
+  <div class="stack">
+    <!-- Candidate Communications -->
+    <section class="panel" aria-labelledby="candidate-communications-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="candidate-communications-heading">Welcome Bulletins for Candidates</h2>
+        </div>
+      </div>
+      {% if communications %}
+        {% for comm in communications %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="badge" style="background:#FFF0F6; color:var(--wdos-magenta);">Notice</span>
+              <small style="color:var(--wdos-muted);">{{ comm.sent_at|timesince }} ago</small>
+            </div>
+            <h3 style="margin-bottom:4px;">{{ comm.subject }}</h3>
+            <p style="font-size:12px; color:var(--wdos-muted);">{{ comm.body }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No announcements currently posted for candidates.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Support for Candidates -->
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Questions About Your Application?</h2>
+      </div>
+      <p style="font-size:13px; color:var(--wdos-muted); margin-bottom:12px;">
+        If you have questions regarding the identity verification process or need to modify your submitted chapter connection, please contact our onboarding support team.
+      </p>
+      <a href="/auth/help/" class="btn small" style="width:100%; justify-content:center;">Contact Onboarding Support</a>
+    </section>
+  </div>
+</div>
+{% endblock %}

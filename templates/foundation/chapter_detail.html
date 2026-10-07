@@ -1,0 +1,166 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}Chapter: {{ chapter.name }} · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ chapter.network }} NETWORK · {{ chapter.country }} HUB · CHAPTER DIRECTORY</div>
+    <h1 id="page-title">{{ chapter.name }} ({{ chapter.code }})</h1>
+    <p>Grassroots community hub located in {{ chapter.region|default:chapter.country }}. Managed by {{ chapter.lead_name|default:"Local Chapter Lead" }}.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px;">
+    <a class="btn" href="/foundation/dashboard/export/?type=chapters&network={{ chapter.network }}&country={{ chapter.country }}" download>
+      <span aria-hidden="true">⬇</span> Export Directory
+    </a>
+    <a class="btn primary" href="/foundation/dashboard/drilldown/chapters/?network={{ chapter.network }}&country={{ chapter.country }}">
+      ‹ All Chapters
+    </a>
+  </div>
+</div>
+
+<!-- Key Chapter Metrics Bar -->
+<div class="stats" role="region" aria-label="Chapter Indicators">
+  <div class="stat">
+    <div class="stat-label"><span>ENROLLED ROSTER</span><span class="icon" aria-hidden="true">👤</span></div>
+    <div class="stat-value">{{ chapter.member_count }}</div>
+    <div class="stat-detail">Active accredited members</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>CHAPTER STATUS</span><span class="icon" aria-hidden="true">✓</span></div>
+    <div class="stat-value" style="font-size:22px; text-transform:capitalize;">{{ chapter.status }}</div>
+    <div class="stat-detail">Operational clearance verified</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>SCHEDULED MEETINGS</span><span class="icon" aria-hidden="true">□</span></div>
+    <div class="stat-value">{{ chapter_meetings|length }}</div>
+    <div class="stat-detail">Upcoming local gatherings</div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: 2fr 1fr; gap:20px;">
+  <!-- Left: Chapter Meetings & Roster -->
+  <div class="stack">
+    <!-- Chapter Gatherings -->
+    <section class="panel" aria-labelledby="chapter-gatherings-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="chapter-gatherings-heading">Chapter Gatherings & Meetups</h2>
+          <p>Upcoming local sessions and fellowships.</p>
+        </div>
+      </div>
+      {% if chapter_meetings %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Meeting</th>
+              <th scope="col">Type</th>
+              <th scope="col">Date / Time</th>
+              <th scope="col">Location</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in chapter_meetings %}
+            <tr>
+              <td><strong>{{ m.title }}</strong></td>
+              <td><span class="badge">{{ m.meeting_type|title }}</span></td>
+              <td>{{ m.scheduled_at|date:"M d, Y H:i" }}</td>
+              <td>{{ m.location }}</td>
+              <td><a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">Details ›</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No gatherings currently scheduled for this chapter.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Enrolled Members Preview -->
+    <section class="panel" aria-labelledby="chapter-roster-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="chapter-roster-heading">Chapter Member Roster</h2>
+          <p>Accredited members affiliated with {{ chapter.name }}.</p>
+        </div>
+      </div>
+      {% if chapter_members %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Member</th>
+              <th scope="col">Network</th>
+              <th scope="col">Joined Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for mem in chapter_members %}
+            <tr>
+              <td><strong>{{ mem.person.display_name|default:"Member" }}</strong></td>
+              <td><span class="badge">{{ mem.network }}</span></td>
+              <td>{{ mem.created_at|date:"M d, Y" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No members currently assigned to this chapter code.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Right: Chapter Profile & Leadership Info -->
+  <section class="panel" aria-labelledby="chapter-profile-heading">
+    <div class="panelhead">
+      <h2 id="chapter-profile-heading">Chapter Profile</h2>
+    </div>
+    <dl class="definition">
+      <div>
+        <dt>Chapter Code</dt>
+        <dd><strong>{{ chapter.code }}</strong></dd>
+      </div>
+      <div>
+        <dt>Network</dt>
+        <dd>{{ chapter.network }}</dd>
+      </div>
+      <div>
+        <dt>Country Hub</dt>
+        <dd>{{ chapter.country }}</dd>
+      </div>
+      <div>
+        <dt>Region / State</dt>
+        <dd>{{ chapter.region|default:"Not specified" }}</dd>
+      </div>
+      <div>
+        <dt>District / LGA</dt>
+        <dd>{{ chapter.district|default:"Not specified" }}</dd>
+      </div>
+      <div>
+        <dt>Lead Coordinator</dt>
+        <dd><strong>{{ chapter.lead_name|default:"Coordinator Assigned" }}</strong></dd>
+      </div>
+      <div>
+        <dt>Lead Email</dt>
+        <dd>{{ chapter.lead_email|default:"contact@woddi.org" }}</dd>
+      </div>
+      <div>
+        <dt>Physical Address</dt>
+        <dd>{{ chapter.address|default:"Community Center" }}</dd>
+      </div>
+      <div>
+        <dt>Formed Date</dt>
+        <dd>{{ chapter.created_at|date:"F Y" }}</dd>
+      </div>
+    </dl>
+  </section>
+</div>
+{% endblock %}

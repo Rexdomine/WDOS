@@ -1,0 +1,84 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}{{ hub.name }} Country Hub ({{ network }}){% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">COUNTRY HUB ENTRY · {{ network }}</div>
+    <h1>{{ hub.name }} Country Hub ({{ country }})</h1>
+    <p>Operational hub for {{ hub.name }} in {{ network }}. Explore leadership levels, community chapters, and country-level activities.</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/work-queue/?country={{ country }}" class="btn">Country Work Queue</a>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Left Column: Leadership Structure in this Country Hub -->
+  <section class="panel">
+    <div class="panelhead">
+      <div>
+        <h2>Leadership Structure & Roster</h2>
+        <p>Select a leadership level to view appointed coordinators and responsibilities:</p>
+      </div>
+      <span class="badge completed">{{ hub.status|title }}</span>
+    </div>
+
+    <div class="cards" style="grid-template-columns: 1fr;">
+      {% for lvl in leadership_levels %}
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px;">
+        <div style="display:flex; align-items:center; gap:16px;">
+          <div class="card-icon" style="margin-bottom:0; width:40px; height:40px; font-weight:700;">
+            T{{ lvl.tier }}
+          </div>
+          <div>
+            <h3 style="margin:0 0 4px;"><a href="/foundation/network/{{ network }}/country/{{ country }}/leadership/{{ lvl.code }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ lvl.name }}</a></h3>
+            <p style="margin:0; font-size:12px;">{{ lvl.description }}</p>
+          </div>
+        </div>
+        <a href="/foundation/network/{{ network }}/country/{{ country }}/leadership/{{ lvl.code }}/" class="btn small" style="white-space:nowrap;">
+          View Tier ›
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Right Column: Country Details & Work Queue -->
+  <div class="stack">
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Country Hub Profile</h2>
+        <span class="scope-badge">{{ country }}</span>
+      </div>
+      <dl class="definition" style="margin-top:12px;">
+        <div><dt>Country Name</dt><dd>{{ hub.name }}</dd></div>
+        <div><dt>ISO Code</dt><dd>{{ hub.code }}</dd></div>
+        <div><dt>Regional Zone</dt><dd>{{ hub.region|default:"Africa" }}</dd></div>
+        <div><dt>Principal Lead</dt><dd>{{ hub.lead_name|default:"Appointed Director" }}</dd></div>
+        <div><dt>Contact Channel</dt><dd>{{ hub.lead_email|default:"country-hub@example.org" }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Country Work Items</h2>
+        <a href="/foundation/work-queue/?country={{ country }}" class="textlink">View all</a>
+      </div>
+      {% for item in work_items %}
+      <div class="mini-item">
+        <div>
+          <h3><a href="/foundation/work-queue/{{ item.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a></h3>
+          <p>{{ item.summary|truncatewords:8 }}</p>
+          <div class="meta"><span class="priority-pill {{ item.priority }}">{{ item.priority }}</span> · <span class="badge {{ item.status }}">{{ item.status }}</span></div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state" style="padding:20px;">
+        <p>No active country tasks in {{ hub.name }}.</p>
+      </div>
+      {% endfor %}
+    </section>
+  </div>
+</div>
+{% endblock %}

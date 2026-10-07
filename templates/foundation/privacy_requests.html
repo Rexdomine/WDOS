@@ -1,0 +1,115 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}Privacy Requests · GDPR Compliance{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">DATA GOVERNANCE & GDPR RIGHTS</div>
+    <h1>Privacy & Data Subject Requests</h1>
+    <p>Exercise your statutory data protection rights under WODDI data governance policies: export personal data, request corrections, or restrict processing.</p>
+  </div>
+</div>
+
+{% if error %}
+<div class="notice" style="background:#FFF1F0; border-color:#FFA39E; color:#CF1322; margin-bottom:20px;">
+  <span>{{ error }}</span>
+</div>
+{% endif %}
+
+<div class="grid">
+  <!-- Left Column: Submit New Privacy Request -->
+  <section class="panel">
+    <div class="panelhead">
+      <div>
+        <h2>Submit a Privacy Request</h2>
+        <p>Your request will be assigned to the WDOS Data Protection Officer.</p>
+      </div>
+      <span class="badge">Governed</span>
+    </div>
+
+    <form method="post" action="/foundation/privacy-requests/new/">
+      {% csrf_token %}
+      <div class="fields" style="display:block;">
+        <div class="field" style="margin-bottom:16px;">
+          <label for="request-type">Request Type</label>
+          <select name="request_type" id="request-type" class="input" style="width:100%;" required>
+            <option value="export">Data Export (Download Personal Archive)</option>
+            <option value="rectification">Data Rectification (Correct Inaccurate Records)</option>
+            <option value="erasure">Data Erasure / Deletion (Right to be Forgotten)</option>
+            <option value="restriction">Restriction of Processing</option>
+          </select>
+        </div>
+
+        <div class="field" style="margin-bottom:16px;">
+          <label for="request-reason">Reason or Specific Instructions (Optional)</label>
+          <textarea
+            name="reason"
+            id="request-reason"
+            class="input textarea"
+            style="width:100%; min-height:90px;"
+            placeholder="Provide context or details to assist our compliance officer..."
+          ></textarea>
+        </div>
+
+        <div class="switch-control" style="margin-bottom:20px;">
+          <input type="checkbox" name="ack" value="1" id="privacy-ack-toggle" required>
+          <div>
+            <label for="privacy-ack-toggle" style="font-size:12.5px; cursor:pointer;">
+              I certify that I am the account holder and confirm this data subject request.
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn primary" style="width:100%; justify-content:center;">
+          Submit Privacy Request
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Right Column: Request History & Lifecycle Tracking -->
+  <section class="panel">
+    <div class="panelhead">
+      <div>
+        <h2>Request History ({{ privacy_requests|length }})</h2>
+        <p>Real-time lifecycle tracking of all submitted requests.</p>
+      </div>
+    </div>
+
+    {% if privacy_requests %}
+    <div style="display:flex; flex-direction:column;">
+      {% for pr in privacy_requests %}
+      <div class="mini-item">
+        <div style="width:100%;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <h3 style="margin:0 0 4px;"><a href="/foundation/privacy-requests/{{ pr.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ pr.get_request_type_display }}</a></h3>
+            <span class="badge {{ pr.status }}">{{ pr.get_status_display }}</span>
+          </div>
+          <p style="margin:4px 0 8px; font-size:12px;">Submitted: {{ pr.created_at|date:"d M Y H:i" }}</p>
+          {% if pr.reason %}
+          <p style="font-size:12px; color:var(--wdos-muted);">"{{ pr.reason|truncatewords:10 }}"</p>
+          {% endif %}
+
+          <!-- Action buttons for completed requests -->
+          <div style="margin-top:8px; display:flex; gap:10px; align-items:center;">
+            {% if pr.status == 'completed' and pr.request_type == 'export' %}
+            <a href="/foundation/privacy-requests/{{ pr.id }}/export/" class="btn small primary" style="font-size:11px;">
+              ⬇ Download Personal Data Archive (.JSON)
+            </a>
+            {% endif %}
+            <a href="/foundation/privacy-requests/{{ pr.id }}/" class="textlink" style="font-size:11.5px;">View Details ›</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🛡️</div>
+      <h3>No Privacy Requests</h3>
+      <p>You have not submitted any privacy or data subject requests on file.</p>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

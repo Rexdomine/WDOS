@@ -1,0 +1,89 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}Report: {{ report.title }} · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ report.network }} NETWORK · {{ report.country }} HUB · EXECUTIVE REPORT</div>
+    <h1 id="page-title">{{ report.title }}</h1>
+    <p>Reporting Period: <strong>{{ report.period }}</strong> · Published on {{ report.created_at|date:"F d, Y" }}</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px;">
+    <a class="btn" href="/foundation/dashboard/export/?type=reports&network={{ report.network }}&country={{ report.country }}" download>
+      <span aria-hidden="true">⬇</span> Export CSV
+    </a>
+    <a class="btn primary" href="/foundation/dashboard/drilldown/reports/?network={{ report.network }}&country={{ report.country }}">
+      ‹ All Reports
+    </a>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: 2fr 1fr; gap:20px;">
+  <!-- Left: Executive Summary & Metrics Breakdown -->
+  <div class="stack">
+    <section class="panel" aria-labelledby="report-summary-heading">
+      <div class="panelhead">
+        <h2 id="report-summary-heading">Executive Summary</h2>
+        <span class="badge completed">{{ report.status|title }}</span>
+      </div>
+      <div style="font-size:15px; line-height:1.7; color:var(--wdos-ink); margin:16px 0;">
+        {{ report.summary }}
+      </div>
+    </section>
+
+    {% if report.metrics %}
+    <section class="panel" aria-labelledby="metrics-breakdown-heading">
+      <div class="panelhead">
+        <h2 id="metrics-breakdown-heading">Audited Metrics & KPIs</h2>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-top:16px;">
+        {% for k, v in report.metrics.items %}
+        <div class="card" style="padding:16px; border:1px solid var(--wdos-line); border-radius:8px; background:white; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:var(--wdos-muted); text-transform:uppercase; margin-bottom:6px;">{{ k }}</div>
+          <div style="font-size:24px; font-weight:700; color:var(--wdos-magenta);">{{ v }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
+  <!-- Right: Scope & Publication Metadata -->
+  <section class="panel" aria-labelledby="report-meta-heading">
+    <div class="panelhead">
+      <h2 id="report-meta-heading">Report Classification</h2>
+    </div>
+    <dl class="definition">
+      <div>
+        <dt>Report Type</dt>
+        <dd><strong>{{ report.report_type|title }}</strong></dd>
+      </div>
+      <div>
+        <dt>Network</dt>
+        <dd>{{ report.network }}</dd>
+      </div>
+      <div>
+        <dt>Country Hub</dt>
+        <dd>{{ report.country }}</dd>
+      </div>
+      <div>
+        <dt>Period</dt>
+        <dd>{{ report.period }}</dd>
+      </div>
+      <div>
+        <dt>Status</dt>
+        <dd><span class="badge completed">{{ report.status|title }}</span></dd>
+      </div>
+      <div>
+        <dt>Created By</dt>
+        <dd>{{ report.author_name|default:"Automated Engine" }}</dd>
+      </div>
+      <div>
+        <dt>Generated At</dt>
+        <dd>{{ report.created_at|date:"M d, Y H:i" }}</dd>
+      </div>
+    </dl>
+  </section>
+</div>
+{% endblock %}

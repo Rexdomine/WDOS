@@ -1,0 +1,223 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}Operations Coordination Dashboard · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ scope_label }} · OPERATIONS & TRIAGE</div>
+    <h1 id="page-title">Operations Coordination Dashboard</h1>
+    <p>Operational throughput, verification queue, work item triage, and logistics synchronization.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    {% if available_roles|length > 1 %}
+    <div class="role-selector-wrap" style="display:flex; align-items:center; gap:6px; background:white; padding:4px 10px; border-radius:8px; border:1px solid var(--wdos-line);">
+      <span style="font-size:11px; font-weight:700; color:var(--wdos-muted);">TEST ROLE:</span>
+      <select onchange="window.location.href='/foundation/?role=' + this.value" aria-label="Switch test role" style="border:none; font-size:12px; font-weight:700; color:var(--wdos-magenta); background:transparent; cursor:pointer;">
+        {% for r in available_roles %}
+        <option value="{{ r }}" {% if r == active_role %}selected{% endif %}>{{ r|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <a class="btn" href="/foundation/dashboard/export/?type=activities&network={{ active_network }}&country={{ active_country }}" download>
+      <span aria-hidden="true">⬇</span> Export Operational Log
+    </a>
+    <a class="btn primary" href="/foundation/dashboard/drilldown/verifications/?network={{ active_network }}&country={{ active_country }}">
+      Open Verification Queue
+    </a>
+  </div>
+</div>
+
+<!-- Scoped Operational KPIs (Reconcile to Source Records) -->
+<div class="stats" role="region" aria-label="Operational Indicators">
+  <a href="/foundation/dashboard/drilldown/verifications/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>PENDING ONBOARDING VERIFICATIONS</span><span class="icon" aria-hidden="true">📋</span></div>
+    <div class="stat-value">{{ kpis.pending_verifications|default:"0" }}</div>
+    <div class="stat-detail">Applications awaiting review & approval</div>
+  </a>
+  <a href="/foundation/dashboard/drilldown/work-items/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>OPEN WORK ITEMS</span><span class="icon" aria-hidden="true">▣</span></div>
+    <div class="stat-value">{{ kpis.open_work_items|default:"0" }}</div>
+    <div class="stat-detail">{{ kpis.urgent_work_items|default:"0" }} marked urgent priority</div>
+  </a>
+  <a href="/foundation/dashboard/drilldown/alerts/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>OPERATIONAL ALERTS</span><span class="icon" aria-hidden="true">♧</span></div>
+    <div class="stat-value">{{ kpis.operational_alerts|default:"0" }}</div>
+    <div class="stat-detail">Bottlenecks & SLA flags requiring action</div>
+  </a>
+  <a href="/foundation/dashboard/drilldown/meetings/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>FIELD LOGISTICS SYNCS</span><span class="icon" aria-hidden="true">□</span></div>
+    <div class="stat-value">{{ kpis.scheduled_meetings|default:"0" }}</div>
+    <div class="stat-detail">Field coordinator and reviewer sessions</div>
+  </a>
+</div>
+
+<!-- Main Operations Grid -->
+<div class="grid">
+  <!-- Left Column: Active Work Queue & Verification Pipeline -->
+  <div class="stack">
+    <!-- Work Queue Section -->
+    <section class="panel" aria-labelledby="work-items-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="work-items-heading">Active Work Items Queue</h2>
+          <p>Assigned tasks and field coordination deliverables in {{ active_network }}.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/work-items/?network={{ active_network }}&country={{ active_country }}" class="textlink">View all queue items ›</a>
+      </div>
+      {% if work_items %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Task / Item</th>
+              <th scope="col">Category</th>
+              <th scope="col">Priority</th>
+              <th scope="col">Status</th>
+              <th scope="col">Scope</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in work_items %}
+            <tr>
+              <td>
+                <a href="/foundation/work-queue/{{ item.id }}/" style="font-weight:650; color:var(--wdos-ink); text-decoration:none;">
+                  {{ item.title }}
+                </a>
+              </td>
+              <td><span class="badge">{{ item.get_category_display }}</span></td>
+              <td><span class="priority-pill {{ item.priority }}">{{ item.priority }}</span></td>
+              <td><span class="badge {{ item.status }}">{{ item.get_status_display }}</span></td>
+              <td><span class="scope-badge" style="font-size:10px;">{{ item.network }}/{{ item.country }}</span></td>
+              <td><a href="/foundation/work-queue/{{ item.id }}/" class="textlink">Process Item ›</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">✓</div>
+        <h3>All Work Items Cleared</h3>
+        <p>There are no active or pending operational work items in {{ active_network }}.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Pending Verification Pipeline -->
+    <section class="panel" aria-labelledby="verifications-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="verifications-heading">Onboarding Verification Pipeline</h2>
+          <p>Candidate profiles with submitted eligibility awaiting approval.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/verifications/?network={{ active_network }}&country={{ active_country }}" class="textlink">Full verification roster ›</a>
+      </div>
+      {% if pending_verifications %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Applicant</th>
+              <th scope="col">Network</th>
+              <th scope="col">Country</th>
+              <th scope="col">Selected Home</th>
+              <th scope="col">Submitted</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for draft in pending_verifications %}
+            <tr>
+              <td><strong>{{ draft.account.display_name|default:draft.account.email }}</strong></td>
+              <td><span class="scope-badge" style="font-size:10px;">{{ draft.data.network|default:"WGMN" }}</span></td>
+              <td>{{ draft.data.country|default:"Nigeria" }}</td>
+              <td>{{ draft.data.local_connection_label|default:"Pending Assignment" }}</td>
+              <td>{{ draft.submitted_at|default:draft.updated_at|timesince }} ago</td>
+              <td><a href="/onboarding/review/{{ draft.account.id }}/" class="textlink">Review & Verify ›</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">📋</div>
+        <h3>No Pending Verifications</h3>
+        <p>The onboarding verification pipeline has zero pending applications in this scope.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Right Column: Operational Alerts & Recent Activity Feed -->
+  <div class="stack">
+    <!-- Operational Alerts -->
+    <section class="panel" aria-labelledby="ops-alerts-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="ops-alerts-heading">Operational Alerts & SLA Flags</h2>
+          <p>Flags and bottlenecks requiring field resolution.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/alerts/?network={{ active_network }}&country={{ active_country }}" class="textlink">All alerts</a>
+      </div>
+      {% if alerts %}
+        {% for al in alerts %}
+        <div class="mini-item" style="border-left: 3px solid {% if al.severity == 'critical' %}#CF1322{% elif al.severity == 'warning' %}#D46B08{% else %}var(--wdos-lemon){% endif %}; padding-left:12px;">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="priority-pill {{ al.severity }}">{{ al.severity }}</span>
+              <small style="color:var(--wdos-muted);">{{ al.created_at|timesince }} ago</small>
+            </div>
+            <h3 style="margin-bottom:4px;"><a href="/foundation/dashboard/alerts/{{ al.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ al.title }}</a></h3>
+            <p style="font-size:12px; color:var(--wdos-muted); margin-bottom:6px;">{{ al.message|truncatewords:14 }}</p>
+            <div class="meta" style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="scope-badge" style="font-size:10px;">{{ al.network }}/{{ al.country }}</span>
+              <a href="/foundation/dashboard/alerts/{{ al.id }}/" class="textlink">Take Action ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No operational alerts flagged for this scope.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Logistics Meetings -->
+    <section class="panel" aria-labelledby="ops-meetings-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="ops-meetings-heading">Operational & Logistics Syncs</h2>
+          <p>Upcoming briefings and reviewer meetings.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/meetings/?network={{ active_network }}&country={{ active_country }}" class="textlink">All syncs</a>
+      </div>
+      {% if meetings %}
+        {% for m in meetings %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="badge" style="background:#FFF7E6; color:#D46B08;">{{ m.get_meeting_type_display }}</span>
+              <small style="font-weight:600; color:var(--wdos-ink);">{{ m.scheduled_at|date:"M j · H:i" }}</small>
+            </div>
+            <h3 style="margin-bottom:4px;"><a href="/foundation/dashboard/meetings/{{ m.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ m.title }}</a></h3>
+            <p style="font-size:12px; color:var(--wdos-muted);">Venue: {{ m.location|default:"Online Sync" }} · {{ m.attendees_count }} Attendees</p>
+            <div class="meta" style="margin-top:6px;">
+              <a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">Sync Details ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No field syncs currently scheduled.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

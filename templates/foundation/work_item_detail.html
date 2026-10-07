@@ -1,0 +1,76 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}{{ item.title }} · Work Record{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">WORK RECORD · {{ item.network }} / {{ item.country }}</div>
+    <h1>{{ item.title }}</h1>
+    <p>Operational record details and workflow state transitions.</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/work-queue/" class="btn">‹ Back to Work Queue</a>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Left Column: Record Context & Description -->
+  <section class="panel">
+    <div class="panelhead">
+      <div>
+        <h2>Record Overview</h2>
+        <span class="badge {{ item.status }}">{{ item.get_status_display }}</span>
+      </div>
+      <span class="priority-pill {{ item.priority }}">{{ item.priority }} Priority</span>
+    </div>
+
+    <div style="margin:20px 0;">
+      <h3>Summary & Instructions</h3>
+      <p style="font-size:14px; color:var(--wdos-ink); line-height:1.6; margin-top:8px; white-space:pre-wrap;">{{ item.summary|default:"No additional notes recorded for this item." }}</p>
+    </div>
+
+    <dl class="definition" style="margin-top:24px;">
+      <div><dt>Network Workspace</dt><dd>{{ item.network }}</dd></div>
+      <div><dt>Country Hub</dt><dd>{{ item.country }}</dd></div>
+      <div><dt>Category</dt><dd>{{ item.get_category_display }}</dd></div>
+      <div><dt>Confidentiality</dt><dd>{% if item.confidential %}Restricted / Confidential{% else %}Standard Clearance{% endif %}</dd></div>
+      <div><dt>Created Timestamp</dt><dd>{{ item.created_at|date:"d M Y H:i" }}</dd></div>
+      <div><dt>Assigned Assignee</dt><dd>{% if item.assigned_to %}{{ item.assigned_to.display_name|default:item.assigned_to.email }}{% else %}Unassigned{% endif %}</dd></div>
+    </dl>
+  </section>
+
+  <!-- Right Column: Status Actions -->
+  <div class="stack">
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Workflow Actions</h2>
+      </div>
+      <form method="post" action="/foundation/work-queue/{{ item.id }}/action/" style="display:flex; flex-direction:column; gap:10px;">
+        {% csrf_token %}
+        {% if item.status == 'pending' %}
+        <button type="submit" name="action" value="claim" class="btn primary" style="width:100%; justify-content:center;">
+          Claim & Begin Work
+        </button>
+        {% elif item.status == 'in_progress' %}
+        <button type="submit" name="action" value="complete" class="btn primary" style="width:100%; justify-content:center;">
+          ✓ Mark Completed
+        </button>
+        {% elif item.status == 'completed' %}
+        <button type="submit" name="action" value="reopen" class="btn" style="width:100%; justify-content:center;">
+          Reopen Work Item
+        </button>
+        {% endif %}
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Security & Boundary</h2>
+      </div>
+      <p style="font-size:12px; color:var(--wdos-muted); line-height:1.5;">
+        This record is verified server-side on every request against your active network ({{ user_scope.active_network }}) and geographic permissions.
+      </p>
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}Work Queue · {{ user_scope.active_network }}{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">WORK QUEUE · {{ user_scope.active_network }}</div>
+    <h1>Authorized Work Queue</h1>
+    <p>Operational tasks, review queues, and approval actions scoped strictly to your network and country clearance.</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/work-queue/" class="btn">Reset Filters</a>
+  </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="tabs" role="tablist" aria-label="Work Queue Status Tabs">
+  <a class="tab {% if status_filter == 'pending' %}active{% endif %}" href="?status=pending">Pending</a>
+  <a class="tab {% if status_filter == 'in_progress' %}active{% endif %}" href="?status=in_progress">In Progress</a>
+  <a class="tab {% if status_filter == 'completed' %}active{% endif %}" href="?status=completed">Completed</a>
+  <a class="tab {% if status_filter == 'all' %}active{% endif %}" href="?status=all">All Items</a>
+</div>
+
+<!-- Work Queue Panel -->
+<section class="panel">
+  <div class="panelhead">
+    <div>
+      <h2>Tasks in Queue ({{ total_count }})</h2>
+      <p>Items in your authorized scope: {{ user_scope.allowed_networks|join:", " }} / {% if "*" in user_scope.allowed_countries %}All Countries{% else %}{{ user_scope.allowed_countries|join:", " }}{% endif %}</p>
+    </div>
+    <span class="scope-badge">{{ user_scope.active_network }}</span>
+  </div>
+
+  {% if items %}
+  <div class="records-table-wrap">
+    <table class="records-table">
+      <thead>
+        <tr>
+          <th scope="col">Title</th>
+          <th scope="col">Scope</th>
+          <th scope="col">Category</th>
+          <th scope="col">Priority</th>
+          <th scope="col">Status</th>
+          <th scope="col">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>
+            <a href="/foundation/work-queue/{{ item.id }}/" style="font-weight:650; color:var(--wdos-ink); text-decoration:none;">
+              {{ item.title }}
+            </a>
+            {% if item.confidential %}
+            <span class="badge" style="background:#FFF0F6; color:var(--wdos-magenta); font-size:10px;">Confidential</span>
+            {% endif %}
+            <div style="font-size:11px; color:var(--wdos-muted); margin-top:2px;">{{ item.summary|truncatewords:8 }}</div>
+          </td>
+          <td><span class="badge">{{ item.network }} / {{ item.country }}</span></td>
+          <td><span class="badge">{{ item.get_category_display }}</span></td>
+          <td><span class="priority-pill {{ item.priority }}">{{ item.priority }}</span></td>
+          <td><span class="badge {{ item.status }}">{{ item.get_status_display }}</span></td>
+          <td>
+            <a href="/foundation/work-queue/{{ item.id }}/" class="btn small" style="white-space:nowrap;">
+              Open Record ›
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <!-- Empty State -->
+  <div class="empty-state">
+    <div class="empty-state-icon">✓</div>
+    <h3>No Work Items Found</h3>
+    <p>There are no items matching status '{{ status_filter }}' in your authorized {{ user_scope.active_network }} scope.</p>
+    <a href="/foundation/work-queue/?status=all" class="btn small primary">View All Items</a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}Search · {{ user_scope.active_network }}{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">SEARCH BOUNDARY · {{ user_scope.active_network }}</div>
+    <h1>Confidential Search</h1>
+    <p>Search records, tasks, country hubs, and leadership directories within your authorized network and geographic clearance.</p>
+  </div>
+</div>
+
+<section class="panel">
+  <!-- Search Form -->
+  <form method="get" action="/foundation/search/" style="display:flex; gap:12px; margin-bottom:24px;">
+    <div style="flex:1; position:relative;">
+      <input
+        type="search"
+        id="global-search-input"
+        name="q"
+        value="{{ query }}"
+        placeholder="Search work items, records, hubs, profiles..."
+        style="width:100%; padding:12px 16px; border:1px solid var(--wdos-line); border-radius:8px; font-size:14px; background:#FCFBFC;"
+        autofocus
+      >
+    </div>
+    <button type="submit" class="btn primary">
+      Search
+    </button>
+  </form>
+
+  <div class="notice" style="margin-bottom:20px; font-size:12px;">
+    <span class="icon">🔒</span>
+    <span>Zero-Leakage Guarantee: Results and counts are strictly filtered server-side. Records outside {{ user_scope.allowed_networks|join:", " }} or above your clearance are never queried or leaked.</span>
+  </div>
+
+  {% if query %}
+    <div class="panelhead">
+      <h2>Search Results ({{ total_count }})</h2>
+      <span class="scope-badge">Query: "{{ query }}"</span>
+    </div>
+
+    {% if results %}
+    <div style="border-top:1px solid var(--wdos-line);">
+      {% for res in results %}
+      <div class="search-result-item">
+        <div>
+          <h4>
+            <a href="{{ res.url }}" style="color:var(--wdos-ink); text-decoration:none;">{{ res.title }}</a>
+          </h4>
+          <p>{{ res.summary }}</p>
+          <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
+            <span class="badge" style="font-size:10px;">{{ res.type|title }}</span>
+            <span class="scope-badge" style="font-size:10px;">{{ res.network }} / {{ res.country }}</span>
+          </div>
+        </div>
+        <a href="{{ res.url }}" class="btn small" style="white-space:nowrap;">Open ›</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">⌕</div>
+      <h3>No matching records found</h3>
+      <p>No results found for "{{ query }}" within your authorized {{ user_scope.active_network }} / {{ user_scope.active_country }} workspace.</p>
+      <a href="/foundation/search/" class="btn small">Clear Search Query</a>
+    </div>
+    {% endif %}
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">⌕</div>
+    <h3>Start searching</h3>
+    <p>Type a keyword, item title, country hub code, or team member name above to search across your workspace.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}Alert: {{ alert.title }} · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ alert.network }} NETWORK · {{ alert.country }} HUB · GOVERNANCE ALERT</div>
+    <h1 id="page-title">{{ alert.title }}</h1>
+    <p>Operational alert logged on {{ alert.created_at|date:"F d, Y H:i" }}. Requires field/leadership review.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px;">
+    {% if is_acknowledged %}
+    <span class="badge completed" style="padding:8px 14px; font-size:13px;">✓ Acknowledged</span>
+    {% else %}
+    <form method="post" action="/foundation/dashboard/alerts/{{ alert.id }}/acknowledge/">
+      {% csrf_token %}
+      <button type="submit" class="btn primary">
+        ✓ Acknowledge Alert
+      </button>
+    </form>
+    {% endif %}
+    <a class="btn" href="/foundation/dashboard/drilldown/alerts/?network={{ alert.network }}&country={{ alert.country }}">
+      ‹ All Alerts
+    </a>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: 2fr 1fr; gap:20px;">
+  <!-- Left: Alert Body & Details -->
+  <section class="panel" aria-labelledby="alert-message-heading">
+    <div class="panelhead">
+      <h2 id="alert-message-heading">Alert Description & Details</h2>
+      <span class="priority-pill {% if alert.severity == 'critical' %}urgent{% elif alert.severity == 'warning' %}high{% else %}normal{% endif %}">
+        {{ alert.severity|upper }}
+      </span>
+    </div>
+    
+    <div style="font-size:15px; line-height:1.6; color:var(--wdos-ink); margin:16px 0; padding:16px; background:#FAFAFA; border-left:4px solid var(--wdos-magenta); border-radius:4px;">
+      {{ alert.message }}
+    </div>
+
+    {% if alert.action_url %}
+    <div style="margin-top:20px;">
+      <a href="{{ alert.action_url }}" class="btn primary small">
+        Execute Remediation Action ›
+      </a>
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- Right: Metadata & Acknowledgment Audit -->
+  <section class="panel" aria-labelledby="alert-meta-heading">
+    <div class="panelhead">
+      <h2 id="alert-meta-heading">Alert Scope & Audit</h2>
+    </div>
+    <dl class="definition">
+      <div>
+        <dt>Severity</dt>
+        <dd><strong>{{ alert.severity|title }}</strong></dd>
+      </div>
+      <div>
+        <dt>Category</dt>
+        <dd>{{ alert.category|title }}</dd>
+      </div>
+      <div>
+        <dt>Network</dt>
+        <dd>{{ alert.network }}</dd>
+      </div>
+      <div>
+        <dt>Country Hub</dt>
+        <dd>{{ alert.country }}</dd>
+      </div>
+      <div>
+        <dt>Status</dt>
+        <dd>
+          {% if alert.is_active %}
+          <span class="badge pending">Active</span>
+          {% else %}
+          <span class="badge completed">Resolved</span>
+          {% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt>Timestamp</dt>
+        <dd>{{ alert.created_at|date:"M d, Y H:i" }}</dd>
+      </div>
+    </dl>
+  </section>
+</div>
+{% endblock %}

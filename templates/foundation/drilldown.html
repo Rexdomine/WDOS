@@ -1,0 +1,156 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}{{ category_title }} Drill-down · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ network }} NETWORK · {{ country }} HUB · DETAILED DRILL-DOWN</div>
+    <h1 id="page-title">{{ category_title }} Directory</h1>
+    <p>Authoritative server-scoped records for {{ network }} Network in {{ country }}. Every item reconciles to database records.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <a class="btn" href="/foundation/dashboard/export/?type={{ category }}&network={{ network }}&country={{ country }}" download>
+      <span aria-hidden="true">⬇</span> Export CSV
+    </a>
+    <a class="btn primary" href="/foundation/?network={{ network }}&country={{ country }}">
+      ‹ Return to Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Scope Filter Bar -->
+<div class="panel" style="padding:12px 18px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span style="font-size:12px; font-weight:700; color:var(--wdos-muted);">ACTIVE SCOPE:</span>
+    <span class="scope-badge">{{ network }} Network</span>
+    <span class="scope-badge">{{ country }} Hub</span>
+  </div>
+  <div style="font-size:12px; color:var(--wdos-muted);">
+    Showing <strong>{{ items|length }}</strong> record{{ items|length|pluralize }}
+  </div>
+</div>
+
+<!-- Main Table Panel -->
+<section class="panel" aria-labelledby="page-title">
+  {% if items %}
+  <div class="records-table-wrap">
+    <table class="records-table">
+      <thead>
+        <tr>
+          {% for col in columns %}
+          <th scope="col">{{ col }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if category == "chapters" %}
+          {% for ch in items %}
+          <tr>
+            <td><strong>{{ ch.code }}</strong></td>
+            <td><a href="/foundation/dashboard/chapters/{{ ch.id }}/" style="font-weight:600; color:var(--wdos-ink); text-decoration:none;">{{ ch.name }}</a></td>
+            <td><span class="badge">{{ ch.network }}</span></td>
+            <td>{{ ch.country }}</td>
+            <td>{{ ch.region|default:"—" }}</td>
+            <td><span class="badge {% if ch.status == 'active' %}completed{% else %}pending{% endif %}">{{ ch.status|title }}</span></td>
+            <td><strong>{{ ch.member_count }}</strong></td>
+            <td>{{ ch.lead_name|default:"Unassigned" }}</td>
+            <td><a href="/foundation/dashboard/chapters/{{ ch.id }}/" class="textlink">View Chapter ›</a></td>
+          </tr>
+          {% endfor %}
+        {% elif category == "alerts" %}
+          {% for al in items %}
+          <tr>
+            <td>
+              <span class="priority-pill {% if al.severity == 'critical' %}urgent{% elif al.severity == 'warning' %}high{% else %}normal{% endif %}">
+                {{ al.severity|upper }}
+              </span>
+            </td>
+            <td><a href="/foundation/dashboard/alerts/{{ al.id }}/" style="font-weight:600; color:var(--wdos-ink); text-decoration:none;">{{ al.title }}</a></td>
+            <td><span class="badge">{{ al.category|title }}</span></td>
+            <td>{{ al.network }}</td>
+            <td>{{ al.country }}</td>
+            <td>{{ al.created_at|date:"M d, Y" }}</td>
+            <td><a href="/foundation/dashboard/alerts/{{ al.id }}/" class="textlink">Review Alert ›</a></td>
+          </tr>
+          {% endfor %}
+        {% elif category == "meetings" %}
+          {% for m in items %}
+          <tr>
+            <td><a href="/foundation/dashboard/meetings/{{ m.id }}/" style="font-weight:600; color:var(--wdos-ink); text-decoration:none;">{{ m.title }}</a></td>
+            <td><span class="badge">{{ m.meeting_type|title }}</span></td>
+            <td>{{ m.network }}</td>
+            <td>{{ m.country }}</td>
+            <td>{{ m.scheduled_at|date:"M d, Y H:i" }}</td>
+            <td>{{ m.location }}</td>
+            <td>{{ m.attendees_count }} confirmed</td>
+            <td><a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">View / RSVP ›</a></td>
+          </tr>
+          {% endfor %}
+        {% elif category == "reports" %}
+          {% for r in items %}
+          <tr>
+            <td><a href="/foundation/dashboard/reports/{{ r.id }}/" style="font-weight:600; color:var(--wdos-ink); text-decoration:none;">{{ r.title }}</a></td>
+            <td><span class="badge">{{ r.report_type|title }}</span></td>
+            <td>{{ r.network }}</td>
+            <td>{{ r.country }}</td>
+            <td>{{ r.period }}</td>
+            <td><span class="badge completed">{{ r.status|title }}</span></td>
+            <td><a href="/foundation/dashboard/reports/{{ r.id }}/" class="textlink">Read Report ›</a></td>
+          </tr>
+          {% endfor %}
+        {% elif category == "members" %}
+          {% for mem in items %}
+          <tr>
+            <td><strong>{{ mem.person.display_name|default:"Member" }}</strong></td>
+            <td><span class="badge">{{ mem.network }}</span></td>
+            <td>{{ mem.home.label|default:mem.home.state|default:"Local Chapter" }}</td>
+            <td>{{ mem.home.country|default:"NG" }}</td>
+            <td>{{ mem.created_at|date:"M d, Y" }}</td>
+          </tr>
+          {% endfor %}
+        {% elif category == "verifications" %}
+          {% for draft in items %}
+          <tr>
+            <td><strong>{{ draft.account.email }}</strong></td>
+            <td><span class="badge">{{ draft.data.network|default:"WGMN" }}</span></td>
+            <td>{{ draft.data.country|default:"NG" }}</td>
+            <td><span class="badge pending">{{ draft.state|title }}</span></td>
+            <td>Rev {{ draft.revision }}</td>
+            <td><a href="/foundation/work-queue/" class="textlink">Triage Queue ›</a></td>
+          </tr>
+          {% endfor %}
+        {% elif category == "work-items" %}
+          {% for wi in items %}
+          <tr>
+            <td>
+              <a href="/foundation/work-queue/{{ wi.id }}/" style="font-weight:600; color:var(--wdos-ink); text-decoration:none;">
+                {{ wi.title }}
+              </a>
+              {% if wi.confidential %}
+              <span class="badge" style="background:#FFF0F6; color:var(--wdos-magenta); font-size:10px;">Confidential</span>
+              {% endif %}
+            </td>
+            <td><span class="badge">{{ wi.get_category_display }}</span></td>
+            <td><span class="priority-pill {{ wi.priority }}">{{ wi.priority }}</span></td>
+            <td><span class="badge {{ wi.status }}">{{ wi.get_status_display }}</span></td>
+            <td>{{ wi.assigned_to.display_name|default:"Unassigned" }}</td>
+            <td><a href="/foundation/work-queue/{{ wi.id }}/" class="textlink">Open Record ›</a></td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state" role="status" style="padding:48px 24px; text-align:center;">
+    <div class="empty-state-icon" aria-hidden="true">✓</div>
+    <h3>No {{ category_title }} in Current Scope</h3>
+    <p>There are no active {{ category }} matching network {{ network }} and country {{ country }}.</p>
+    <a href="/foundation/?network={{ network }}&country={{ country }}" class="btn small primary" style="margin-top:12px;">
+      Return to Overview
+    </a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

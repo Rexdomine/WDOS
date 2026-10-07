@@ -1,0 +1,97 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}Meeting: {{ meeting.title }} · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ meeting.network }} NETWORK · {{ meeting.country }} HUB · SCHEDULED GATHERING</div>
+    <h1 id="page-title">{{ meeting.title }}</h1>
+    <p>Scheduled for <strong>{{ meeting.scheduled_at|date:"l, F d, Y @ H:i" }}</strong> · {{ meeting.location }}</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px;">
+    <form method="post" action="/foundation/dashboard/meetings/{{ meeting.id }}/rsvp/">
+      {% csrf_token %}
+      {% if is_rsvpd %}
+      <button type="submit" class="btn" style="background:#FFF0F6; color:var(--wdos-magenta); border-color:var(--wdos-magenta);">
+        ✓ Confirmed (Click to Cancel RSVP)
+      </button>
+      {% else %}
+      <button type="submit" class="btn primary">
+        RSVP to Attend ✓
+      </button>
+      {% endif %}
+    </form>
+    <a class="btn" href="/foundation/dashboard/drilldown/meetings/?network={{ meeting.network }}&country={{ meeting.country }}">
+      ‹ All Meetings
+    </a>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: 2fr 1fr; gap:20px;">
+  <!-- Left: Meeting Description & Virtual Access -->
+  <section class="panel" aria-labelledby="meeting-info-heading">
+    <div class="panelhead">
+      <h2 id="meeting-info-heading">Agenda & Details</h2>
+      <span class="badge">{{ meeting.meeting_type|title }}</span>
+    </div>
+
+    <div style="font-size:15px; line-height:1.6; color:var(--wdos-ink); margin:16px 0;">
+      {{ meeting.description|linebreaks }}
+    </div>
+
+    <div style="margin-top:24px; padding:16px; background:#FAFAFA; border-radius:8px; border:1px solid var(--wdos-line);">
+      <h3 style="font-size:14px; margin-bottom:8px; color:var(--wdos-ink);">Location & Access</h3>
+      <p style="font-size:13px; margin:0 0 8px; color:var(--wdos-muted);"><strong>Venue / Details:</strong> {{ meeting.location }}</p>
+      {% if meeting.virtual_link %}
+      <a href="{{ meeting.virtual_link }}" target="_blank" rel="noopener noreferrer" class="btn small primary">
+        Join Virtual Room ›
+      </a>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Right: Attendance & Metadata -->
+  <section class="panel" aria-labelledby="meeting-meta-heading">
+    <div class="panelhead">
+      <h2 id="meeting-meta-heading">Meeting Details</h2>
+    </div>
+    <dl class="definition">
+      <div>
+        <dt>Type</dt>
+        <dd><strong>{{ meeting.meeting_type|title }}</strong></dd>
+      </div>
+      <div>
+        <dt>Network</dt>
+        <dd>{{ meeting.network }}</dd>
+      </div>
+      <div>
+        <dt>Country Hub</dt>
+        <dd>{{ meeting.country }}</dd>
+      </div>
+      <div>
+        <dt>Target Audience</dt>
+        <dd>{{ meeting.target_role|title }}</dd>
+      </div>
+      <div>
+        <dt>Confirmed RSVPs</dt>
+        <dd><strong>{{ meeting.attendees_count }}</strong> attendees</dd>
+      </div>
+      <div>
+        <dt>Your Status</dt>
+        <dd>
+          {% if is_rsvpd %}
+          <span class="badge completed">RSVP Confirmed</span>
+          {% else %}
+          <span class="badge pending">Not Confirmed</span>
+          {% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt>Facilitator</dt>
+        <dd>{{ meeting.organizer_name|default:"Leadership Team" }}</dd>
+      </div>
+    </dl>
+  </section>
+</div>
+{% endblock %}

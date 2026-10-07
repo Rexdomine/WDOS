@@ -1,0 +1,220 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}{{ country_name }} Country Hub Dashboard · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">{{ active_network }} NETWORK · {{ country_name|upper }} COUNTRY HUB</div>
+    <h1 id="page-title">{{ country_name }} Country Hub Dashboard</h1>
+    <p>National and field operations, regional chapter coordination, and country-level governance for {{ country_name }}.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    {% if available_roles|length > 1 %}
+    <div class="role-selector-wrap" style="display:flex; align-items:center; gap:6px; background:white; padding:4px 10px; border-radius:8px; border:1px solid var(--wdos-line);">
+      <span style="font-size:11px; font-weight:700; color:var(--wdos-muted);">TEST ROLE:</span>
+      <select onchange="window.location.href='/foundation/?role=' + this.value" aria-label="Switch test role" style="border:none; font-size:12px; font-weight:700; color:var(--wdos-magenta); background:transparent; cursor:pointer;">
+        {% for r in available_roles %}
+        <option value="{{ r }}" {% if r == active_role %}selected{% endif %}>{{ r|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <a class="btn" href="/foundation/dashboard/export/?type=chapters&network={{ active_network }}&country={{ active_country }}" download>
+      <span aria-hidden="true">⬇</span> Export Country Roster
+    </a>
+    <a class="btn primary" href="/foundation/network/{{ active_network }}/country/{{ active_country }}/">
+      Explore Country Hierarchy
+    </a>
+  </div>
+</div>
+
+<!-- Scoped Country KPIs (Reconcile to Source Records in this Country) -->
+<div class="stats" role="region" aria-label="Country Performance Indicators">
+  <div class="stat">
+    <div class="stat-label"><span>COUNTRY TOTAL MEMBERS</span><span class="icon" aria-hidden="true">👥</span></div>
+    <div class="stat-value">{{ kpis.country_members|default:"0" }}</div>
+    <div class="stat-detail">Affiliated within {{ country_name }}</div>
+  </div>
+  <a href="/foundation/dashboard/drilldown/chapters/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>ACTIVE CHAPTERS</span><span class="icon" aria-hidden="true">⌑</span></div>
+    <div class="stat-value">{{ kpis.country_chapters|default:"0" }}</div>
+    <div class="stat-detail">Local hubs across state/regional zones</div>
+  </a>
+  <a href="/foundation/dashboard/drilldown/alerts/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>COUNTRY FIELD ALERTS</span><span class="icon" aria-hidden="true">♧</span></div>
+    <div class="stat-value">{{ kpis.country_alerts|default:"0" }}</div>
+    <div class="stat-detail">Local regulatory & operational updates</div>
+  </a>
+  <a href="/foundation/dashboard/drilldown/meetings/?network={{ active_network }}&country={{ active_country }}" class="stat" style="text-decoration:none; color:inherit;">
+    <div class="stat-label"><span>COUNTRY ASSEMBLIES</span><span class="icon" aria-hidden="true">□</span></div>
+    <div class="stat-value">{{ kpis.country_meetings|default:"0" }}</div>
+    <div class="stat-detail">Upcoming assemblies & leader briefings</div>
+  </a>
+</div>
+
+<!-- Main Country Leadership Grid -->
+<div class="grid">
+  <!-- Left Column: Chapters Distribution & Field Reports -->
+  <div class="stack">
+    <!-- Regional Chapters Distribution -->
+    <section class="panel" aria-labelledby="country-chapters-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="country-chapters-heading">Active Chapters in {{ country_name }}</h2>
+          <p>Local chapter mobilization, LGA connections, and membership rosters.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/chapters/?network={{ active_network }}&country={{ active_country }}" class="textlink">All {{ country_name }} chapters ›</a>
+      </div>
+      {% if chapters %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Chapter Name</th>
+              <th scope="col">Code</th>
+              <th scope="col">Region / State</th>
+              <th scope="col">Members</th>
+              <th scope="col">Chapter Lead</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ch in chapters %}
+            <tr>
+              <td>
+                <a href="/foundation/dashboard/chapters/{{ ch.id }}/" style="font-weight:700; color:var(--wdos-ink); text-decoration:none;">
+                  {{ ch.name }}
+                </a>
+              </td>
+              <td><code>{{ ch.code }}</code></td>
+              <td>{{ ch.region }}{% if ch.district %} / {{ ch.district }}{% endif %}</td>
+              <td><strong>{{ ch.member_count }}</strong></td>
+              <td>{{ ch.lead_name|default:"Lead Assigned" }}</td>
+              <td><a href="/foundation/dashboard/chapters/{{ ch.id }}/" class="textlink">View Chapter ›</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">⌑</div>
+        <h3>No Chapters Found in {{ country_name }}</h3>
+        <p>There are currently no active chapters seeded in {{ country_name }} for {{ active_network }}.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Country Field Reports -->
+    <section class="panel" aria-labelledby="country-reports-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="country-reports-heading">Field Reports for {{ country_name }}</h2>
+          <p>Monthly assessments and chapter performance monitoring.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/reports/?network={{ active_network }}&country={{ active_country }}" class="textlink">All reports ›</a>
+      </div>
+      {% if reports %}
+      <div class="records-table-wrap">
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th scope="col">Report Title</th>
+              <th scope="col">Period</th>
+              <th scope="col">Summary</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rep in reports %}
+            <tr>
+              <td>
+                <a href="/foundation/dashboard/reports/{{ rep.id }}/" style="font-weight:650; color:var(--wdos-ink); text-decoration:none;">
+                  {{ rep.title }}
+                </a>
+              </td>
+              <td>{{ rep.period }}</td>
+              <td>{{ rep.summary|truncatewords:10 }}</td>
+              <td><a href="/foundation/dashboard/reports/{{ rep.id }}/" class="textlink">Read Report ›</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" role="status">
+        <p>No published field reports found for {{ country_name }}.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Right Column: Country Alerts & Assemblies -->
+  <div class="stack">
+    <!-- Country Alerts -->
+    <section class="panel" aria-labelledby="country-alerts-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="country-alerts-heading">Country Hub Field Alerts</h2>
+          <p>Local notifications restricted to {{ country_name }}.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/alerts/?network={{ active_network }}&country={{ active_country }}" class="textlink">View alerts</a>
+      </div>
+      {% if alerts %}
+        {% for al in alerts %}
+        <div class="mini-item" style="border-left: 3px solid {% if al.severity == 'critical' %}#CF1322{% elif al.severity == 'warning' %}#D46B08{% else %}var(--wdos-magenta){% endif %}; padding-left:12px;">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="priority-pill {{ al.severity }}">{{ al.severity }}</span>
+              <small style="color:var(--wdos-muted);">{{ al.created_at|timesince }} ago</small>
+            </div>
+            <h3 style="margin-bottom:4px;"><a href="/foundation/dashboard/alerts/{{ al.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ al.title }}</a></h3>
+            <p style="font-size:12px; color:var(--wdos-muted); margin-bottom:6px;">{{ al.message|truncatewords:14 }}</p>
+            <div class="meta">
+              <a href="/foundation/dashboard/alerts/{{ al.id }}/" class="textlink">Inspect Alert ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No active alerts for {{ country_name }}.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Assemblies & Field Gatherings -->
+    <section class="panel" aria-labelledby="country-assemblies-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="country-assemblies-heading">National Assemblies & Gatherings</h2>
+          <p>Field events in {{ country_name }}.</p>
+        </div>
+        <a href="/foundation/dashboard/drilldown/meetings/?network={{ active_network }}&country={{ active_country }}" class="textlink">All events</a>
+      </div>
+      {% if meetings %}
+        {% for m in meetings %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="badge" style="background:#EDF5E6; color:#35581B;">{{ m.get_meeting_type_display }}</span>
+              <small style="font-weight:600; color:var(--wdos-ink);">{{ m.scheduled_at|date:"M j · H:i" }}</small>
+            </div>
+            <h3 style="margin-bottom:4px;"><a href="/foundation/dashboard/meetings/{{ m.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ m.title }}</a></h3>
+            <p style="font-size:12px; color:var(--wdos-muted);">Venue: {{ m.location|default:"National Center" }} · {{ m.attendees_count }} Registered</p>
+            <div class="meta" style="margin-top:6px;">
+              <a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">Assembly Details ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No upcoming country assemblies scheduled in {{ country_name }}.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

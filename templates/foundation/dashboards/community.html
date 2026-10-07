@@ -1,0 +1,177 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+{% block title %}WDOS Community & Public Hub · WDOS{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">WDOS GLOBAL COMMUNITY · PUBLIC HUB</div>
+    <h1 id="page-title">Welcome to the WDOS Community</h1>
+    <p>Explore our dual networks, attend open webinars and public initiatives, and connect with local chapters across Africa.</p>
+  </div>
+  <div class="actions" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    {% if available_roles|length > 1 %}
+    <div class="role-selector-wrap" style="display:flex; align-items:center; gap:6px; background:white; padding:4px 10px; border-radius:8px; border:1px solid var(--wdos-line);">
+      <span style="font-size:11px; font-weight:700; color:var(--wdos-muted);">TEST ROLE:</span>
+      <select onchange="window.location.href='/foundation/?role=' + this.value" aria-label="Switch test role" style="border:none; font-size:12px; font-weight:700; color:var(--wdos-magenta); background:transparent; cursor:pointer;">
+        {% for r in available_roles %}
+        <option value="{{ r }}" {% if r == active_role %}selected{% endif %}>{{ r|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <a class="btn primary" href="/auth/register/">
+      Apply for Full Membership ›
+    </a>
+  </div>
+</div>
+
+<!-- Community Welcome Banner -->
+<div class="panel" style="margin-bottom:24px; background:linear-gradient(135deg, #FFFDFE 0%, #FBF6FA 100%); border-top: 6px solid var(--wdos-magenta);">
+  <div style="max-width:720px;">
+    <h2 style="font-size:24px; margin-bottom:8px; color:var(--wdos-ink);">Nurturing Communities, Transforming Generations</h2>
+    <p style="font-size:14px; line-height:1.6; color:var(--wdos-muted); margin-bottom:16px;">
+      The Women of Divine Destiny Initiative (WODDI) operates two dedicated networks across Africa: 
+      <strong>WGMN</strong> (Women of Divine Destiny Network) empowering mothers and families, and 
+      <strong>WNNN</strong> (Next-Gen Nurturers Network) developing tomorrow’s leaders through education, digital literacy, and community action.
+    </p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a href="/onboarding/" class="btn small primary">Begin Onboarding</a>
+      <a href="/auth/help/" class="btn small">About Our Programs</a>
+    </div>
+  </div>
+</div>
+
+<!-- Community Stats -->
+<div class="stats" role="region" aria-label="Community Indicators">
+  <div class="stat">
+    <div class="stat-label"><span>OPEN COMMUNITY EVENTS</span><span class="icon" aria-hidden="true">□</span></div>
+    <div class="stat-value">{{ kpis.open_events|default:"0" }}</div>
+    <div class="stat-detail">Webinars, mentorship sessions, & open days</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>ACTIVE COUNTRY HUBS</span><span class="icon" aria-hidden="true">⌑</span></div>
+    <div class="stat-value">{{ kpis.country_hubs_count|default:"5" }}</div>
+    <div class="stat-detail">Nigeria, Kenya, Ghana, South Africa, Rwanda</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><span>LOCAL CHAPTERS</span><span class="icon" aria-hidden="true">👥</span></div>
+    <div class="stat-value">{{ kpis.total_chapters|default:"9" }}</div>
+    <div class="stat-detail">Grassroots hubs across multiple cities</div>
+  </div>
+</div>
+
+<!-- Main Community Grid -->
+<div class="grid">
+  <!-- Left Column: Open Events & Chapter Locator -->
+  <div class="stack">
+    <!-- Open Events -->
+    <section class="panel" aria-labelledby="community-events-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="community-events-heading">Open Public Events & Webinars</h2>
+          <p>Free to attend for all community members and prospective applicants.</p>
+        </div>
+      </div>
+      {% if community_events %}
+        {% for m in community_events %}
+        <div class="mini-item" style="padding:14px; border:1px solid var(--wdos-line); border-radius:8px; margin-bottom:10px;">
+          <div style="width:100%;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span class="badge" style="background:#EDF5E6; color:#35581B;">Public Session</span>
+              <strong style="color:var(--wdos-ink); font-size:13px;">{{ m.scheduled_at|date:"l, M j · H:i" }}</strong>
+            </div>
+            <h3 style="margin-bottom:4px; font-size:16px;">{{ m.title }}</h3>
+            <p style="font-size:13px; color:var(--wdos-muted); margin-bottom:8px;">
+              Venue: {{ m.location|default:"Online Public Stream" }} · Open to public
+            </p>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <form method="post" action="/foundation/dashboard/meetings/{{ m.id }}/rsvp/">
+                {% csrf_token %}
+                <button type="submit" class="btn small primary">Register to Attend</button>
+              </form>
+              <a href="/foundation/dashboard/meetings/{{ m.id }}/" class="textlink">Event Info ›</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status">
+        <div class="empty-state-icon" aria-hidden="true">□</div>
+        <h3>No Open Events at this Moment</h3>
+        <p>Stay tuned for our upcoming monthly public empowerment webinar announcements.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Chapter Finder Directory Preview -->
+    <section class="panel" aria-labelledby="directory-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="directory-heading">Find a Local Chapter Near You</h2>
+          <p>Connect with a neighborhood chapter for community fellowship.</p>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; margin-top:12px;">
+        <div class="card" style="padding:14px; border:1px solid var(--wdos-line); border-radius:8px; background:white;">
+          <strong style="color:var(--wdos-ink); display:block; margin-bottom:4px;">Nigeria Country Hub</strong>
+          <span style="font-size:12px; color:var(--wdos-muted);">Chapters in Lagos, Abuja, Port Harcourt</span>
+        </div>
+        <div class="card" style="padding:14px; border:1px solid var(--wdos-line); border-radius:8px; background:white;">
+          <strong style="color:var(--wdos-ink); display:block; margin-bottom:4px;">Kenya Country Hub</strong>
+          <span style="font-size:12px; color:var(--wdos-muted);">Chapters in Nairobi, Mombasa, Kisumu</span>
+        </div>
+        <div class="card" style="padding:14px; border:1px solid var(--wdos-line); border-radius:8px; background:white;">
+          <strong style="color:var(--wdos-ink); display:block; margin-bottom:4px;">Ghana Country Hub</strong>
+          <span style="font-size:12px; color:var(--wdos-muted);">Chapters in Accra, Kumasi, Takoradi</span>
+        </div>
+        <div class="card" style="padding:14px; border:1px solid var(--wdos-line); border-radius:8px; background:white;">
+          <strong style="color:var(--wdos-ink); display:block; margin-bottom:4px;">South Africa Country Hub</strong>
+          <span style="font-size:12px; color:var(--wdos-muted);">Chapters in Johannesburg, Cape Town</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Right Column: Public Bulletins & Get Involved -->
+  <div class="stack">
+    <!-- Public Bulletins -->
+    <section class="panel" aria-labelledby="community-bulletins-heading">
+      <div class="panelhead">
+        <div>
+          <h2 id="community-bulletins-heading">Community Announcements</h2>
+        </div>
+      </div>
+      {% if community_bulletins %}
+        {% for comm in community_bulletins %}
+        <div class="mini-item">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span class="badge" style="background:#FFF0F6; color:var(--wdos-magenta);">Community</span>
+              <small style="color:var(--wdos-muted);">{{ comm.sent_at|timesince }} ago</small>
+            </div>
+            <h3 style="margin-bottom:4px;">{{ comm.subject }}</h3>
+            <p style="font-size:12px; color:var(--wdos-muted);">{{ comm.body }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" role="status" style="padding:24px 12px;">
+        <p>No announcements currently posted for the public.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Join CTA Panel -->
+    <section class="panel" style="border: 2px dashed var(--wdos-magenta); background:#FFFDFE;">
+      <div class="panelhead">
+        <h2>Ready to Join WDOS?</h2>
+      </div>
+      <p style="font-size:13px; color:var(--wdos-muted); margin-bottom:14px; line-height:1.5;">
+        Become an accredited member of WGMN or WNNN. Gain access to mentorship, leadership training, community grants, and continental assemblies.
+      </p>
+      <a href="/auth/register/" class="btn primary" style="width:100%; justify-content:center;">Register Your Account ›</a>
+    </section>
+  </div>
+</div>
+{% endblock %}

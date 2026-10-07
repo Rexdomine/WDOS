@@ -1,0 +1,191 @@
+{% load static %}
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ direction }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WDOS · {% block title %}{{ translations.onb_workspace_title|default:"Workspace" }}{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'accounts/design.css' %}">
+  <link rel="stylesheet" href="{% static 'accounts/refinements.css' %}">
+  <link rel="stylesheet" href="{% static 'foundation/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'foundation/shell.css' %}">
+  <style>html, body { overflow-x: hidden; }</style>
+</head>
+<body class="foundation-shell {% if high_contrast %}theme-high-contrast{% endif %} {% if reduced_motion %}reduce-motion{% endif %} font-size-{{ font_size|default:'standard' }}">
+  
+  <!-- Desktop Sidebar -->
+  <aside class="sidebar" aria-label="Main Navigation">
+    <a href="/foundation/" style="display:block;"><img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer"></a>
+    
+    <!-- Active Network & Geography Scope Indicator -->
+    <div class="workspace" style="flex-direction:column; align-items:stretch; gap:6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <b>{{ user_scope.active_network }}</b>
+          <span>{{ user_scope.active_country }} Hub</span>
+        </div>
+        <span class="scope-badge">{{ user_scope.leadership_level|title }}</span>
+      </div>
+      {% if user_scope.allowed_networks|length > 1 or user_scope.is_management_or_admin %}
+      <form method="post" action="/foundation/scope/switch/" style="margin-top:6px; display:flex; gap:4px;">
+        {% csrf_token %}
+        <select name="network" onchange="this.form.submit()" style="font-size:11px; padding:3px 6px; border-radius:6px; border:1px solid var(--wdos-line); flex:1; background:white;">
+          {% for net in user_scope.allowed_networks %}
+          <option value="{{ net }}" {% if net == user_scope.active_network %}selected{% endif %}>{{ net }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
+    </div>
+
+    <div class="nav-label">{{ translations.onb_workspace|default:"WORKSPACE" }}</div>
+    <a class="navitem {% if active_nav == 'workspace' %}active{% endif %}" href="/foundation/">
+      <span class="icon" aria-hidden="true">⌂</span>{{ translations.onb_home|default:"Home" }}
+    </a>
+    <a class="navitem {% if active_nav == 'work_queue' %}active{% endif %}" href="/foundation/work-queue/">
+      <span class="icon" aria-hidden="true">▣</span>{{ translations.onb_my_work|default:"Work Queue" }}
+    </a>
+    <a class="navitem {% if active_nav == 'country_hubs' %}active{% endif %}" href="/foundation/network/{{ user_scope.active_network }}/">
+      <span class="icon" aria-hidden="true">⌑</span>Country Hubs
+    </a>
+    <a class="navitem {% if active_nav == 'search' %}active{% endif %}" href="/foundation/search/">
+      <span class="icon" aria-hidden="true">⌕</span>{{ translations.onb_search|default:"Search" }}
+    </a>
+    <a class="navitem {% if active_nav == 'notifications' %}active{% endif %}" href="/foundation/notifications/">
+      <span class="icon" aria-hidden="true">♧</span>{{ translations.account_notifications|default:"Notifications" }}
+      {% if unread_notifications_count > 0 %}
+      <span class="nav-count scope-badge" data-notif-badge>{{ unread_notifications_count }}</span>
+      {% endif %}
+    </a>
+
+    <div class="nav-label">ACCOUNT & PRIVACY</div>
+    <a class="navitem {% if active_nav == 'profile' %}active{% endif %}" href="/foundation/profile/">
+      <span class="icon" aria-hidden="true">👤</span>My Profile
+    </a>
+    <a class="navitem {% if active_nav == 'settings' %}active{% endif %}" href="/foundation/settings/">
+      <span class="icon" aria-hidden="true">⚙</span>{{ translations.onb_settings|default:"Settings & Accessibility" }}
+    </a>
+    <a class="navitem {% if active_nav == 'privacy' %}active{% endif %}" href="/foundation/privacy-requests/">
+      <span class="icon" aria-hidden="true">🛡️</span>Privacy Requests
+    </a>
+    <a class="navitem" href="/auth/help/">
+      <span class="icon" aria-hidden="true">?</span>{{ translations.onb_help|default:"Help & Support" }}
+    </a>
+
+    <!-- Sidebar Bottom User Info -->
+    <div class="sidebottom" style="margin-top:auto; padding-top:20px;">
+      <div class="user" style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="avatar">{{ initials }}</div>
+          <div>
+            <b>{{ display_name }}</b>
+            <small style="color:var(--wdos-muted);">{{ user_scope.leadership_level|title }}</small>
+          </div>
+        </div>
+      </div>
+      <form method="post" action="/auth/logout/" style="margin-top:10px;">
+        {% csrf_token %}
+        <button type="submit" class="btn small" style="width:100%; justify-content:center;">
+          {{ translations.sign_out|default:"Sign out" }}
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Mobile Top Header -->
+  <div class="mobile-head">
+    <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
+    <div class="right" style="display:flex; align-items:center; gap:10px;">
+      <span class="scope-badge" style="font-size:10px;">{{ user_scope.active_network }}</span>
+      <a href="/foundation/notifications/" style="text-decoration:none; position:relative; color:inherit;">
+        <span class="icon" aria-hidden="true">♧</span>
+        {% if unread_notifications_count > 0 %}
+        <span style="position:absolute; top:-4px; right:-4px; background:var(--wdos-magenta); color:white; font-size:9px; border-radius:50%; width:14px; height:14px; display:flex; align-items:center; justify-content:center;">{{ unread_notifications_count }}</span>
+        {% endif %}
+      </a>
+      <div class="profile-menu" data-profile-menu>
+        <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button>
+        <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
+          <strong>{{ display_name }}</strong>
+          <small style="display:block; margin-bottom:8px; color:var(--wdos-muted);">{{ user_scope.leadership_level|title }} ({{ user_scope.active_network }})</small>
+          <a href="/foundation/profile/" role="menuitem" style="display:block; padding:6px 0; color:var(--wdos-ink); text-decoration:none;">My Profile</a>
+          <a href="/foundation/settings/" role="menuitem" style="display:block; padding:6px 0; color:var(--wdos-ink); text-decoration:none;">Settings</a>
+          <a href="/foundation/privacy-requests/" role="menuitem" style="display:block; padding:6px 0; color:var(--wdos-ink); text-decoration:none;">Privacy Requests</a>
+          <hr style="border:0; border-top:1px solid var(--wdos-line); margin:6px 0;">
+          <form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem" class="btn small" style="width:100%; border:none; text-align:start; padding:4px 0;"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out|default:"Sign out" }}</span></button></form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation -->
+  <nav class="mobile-nav" aria-label="Mobile Navigation">
+    <a href="/foundation/" {% if active_nav == 'workspace' %}aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>{{ translations.onb_home|default:"Home" }}</a>
+    <a href="/foundation/work-queue/" {% if active_nav == 'work_queue' %}aria-current="page"{% endif %}><span aria-hidden="true">▣</span>Work</a>
+    <a href="/foundation/search/" {% if active_nav == 'search' %}aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>Search</a>
+    <a href="/foundation/notifications/" {% if active_nav == 'notifications' %}aria-current="page"{% endif %}><span aria-hidden="true">♧</span>Alerts</a>
+    <a href="/foundation/settings/" {% if active_nav == 'settings' %}aria-current="page"{% endif %}><span aria-hidden="true">⋯</span>Settings</a>
+  </nav>
+
+  <!-- Main Content Shell -->
+  <div class="content">
+    <div class="topbar">
+      <!-- Scoped Breadcrumbs Trail -->
+      <nav aria-label="Breadcrumb" class="scoped-breadcrumbs">
+        {% for crumb in breadcrumbs %}
+          {% if not forloop.first %}<span class="sep" aria-hidden="true">/</span>{% endif %}
+          {% if crumb.is_current or not crumb.url %}
+            <span class="current" aria-current="page">{{ crumb.label }}</span>
+          {% else %}
+            <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+          {% endif %}
+        {% endfor %}
+      </nav>
+
+      <!-- Top Tools -->
+      <div class="toptools">
+        <a href="/foundation/search/" class="search" style="text-decoration:none; color:inherit;" aria-label="{{ translations.onb_search|default:'Search' }}">
+          <span class="icon" aria-hidden="true">⌕</span>{{ translations.onb_search|default:"Search" }} <small aria-hidden="true">⌘ K</small>
+        </a>
+        <a href="/foundation/notifications/" class="icon" role="img" aria-label="{{ translations.account_notifications|default:'Notifications' }}" style="text-decoration:none; color:inherit; position:relative;">
+          ♧
+          {% if unread_notifications_count > 0 %}
+          <span style="position:absolute; top:-5px; right:-6px; background:var(--wdos-magenta); color:white; font-size:10px; border-radius:50%; width:15px; height:15px; display:flex; align-items:center; justify-content:center;" data-notif-badge>{{ unread_notifications_count }}</span>
+          {% endif %}
+        </a>
+        <a href="/foundation/settings/" class="language" style="text-decoration:none; color:inherit;">
+          {{ lang|upper }} ▾
+        </a>
+        
+        <div class="profile-menu" data-profile-menu>
+          <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button>
+          <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
+            <strong>{{ display_name }}</strong>
+            <small style="display:block; margin:2px 0 8px; color:var(--wdos-muted);">{{ user_scope.leadership_level|title }} ({{ user_scope.active_network }})</small>
+            <a href="/foundation/profile/" role="menuitem" style="display:block; padding:4px 0; color:var(--wdos-ink); text-decoration:none; font-size:12px;">My Profile</a>
+            <a href="/foundation/settings/" role="menuitem" style="display:block; padding:4px 0; color:var(--wdos-ink); text-decoration:none; font-size:12px;">Settings & Accessibility</a>
+            <a href="/foundation/privacy-requests/" role="menuitem" style="display:block; padding:4px 0; color:var(--wdos-ink); text-decoration:none; font-size:12px;">Privacy Requests</a>
+            <hr style="border:0; border-top:1px solid var(--wdos-line); margin:6px 0;">
+            <form method="post" action="/auth/logout/">
+              {% csrf_token %}
+              <button type="submit" role="menuitem" style="background:none; border:none; color:var(--wdos-magenta); cursor:pointer; padding:4px 0; font-size:12px; font-weight:600;">
+                <span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out|default:"Sign out" }}</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page Body Block -->
+    <main id="main-content">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer>{{ translations.onb_footer|default:"WODDI Digital Operating System · Authenticated Session" }}</footer>
+  </div>
+
+  <script src="{% static 'accounts/onboarding.js' %}"></script>
+  <script src="{% static 'foundation/shell.js' %}"></script>
+</body>
+</html>

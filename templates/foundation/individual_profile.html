@@ -1,0 +1,121 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}{{ profile_name }} · Individual Profile{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">INDIVIDUAL PROFILE · LEVEL 5</div>
+    <h1>{{ profile_name }}</h1>
+    <p>Permanent individual profile and assigned network, geographic, and role authority in WDOS.</p>
+  </div>
+  <div class="actions">
+    {% if not is_own_profile and network and country and level %}
+    <a href="/foundation/network/{{ network }}/country/{{ country }}/leadership/{{ level }}/" class="btn">‹ Back to Leadership Roster</a>
+    {% else %}
+    <a href="/foundation/" class="btn">‹ Back to Workspace</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Left Column: Identity & Membership Record -->
+  <section class="panel">
+    <div class="record-summary" style="display:flex; align-items:center; gap:20px; border-bottom:1px solid var(--wdos-line); padding-bottom:20px; margin-bottom:20px;">
+      <div class="avatar" style="width:64px; height:64px; font-size:22px; font-weight:750;">
+        {{ profile_name|slice:":2"|upper|default:"WD" }}
+      </div>
+      <div>
+        <h2 style="margin:0 0 6px;">{{ profile_name }}</h2>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span class="scope-badge">{{ target_account.person_id|default:target_account.id }}</span>
+          <span class="badge completed">{{ target_account.status|title }}</span>
+          {% if is_own_profile %}
+          <span class="badge" style="background:#F6F5F7; color:var(--wdos-ink);">Your Profile</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <h3>Membership & Geographic Assignment</h3>
+    <dl class="definition" style="margin:16px 0 24px;">
+      <div><dt>Network</dt><dd>{{ membership.network|default:network|default:"WGMN" }}</dd></div>
+      <div><dt>Country Hub</dt><dd>{{ home_country }}</dd></div>
+      <div><dt>Administrative Region</dt><dd>{{ home_region }}</dd></div>
+      <div><dt>Local District / LGA</dt><dd>{{ home_district }}</dd></div>
+      <div><dt>Member Since</dt><dd>{{ target_account.created_at|date:"d M Y" }}</dd></div>
+      <div><dt>Identity Verification</dt><dd>{% if target_account.verified_at %}Verified on {{ target_account.verified_at|date:"d M Y" }}{% else %}Unverified{% endif %}</dd></div>
+    </dl>
+
+    <h3 style="margin-top:24px;">Active Access Grants</h3>
+    {% if active_grants %}
+    <div class="records-table-wrap" style="margin-top:12px;">
+      <table class="records-table">
+        <thead>
+          <tr>
+            <th scope="col">Role</th>
+            <th scope="col">Network</th>
+            <th scope="col">Geography</th>
+            <th scope="col">Function</th>
+            <th scope="col">Expires</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for grant in active_grants %}
+          <tr>
+            <td><b>{{ grant.role }}</b></td>
+            <td>{{ grant.network }}</td>
+            <td>{{ grant.geography }}</td>
+            <td>{{ grant.function }}</td>
+            <td><small>{{ grant.expires_at|date:"d M Y H:i" }}</small></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="font-size:13px; color:var(--wdos-muted); margin-top:8px;">Standard community member access. No elevated operational grants active.</p>
+    {% endif %}
+  </section>
+
+  <!-- Right Column: Current Work Assignments -->
+  <div class="stack">
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Assigned Tasks</h2>
+        <span class="scope-badge">{{ assigned_work_items|length }}</span>
+      </div>
+      {% for item in assigned_work_items %}
+      <div class="mini-item">
+        <div>
+          <h3><a href="/foundation/work-queue/{{ item.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a></h3>
+          <p>{{ item.summary|truncatewords:8 }}</p>
+          <div class="meta"><span class="priority-pill {{ item.priority }}">{{ item.priority }}</span> · <span class="badge {{ item.status }}">{{ item.status }}</span></div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state" style="padding:20px;">
+        <p>No active work items assigned to this profile.</p>
+      </div>
+      {% endfor %}
+    </section>
+
+    {% if is_own_profile %}
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Quick Actions</h2>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <a href="/foundation/settings/" class="btn small" style="justify-content:start;">⚙ Language & Accessibility Preferences</a>
+        <a href="/foundation/privacy-requests/" class="btn small" style="justify-content:start;">🛡️ Submit Privacy Request (GDPR)</a>
+        <form method="post" action="/auth/revoke/" style="margin-top:8px;">
+          {% csrf_token %}
+          <button type="submit" class="btn small" style="width:100%; color:#CF1322; border-color:#FFA39E; background:#FFF1F0; justify-content:center;">
+            Revoke All Other Sessions
+          </button>
+        </form>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

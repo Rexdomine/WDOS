@@ -1,0 +1,105 @@
+{% extends "foundation/base_shell.html" %}
+{% block title %}{{ level_title }} · {{ hub.name }} ({{ network }}){% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="eyebrow">LEADERSHIP LEVEL · TIER {{ leadership_obj.tier|default:3 }}</div>
+    <h1>{{ level_title }} ({{ hub.name }})</h1>
+    <p>{{ leadership_obj.description|default:"Appointed leadership and members at this tier within the country hub." }}</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/network/{{ network }}/country/{{ country }}/" class="btn">‹ Back to {{ hub.name }} Hub</a>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Left Column: Individual Roster -->
+  <section class="panel">
+    <div class="panelhead">
+      <div>
+        <h2>Appointed Individuals ({{ roster|length }})</h2>
+        <p>Click on any individual to inspect their authorized profile, verification status, and work assignments:</p>
+      </div>
+      <span class="scope-badge">{{ network }} / {{ country }}</span>
+    </div>
+
+    {% if roster %}
+    <div class="records-table-wrap">
+      <table class="records-table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Role</th>
+            <th scope="col">Status</th>
+            <th scope="col">Profile Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for person_acct in roster %}
+          <tr>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="avatar" style="width:28px; height:28px; font-size:10px;">
+                  {{ person_acct.display_name|slice:":2"|upper|default:"WD" }}
+                </span>
+                <b>{{ person_acct.display_name|default:person_acct.email }}</b>
+              </div>
+            </td>
+            <td><span class="badge">{{ level_title }}</span></td>
+            <td><span class="badge completed">{{ person_acct.status|title }}</span></td>
+            <td>
+              <a href="/foundation/network/{{ network }}/country/{{ country }}/leadership/{{ level }}/profile/{{ person_acct.person_id }}/" class="textlink">
+                Open Profile ›
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">👤</div>
+      <h3>No Individuals in this Tier</h3>
+      <p>There are currently no active appointments at the {{ level_title }} tier for {{ hub.name }}.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- Right Column: Tier Summary & Responsibilities -->
+  <div class="stack">
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Tier Details</h2>
+        <span class="priority-pill normal">Tier {{ leadership_obj.tier|default:3 }}</span>
+      </div>
+      <dl class="definition" style="margin-top:12px;">
+        <div><dt>Title</dt><dd>{{ level_title }}</dd></div>
+        <div><dt>Network</dt><dd>{{ network }}</dd></div>
+        <div><dt>Country Hub</dt><dd>{{ hub.name }}</dd></div>
+        <div><dt>Authority Scope</dt><dd>Geographic & Tier Bound</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Tier Work Items</h2>
+      </div>
+      {% for item in work_items %}
+      <div class="mini-item">
+        <div>
+          <h3><a href="/foundation/work-queue/{{ item.id }}/" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a></h3>
+          <p>{{ item.summary|truncatewords:8 }}</p>
+          <div class="meta"><span class="priority-pill {{ item.priority }}">{{ item.priority }}</span></div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state" style="padding:16px;">
+        <p>No active work items assigned specifically to this leadership tier.</p>
+      </div>
+      {% endfor %}
+    </section>
+  </div>
+</div>
+{% endblock %}

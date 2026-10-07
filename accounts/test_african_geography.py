@@ -586,6 +586,41 @@ class OnboardingGeographyIntegrationTests(TestCase):
         self.assertIn("Tema Metropolitan", gh_choices)
         self.assertIn("__not_listed__", gh_choices)
 
+        # Kenya Bungoma (previously empty, now fully populated with 9 sub-counties)
+        bungoma_form = GeographyForm(initial={"country": "Kenya", "region": "Bungoma"})
+        bungoma_choices = [c[0] for c in bungoma_form.fields["district"].choices]
+        self.assertIn("Bumula", bungoma_choices)
+        self.assertIn("Kanduyi", bungoma_choices)
+        self.assertIn("Kimilili", bungoma_choices)
+        self.assertIn("__not_listed__", bungoma_choices)
+
+        # Ghana Bono (previously empty, now fully populated with 12 districts)
+        bono_form = GeographyForm(initial={"country": "Ghana", "region": "Bono"})
+        bono_choices = [c[0] for c in bono_form.fields["district"].choices]
+        self.assertIn("Sunyani Municipal", bono_choices)
+        self.assertIn("Berekum East Municipal", bono_choices)
+        self.assertIn("Dormaa Central Municipal", bono_choices)
+        self.assertIn("__not_listed__", bono_choices)
+
+        # Rwanda Kigali (3 districts)
+        rwa_form = GeographyForm(initial={"country": "Rwanda", "region": "Kigali"})
+        rwa_choices = [c[0] for c in rwa_form.fields["district"].choices]
+        self.assertIn("Gasabo", rwa_choices)
+        self.assertIn("Kicukiro", rwa_choices)
+        self.assertIn("Nyarugenge", rwa_choices)
+
+        # Egypt Cairo (Markaz/Districts)
+        egy_form = GeographyForm(initial={"country": "Egypt", "region": "Cairo"})
+        egy_choices = [c[0] for c in egy_form.fields["district"].choices]
+        self.assertIn("Nasr City", egy_choices)
+        self.assertIn("Heliopolis", egy_choices)
+
+        # DRC Kinshasa (Communes)
+        cod_form = GeographyForm(initial={"country": "Congo (Democratic Republic of the)", "region": "Kinshasa"})
+        cod_choices = [c[0] for c in cod_form.fields["district"].choices]
+        self.assertIn("Gombe", cod_choices)
+        self.assertIn("Limete", cod_choices)
+
 
 
 

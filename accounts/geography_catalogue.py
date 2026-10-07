@@ -12,6 +12,7 @@ Data sources and methodology:
 """
 from datetime import date
 from typing import Dict, List, Optional, Tuple, Any
+import unicodedata
 
 # Source provenance metadata constants
 SOURCES = {
@@ -64,151 +65,53 @@ def get_source_for_country(iso3: str) -> Dict[str, str]:
     return SOURCES["GEOBOUNDARIES"]
 
 
-# Reliable Level 2 datasets
-# Kenya subcounties (UN OCHA/HDX COD-AB)
-KENYA_SUBCOUNTIES: Dict[str, List[str]] = {
-    "Baringo": ["Baringo Central", "Baringo North", "Baringo South", "Eldama Ravine", "Mogotio", "Tiaty"],
-    "Bomet": ["Bomet Central", "Bomet East", "Chepalungu", "Konoin", "Sotik"],
-    "Bungoma": ["Bumula", "Kabuchai", "Kanduyi", "Kimilili", "Mt. Elgon", "Sirisia", "Tongaren", "Webuye East", "Webuye West"],
-    "Busia": ["Budalangi", "Butula", "Funyula", "Matayos", "Nambale", "Teso North", "Teso South"],
-    "Elgeyo-Marakwet": ["Keiyo North", "Keiyo South", "Marakwet East", "Marakwet West"],
-    "Embu": ["Manyatta", "Mbeere North", "Mbeere South", "Runyenjes"],
-    "Garissa": ["Balambala", "Dadaab", "Fafi", "Garissa Township", "Hulugho", "Ijara", "Lagdera"],
-    "Homa Bay": ["Homa Bay Town", "Kabondo Kasipul", "Karachuonyo", "Kasipul", "Mbita", "Ndhiwa", "Rangwe", "Suba"],
-    "Isiolo": ["Isiolo North", "Isiolo South"],
-    "Kajiado": ["Kajiado Central", "Kajiado East", "Kajiado North", "Kajiado South", "Kajiado West"],
-    "Kakamega": ["Butere", "Ikolomani", "Khwisero", "Likuyani", "Lugari", "Lurambi", "Malava", "Matungu", "Mumias East", "Mumias West", "Navakholo", "Shinyalu"],
-    "Kericho": ["Ainamoi", "Belgut", "Bureti", "Kipkelion East", "Kipkelion West", "Sigowet-Soin"],
-    "Kiambu": [
-        "Gatundu North", "Gatundu South", "Githunguri", "Juja", "Kabete", "Kiambaa",
-        "Kiambu", "Kikuyu", "Lari", "Limuru", "Ruiru", "Thika Town"
-    ],
-    "Kilifi": ["Ganze", "Kaloleni", "Kilifi North", "Kilifi South", "Magarini", "Malindi", "Rabai"],
-    "Kirinyaga": ["Gichugu", "Kirinyaga Central", "Mwea", "Ndia"],
-    "Kisii": ["Bobasi", "Bomachoge Borabu", "Bomachoge Chache", "Bonchari", "Kitutu Chache North", "Kitutu Chache South", "Nyaribari Chache", "Nyaribari Masaba", "South Mugirango"],
-    "Kisumu": ["Kisumu Central", "Kisumu East", "Kisumu West", "Muhoroni", "Nyakach", "Nyando", "Seme"],
-    "Kitui": ["Kitui Central", "Kitui East", "Kitui Rural", "Kitui South", "Kitui West", "Mwingi Central", "Mwingi North", "Mwingi West"],
-    "Kwale": ["Kinango", "Lunga Lunga", "Matuga", "Msambweni"],
-    "Laikipia": ["Laikipia East", "Laikipia North", "Laikipia West"],
-    "Lamu": ["Lamu East", "Lamu West"],
-    "Machakos": ["Kangundo", "Kathiani", "Machakos Town", "Masinga", "Matungulu", "Mavoko", "Mwala", "Yatta"],
-    "Makueni": ["Kaiti", "Kibwezi East", "Kibwezi West", "Kilome", "Makueni", "Mbooni"],
-    "Mandera": ["Banissa", "Lafey", "Mandera East", "Mandera North", "Mandera South", "Mandera West"],
-    "Marsabit": ["Laisamis", "Moyale", "North Horr", "Saku"],
-    "Meru": ["Buuri", "Central Imenti", "Igembe Central", "Igembe North", "Igembe South", "North Imenti", "South Imenti", "Tigania East", "Tigania West"],
-    "Migori": ["Awendo", "Kuria East", "Kuria West", "Nyatike", "Rongo", "Suna East", "Suna West", "Uriri"],
-    "Mombasa": ["Changamwe", "Jomvu", "Kisauni", "Likoni", "Mvita", "Nyali"],
-    "Murang'a": ["Gatanga", "Kandara", "Kangema", "Kigumo", "Kiharu", "Maragua", "Mathioya"],
-    "Nairobi": [
-        "Westlands", "Dagoretti North", "Dagoretti South", "Langata", "Kibra",
-        "Roysambu", "Kasarani", "Ruaraka", "Embakasi South", "Embakasi North",
-        "Embakasi Central", "Embakasi East", "Embakasi West", "Makadara",
-        "Kamukunji", "Starehe", "Mathare"
-    ],
-    "Nakuru": ["Bahati", "Gilgil", "Kuresoi North", "Kuresoi South", "Molo", "Naivasha", "Nakuru Town East", "Nakuru Town West", "Njoro", "Rongai", "Subukia"],
-    "Nandi": ["Aldai", "Chesumei", "Emgwen", "Mosop", "Nandi Hills", "Tinderet"],
-    "Narok": ["Emurua Dikirr", "Kilgoris", "Narok East", "Narok North", "Narok South", "Narok West"],
-    "Nyamira": ["Borabu", "Kitutu Masaba", "North Mugirango", "West Mugirango"],
-    "Nyandarua": ["Kinangop", "Kipipiri", "Ndaragwa", "Ol Joro Orok", "Ol Kalou"],
-    "Nyeri": ["Kieni", "Mathira", "Mukurweini", "Nyeri Town", "Othaya", "Tetu"],
-    "Samburu": ["Samburu East", "Samburu North", "Samburu West"],
-    "Siaya": ["Alego Usonga", "Bondo", "Gem", "Rarieda", "Ugenya", "Ugunja"],
-    "Taita-Taveta": ["Mwatate", "Taveta", "Voi", "Wundanyi"],
-    "Tana River": ["Bura", "Galole", "Garsen"],
-    "Tharaka-Nithi": ["Chuka/Igambang'ombe", "Maara", "Tharaka"],
-    "Trans Nzoia": ["Cherangany", "Endebess", "Kiminini", "Kwanza", "Saboti"],
-    "Turkana": ["Loima", "Turkana Central", "Turkana East", "Turkana North", "Turkana South", "Turkana West"],
-    "Uasin Gishu": ["Ainabkoi", "Kapseret", "Kesses", "Moiben", "Soy", "Turbo"],
-    "Vihiga": ["Emuhaya", "Hamisi", "Luanda", "Sabatia", "Vihiga"],
-    "Wajir": ["Eldas", "Tarbaj", "Wajir East", "Wajir North", "Wajir South", "Wajir West"],
-    "West Pokot": ["Kacheliba", "Kapenguria", "Pokot South", "Sigor"],
-}
+from .african_level2_data import AFRICAN_LEVEL2_DATA
 
-# South Africa District & Metropolitan Municipalities (geoBoundaries gbOpen & COD-AB)
-SOUTH_AFRICA_MUNICIPALITIES: Dict[str, List[str]] = {
-    "Gauteng": ["City of Johannesburg", "City of Tshwane", "Ekurhuleni", "Sedibeng", "West Rand"],
-    "Western Cape": ["City of Cape Town", "Cape Winelands", "Garden Route", "Overberg", "West Coast", "Central Karoo"],
-    "KwaZulu-Natal": ["eThekwini", "uMgungundlovu", "Ugu", "uThukela", "uMzinyathi", "Amajuba", "Zululand", "uMkhanyakude", "King Cetshwayo", "iLembe", "Harry Gwala"],
-    "Eastern Cape": ["Buffalo City", "Nelson Mandela Bay", "Sarah Baartman", "Amathole", "Chris Hani", "Joe Gqabi", "OR Tambo", "Alfred Nzo"],
-    "Limpopo": ["Capricorn", "Mopani", "Sekhukhune", "Vhembe", "Waterberg"],
-    "Mpumalanga": ["Ehlanzeni", "Gert Sibande", "Nkangala"],
-    "Free State": ["Mangaung", "Fezile Dabi", "Lejweleputswa", "Thabo Mofutsanyana", "Xhariep"],
-    "North West": ["Bojanala Platinum", "Dr Kenneth Kaunda", "Dr Ruth Segomotsi Mompati", "Ngaka Modiri Molema"],
-    "Northern Cape": ["Frances Baard", "John Taolo Gaetsewe", "Namakwa", "Pixley ka Seme", "ZF Mgcawu"],
-}
+# Backwards compatibility aliases
+KENYA_SUBCOUNTIES: Dict[str, List[str]] = AFRICAN_LEVEL2_DATA.get("KEN", {})
+SOUTH_AFRICA_MUNICIPALITIES: Dict[str, List[str]] = AFRICAN_LEVEL2_DATA.get("ZAF", {})
+GHANA_DISTRICTS: Dict[str, List[str]] = AFRICAN_LEVEL2_DATA.get("GHA", {})
 
-# Ghana Metropolitan, Municipal and District Assemblies (UN OCHA/HDX COD-AB)
-GHANA_DISTRICTS: Dict[str, List[str]] = {
-    "Ahafo": ["Asunafo North", "Asunafo South", "Asutifi North", "Asutifi South", "Tano North", "Tano South"],
-    "Ashanti": [
-        "Kumasi Metropolitan", "Asokore Mampong Municipal", "Obuasi Municipal", "Ejisu Municipal",
-        "Bekwai Municipal", "Mampong Municipal", "Atwima Nwabiagya", "Kwabre East",
-        "Atwima Kwanwoma", "Atwima Mponua", "Amansie Central", "Amansie West",
-        "Afigya Kwabre", "Asante Akim Central", "Asante Akim North", "Asante Akim South",
-        "Offinso Municipal", "Offinso North", "Sekyere East", "Sekyere Central", "Sekyere South"
-    ],
-    "Bono": [
-        "Sunyani Municipal", "Sunyani West", "Berekum East Municipal", "Berekum West",
-        "Dormaa Central Municipal", "Dormaa East", "Dormaa West", "Jaman North",
-        "Jaman South Municipal", "Tain", "Banda", "Wenchi Municipal"
-    ],
-    "Bono East": [
-        "Techiman Municipal", "Techiman North", "Atebubu-Amantin Municipal",
-        "Kintampo North Municipal", "Kintampo South", "Nkoranza North",
-        "Nkoranza South Municipal", "Pru East", "Pru West", "Sene East", "Sene West"
-    ],
-    "Central": [
-        "Cape Coast Metropolitan", "Awutu Senya East Municipal", "Effutu Municipal",
-        "Komenda-Edina-Eguafo-Abirem Municipal", "Mfantseman Municipal", "Agona West Municipal",
-        "Assin Central Municipal", "Gomoa East", "Gomoa Central", "Gomoa West",
-        "Abura-Asebu-Kwamankese", "Twifo Atti-Morkwa", "Upper Denkyira East Municipal", "Upper Denkyira West"
-    ],
-    "Eastern": [
-        "New Juaben South Municipal", "New Juaben North Municipal", "Birim Central Municipal",
-        "Kwahu West Municipal", "Suhum Municipal", "Akuapem South", "Akuapem North Municipal",
-        "Nsawam Adoagyiri Municipal", "Abuakwa South Municipal", "Abuakwa North Municipal",
-        "Lower Manya Krobo Municipal", "Yilo Krobo Municipal", "Asuogyaman", "Fanteakwa North", "Fanteakwa South"
-    ],
-    "Greater Accra": [
-        "Accra Metropolitan", "Tema Metropolitan", "Ga Central Municipal", "Ga East Municipal",
-        "Ga North Municipal", "Ga South Municipal", "Ga West Municipal", "La Dade Kotopon Municipal",
-        "Ledzokuku Municipal", "Krowor Municipal", "Adentan Municipal", "Ashaiman Municipal",
-        "Shai Osudoku", "Ada East", "Ada West", "Ayawaso Central Municipal",
-        "Ayawaso East Municipal", "Ayawaso North Municipal", "Ayawaso West Municipal",
-        "Ablekuma Central Municipal", "Ablekuma North Municipal", "Ablekuma West Municipal",
-        "Korle Klottey Municipal", "Okaikwei North Municipal"
-    ],
-    "North East": ["East Mamprusi Municipal", "West Mamprusi Municipal", "Bunkpurugu Nakpanduri", "Chereponi", "Mamprugu Moagduri", "Yunyoo-Nasuan"],
-    "Northern": [
-        "Tamale Metropolitan", "Sagnarigu Municipal", "Yendi Municipal", "Savelugu Municipal",
-        "Nanton", "Tolon", "Kumbungu", "Mion", "Gushegu Municipal", "Karaga",
-        "Tatale Sanguli", "Zabzugu", "Kpandai", "Nanumba North Municipal", "Nanumba South"
-    ],
-    "Oti": ["Krachi East Municipal", "Krachi West", "Krachi Nchumuru", "Nkwanta North", "Nkwanta South Municipal", "Biakoye", "Jasikan", "Kadjebi"],
-    "Savannah": ["West Gonja Municipal", "East Gonja Municipal", "Central Gonja", "North Gonja", "Bole", "Sawla-Tuna-Kalba", "North East Gonja"],
-    "Upper East": [
-        "Bolgatanga Municipal", "Bolgatanga East", "Bawku Municipal", "Kasena Nankana Municipal",
-        "Bongo", "Builsa North Municipal", "Builsa South", "Garu", "Tempane", "Talensi",
-        "Nabdam", "Binduri", "Pusiga", "Kasena Nankana West"
-    ],
-    "Upper West": [
-        "Wa Municipal", "Wa East", "Wa West", "Jirapa Municipal", "Lawra Municipal",
-        "Nandom Municipal", "Nadowli Kaleo", "Daffiama Bussie Issa", "Sissala East Municipal",
-        "Sissala West", "Lambussie Karni"
-    ],
-    "Volta": [
-        "Ho Municipal", "Kpando Municipal", "Hohoe Municipal", "South Dayi", "North Dayi",
-        "Afadzato South", "Central Tongu", "North Tongu", "South Tongu", "Ketu South Municipal",
-        "Ketu North Municipal", "Keta Municipal", "Anloga", "Akatsi South", "Akatsi North"
-    ],
-    "Western": [
-        "Sekondi-Takoradi Metropolitan", "Effia Kwesimintsim Municipal", "Tarkwa Nsuaem Municipal",
-        "Prestea Huni-Valley Municipal", "Ahanta West Municipal", "Nzema East Municipal",
-        "Ellembelle", "Jomoro Municipal", "Wassa East", "Wassa Amenfi West Municipal",
-        "Wassa Amenfi East Municipal", "Wassa Amenfi Central"
-    ],
-    "Western North": ["Sefwi Wiawso Municipal", "Bibiani Anhwiaso Bekwai Municipal", "Juaboso", "Bia East", "Bia West", "Bodi", "Suaman", "Aowin Municipal", "Akontombra"],
-}
+
+def _norm_region_key(s: str) -> str:
+    s = s.replace("\u01c3", "").replace("!", "").replace("'", "").replace("-", " ")
+    return unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("ASCII").lower().strip()
+
+
+def _strip_common_suffixes(s: str) -> str:
+    n = _norm_region_key(s)
+    for suffix in [
+        " province", " region", " state", " district", " governorate",
+        " wilaya", " city", " autonomous region", " area", " department"
+    ]:
+        if n.endswith(suffix):
+            return n[:-len(suffix)].strip()
+    return n
+
+
+def get_subdivisions_for_region(country_level2: Dict[str, List[str]], reg_code: str, reg_name: str) -> List[str]:
+    """
+    Find Level 2 subdivisions for a given region using exact, normalized, or suffix-stripped matching.
+    """
+    if not country_level2:
+        return []
+    if reg_name in country_level2:
+        return country_level2[reg_name]
+    if reg_code in country_level2:
+        return country_level2[reg_code]
+
+    norm_dict = {_norm_region_key(k): v for k, v in country_level2.items()}
+    nr = _norm_region_key(reg_name)
+    if nr in norm_dict:
+        return norm_dict[nr]
+
+    stripped_dict = {_strip_common_suffixes(k): v for k, v in country_level2.items()}
+    sr = _strip_common_suffixes(reg_name)
+    if sr in stripped_dict:
+        return stripped_dict[sr]
+
+    return []
+
 
 
 def _build_catalogue() -> Dict[str, Any]:
@@ -252,51 +155,15 @@ def _build_catalogue() -> Dict[str, Any]:
                     })
                 level2_data[state_code] = level2_units
                 level2_data[state_name] = level2_units
-        elif iso3 == "KEN":
+        elif iso3 in AFRICAN_LEVEL2_DATA:
             level2_reliable = True
+            c_l2_dict = AFRICAN_LEVEL2_DATA[iso3]
             for reg_code, reg_name in raw["regions"]:
-                sub_list = KENYA_SUBCOUNTIES.get(reg_name, [])
+                sub_list = get_subdivisions_for_region(c_l2_dict, reg_code, reg_name)
                 level2_units = []
                 for sub in sub_list:
-                    slug = sub.lower().replace(" ", "-")
-                    level2_units.append({
-                        "id": f"{reg_code}-{slug}",
-                        "parent_id": reg_code,
-                        "country_iso3": iso3,
-                        "display_name": sub,
-                        "local_unit_type": raw["local_label"],
-                        "source": source_meta["name"],
-                        "source_version": source_meta["version"],
-                        "last_verified_date": source_meta["last_verified_date"],
-                    })
-                level2_data[reg_code] = level2_units
-                level2_data[reg_name] = level2_units
-        elif iso3 == "ZAF":
-            level2_reliable = True
-            for reg_code, reg_name in raw["regions"]:
-                sub_list = SOUTH_AFRICA_MUNICIPALITIES.get(reg_name, [])
-                level2_units = []
-                for sub in sub_list:
-                    slug = sub.lower().replace(" ", "-")
-                    level2_units.append({
-                        "id": f"{reg_code}-{slug}",
-                        "parent_id": reg_code,
-                        "country_iso3": iso3,
-                        "display_name": sub,
-                        "local_unit_type": raw["local_label"],
-                        "source": source_meta["name"],
-                        "source_version": source_meta["version"],
-                        "last_verified_date": source_meta["last_verified_date"],
-                    })
-                level2_data[reg_code] = level2_units
-                level2_data[reg_name] = level2_units
-        elif iso3 == "GHA":
-            level2_reliable = True
-            for reg_code, reg_name in raw["regions"]:
-                sub_list = GHANA_DISTRICTS.get(reg_name, [])
-                level2_units = []
-                for sub in sub_list:
-                    slug = sub.lower().replace(" ", "-")
+                    slug = sub.lower().replace(" ", "-").replace("/", "-").replace("'", "").replace("\u01c3", "").replace("!", "")
+                    slug = unicodedata.normalize("NFKD", slug).encode("ASCII", "ignore").decode("ASCII")
                     level2_units.append({
                         "id": f"{reg_code}-{slug}",
                         "parent_id": reg_code,
@@ -630,6 +497,11 @@ def import_catalogue_to_database() -> Dict[str, int]:
                         continue
                     seen_l2.add(l2_id)
                     parent_obj = level1_objs.get(l2["parent_id"])
+                    existing = AdministrativeDivision.objects.filter(
+                        country=c_obj, parent=parent_obj, display_name=l2["display_name"]
+                    ).first()
+                    if existing and existing.id != l2_id:
+                        existing.delete()
                     AdministrativeDivision.objects.update_or_create(
                         id=l2_id,
                         defaults={

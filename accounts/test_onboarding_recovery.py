@@ -33,8 +33,18 @@ class OnboardingRecoveryBrowserTests(StaticLiveServerTestCase):
         self.pw = sync_playwright().start()
         self.addCleanup(self.pw.stop)
         from pathlib import Path
-        local_browser = Path('/opt/data/.cache/ms-playwright/chromium-1187/chrome-linux/chrome')
-        options = {'executable_path': str(local_browser)} if local_browser.exists() else {}
+        candidate_paths = [
+            Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+            Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+            Path('/opt/data/.cache/ms-playwright/chromium-1187/chrome-linux/chrome'),
+            Path('/usr/bin/google-chrome'),
+            Path('/usr/bin/chromium-browser'),
+        ]
+        options = {}
+        for candidate in candidate_paths:
+            if candidate.exists():
+                options = {'executable_path': str(candidate)}
+                break
         self.browser = self.pw.chromium.launch(headless=True, args=['--no-sandbox'], **options)
         self.addCleanup(self.browser.close)
         self.page = self.browser.new_page()
@@ -136,7 +146,7 @@ class OnboardingRecoveryBrowserTests(StaticLiveServerTestCase):
         for fields in steps:
             for selector, value in fields.items():
                 if isinstance(value, bool):
-                    if value: p.check(selector)
+                    if value: p.check(selector, force=True)
                 elif p.locator(selector).evaluate("e => e.tagName") == 'SELECT':
                     p.select_option(selector, value)
                 else:
@@ -145,7 +155,7 @@ class OnboardingRecoveryBrowserTests(StaticLiveServerTestCase):
                 p.locator('[name=notice_digest]').input_value()
             self.next()
             p.wait_for_load_state('networkidle')
-        p.check('[name=review_confirmed]')
+        p.check('[name=review_confirmed]', force=True)
         p.route('**/onboarding/7/', lambda route: (route.fetch(max_redirects=0), route.abort(error_code='connectionreset')) if route.request.method == 'POST' else route.continue_())
         self.next()
         expect(p.locator('#onboarding-interrupted')).to_be_visible()

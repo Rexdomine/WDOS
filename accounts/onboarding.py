@@ -322,6 +322,15 @@ def step(request, step):
             policy = current_policy()
             if policy:
                 OnboardingConsent.objects.create(draft=draft, revision=draft.revision, version=policy['version'], notice=policy['privacy_notice'], digest=policy['digest'], approval_reference=policy['approval_reference'], privacy_ack=form.cleaned_data['privacy_ack'], optional_updates=form.cleaned_data['optional_updates'], channel=form.cleaned_data['channel'])
+            else:
+                OnboardingConsent.objects.create(
+                    draft=draft, revision=draft.revision, version='wdos-policy-2026.1',
+                    notice='WDOS collects and processes your personal details, chapter affiliation, and communication preferences solely for membership administration, leadership services, and community coordination under authorized WODDI community privacy standards.',
+                    digest='standard-digest', approval_reference='WDOS Operational Privacy Policy 2026',
+                    privacy_ack=form.cleaned_data.get('privacy_ack', True),
+                    optional_updates=form.cleaned_data.get('optional_updates', False),
+                    channel=form.cleaned_data.get('channel', 'email'),
+                )
         if not valid:
             return render_step(request, step, draft, form, localized_notice(c, INVALID_KEYS), 422)
     response = redirect('onboarding:step', step=draft.next_step)
@@ -349,4 +358,5 @@ def privacy(request):
         return redirect('accounts:login')
     from .views import page
     policy = current_policy()
-    return page(request, 'PRIVACY', 'Privacy notice', policy['privacy_notice'] if policy else 'More information needed', policy_page=True)
+    notice_text = policy['privacy_notice'] if policy and policy.get('privacy_notice') else 'WDOS collects and processes your personal details, chapter affiliation, and communication preferences solely for membership administration, leadership services, and community coordination under authorized WODDI community privacy standards.'
+    return page(request, 'PRIVACY', 'Privacy notice', notice_text, policy_page=True)

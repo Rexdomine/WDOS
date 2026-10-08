@@ -147,11 +147,38 @@ def run_audit():
             page.wait_for_url(url_pattern, timeout=timeout)
             page.wait_for_load_state('networkidle')
 
-        # --- LOGIN ---
-        log("Executing login...", "INFO")
+        # =========================================================================
+        # 0. AUTHENTICATION PAGES & VIEW PASSWORD BUTTON AUDIT
+        # =========================================================================
+        log("Testing View Password Button on Register page...", "INFO")
+        page.goto(f"{BASE}/auth/register/", wait_until='networkidle')
+        page.fill("#id_password", "TestPassword2026!Wdos")
+        assert page.locator("#id_password").get_attribute("type") == "password"
+        # Click view password button
+        page.locator(".show-password").click()
+        page.wait_for_timeout(200)
+        assert page.locator("#id_password").get_attribute("type") == "text", "Password was not revealed on register page!"
+        capture("00a_register_password_toggle.png", "Register page: View password button toggled password text to visible")
+        # Click again to hide
+        page.locator(".show-password").click()
+        page.wait_for_timeout(200)
+        assert page.locator("#id_password").get_attribute("type") == "password", "Password was not hidden on register page!"
+
+        log("Testing View Password Button on Login page...", "INFO")
         page.goto(f"{BASE}/auth/login/", wait_until='networkidle')
         page.fill("#id_email", email)
         page.fill("#id_password", password)
+        assert page.locator("#id_password").get_attribute("type") == "password"
+        page.locator(".show-password").click()
+        page.wait_for_timeout(200)
+        assert page.locator("#id_password").get_attribute("type") == "text", "Password was not revealed on login page!"
+        capture("00b_login_password_toggle.png", "Login page: View password button toggled password text to visible")
+        page.locator(".show-password").click()
+        page.wait_for_timeout(200)
+        assert page.locator("#id_password").get_attribute("type") == "password", "Password was not hidden on login page!"
+
+        # Submit Login
+        log("Executing login...", "INFO")
         page.click("button[type=submit]")
         page.wait_for_load_state('networkidle')
 
@@ -171,13 +198,28 @@ def run_audit():
         # Check tabs exist
         assert page.locator(".tabs .tab").count() == 3
 
+        # Test Sidebar locked nav item toast
+        page.locator(".navitem.locked-nav").first.click()
+        page.wait_for_timeout(200)
+        toast = page.locator("#onboarding-toast")
+        assert not toast.is_hidden(), "Toast alert not shown on locked nav click"
+        log("PASS: Locked nav toast alert displayed cleanly", "PASS")
+
+        # Test Topbar language menu
+        lang_trigger = page.locator(".topbar [data-lang-trigger]")
+        lang_trigger.click()
+        page.wait_for_timeout(200)
+        assert not page.locator(".topbar [data-lang-panel]").is_hidden(), "Language dropdown did not open"
+        lang_trigger.click()
+        page.wait_for_timeout(200)
+
         # Form controls
         page.select_option("#id_language", "en")
         page.select_option("#id_timezone", "UTC")
         page.select_option("#id_reading", "standard")
         page.check("#id_reduce_motion", force=True)
 
-        capture("01_step1_preferences.png", "Step 1: Language, timezone, reading & motion preferences with full-height sidebar")
+        capture("01_step1_preferences.png", "Step 1: Language, timezone, reading & motion preferences with full-height sidebar and interactive layout")
 
         # Test Back button on Step 1 (should redirect to /auth/status/)
         click_and_wait("button[name=action][value=back]", "**/auth/status/**")
@@ -455,13 +497,17 @@ def run_audit():
         # Verify privacy notice link exists and points to /onboarding/privacy/
         assert page.locator("a[href*='/onboarding/privacy/']").count() > 0
 
+        # Verify privacy checkbox is NOT disabled
+        assert not page.locator("#id_privacy_ack").is_disabled(), "Privacy checkbox is unexpectedly disabled!"
+
         # Attempting to submit without privacy_ack should fail validation (stay on step 6)
         page.click("button[name=action][value=continue]")
         page.wait_for_timeout(300)
         assert "/onboarding/6/" in page.url
 
-        # Check privacy notice acknowledgment
-        page.check("#id_privacy_ack", force=True)
+        # Click privacy notice checkbox via styled control and verify checked state
+        page.locator(".checkbox-control[for=id_privacy_ack]").click()
+        assert page.locator("#id_privacy_ack").is_checked(), "Clicking checkbox control failed to toggle privacy_ack!"
         page.check("#id_optional_updates", force=True)
         page.select_option("#id_channel", "email")
         capture("06b_step6_consents_acknowledged.png", "Step 6: Privacy notice acknowledged and communication preferences selected")

@@ -168,3 +168,38 @@ html[dir=rtl] .field .searchable-select-search-wrap input.searchable-select-sear
     margin-right: 232px !important;
   }
 }
+
+/* Interactive Navigation, Menus & Accessibility Polish */
+.brand-link{display:inline-block;line-height:0;text-decoration:none}
+.navitem.locked-nav{background:transparent;border:0;width:100%;text-align:start;font:inherit;color:inherit;cursor:pointer;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:10px}
+.navitem.locked-nav:hover{background:#f6f2f7;color:var(--wdos-ink,#1e1822)}
+.navitem.locked-nav .icon{opacity:0.65}
+.navitem{text-decoration:none;display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;color:#544758;cursor:pointer}
+.navitem:hover{background:#f6f2f7;color:var(--wdos-ink,#1e1822)}
+.navitem.active{background:#fbf2f6;color:#d4006a;font-weight:600}
+
+.lang-menu{position:relative;display:inline-block}
+.lang-trigger{background:transparent;border:0;padding:6px 10px;font:inherit;font-size:12.5px;color:inherit;cursor:pointer;border-radius:6px;display:inline-flex;align-items:center;gap:4px}
+.lang-trigger:hover{background:#f4edf5}
+.lang-panel{position:absolute;inset-inline-end:0;top:calc(100% + 6px);background:#fff;border:1px solid #dfd9e2;border-radius:8px;box-shadow:0 8px 24px rgba(35,25,38,0.14);z-index:50;min-width:140px;padding:6px 0;display:flex;flex-direction:column}
+.lang-panel[hidden]{display:none !important}
+.lang-panel a{display:block;padding:7px 14px;color:#26212a;text-decoration:none;font-size:12.5px;transition:background 0.15s ease}
+.lang-panel a:hover{background:#f7f2f8;color:#d4006a}
+
+.profile-menu-header{padding:8px 10px 10px;border-bottom:1px solid #f0eaf1;margin-bottom:6px}
+.profile-menu-header b{display:block;font-size:13px;color:#1e1822}
+.profile-menu-header small{display:block;font-size:11px;color:#6b5b70;margin-top:2px;overflow-wrap:break-word}
+.profile-menu-panel .menu-item{display:block;padding:8px 10px;color:#26212a;text-decoration:none;font-size:12px;border-radius:6px}
+.profile-menu-panel .menu-item:hover{background:#f7f2f8;color:#d4006a}
+.profile-menu-panel .sign-out-btn{width:100%;margin-top:4px;padding:8px 10px;border:0;border-top:1px solid #f0eaf1;background:transparent;text-align:start;font:inherit;font-size:12px;color:#9b164b;cursor:pointer;border-radius:0 0 6px 6px}
+.profile-menu-panel .sign-out-btn:hover{background:#fff0f3}
+
+.onboarding-toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:9999;max-width:90vw;width:440px;background:#ffffff;border:1.5px solid #d4006a;border-radius:10px;padding:12px 18px;box-shadow:0 10px 30px rgba(212,0,106,0.18);font-size:13px;line-height:1.45;color:#26212a;text-align:center;font-weight:550;animation:toastSlideIn 0.25s cubic-bezier(0.16,1,0.3,1)}
+.onboarding-toast[hidden]{display:none !important}
+@keyframes toastSlideIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}
+
+.mobile-nav a{text-decoration:none;color:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.mobile-nav-btn{background:transparent;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+.checkbox-control:hover{border-color:#d4006a;background:#fffaff}
+.checkbox-control:hover .checkbox-box{border-color:#b00055}

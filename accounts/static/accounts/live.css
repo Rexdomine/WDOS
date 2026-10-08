@@ -10,12 +10,13 @@ button,.btn{cursor:pointer}
 .field input:not([type=checkbox]){display:block;width:100%;padding:12px 13px;background:#fdfcfd;border:1px solid #dfd9e2;border-radius:8px;min-height:44px;font-size:12px;color:#544758}
 .field input[type=checkbox]{width:15px;height:15px;margin:0;accent-color:#d4006a}
 .field-help{font-size:11px;margin-top:7px}
+input::-ms-reveal,input::-ms-clear{display:none !important}
 .password-wrap{position:relative}
 .password-wrap input{padding-inline-end:48px}
-.show-password{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:4px;border:0;background:transparent;color:#a30052}
-.show-password svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.show-password{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:4px;border:0;background:transparent;color:#a30052;cursor:pointer !important;z-index:5 !important;pointer-events:auto !important}
+.show-password svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .show-password.is-visible svg{opacity:.75}
-.show-password.is-visible:after{content:"";position:absolute;width:24px;height:2px;background:currentColor;transform:rotate(-45deg);border-radius:2px}
+.show-password.is-visible:after{content:"";position:absolute;width:24px;height:2px;background:currentColor;transform:rotate(-45deg);border-radius:2px;pointer-events:none}
 .error-summary,#offline,.setup-secret,.destination,.resend-feedback,.lost-factor{background:#fff5f8;border:1px solid #f0dce6;border-radius:10px;padding:13px 16px;margin:0 0 19px;color:#6b5b70}
 .error-summary a{color:#8d1248}
 .error-summary p{margin-top:8px}

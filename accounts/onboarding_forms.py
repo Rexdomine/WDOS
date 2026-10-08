@@ -532,14 +532,19 @@ class GeographyForm(BaseForm):
 
         # Set initial local_home based on matching policy homes
         selected_dist = (self.data and self.data.get('district')) or (self.initial and self.initial.get('district'))
-        matching_init_homes = [
-            h for h in network_homes
-            if (not selected_country or h.get('country') in (selected_country, getattr(c_record, 'get', lambda k: '')('name') if c_record else '', getattr(c_record, 'get', lambda k: '')('code') if c_record else '', getattr(c_record, 'get', lambda k: '')('iso3') if c_record else ''))
-            and (not selected_region or h.get('region') == selected_region)
-            and (not selected_dist or h.get('district') == selected_dist)
-        ]
-        if matching_init_homes and matching_init_homes[0].get('label'):
-            self.fields['local_home'].initial = matching_init_homes[0]['label']
+        if self.initial and self.initial.get('local_home') and self.initial.get('local_home') != 'Pending assignment':
+            self.fields['local_home'].initial = self.initial.get('local_home')
+        elif selected_country and selected_region:
+            matching_init_homes = [
+                h for h in network_homes
+                if (h.get('country') in (selected_country, getattr(c_record, 'get', lambda k: '')('name') if c_record else '', getattr(c_record, 'get', lambda k: '')('code') if c_record else '', getattr(c_record, 'get', lambda k: '')('iso3') if c_record else ''))
+                and h.get('region') == selected_region
+                and (not selected_dist or h.get('district') == selected_dist)
+            ]
+            if matching_init_homes and matching_init_homes[0].get('label'):
+                self.fields['local_home'].initial = matching_init_homes[0]['label']
+            else:
+                self.fields['local_home'].initial = 'Pending assignment'
         else:
             self.fields['local_home'].initial = 'Pending assignment'
 
@@ -603,7 +608,7 @@ class GeographyForm(BaseForm):
                         h.get('region') for h in homes
                         if h.get('country') in (country_input, country_obj['name'], country_obj['code'], country_obj.get('iso3'))
                     ]
-                    if region_input not in policy_regions and not any(h.get('region') == region_input for h in homes):
+                    if region_input not in policy_regions:
                         self.add_error('region', 'Check the highlighted information')
         elif country_input:
             cid = country_input.upper() if len(country_input) == 3 else country_input.lower().replace(' ', '-')

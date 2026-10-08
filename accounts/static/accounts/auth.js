@@ -75,19 +75,32 @@ for (const panel of document.querySelectorAll("[data-resend-remaining]")) {
   tick();
 }
 
-for (const button of document.querySelectorAll(".show-password")) {
-  button.addEventListener("click", () => {
-    const field = document.getElementById(button.dataset.target);
-    if (!field) return;
-    const show = field.type === "password";
-    field.type = show ? "text" : "password";
-    const label = show ? button.dataset.hideLabel : button.dataset.showLabel;
-    button.classList.toggle("is-visible", show);
-    button.setAttribute("aria-label", label);
-    button.setAttribute("aria-pressed", String(show));
-    field.focus();
-  });
+function handlePasswordToggle(button) {
+  const targetId = button.dataset.target || button.getAttribute("aria-controls");
+  const field = targetId ? document.getElementById(targetId) : button.closest(".password-wrap")?.querySelector("input");
+  if (!field) return;
+  const isCurrentlyPassword = field.type === "password";
+  field.type = isCurrentlyPassword ? "text" : "password";
+  const showLabel = button.dataset.showLabel || "Show password";
+  const hideLabel = button.dataset.hideLabel || "Hide password";
+  const newLabel = isCurrentlyPassword ? hideLabel : showLabel;
+  button.classList.toggle("is-visible", isCurrentlyPassword);
+  button.setAttribute("aria-label", newLabel);
+  button.setAttribute("title", newLabel);
+  button.setAttribute("aria-pressed", String(isCurrentlyPassword));
+  try {
+    const len = field.value.length;
+    field.setSelectionRange(len, len);
+  } catch (_) {}
 }
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest(".show-password");
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+  handlePasswordToggle(button);
+});
 
 const summary = document.querySelector(".error-summary");
 if (summary) summary.focus();

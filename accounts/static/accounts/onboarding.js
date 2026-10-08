@@ -44,6 +44,9 @@
     initializeEligibilityWatcher();
     initializeSearchableDropdowns();
     initializeRecordTabs();
+    initializeLanguageMenu();
+    initializeLockedNav();
+    initializeSearchTrigger();
   };
   const recover = async () => {
     if (pending) return;
@@ -1063,9 +1066,83 @@ function initializeSearchableDropdowns() {
   });
 }
 
+let toastTimer = null;
+function showToast(message) {
+  const toast = document.getElementById("onboarding-toast");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.hidden = false;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.hidden = true;
+  }, 4000);
+}
+
+function initializeLanguageMenu() {
+  document.querySelectorAll("[data-lang-menu]").forEach((menu) => {
+    if (menu._langInitialized) return;
+    menu._langInitialized = true;
+    const trigger = menu.querySelector("[data-lang-trigger]");
+    const panel = menu.querySelector("[data-lang-panel]");
+    if (!trigger || !panel) return;
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const willShow = panel.hidden;
+      document.querySelectorAll("[data-lang-panel]").forEach(p => p.hidden = true);
+      panel.hidden = !willShow;
+      trigger.setAttribute("aria-expanded", String(willShow));
+    });
+    document.addEventListener("click", (e) => {
+      if (!menu.contains(e.target)) {
+        panel.hidden = true;
+        trigger.setAttribute("aria-expanded", "false");
+      }
+    });
+  });
+}
+
+function initializeLockedNav() {
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".locked-nav");
+    if (!btn) return;
+    e.preventDefault();
+    const feature = btn.dataset.lockedFeature || "This section";
+    showToast(`${feature} will be unlocked once your onboarding registration is reviewed and approved.`);
+  });
+}
+
+function initializeSearchTrigger() {
+  const trigger = document.querySelector("[data-search-trigger]");
+  if (trigger) {
+    trigger.addEventListener("click", (e) => {
+      e.preventDefault();
+      const firstSearchable = document.querySelector(".searchable-select-trigger");
+      if (firstSearchable) {
+        firstSearchable.click();
+      } else {
+        showToast("Search is scoped to active workspace modules upon registration completion.");
+      }
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      const firstSearchable = document.querySelector(".searchable-select-trigger");
+      if (firstSearchable) {
+        firstSearchable.click();
+      } else {
+        showToast("Search is scoped to active workspace modules upon registration completion.");
+      }
+    }
+  });
+}
+
 initializeProfileMenus();
 initializeRecordTabs();
 initializePhotoControls();
 initializeGeographyDropdowns();
 initializeEligibilityWatcher();
 initializeSearchableDropdowns();
+initializeLanguageMenu();
+initializeLockedNav();
+initializeSearchTrigger();

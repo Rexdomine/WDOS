@@ -212,10 +212,42 @@ class UserPreference(models.Model):
     )
     active_network = models.CharField(max_length=8, blank=True)
     active_country = models.CharField(max_length=8, blank=True)
+    reminder_preference = models.CharField(
+        max_length=64,
+        default="inside_wdos",
+        choices=[
+            ("inside_wdos", "Keep reminders inside WDOS"),
+            ("browser", "Send browser notifications"),
+            ("none", "Do not send reminders"),
+        ],
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"UserPreference({self.account_id}, lang={self.language})"
+
+
+class DeviceSession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    account = models.ForeignKey(
+        "accounts.Account",
+        on_delete=models.CASCADE,
+        related_name="device_sessions",
+    )
+    session_key = models.CharField(max_length=64, blank=True)
+    device_name = models.CharField(max_length=128, default="This device")
+    browser_info = models.CharField(max_length=128, default="Chrome · Lagos")
+    ip_address = models.CharField(max_length=64, default="127.0.0.1")
+    is_current = models.BooleanField(default=False)
+    last_active = models.DateTimeField(auto_now=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-last_active"]
+
+    def __str__(self):
+        return f"DeviceSession({self.account_id}, {self.device_name}, current={self.is_current})"
 
 
 class PrivacyRequest(models.Model):
@@ -225,24 +257,22 @@ class PrivacyRequest(models.Model):
         on_delete=models.CASCADE,
         related_name="privacy_requests",
     )
+    reference = models.CharField(max_length=32, default="PR-DEMO-01")
     request_type = models.CharField(
-        max_length=32,
-        choices=[
-            ("export", "Data Export"),
-            ("rectification", "Data Rectification"),
-            ("erasure", "Data Erasure / Deletion"),
-            ("restriction", "Restriction of Processing"),
-        ],
+        max_length=64,
+        default="Correct my information",
     )
+    details = models.TextField(blank=True)
+    safe_reply_route = models.CharField(max_length=64, default="Reply in my account")
+    current_step = models.CharField(max_length=64, default="Identity check required")
+    next_action = models.CharField(max_length=128, default="Confirm through the approved verification route")
+    identity_check_status = models.CharField(max_length=32, default="Not checked")
+    decision = models.CharField(max_length=64, default="More information needed")
+    reason_and_retention = models.TextField(blank=True)
+    timeline = models.JSONField(default=list, blank=True)
     status = models.CharField(
-        max_length=24,
-        default="submitted",
-        choices=[
-            ("submitted", "Submitted"),
-            ("processing", "Processing"),
-            ("completed", "Completed"),
-            ("rejected", "Rejected"),
-        ],
+        max_length=32,
+        default="Waiting for review",
     )
     reason = models.TextField(blank=True)
     resolution_notes = models.TextField(blank=True)
@@ -255,7 +285,30 @@ class PrivacyRequest(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"PrivacyRequest({self.account_id}, {self.request_type}, {self.status})"
+        return f"PrivacyRequest({self.account_id}, {self.reference}, {self.status})"
+
+
+class NetworkTransition(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    account = models.ForeignKey(
+        "accounts.Account",
+        on_delete=models.CASCADE,
+        related_name="network_transitions",
+    )
+    current_relationship = models.CharField(max_length=128, default="WNNN membership")
+    requested_transition = models.CharField(max_length=128, default="WGMN membership review")
+    age_evidence_method = models.CharField(max_length=128, default="Approved re-attestation")
+    consent_confirmed = models.BooleanField(default=False)
+    status = models.CharField(max_length=32, default="in_progress")
+    step = models.PositiveSmallIntegerField(default=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"NetworkTransition({self.account_id}, {self.requested_transition})"
 
 
 class Chapter(models.Model):

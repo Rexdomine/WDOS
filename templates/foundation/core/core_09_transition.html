@@ -1,0 +1,270 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Review your network transition · WDOS{% endblock %}
+
+{% block content %}
+<div class="stage4-pagehead">
+  <div>
+    <div class="eyebrow">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria"|upper }}</div>
+    <h1>Review your network transition</h1>
+    <p>Check the evidence and the impact of this decision before confirming.</p>
+  </div>
+</div>
+
+<div class="stage4-tabs">
+  <a href="?tab=overview" class="stage4-tab {% if active_tab == 'overview' or not active_tab %}active{% endif %}">Overview</a>
+  <a href="?tab=records" class="stage4-tab {% if active_tab == 'records' %}active{% endif %}">Records</a>
+  <a href="?tab=history" class="stage4-tab {% if active_tab == 'history' %}active{% endif %}">History</a>
+</div>
+
+{% if state_mode %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta);">
+  <div class="stage4-state-icon">✓</div>
+  <h3>{{ state_title }}</h3>
+  <p>{{ state_message }}</p>
+  <a href="{{ state_action_url|default:'/foundation/network-transition/' }}" class="btn primary small">{{ state_action_label }}</a>
+</div>
+{% endif %}
+
+{% if transition_confirmed %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid #35581B; background:#EDF5E6;">
+  <div class="stage4-state-icon" style="color:#35581B; border-color:#35581B;">✓</div>
+  <h3 style="color:#35581B;">Review request submitted</h3>
+  <p>Your network transition request has been routed to the authorized leadership reviewer. Your prior history is preserved.</p>
+</div>
+{% endif %}
+
+<div class="stage4-layout">
+  <!-- Main Decision Card -->
+  <div class="stage4-main-col">
+    <div class="stage4-card">
+      <div class="stage4-card-head" style="margin-bottom:12px;">
+        <div>
+          <h2>Review your network transition</h2>
+          <div style="margin-top:6px;">
+            <span class="action-pill" style="font-size:11.5px;"><span class="dot" style="background:#6B6B6B;"></span> In progress</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #F0EDF2; margin:16px 0 14px;"></div>
+
+      <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:14px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <div>
+          <h4 style="font-size:13.5px; font-weight:700; color:#171717; margin:0 0 3px 0;">Before you continue</h4>
+          <p style="font-size:12px; color:#6B6B6B; margin:0 0 4px 0;">Your active role and network determine what you can see.</p>
+          <a href="#" style="font-size:12px; font-weight:600; color:var(--wdos-magenta); text-decoration:none;">Please review</a>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #F0EDF2; margin:14px 0;"></div>
+
+      <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:20px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <div>
+          <h4 style="font-size:13.5px; font-weight:700; color:#171717; margin:0 0 3px 0;">Your information is protected</h4>
+          <p style="font-size:12px; color:#6B6B6B; margin:0 0 4px 0;">Only the people authorized for this record can review the submission.</p>
+          <a href="#" style="font-size:12px; font-weight:600; color:var(--wdos-magenta); text-decoration:none;">Scoped access</a>
+        </div>
+      </div>
+
+      <form method="post" action="/foundation/network-transition/">
+        {% csrf_token %}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:18px;">
+          <div class="stage4-form-group" style="margin-bottom:0;">
+            <label style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Current relationship</label>
+            <input type="text" readonly value="WNNN membership" class="stage4-input" style="background:#FFFFFF; cursor:default;">
+          </div>
+          <div class="stage4-form-group" style="margin-bottom:0;">
+            <label style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Requested transition</label>
+            <input type="text" readonly value="WGMN membership review" class="stage4-input" style="background:#FFFFFF; cursor:default;">
+          </div>
+        </div>
+
+        <div class="stage4-form-group" style="margin-bottom:18px;">
+          <label style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Age evidence method</label>
+          <div class="stage4-input" style="display:flex; justify-content:space-between; align-items:center; cursor:default; max-width:440px; background:#FFFFFF;">
+            <span>Approved re-attestation</span>
+            <span style="color:#6B6B6B; font-size:16px;">›</span>
+          </div>
+        </div>
+
+        <div class="stage4-form-group" style="margin-bottom:20px;">
+          <label style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Consent to review</label>
+          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13.5px; color:#171717; padding:12px 14px; border:1px solid var(--wdos-line); border-radius:8px; background:#FFFFFF;">
+            <input type="checkbox" name="consent_confirmed" value="1" checked required style="width:18px; height:18px; accent-color:var(--wdos-magenta);">
+            <span>I understand that my history will be retained.</span>
+          </label>
+        </div>
+
+        <div class="stage4-notice-banner" style="margin-top:0; margin-bottom:24px;">
+          <span class="shield-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </span>
+          <span>Your active role and network determine what you can see.</span>
+        </div>
+
+        <div style="border-top:1px solid #F0EDF2; margin:24px 0 20px;"></div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+          <span style="font-size:12.5px; color:#6B6B6B;">A decision requires the appropriate authority.</span>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <button type="button" class="btn secondary" onclick="window.history.back()">Back</button>
+            <button type="submit" class="btn primary">→ Confirm review request</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Stepper Sidebar -->
+  <div class="stage4-side-col">
+    <div class="stage4-card">
+      <h3 style="font-size:16px; font-weight:700; color:#171717; margin:0 0 16px 0;">Decision context</h3>
+
+      <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:14px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <div>
+          <h4 style="font-size:13.5px; font-weight:700; color:#171717; margin:0 0 3px 0;">Before you continue</h4>
+          <p style="font-size:12px; color:#6B6B6B; margin:0 0 4px 0;">Your active role and network determine what you can see.</p>
+          <a href="#" style="font-size:12px; font-weight:600; color:var(--wdos-magenta); text-decoration:none;">Please review</a>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #F0EDF2; margin:14px 0;"></div>
+
+      <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:20px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <div>
+          <h4 style="font-size:13.5px; font-weight:700; color:#171717; margin:0 0 3px 0;">Your information is protected</h4>
+          <p style="font-size:12px; color:#6B6B6B; margin:0 0 4px 0;">Only the people authorized for this record can review the submission.</p>
+          <a href="#" style="font-size:12px; font-weight:600; color:var(--wdos-magenta); text-decoration:none;">Scoped access</a>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #F0EDF2; margin:16px 0;"></div>
+
+      <!-- Stepper with vertical line -->
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <!-- Step 01 -->
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:#EAF5E9; color:#2E7D32; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; margin-top:2px;">✓</div>
+          <div>
+            <div style="font-size:10.5px; font-weight:800; letter-spacing:0.08em; color:#6B6B6B; text-transform:uppercase;">STEP 01</div>
+            <h4 style="font-size:13.5px; font-weight:700; color:#171717; margin:2px 0 3px 0;">Review eligibility evidence</h4>
+            <p style="font-size:12px; color:#6B6B6B; margin:0;">Your active role and network determine what you can see.</p>
+          </div>
+        </div>
+
+        <!-- Step 02 (Active) -->
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:#D4006A; color:#FFFFFF; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; flex-shrink:0; margin-top:2px;">•</div>
+          <div>
+            <div style="font-size:10.5px; font-weight:800; letter-spacing:0.08em; color:#D4006A; text-transform:uppercase;">STEP 02</div>
+            <h4 style="font-size:13.5px; font-weight:700; color:#171717; margin:2px 0 3px 0;">Confirm proposed relationship</h4>
+            <p style="font-size:12px; color:#6B6B6B; margin:0;">Only the people authorized for this record can review the submission.</p>
+          </div>
+        </div>
+
+        <!-- Step 03 -->
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:#EAF5E9; color:#2E7D32; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; margin-top:2px;">✓</div>
+          <div>
+            <div style="font-size:10.5px; font-weight:800; letter-spacing:0.08em; color:#6B6B6B; text-transform:uppercase;">STEP 03</div>
+            <h4 style="font-size:13.5px; font-weight:700; color:#171717; margin:2px 0 3px 0;">Authorized transition review</h4>
+            <p style="font-size:12px; color:#6B6B6B; margin:0;">Your progress and next action remain available here.</p>
+          </div>
+        </div>
+
+        <!-- Step 04 -->
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:#EAF5E9; color:#2E7D32; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; margin-top:2px;">✓</div>
+          <div>
+            <div style="font-size:10.5px; font-weight:800; letter-spacing:0.08em; color:#6B6B6B; text-transform:uppercase;">STEP 04</div>
+            <h4 style="font-size:13.5px; font-weight:700; color:#171717; margin:2px 0 3px 0;">History preserved</h4>
+            <p style="font-size:12px; color:#6B6B6B; margin:0;">Your progress and next action remain available here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stage4-preview-banner">
+  <a href="?view_mode=state" class="stage4-preview-link">＋ Related screens · design preview</a>
+  <p class="stage4-preview-help">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Need help? Ask your support team. Never share your password or verification codes.
+  </p>
+</div>
+
+{% if request.GET.view_mode == 'state' or request.GET.contract == '1' %}
+<!-- State & Interaction Contract Artboards Section (PDF Page 209) -->
+<section class="stage4-state-section" id="state-contract" style="margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--wdos-line);">
+  <div class="stage4-state-header">
+    <div class="contract-tag">CORE-09 / INTERACTION CONTRACT</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Review your network transition</h2>
+        <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Designed feedback components for the moments around the main screen.</p>
+      </div>
+      <span class="action-pill magenta" style="font-size:11px;"><span class="dot"></span> Proposed for approval</span>
+    </div>
+  </div>
+
+  <div class="stage4-state-grid">
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h3>Check the highlighted information</h3>
+      <p>Complete the required fields before continuing. Your entered information is retained.</p>
+      <a href="/foundation/network-transition/" class="btn primary small">Review fields</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <h3>Saved for later</h3>
+      <p>Your draft is saved. Return to this record when you are ready to continue.</p>
+      <a href="/foundation/network-transition/" class="btn primary small">Open draft</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </div>
+      <h3>Another change needs review</h3>
+      <p>This record changed since you opened it. Review the latest version before submitting.</p>
+      <a href="/foundation/network-transition/" class="btn primary small">Review latest version</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <h3>Loading current information</h3>
+      <p>Loading review your network transition. No stale values or completed actions are implied.</p>
+      <a href="/foundation/workspace/" class="btn primary small">Cancel and return</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      </div>
+      <h3>More information needed</h3>
+      <p>Check the marked details before continuing with review your network transition. Your entered information remains available.</p>
+      <a href="/foundation/network-transition/" class="btn primary small">Review details</a>
+    </div>
+  </div>
+
+  <div class="stage4-contract-box">
+    <h5>FUTURE FULL-STACK IMPLEMENTATION CONTRACT</h5>
+    <p>Implement CORE-09 with server-validated my workspace data, record-level permissions, durable history and tested recovery. This artboard does not authorize live actions.</p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

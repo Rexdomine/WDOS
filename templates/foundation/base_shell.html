@@ -15,80 +15,107 @@
   
   <!-- Desktop Sidebar -->
   <aside class="sidebar" aria-label="Main Navigation">
-    <a href="/foundation/" style="display:block;"><img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer"></a>
+    <a href="/foundation/" style="display:block; margin-bottom:20px;">
+      <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer" style="max-width:135px; height:auto; display:block;">
+    </a>
     
     <!-- Active Network & Geography Scope Indicator -->
-    <div class="workspace" style="flex-direction:column; align-items:stretch; gap:6px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <b>{{ user_scope.active_network }}</b>
-          <span>{{ user_scope.active_country }} Hub</span>
-        </div>
-        <span class="scope-badge">{{ user_scope.leadership_level|title }}</span>
+    <a href="/foundation/dashboard/switch-role/" class="scope-box" aria-label="Switch active scope or network" style="text-decoration:none;">
+      <div class="scope-box-text">
+        <div class="scope-network">{{ user_scope.active_network }} / {{ country_name|default:user_scope.active_country }}</div>
+        <div class="scope-role">{{ active_role_title|default:user_scope.active_role|title }}</div>
       </div>
-      {% if user_scope.allowed_networks|length > 1 or user_scope.is_management_or_admin %}
-      <form method="post" action="/foundation/scope/switch/" style="margin-top:6px; display:flex; gap:4px;">
-        {% csrf_token %}
-        <select name="network" onchange="this.form.submit()" style="font-size:11px; padding:3px 6px; border-radius:6px; border:1px solid var(--wdos-line); flex:1; background:white;">
-          {% for net in user_scope.allowed_networks %}
-          <option value="{{ net }}" {% if net == user_scope.active_network %}selected{% endif %}>{{ net }}</option>
-          {% endfor %}
-        </select>
-      </form>
-      {% endif %}
-    </div>
+      <div class="scope-box-arrow" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </a>
 
-    <div class="nav-label">{{ translations.onb_workspace|default:"WORKSPACE" }}</div>
+    {% if is_privacy_reviewer %}
+    <div class="nav-label">WORKSPACE</div>
     <a class="navitem {% if active_nav == 'workspace' %}active{% endif %}" href="/foundation/">
-      <span class="icon" aria-hidden="true">⌂</span>{{ translations.onb_home|default:"Home" }}
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home
+    </a>
+    <a class="navitem {% if active_nav == 'people' %}active{% endif %}" href="/foundation/#people">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      People & leadership
+    </a>
+    <a class="navitem {% if active_nav == 'work' %}active{% endif %}" href="/foundation/work-queue/">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="10" x2="11" y2="14"/></svg>
+      Work & programmes
+    </a>
+    <a class="navitem {% if active_nav == 'meetings' %}active{% endif %}" href="/foundation/#meetings">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Meetings & events
+    </a>
+    <a class="navitem {% if active_nav == 'communications' %}active{% endif %}" href="/foundation/#comms">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Communications
+    </a>
+    <a class="navitem {% if active_nav == 'learning' %}active{% endif %}" href="/foundation/settings/">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Learning & resources
+    </a>
+    <a class="navitem {% if active_nav == 'reports' %}active{% endif %}" href="/foundation/dashboard/export/">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Reports & oversight
+    </a>
+    <a class="navitem" href="/auth/help/">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Help & support
+    </a>
+    <a class="navitem {% if active_nav == 'settings' %}active{% endif %}" href="/foundation/settings/">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </a>
+    {% else %}
+    <div class="nav-label">WORKSPACE</div>
+    <a class="navitem {% if active_nav == 'workspace' %}active{% endif %}" href="/foundation/">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home
     </a>
     <a class="navitem {% if active_nav == 'work_queue' %}active{% endif %}" href="/foundation/work-queue/">
-      <span class="icon" aria-hidden="true">▣</span>{{ translations.onb_my_work|default:"Work Queue" }}
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="10" x2="11" y2="14"/></svg>
+      My activities
     </a>
-    <a class="navitem {% if active_nav == 'country_hubs' %}active{% endif %}" href="/foundation/network/{{ user_scope.active_network }}/">
-      <span class="icon" aria-hidden="true">⌑</span>Country Hubs
-    </a>
-    <a class="navitem {% if active_nav == 'search' %}active{% endif %}" href="/foundation/search/">
-      <span class="icon" aria-hidden="true">⌕</span>{{ translations.onb_search|default:"Search" }}
+    <a class="navitem {% if active_nav == 'meetings' %}active{% endif %}" href="/foundation/#meetings">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Meetings & events
     </a>
     <a class="navitem {% if active_nav == 'notifications' %}active{% endif %}" href="/foundation/notifications/">
-      <span class="icon" aria-hidden="true">♧</span>{{ translations.account_notifications|default:"Notifications" }}
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Messages
       {% if unread_notifications_count > 0 %}
       <span class="nav-count scope-badge" data-notif-badge>{{ unread_notifications_count }}</span>
       {% endif %}
     </a>
-
-    <div class="nav-label">ACCOUNT & PRIVACY</div>
-    <a class="navitem {% if active_nav == 'profile' %}active{% endif %}" href="/foundation/profile/">
-      <span class="icon" aria-hidden="true">👤</span>My Profile
-    </a>
-    <a class="navitem {% if active_nav == 'settings' %}active{% endif %}" href="/foundation/settings/">
-      <span class="icon" aria-hidden="true">⚙</span>{{ translations.onb_settings|default:"Settings & Accessibility" }}
-    </a>
-    <a class="navitem {% if active_nav == 'privacy' %}active{% endif %}" href="/foundation/privacy-requests/">
-      <span class="icon" aria-hidden="true">🛡️</span>Privacy Requests
+    <a class="navitem {% if active_nav == 'learning' %}active{% endif %}" href="/foundation/settings/">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Learning & resources
     </a>
     <a class="navitem" href="/auth/help/">
-      <span class="icon" aria-hidden="true">?</span>{{ translations.onb_help|default:"Help & Support" }}
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Help & support
     </a>
+    <a class="navitem {% if active_nav == 'settings' %}active{% endif %}" href="/foundation/settings/">
+      <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </a>
+    {% endif %}
+
+    <!-- Sidebar Callout -->
+    <div class="sidebar-callout">
+      <h4>A little support goes a long way.</h4>
+      <p>Find guidance or ask your support team.</p>
+    </div>
 
     <!-- Sidebar Bottom User Info -->
-    <div class="sidebottom" style="margin-top:auto; padding-top:20px;">
-      <div class="user" style="display:flex; align-items:center; justify-content:space-between;">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <div class="avatar">{{ initials }}</div>
-          <div>
-            <b>{{ display_name }}</b>
-            <small style="color:var(--wdos-muted);">{{ user_scope.leadership_level|title }}</small>
-          </div>
-        </div>
+    <div class="sidebar-user">
+      <div class="avatar">{{ initials|default:"AO" }}</div>
+      <div class="user-info">
+        <div class="user-name">{{ display_name|default:"Ada Okafor" }}</div>
+        <div class="user-role">{{ active_role_title|default:user_scope.active_role|title }}</div>
       </div>
-      <form method="post" action="/auth/logout/" style="margin-top:10px;">
-        {% csrf_token %}
-        <button type="submit" class="btn small" style="width:100%; justify-content:center;">
-          {{ translations.sign_out|default:"Sign out" }}
-        </button>
-      </form>
     </div>
   </aside>
 
@@ -97,83 +124,102 @@
     <a href="/foundation/" style="display:flex; align-items:center; text-decoration:none;">
       <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
     </a>
-    <div class="right" style="display:flex; align-items:center; gap:10px;">
-      <span class="scope-badge" style="font-size:10px;">{{ user_scope.active_network }}</span>
-      <a href="/foundation/search/" style="text-decoration:none; color:inherit; display:flex; align-items:center;" aria-label="{{ translations.onb_search|default:'Search' }}">
-        <span class="icon" aria-hidden="true" style="font-size:16px;">⌕</span>
-      </a>
-      <a href="/foundation/notifications/" style="text-decoration:none; position:relative; color:inherit; display:flex; align-items:center;" aria-label="{{ translations.account_notifications|default:'Notifications' }}">
-        <span class="icon" aria-hidden="true">♧</span>
+    <div class="right" style="display:flex; align-items:center; gap:12px;">
+      <a href="/foundation/notifications/" style="text-decoration:none; position:relative; color:inherit; display:flex; align-items:center;" aria-label="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         {% if unread_notifications_count > 0 %}
-        <span style="position:absolute; top:-4px; right:-4px; background:var(--wdos-magenta); color:white; font-size:9px; border-radius:50%; width:14px; height:14px; display:flex; align-items:center; justify-content:center;">{{ unread_notifications_count }}</span>
+        <span style="position:absolute; top:-4px; right:-4px; background:var(--wdos-magenta); color:white; font-size:9px; border-radius:50%; width:14px; height:14px; display:flex; align-items:center; justify-content:center; font-weight:700;">{{ unread_notifications_count }}</span>
         {% endif %}
       </a>
       <div class="profile-menu" data-profile-menu>
-        <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button>
+        <button class="profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
         <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
-          <strong>{{ display_name }}</strong>
-          <small style="display:block; margin-bottom:8px; color:var(--wdos-muted);">{{ user_scope.leadership_level|title }} ({{ user_scope.active_network }})</small>
-          <a href="/foundation/profile/" role="menuitem" style="display:block; padding:6px 0; color:var(--wdos-ink); text-decoration:none;">My Profile</a>
-          <a href="/foundation/settings/" role="menuitem" style="display:block; padding:6px 0; color:var(--wdos-ink); text-decoration:none;">Settings</a>
-          <a href="/foundation/privacy-requests/" role="menuitem" style="display:block; padding:6px 0; color:var(--wdos-ink); text-decoration:none;">Privacy Requests</a>
-          <hr style="border:0; border-top:1px solid var(--wdos-line); margin:6px 0;">
-          <form method="post" action="/auth/logout/">{% csrf_token %}<button type="submit" role="menuitem" class="btn small" style="width:100%; border:none; text-align:start; padding:4px 0;"><span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out|default:"Sign out" }}</span></button></form>
+          <div class="profile-menu-header">
+            <strong class="profile-menu-name">{{ display_name|default:"Ada Okafor" }}</strong>
+            <small class="profile-menu-scope">{{ active_role_title|default:user_scope.active_role|title }} ({{ user_scope.active_network }})</small>
+          </div>
+          <div class="profile-menu-items">
+            <a href="/foundation/" role="menuitem" class="profile-menu-link">Workspace Home</a>
+            <a href="/foundation/work-queue/" role="menuitem" class="profile-menu-link">My Work Queue</a>
+            <a href="/foundation/profile/" role="menuitem" class="profile-menu-link">My Profile</a>
+            <a href="/foundation/account/security/" role="menuitem" class="profile-menu-link">Account Security</a>
+            <a href="/foundation/settings/" role="menuitem" class="profile-menu-link">Language &amp; Preferences</a>
+            <a href="/foundation/privacy-requests/" role="menuitem" class="profile-menu-link">Privacy &amp; Consent</a>
+          </div>
+          <div class="profile-menu-divider" aria-hidden="true"></div>
+          <form method="post" action="/auth/logout/" class="profile-menu-logout-form">
+            {% csrf_token %}
+            <button type="submit" role="menuitem" class="profile-menu-logout-btn">
+              <span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out|default:"Sign out" }}</span>
+            </button>
+          </form>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- Mobile Bottom Navigation -->
-  <nav class="mobile-nav" aria-label="Mobile Navigation">
-    <a href="/foundation/" {% if active_nav == 'workspace' %}aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>{{ translations.onb_home|default:"Home" }}</a>
-    <a href="/foundation/work-queue/" {% if active_nav == 'work_queue' %}aria-current="page"{% endif %}><span aria-hidden="true">▣</span>Work</a>
-    <a href="/foundation/search/" {% if active_nav == 'search' %}aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>Search</a>
-    <a href="/foundation/notifications/" {% if active_nav == 'notifications' %}aria-current="page"{% endif %}><span aria-hidden="true">♧</span>Alerts</a>
-    <a href="/foundation/settings/" {% if active_nav == 'settings' %}aria-current="page"{% endif %}><span aria-hidden="true">⋯</span>Settings</a>
-  </nav>
+  <!-- Mobile Scope Banner -->
+  <div class="mobile-scope-bar">
+    <span>{{ user_scope.active_network }} / {{ country_name|default:"Nigeria" }} &nbsp;·&nbsp; {{ active_role_title|default:user_scope.active_role|title }}</span>
+  </div>
 
   <!-- Main Content Shell -->
   <div class="content">
     <div class="topbar">
       <!-- Scoped Breadcrumbs Trail -->
       <nav aria-label="Breadcrumb" class="scoped-breadcrumbs">
-        {% for crumb in breadcrumbs %}
-          {% if not forloop.first %}<span class="sep" aria-hidden="true">/</span>{% endif %}
-          {% if crumb.is_current or not crumb.url %}
-            <span class="current" aria-current="page">{{ crumb.label }}</span>
-          {% else %}
-            <a href="{{ crumb.url }}">{{ crumb.label }}</a>
-          {% endif %}
-        {% endfor %}
+        {% if custom_breadcrumbs %}
+          {% for crumb in custom_breadcrumbs %}
+            {% if not forloop.first %}<span class="sep" aria-hidden="true">/</span>{% endif %}
+            {% if crumb.is_current or not crumb.url %}
+              <span class="current" aria-current="page">{{ crumb.label }}</span>
+            {% else %}
+              <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <a href="/foundation/">Workspace</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span class="current">Shared workspace and personal settings</span>
+        {% endif %}
       </nav>
 
       <!-- Top Tools -->
       <div class="toptools">
-        <a href="/foundation/search/" class="search" style="text-decoration:none; color:inherit;" aria-label="{{ translations.onb_search|default:'Search' }}">
-          <span class="icon" aria-hidden="true">⌕</span>{{ translations.onb_search|default:"Search" }} <small aria-hidden="true">⌘ K</small>
+        <a href="/foundation/search/" class="search" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:8px; padding:6px 14px; border-radius:8px; border:1px solid var(--wdos-line); background:#FAF9FB;" aria-label="Search WDOS">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span style="font-size:12.5px; color:#6B6B6B;">Search WDOS</span>
+          <small aria-hidden="true" style="background:#ECE8EE; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700; color:#524956;">⌘ K</small>
         </a>
-        <a href="/foundation/notifications/" class="icon" role="img" aria-label="{{ translations.account_notifications|default:'Notifications' }}" style="text-decoration:none; color:inherit; position:relative;">
-          ♧
+        <a href="/foundation/notifications/" class="icon" role="img" aria-label="Notifications" style="text-decoration:none; color:inherit; position:relative; font-size:16px; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:1px solid var(--wdos-line); background:white;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A3E52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           {% if unread_notifications_count > 0 %}
-          <span style="position:absolute; top:-5px; right:-6px; background:var(--wdos-magenta); color:white; font-size:10px; border-radius:50%; width:15px; height:15px; display:flex; align-items:center; justify-content:center;" data-notif-badge>{{ unread_notifications_count }}</span>
+          <span style="position:absolute; top:-4px; right:-4px; background:var(--wdos-magenta); color:white; font-size:9px; border-radius:50%; width:14px; height:14px; display:flex; align-items:center; justify-content:center; font-weight:700;" data-notif-badge>{{ unread_notifications_count }}</span>
           {% endif %}
         </a>
-        <a href="/foundation/settings/" class="language" style="text-decoration:none; color:inherit;">
-          {{ lang|upper }} ▾
+        <a href="/foundation/settings/" class="language" style="text-decoration:none; color:#171717; font-size:12.5px; font-weight:600; padding:6px 10px; border-radius:8px; border:1px solid var(--wdos-line); background:white;">
+          English ▾
         </a>
         
         <div class="profile-menu" data-profile-menu>
-          <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false">{{ initials }}</button>
+          <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open profile menu">{{ initials }}</button>
           <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
-            <strong>{{ display_name }}</strong>
-            <small style="display:block; margin:2px 0 8px; color:var(--wdos-muted);">{{ user_scope.leadership_level|title }} ({{ user_scope.active_network }})</small>
-            <a href="/foundation/profile/" role="menuitem" style="display:block; padding:4px 0; color:var(--wdos-ink); text-decoration:none; font-size:12px;">My Profile</a>
-            <a href="/foundation/settings/" role="menuitem" style="display:block; padding:4px 0; color:var(--wdos-ink); text-decoration:none; font-size:12px;">Settings & Accessibility</a>
-            <a href="/foundation/privacy-requests/" role="menuitem" style="display:block; padding:4px 0; color:var(--wdos-ink); text-decoration:none; font-size:12px;">Privacy Requests</a>
-            <hr style="border:0; border-top:1px solid var(--wdos-line); margin:6px 0;">
-            <form method="post" action="/auth/logout/">
+            <div class="profile-menu-header">
+              <strong class="profile-menu-name">{{ display_name|default:"Ada Okafor" }}</strong>
+              <small class="profile-menu-scope">{{ active_role_title|default:user_scope.active_role|title }} ({{ user_scope.active_network }})</small>
+            </div>
+            <div class="profile-menu-items">
+              <a href="/foundation/profile/" role="menuitem" class="profile-menu-link">My Profile</a>
+              <a href="/foundation/account/security/" role="menuitem" class="profile-menu-link">Account Security</a>
+              <a href="/foundation/settings/" role="menuitem" class="profile-menu-link">Language &amp; Preferences</a>
+              <a href="/foundation/privacy-requests/" role="menuitem" class="profile-menu-link">Privacy &amp; Consent</a>
+            </div>
+            <div class="profile-menu-divider" aria-hidden="true"></div>
+            <form method="post" action="/auth/logout/" class="profile-menu-logout-form">
               {% csrf_token %}
-              <button type="submit" role="menuitem" style="background:none; border:none; color:var(--wdos-magenta); cursor:pointer; padding:4px 0; font-size:12px; font-weight:600;">
+              <button type="submit" role="menuitem" class="profile-menu-logout-btn">
                 <span lang="{{ lang }}" dir="{{ direction }}">{{ translations.sign_out|default:"Sign out" }}</span>
               </button>
             </form>
@@ -187,7 +233,35 @@
       {% block content %}{% endblock %}
     </main>
 
-    <footer>{{ translations.onb_footer|default:"WODDI Digital Operating System · Authenticated Session" }}</footer>
+    <!-- Stage 4 Artboard Footer -->
+    <footer class="stage4-footer">
+      <span>WODDI · No Woman Is Left Out</span>
+      <span>{{ screen_code|default:"CORE-01" }} · UI review v2 · Sample data</span>
+    </footer>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-nav" aria-label="Mobile Navigation">
+      <a href="/foundation/" {% if active_nav == 'workspace' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </a>
+      <a href="/foundation/work-queue/" {% if active_nav == 'work_queue' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="10" x2="11" y2="14"/></svg>
+        My work
+      </a>
+      <a href="/foundation/#meetings" {% if active_nav == 'meetings' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Meetings
+      </a>
+      <a href="/foundation/notifications/" {% if active_nav == 'notifications' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Messages
+      </a>
+      <a href="/foundation/settings/" {% if active_nav == 'settings' or active_nav == 'more' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
+        More
+      </a>
+    </nav>
   </div>
 
   <script src="{% static 'foundation/shell.js' %}"></script>

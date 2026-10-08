@@ -1,0 +1,111 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Your connection is unavailable · WDOS{% endblock %}
+
+{% block content %}
+<div class="stage4-pagehead">
+  <div>
+    <div class="eyebrow">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria"|upper }}</div>
+    <h1>Your connection is unavailable</h1>
+    <p>One step at a time. Check the details below; nothing changes until you confirm.</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/workspace/" class="btn secondary">Save and come back</a>
+    <a href="/foundation/connection-status/?check=1" class="btn primary">→ Check connection</a>
+  </div>
+</div>
+
+{% if state_mode %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta);">
+  <div class="stage4-state-icon">✓</div>
+  <h3>{{ state_title }}</h3>
+  <p>{{ state_message }}</p>
+  <a href="{{ state_action_url|default:'/foundation/workspace/' }}" class="btn primary small">{{ state_action_label }}</a>
+</div>
+{% endif %}
+
+<div class="stage4-card" style="margin-bottom:24px;">
+  <div class="stage4-card-head" style="margin-bottom:20px;">
+    <div class="stage4-avatar-icon stage4-icon-circle-purple">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </div>
+    <div>
+      <h2>Your connection is unavailable</h2>
+      <div class="sub">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria" }}</div>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid #F0EDF2; margin:20px 0;"></div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px; margin-bottom:24px;">
+    <div>
+      <div class="stage4-form-group" style="margin-bottom:20px;">
+        <label style="display:block; font-size:12.5px; font-weight:700; color:#6B6B6B; margin-bottom:6px;">What you can read</label>
+        <div style="font-size:14px; font-weight:700; color:#171717;">
+          Only approved previously saved information
+        </div>
+      </div>
+      <div class="stage4-form-group" style="margin-bottom:0;">
+        <label style="display:block; font-size:12.5px; font-weight:700; color:#6B6B6B; margin-bottom:6px;">Your unsent work</label>
+        <div style="font-size:14px; font-weight:700; color:#171717;">
+          Kept only where safely supported on this device
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="stage4-form-group" style="margin-bottom:0;">
+        <label style="display:block; font-size:12.5px; font-weight:700; color:#6B6B6B; margin-bottom:6px;">What you cannot do</label>
+        <div style="font-size:14px; font-weight:700; color:#171717;">
+          Submit, approve or upload until reconnected
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage4-notice-banner" style="margin-top:0;">
+    <span class="shield-icon" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </span>
+    <span>A green tick appears only after the server confirms a save. Do not resubmit an action with an unknown result.</span>
+  </div>
+</div>
+
+<div class="stage4-preview-banner">
+  <a href="?view_mode=state" class="stage4-preview-link">＋ Related screens · design preview</a>
+  <p class="stage4-preview-help">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Need help? Ask your support team. Never share your password or verification codes.
+  </p>
+</div>
+
+{% if request.GET.view_mode == 'state' or request.GET.contract == '1' %}
+<!-- State & Interaction Contract Artboards Section (PDF Page 191) -->
+<section class="stage4-state-section" id="state-contract" style="margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--wdos-line);">
+  <div class="stage4-state-header">
+    <div class="contract-tag">CORE-07-CONNECTION / FEEDBACK AND RECOVERY</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Your connection is unavailable</h2>
+        <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Clear outcomes, safe next steps. Examples are not live actions.</p>
+      </div>
+      <span class="action-pill magenta" style="font-size:11px;"><span class="dot"></span> Proposed for approval</span>
+    </div>
+  </div>
+
+  <div class="stage4-state-grid">
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon" style="color:#35581B; border-color:#35581B;">✓</div>
+      <h3>Connection restored</h3>
+      <p>Check the recorded status before submitting again.</p>
+      <a href="/foundation/workspace/" class="btn primary small">Check saved status</a>
+    </div>
+  </div>
+
+  <div class="stage4-contract-box">
+    <p>Design only. Server-owned identity, scope, permissions, audit, deadlines and safe retry checks are required. Policy-dependent examples are not approvals.</p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

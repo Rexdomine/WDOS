@@ -1,0 +1,190 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Your privacy request · WDOS{% endblock %}
+
+{% block content %}
+<div class="stage4-pagehead">
+  <div>
+    <div class="eyebrow">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria"|upper }}</div>
+    <h1>Your privacy request</h1>
+    <p>One step at a time. Check the details below; nothing changes until you confirm.</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/privacy-requests/" class="btn secondary">Save and come back</a>
+    <a href="/foundation/privacy-requests/verify/?ref={{ privacy_req.reference|default:'PR-DEMO-01' }}" class="btn primary">→ Continue identity check</a>
+  </div>
+</div>
+
+{% if state_mode %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta);">
+  <div class="stage4-state-icon">✓</div>
+  <h3>{{ state_title }}</h3>
+  <p>{{ state_message }}</p>
+  <a href="{{ state_action_url|default:'/foundation/privacy-requests/' }}" class="btn primary small">{{ state_action_label }}</a>
+</div>
+{% endif %}
+
+<div class="stage4-card">
+  <div class="stage4-card-head" style="margin-bottom:20px;">
+    <div class="stage4-avatar-icon stage4-icon-circle-purple">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </div>
+    <div>
+      <h2>Your privacy request</h2>
+      <div class="sub">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria" }}</div>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid #F0EDF2; margin:20px 0;"></div>
+
+  <div class="stage4-meta-grid" style="grid-template-columns: repeat(2, 1fr); gap: 20px 32px;">
+    <div class="stage4-meta-item">
+      <label>Reference</label>
+      <div class="val">{{ privacy_req.reference|default:"PR-DEMO-01" }}</div>
+    </div>
+    <div class="stage4-meta-item">
+      <label>Request</label>
+      <div class="val">{{ privacy_req.request_type_label|default:"Correct my information" }}</div>
+    </div>
+    <div class="stage4-meta-item">
+      <label>Current step</label>
+      <div class="val">{{ privacy_req.current_step|default:"Identity check required" }}</div>
+    </div>
+    <div class="stage4-meta-item">
+      <label>Next action</label>
+      <div class="val">{{ privacy_req.next_action|default:"Confirm through the approved verification route" }}</div>
+    </div>
+  </div>
+
+  <!-- Desktop Table -->
+  <table class="stage4-table stage4-desktop-table">
+    <thead>
+      <tr>
+        <th>WHEN</th>
+        <th>WHAT HAPPENED</th>
+        <th>WHO</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in timeline_events %}
+      <tr>
+        <td style="color:var(--wdos-muted);">{{ event.when }}</td>
+        <td style="font-weight:600; color:var(--wdos-ink);">{{ event.what }}</td>
+        <td>
+          {% if event.is_you or event.who == 'You' %}
+          <span class="action-pill"><span class="dot"></span> You</span>
+          {% else %}
+          {{ event.who }}
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td style="color:var(--wdos-muted);">14 Sep · sample</td>
+        <td style="font-weight:600; color:var(--wdos-ink);">Request received</td>
+        <td><span class="action-pill"><span class="dot"></span> You</span></td>
+      </tr>
+      <tr>
+        <td style="color:var(--wdos-muted);">14 Sep · sample</td>
+        <td style="font-weight:600; color:var(--wdos-ink);">Identity check requested</td>
+        <td style="color:var(--wdos-ink);">Authorised privacy reviewer</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Mobile Stacked List -->
+  <div class="stage4-mobile-list">
+    {% for event in timeline_events %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row"><span class="label">When</span><span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ event.when }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">What happened</span><span class="value">{{ event.what }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">Who</span><span class="value">{% if event.is_you %}<span class="action-pill"><span class="dot"></span> You</span>{% else %}{{ event.who }}{% endif %}</span></div>
+    </div>
+    {% empty %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row"><span class="label">When</span><span class="value" style="font-weight:400; color:var(--wdos-muted);">14 Sep · sample</span></div>
+      <div class="mobile-stacked-row"><span class="label">What happened</span><span class="value">Request received</span></div>
+      <div class="mobile-stacked-row"><span class="label">Who</span><span class="value"><span class="action-pill"><span class="dot"></span> You</span></span></div>
+    </div>
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row"><span class="label">When</span><span class="value" style="font-weight:400; color:var(--wdos-muted);">14 Sep · sample</span></div>
+      <div class="mobile-stacked-row"><span class="label">What happened</span><span class="value">Identity check requested</span></div>
+      <div class="mobile-stacked-row"><span class="label">Who</span><span class="value">Authorised privacy reviewer</span></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="stage4-table-foot">
+    <span>Showing 2 records in this view</span>
+    <div class="pagination-controls">
+      <button type="button" aria-label="Previous page">←</button>
+      <span>1</span>
+      <button type="button" aria-label="Next page">→</button>
+    </div>
+  </div>
+
+  <div class="stage4-notice-banner" style="margin-top:16px;">
+    <span class="shield-icon" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </span>
+    <span>Your active role and network determine what you can see.</span>
+  </div>
+</div>
+
+<div class="stage4-preview-banner">
+  <a href="?view_mode=state" class="stage4-preview-link">＋ Related screens · design preview</a>
+  <p class="stage4-preview-help">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Need help? Ask your support team. Never share your password or verification codes.
+  </p>
+</div>
+
+{% if request.GET.view_mode == 'state' or request.GET.contract == '1' %}
+<!-- State & Interaction Contract Artboards Section (PDF Page 203) -->
+<section class="stage4-state-section" id="state-contract" style="margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--wdos-line);">
+  <div class="stage4-state-header">
+    <div class="contract-tag">CORE-08-STATUS / FEEDBACK AND RECOVERY</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Your privacy request</h2>
+        <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Clear outcomes, safe next steps. Examples are not live actions.</p>
+      </div>
+      <span class="action-pill magenta" style="font-size:11px;"><span class="dot"></span> Proposed for approval</span>
+    </div>
+  </div>
+
+  <div class="stage4-state-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <h3>Some information must be retained</h3>
+      <p>The reviewer explains the approved retention reason and what can still be changed.</p>
+      <a href="/foundation/privacy-requests/status/?reason=retention" class="btn primary small">Read decision</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon" style="color:#35581B; border-color:#35581B;">✓</div>
+      <h3>Request completed</h3>
+      <p>See exactly what changed and when.</p>
+      <a href="/foundation/privacy-requests/status/?status=completed" class="btn primary small">View outcome</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <h3>Request needs review</h3>
+      <p>No deletion occurs until identity, scope and retention rules are checked.</p>
+      <a href="/foundation/privacy-requests/status/?status=under_review" class="btn primary small">View next step</a>
+    </div>
+  </div>
+
+  <div class="stage4-contract-box">
+    <p>Design only. Server-owned identity, scope, permissions, audit, deadlines and safe retry checks are required. Policy-dependent examples are not approvals.</p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

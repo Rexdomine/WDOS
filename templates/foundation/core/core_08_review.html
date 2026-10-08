@@ -1,0 +1,142 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Review a privacy request · WDOS{% endblock %}
+
+{% block content %}
+<div class="stage4-pagehead">
+  <div>
+    <div class="eyebrow">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria"|upper }}</div>
+    <h1>Review a privacy request</h1>
+    <p>One step at a time. Check the details below; nothing changes until you confirm.</p>
+  </div>
+</div>
+
+{% if state_mode %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta);">
+  <div class="stage4-state-icon">✓</div>
+  <h3>{{ state_title }}</h3>
+  <p>{{ state_message }}</p>
+  <a href="{{ state_action_url|default:'/foundation/privacy-requests/review/' }}" class="btn primary small">{{ state_action_label }}</a>
+</div>
+{% endif %}
+
+{% if decision_recorded %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid #35581B; background:#EDF5E6;">
+  <div class="stage4-state-icon" style="color:#35581B; border-color:#35581B;">✓</div>
+  <h3 style="color:#35581B;">Decision recorded</h3>
+  <p>The privacy review decision has been securely logged with the required retention justification.</p>
+</div>
+{% endif %}
+
+<div class="stage4-card" style="margin-bottom:20px;">
+  <div class="stage4-card-head" style="margin-bottom:20px;">
+    <h2>Details to check</h2>
+  </div>
+
+  <form method="post" action="/foundation/privacy-requests/review/">
+    {% csrf_token %}
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+      <div class="stage4-form-group" style="margin-bottom:0;">
+        <label style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Request reference</label>
+        <input type="text" name="request_ref" value="{{ privacy_req.reference|default:'PR-DEMO-01' }}" class="stage4-input" style="background:#FFFFFF;">
+      </div>
+
+      <div class="stage4-form-group" style="margin-bottom:0;">
+        <label for="identity_check" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">
+          Identity and scope check
+        </label>
+        <select name="identity_check" id="identity_check" class="stage4-select" style="width:100%; padding:10px 14px; font-size:13.5px;">
+          <option value="not_checked" selected>Not checked</option>
+          <option value="verified">Verified against approved identity document</option>
+          <option value="failed">Identity check failed</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stage4-form-group" style="margin-bottom:20px;">
+      <label for="decision" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">
+        Decision
+      </label>
+      <select name="decision" id="decision" class="stage4-select" style="width:100%; max-width:440px; padding:10px 14px; font-size:13.5px;">
+        <option value="more_info" selected>More information needed</option>
+        <option value="approve">Approve correction</option>
+        <option value="retain">Retain records under approved policy</option>
+        <option value="reject">Reject request</option>
+      </select>
+    </div>
+
+    <div class="stage4-form-group" style="margin-bottom:24px;">
+      <label for="reason_and_retention" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">
+        Reason and retention rule
+      </label>
+      <textarea name="reason_and_retention" id="reason_and_retention" required rows="5" placeholder="Write here..." class="stage4-input" style="font-family:inherit;"></textarea>
+    </div>
+
+    <div style="border-top:1px solid #F0EDF2; margin:24px 0 20px;"></div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+      <span style="font-size:12.5px; color:#6B6B6B;">Your information stays within your authorized scope.</span>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <a href="/foundation/privacy-requests/" class="btn secondary">Save and come back</a>
+        <button type="submit" class="btn primary">→ Record decision</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="stage4-notice-banner" style="margin-top:0; margin-bottom:24px;">
+  <span class="shield-icon" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  </span>
+  <span>Record the approved basis. Do not expose restricted case information in a general privacy reply.</span>
+</div>
+
+<div class="stage4-preview-banner">
+  <a href="?view_mode=state" class="stage4-preview-link">＋ Related screens · design preview</a>
+  <p class="stage4-preview-help">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Need help? Ask your support team. Never share your password or verification codes.
+  </p>
+</div>
+
+{% if request.GET.view_mode == 'state' or request.GET.contract == '1' %}
+<!-- State & Interaction Contract Artboards Section (PDF Page 206) -->
+<section class="stage4-state-section" id="state-contract" style="margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--wdos-line);">
+  <div class="stage4-state-header">
+    <div class="contract-tag">CORE-08-REVIEW / FEEDBACK AND RECOVERY</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Review a privacy request</h2>
+        <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Clear outcomes, safe next steps. Examples are not live actions.</p>
+      </div>
+      <span class="action-pill magenta" style="font-size:11px;"><span class="dot"></span> Proposed for approval</span>
+    </div>
+  </div>
+
+  <div class="stage4-state-grid" style="grid-template-columns: repeat(2, 1fr);">
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h3>Check the highlighted detail</h3>
+      <p>Open the form to review the required information. Your draft stays available.</p>
+      <a href="/foundation/privacy-requests/review/" class="btn primary small">Review form details</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <h3>Connection interrupted</h3>
+      <p>Nothing has been confirmed. Keep this page open and check the recorded status before trying again.</p>
+      <a href="/foundation/privacy-requests/review/" class="btn primary small">Check status</a>
+    </div>
+  </div>
+
+  <div class="stage4-contract-box">
+    <p>Design only. Server-owned identity, scope, permissions, audit, deadlines and safe retry checks are required. Policy-dependent examples are not approvals.</p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

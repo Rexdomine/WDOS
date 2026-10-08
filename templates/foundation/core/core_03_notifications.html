@@ -1,0 +1,207 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Notifications · WDOS{% endblock %}
+
+{% block content %}
+<div class="stage4-pagehead">
+  <div>
+    <div class="eyebrow">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria"|upper }}</div>
+    <h1>Notifications</h1>
+    <p>See the relevant my workspace records, linked evidence and next actions for your scope.</p>
+  </div>
+  <div class="actions">
+    <button type="button" class="btn secondary" onclick="window.history.back()">Back</button>
+    <form method="post" action="/foundation/api/notifications/mark-all-read/" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn primary">→ Mark all as read</button>
+    </form>
+  </div>
+</div>
+
+{% if state_mode %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta);">
+  <div class="stage4-state-icon">✓</div>
+  <h3>{{ state_title }}</h3>
+  <p>{{ state_message }}</p>
+  <a href="{{ state_action_url|default:'/foundation/notifications/' }}" class="btn primary small">{{ state_action_label }}</a>
+</div>
+{% endif %}
+
+<!-- Full-Width Notifications Card -->
+<div class="stage4-card">
+  <div class="stage4-card-head" style="margin-bottom:12px;">
+    <h2 style="font-size:18px; margin:0;">Notifications</h2>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="stage4-filter-toolbar">
+    <div class="stage4-search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Search these records" id="notif-search">
+    </div>
+    <div class="stage4-filter-actions">
+      <span class="stage4-filter-pill-active">Current view</span>
+      <button type="button" class="stage4-filter-pill">Status ↓</button>
+      <button type="button" class="stage4-filter-pill">More filters</button>
+    </div>
+  </div>
+
+  <!-- Desktop Table -->
+  <table class="stage4-table stage4-desktop-table">
+    <thead>
+      <tr>
+        <th>ITEM</th>
+        <th>WHEN</th>
+        <th>NEXT ACTION</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in notification_items %}
+      <tr class="{% if not item.is_read %}stage4-row-unread{% endif %}">
+        <td style="font-weight:600; color:var(--wdos-ink);">{{ item.title }}</td>
+        <td style="color:var(--wdos-muted);">{{ item.when }}</td>
+        <td>
+          <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
+            <span class="dot"></span> {{ item.action_label }}
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="3" style="text-align:center; padding:24px; color:var(--wdos-muted);">
+          There are no notifications matching the selected scope.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Mobile Stacked List -->
+  <div class="stage4-mobile-list">
+    {% for item in notification_items %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row">
+        <span class="label">Item</span>
+        <span class="value">{{ item.title }}</span>
+      </div>
+      <div class="mobile-stacked-row">
+        <span class="label">When</span>
+        <span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ item.when }}</span>
+      </div>
+      <div class="mobile-stacked-row" style="margin-top:6px;">
+        <span class="label">Next action</span>
+        <span class="value">
+          <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
+            <span class="dot"></span> {{ item.action_label }}
+          </a>
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="stage4-table-foot">
+    <span>Showing {{ notification_items|length }} records in this view</span>
+    <div class="pagination-controls">
+      <button type="button" aria-label="Previous page">←</button>
+      <span>1</span>
+      <button type="button" aria-label="Next page">→</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage4-notice-banner" style="margin-top:16px;">
+  <span class="shield-icon" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  </span>
+  <span>Your active role and network determine what you can see.</span>
+</div>
+
+<!-- Bottom 2-Column Cards (matching PDF p.162) -->
+<div class="stage4-related-grid">
+  <div class="stage4-card">
+    <div class="stage4-card-icon-pink">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+    </div>
+    <h3 style="font-size:15px; font-weight:700; color:var(--wdos-ink); margin:0 0 6px 0;">Your local connection</h3>
+    <p style="font-size:12px; color:var(--wdos-muted); margin:0 0 10px 0;">{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }} · Lagos · Ikeja.</p>
+    <a href="/foundation/profile/" style="color:var(--wdos-magenta); font-size:12.5px; font-weight:600; text-decoration:none;">My membership →</a>
+  </div>
+
+  <div class="stage4-card">
+    <div class="stage4-card-icon-pink">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+    </div>
+    <h3 style="font-size:15px; font-weight:700; color:var(--wdos-ink); margin:0 0 6px 0;">Need a hand?</h3>
+    <p style="font-size:12px; color:var(--wdos-muted); margin:0 0 10px 0;">Your support team can help with access, learning and digital inclusion.</p>
+    <a href="/auth/help/" style="color:var(--wdos-magenta); font-size:12.5px; font-weight:600; text-decoration:none;">Get support →</a>
+  </div>
+</div>
+
+<div class="stage4-preview-banner">
+  <a href="?view_mode=state" class="stage4-preview-link">＋ Related screens · design preview</a>
+  <p class="stage4-preview-help">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Need help? Ask your support team. Never share your password or verification codes.
+  </p>
+</div>
+
+{% if request.GET.view_mode == 'state' or request.GET.contract == '1' %}
+<!-- State & Interaction Contract Artboards Section (PDF Page 164) -->
+<section class="stage4-state-section" id="state-contract" style="margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--wdos-line);">
+  <div class="stage4-state-header">
+    <div class="contract-tag">CORE-03 / FEEDBACK AND RECOVERY</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Notifications</h2>
+        <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Clear outcomes, safe next steps. Examples are not live actions.</p>
+      </div>
+      <span class="action-pill magenta" style="font-size:11px;"><span class="dot"></span> Proposed for approval</span>
+    </div>
+  </div>
+
+  <div class="stage4-state-grid">
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <h3>No records in this view</h3>
+      <p>There are no my workspace records matching the selected scope.</p>
+      <a href="/foundation/notifications/?clear_filters=1" class="btn primary small">Clear filters</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <h3>Connection interrupted</h3>
+      <p>Your last saved information is safe. Reconnect before submitting changes.</p>
+      <a href="/foundation/connection-status/" class="btn primary small">Try again</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <h3>Access has changed</h3>
+      <p>This action is no longer available for your current role. No change was applied.</p>
+      <a href="/foundation/workspace/" class="btn primary small">Return to workspace</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <h3>Loading current information</h3>
+      <p>Loading this view. Please wait while the latest saved information is checked.</p>
+      <a href="/foundation/workspace/" class="btn primary small">Back to my workspace</a>
+    </div>
+  </div>
+
+  <div class="stage4-contract-box">
+    <p>Design only. Server-owned identity, scope, permissions, audit, deadlines and safe retry checks are required. Policy-dependent examples are not approvals.</p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

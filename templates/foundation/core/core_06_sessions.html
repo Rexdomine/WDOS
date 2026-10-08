@@ -1,0 +1,201 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Your signed-in devices · WDOS{% endblock %}
+
+{% block content %}
+<div class="stage4-pagehead">
+  <div>
+    <div class="eyebrow">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria"|upper }}</div>
+    <h1>Your signed-in devices</h1>
+    <p>One step at a time. Check the details below; nothing changes until you confirm.</p>
+  </div>
+  <div class="actions">
+    <button type="button" class="btn secondary" onclick="window.history.back()">Save and come back</button>
+    <a href="/foundation/account/signout-device/" class="btn primary">→ Sign out another device</a>
+  </div>
+</div>
+
+{% if state_mode %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta);">
+  <div class="stage4-state-icon">✓</div>
+  <h3>{{ state_title }}</h3>
+  <p>{{ state_message }}</p>
+  <a href="{{ state_action_url|default:'/foundation/account/sessions/' }}" class="btn primary small">{{ state_action_label }}</a>
+</div>
+{% endif %}
+
+<div class="stage4-card">
+  <div class="stage4-card-head" style="margin-bottom:14px;">
+    <h2>Your signed-in devices</h2>
+  </div>
+
+  <div class="stage4-filter-toolbar">
+    <div class="stage4-search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Search these records" id="sessions-search">
+    </div>
+    <div class="stage4-filter-actions">
+      <span class="stage4-filter-pill-active">Current view</span>
+      <button type="button" class="stage4-filter-pill">Status ↓</button>
+      <button type="button" class="stage4-filter-pill">More filters</button>
+    </div>
+  </div>
+
+  <!-- Desktop Table -->
+  <table class="stage4-table stage4-desktop-table">
+    <thead>
+      <tr>
+        <th>DEVICE</th>
+        <th>BROWSER / AREA</th>
+        <th>LAST ACTIVE</th>
+        <th>ACTION</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for session in device_sessions %}
+      <tr>
+        <td style="font-weight:600; color:var(--wdos-ink);">{{ session.device_name }}</td>
+        <td style="color:var(--wdos-muted);">{{ session.browser_info }}</td>
+        <td style="color:var(--wdos-muted);">{{ session.last_active_str }}</td>
+        <td>
+          {% if session.is_current %}
+          <span class="action-pill"><span class="dot"></span> Keep signed in</span>
+          {% else %}
+          <a href="/foundation/account/signout-device/?device_id={{ session.id }}" class="action-pill amber" style="text-decoration:none;">
+            <span class="dot"></span> Review sign-out
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td style="font-weight:600; color:var(--wdos-ink);">This device</td>
+        <td style="color:var(--wdos-muted);">Chrome · Lagos</td>
+        <td style="color:var(--wdos-muted);">Now</td>
+        <td><span class="action-pill"><span class="dot"></span> Keep signed in</span></td>
+      </tr>
+      <tr>
+        <td style="font-weight:600; color:var(--wdos-ink);">Other device</td>
+        <td style="color:var(--wdos-muted);">Mobile browser</td>
+        <td style="color:var(--wdos-muted);">Yesterday</td>
+        <td>
+          <a href="/foundation/account/signout-device/" class="action-pill amber" style="text-decoration:none;">
+            <span class="dot"></span> Review sign-out
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Mobile Stacked List -->
+  <div class="stage4-mobile-list">
+    {% for session in device_sessions %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row">
+        <span class="label">Device</span>
+        <span class="value">{{ session.device_name }}</span>
+      </div>
+      <div class="mobile-stacked-row">
+        <span class="label">Browser / area</span>
+        <span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ session.browser_info }}</span>
+      </div>
+      <div class="mobile-stacked-row">
+        <span class="label">Last active</span>
+        <span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ session.last_active_str }}</span>
+      </div>
+      <div class="mobile-stacked-row" style="margin-top:6px;">
+        <span class="label">Action</span>
+        <span class="value">
+          {% if session.is_current %}
+          <span class="action-pill"><span class="dot"></span> Keep signed in</span>
+          {% else %}
+          <a href="/foundation/account/signout-device/?device_id={{ session.id }}" class="action-pill amber" style="text-decoration:none;">
+            <span class="dot"></span> Review sign-out
+          </a>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    {% empty %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row"><span class="label">Device</span><span class="value">This device</span></div>
+      <div class="mobile-stacked-row"><span class="label">Browser / area</span><span class="value">Chrome · Lagos</span></div>
+      <div class="mobile-stacked-row"><span class="label">Last active</span><span class="value">Now</span></div>
+      <div class="mobile-stacked-row"><span class="label">Action</span><span class="value"><span class="action-pill"><span class="dot"></span> Keep signed in</span></span></div>
+    </div>
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row"><span class="label">Device</span><span class="value">Other device</span></div>
+      <div class="mobile-stacked-row"><span class="label">Browser / area</span><span class="value">Mobile browser</span></div>
+      <div class="mobile-stacked-row"><span class="label">Last active</span><span class="value">Yesterday</span></div>
+      <div class="mobile-stacked-row"><span class="label">Action</span><span class="value"><a href="/foundation/account/signout-device/" class="action-pill amber" style="text-decoration:none;"><span class="dot"></span> Review sign-out</a></span></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="stage4-table-foot">
+    <span>Showing {{ device_sessions|length|default:2 }} records in this view</span>
+    <div class="pagination-controls">
+      <button type="button" aria-label="Previous page">←</button>
+      <span>1</span>
+      <button type="button" aria-label="Next page">→</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage4-notice-banner" style="margin-top:16px;">
+  <span class="shield-icon" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  </span>
+  <span>Your active role and network determine what you can see.</span>
+</div>
+
+<div class="stage4-preview-banner">
+  <a href="?view_mode=state" class="stage4-preview-link">＋ Related screens · design preview</a>
+  <p class="stage4-preview-help">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Need help? Ask your support team. Never share your password or verification codes.
+  </p>
+</div>
+
+{% if request.GET.view_mode == 'state' or request.GET.contract == '1' %}
+<!-- State & Interaction Contract Artboards Section (PDF Page 179) -->
+<section class="stage4-state-section" id="state-contract" style="margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--wdos-line);">
+  <div class="stage4-state-header">
+    <div class="contract-tag">CORE-06-SESSIONS / FEEDBACK AND RECOVERY</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Your signed-in devices</h2>
+        <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Clear outcomes, safe next steps. Examples are not live actions.</p>
+      </div>
+      <span class="action-pill magenta" style="font-size:11px;"><span class="dot"></span> Proposed for approval</span>
+    </div>
+  </div>
+
+  <div class="stage4-state-grid" style="grid-template-columns: repeat(2, 1fr);">
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h3>Check the highlighted detail</h3>
+      <p>Open the form to review the required information. Your draft stays available.</p>
+      <a href="/foundation/account/sessions/" class="btn primary small">Review form details</a>
+    </div>
+
+    <div class="stage4-state-card">
+      <div class="stage4-state-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <h3>Connection interrupted</h3>
+      <p>Nothing has been confirmed. Keep this page open and check the recorded status before trying again.</p>
+      <a href="/foundation/account/sessions/" class="btn primary small">Check status</a>
+    </div>
+  </div>
+
+  <div class="stage4-contract-box">
+    <p>Design only. Server-owned identity, scope, permissions, audit, deadlines and safe retry checks are required. Policy-dependent examples are not approvals.</p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

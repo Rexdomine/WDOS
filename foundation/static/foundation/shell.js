@@ -45,6 +45,12 @@ document.addEventListener('DOMContentLoaded', function () {
       const panel = menu ? menu.querySelector('[data-profile-panel]') : null;
       if (panel) {
         const isHidden = panel.hasAttribute('hidden');
+        document.querySelectorAll('[data-profile-panel]').forEach(function (p) {
+          if (p !== panel) p.setAttribute('hidden', '');
+        });
+        document.querySelectorAll('[data-profile-trigger]').forEach(function (t) {
+          if (t !== trigger) t.setAttribute('aria-expanded', 'false');
+        });
         if (isHidden) {
           panel.removeAttribute('hidden');
           this.setAttribute('aria-expanded', 'true');
@@ -56,6 +62,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  document.querySelectorAll('[data-profile-panel]').forEach(function (panel) {
+    panel.addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
+  });
+
   document.addEventListener('click', function () {
     document.querySelectorAll('[data-profile-panel]').forEach(function (panel) {
       panel.setAttribute('hidden', '');
@@ -63,6 +75,17 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-profile-trigger]').forEach(function (trigger) {
       trigger.setAttribute('aria-expanded', 'false');
     });
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('[data-profile-panel]').forEach(function (panel) {
+        panel.setAttribute('hidden', '');
+      });
+      document.querySelectorAll('[data-profile-trigger]').forEach(function (trigger) {
+        trigger.setAttribute('aria-expanded', 'false');
+      });
+    }
   });
 
   // Mark notification read via API

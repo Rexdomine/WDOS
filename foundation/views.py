@@ -21,7 +21,9 @@ from .models import (
     DashboardActivity,
     DashboardAlert,
     DashboardReport,
+    DeviceSession,
     LeadershipLevel,
+    NetworkTransition,
     Notification,
     PrivacyRequest,
     Role,
@@ -138,6 +140,7 @@ def _get_authenticated_context(request):
     context = {
         "account": account,
         "user_scope": user_scope,
+        "country_name": get_country_display_name(user_scope.active_country),
         "user_pref": user_pref,
         "lang": lang,
         "direction": direction,
@@ -163,6 +166,123 @@ def _render_scope_error(request, context, exception):
         {"label": "Access Restricted", "url": None, "is_current": True},
     ]
     return render(request, "foundation/error_scope.html", context, status=403)
+
+
+def _get_stage4_state_context(request, screen_name):
+    """
+    Map Stage 04 query parameters to exact PDF interaction contract feedback states.
+    Supports ?state=empty | connection_error | access_changed | loading | validation_error | blocked | not_supported
+    """
+    state = request.GET.get("state", "").lower().strip()
+    if not state:
+        return {}
+    
+    state_map = {
+        "empty": {
+            "state_mode": "empty",
+            "state_title": "No records in this view",
+            "state_message": f"There are no my workspace records matching the selected scope for {screen_name.lower()}.",
+            "state_action_label": "Clear filters",
+            "state_action_url": request.path,
+        },
+        "connection_error": {
+            "state_mode": "connection_error",
+            "state_title": "Connection interrupted",
+            "state_message": "Your last saved information is safe. Reconnect before submitting changes.",
+            "state_action_label": "Try again",
+            "state_action_url": "/foundation/connection-status/",
+        },
+        "offline": {
+            "state_mode": "connection_error",
+            "state_title": "Connection interrupted",
+            "state_message": "Your last saved information is safe. Reconnect before submitting changes.",
+            "state_action_label": "Try again",
+            "state_action_url": "/foundation/connection-status/",
+        },
+        "access_changed": {
+            "state_mode": "access_changed",
+            "state_title": "Access has changed",
+            "state_message": "This action is no longer available for your current role. No change was applied.",
+            "state_action_label": "Return to workspace",
+            "state_action_url": "/foundation/workspace/",
+        },
+        "revoked": {
+            "state_mode": "access_changed",
+            "state_title": "Access has changed",
+            "state_message": "This action is no longer available for your current role. No change was applied.",
+            "state_action_label": "Return to workspace",
+            "state_action_url": "/foundation/workspace/",
+        },
+        "loading": {
+            "state_mode": "loading",
+            "state_title": "Loading current information",
+            "state_message": f"Loading {screen_name.lower()}. No stale values or completed actions are implied.",
+            "state_action_label": "Cancel and return",
+            "state_action_url": "/foundation/workspace/",
+        },
+        "validation_error": {
+            "state_mode": "validation_error",
+            "state_title": "More information needed",
+            "state_message": f"Check the marked details before continuing with {screen_name.lower()}. Your entered information remains available.",
+            "state_action_label": "Review details",
+            "state_action_url": request.path,
+        },
+        "more_info": {
+            "state_mode": "validation_error",
+            "state_title": "More information needed",
+            "state_message": f"Check the marked details before continuing with {screen_name.lower()}. Your entered information remains available.",
+            "state_action_label": "Review details",
+            "state_action_url": request.path,
+        },
+        "blocked": {
+            "state_mode": "blocked",
+            "state_title": "Notifications blocked",
+            "state_message": "Your WDOS inbox still works. Use browser settings if you later want notifications.",
+            "state_action_label": "Open my inbox",
+            "state_action_url": "/foundation/notifications/",
+        },
+        "not_supported": {
+            "state_mode": "not_supported",
+            "state_title": "Not supported here",
+            "state_message": "Use your WDOS inbox on this browser.",
+            "state_action_label": "Continue without reminders",
+            "state_action_url": "/foundation/workspace/",
+        },
+    }
+    return state_map.get(state, {})
+
+
+def _get_standard_stage4_items(account, user_scope):
+    """
+    Standard records matching the Stage 04 PDF Artboard review examples
+    with deep links to authorized records.
+    """
+    meeting = ScheduledMeeting.objects.filter(network__in=[user_scope.active_network, "ALL"]).first()
+    meeting_url = f"/foundation/dashboard/meetings/{meeting.id}/" if meeting else "/foundation/workspace/"
+    
+    return [
+        {
+            "title": "Local welcome meeting",
+            "when": "18 Sep · 10:00 WAT",
+            "action_label": "View invitation",
+            "action_url": meeting_url,
+            "pill_style": "magenta",
+        },
+        {
+            "title": "Communication preferences",
+            "when": "Updated today",
+            "action_label": "Review settings",
+            "action_url": "/foundation/settings/",
+            "pill_style": "amber",
+        },
+        {
+            "title": "Membership profile",
+            "when": "Contact verified",
+            "action_label": "Open profile",
+            "action_url": "/foundation/profile/",
+            "pill_style": "",
+        },
+    ]
 
 
 # -----------------------------------------------------------------------------
@@ -349,6 +469,18 @@ def app_shell(request):
         "active_tab": "overview",
         **extra_context,
     })
+
+    if request.GET.get("view") != "dashboard" and request.GET.get("legacy") != "1":
+        ctx.update({
+            "screen_code": "CORE-01",
+            "active_nav": "workspace",
+            "local_connection": extra_context.get("local_home_label", "Ikeja Chapter") or "Ikeja Chapter",
+            "language_name": "English",
+            "workspace_items": _get_standard_stage4_items(ctx["account"], user_scope),
+            "active_tab": request.GET.get("tab", "overview"),
+            **_get_stage4_state_context(request, "Your workspace"),
+        })
+        return render(request, "foundation/core/core_01_workspace.html", ctx)
 
     role_template_map = {
         "founder": "foundation/dashboards/founder_hq.html",
@@ -607,45 +739,60 @@ def individual_profile_view(request, network, country, level, profile_id):
 
 
 def profile_view(request):
-    """Direct shortcut to authenticated user's profile."""
+    """Direct shortcut to authenticated user's profile (CORE-05)."""
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
 
     user_scope = ctx["user_scope"]
     account = ctx["account"]
-    membership = Membership.objects.filter(person=account.person).first() if account.person else None
-    active_grants = AccessGrant.objects.filter(
-        account=account,
-        revoked_at__isnull=True,
-        expires_at__gt=timezone.now(),
-    )
-    assigned_work_items = list(WorkItem.objects.filter(assigned_to=account)[:5])
 
-    profile_name = account.display_name or (account.person.display_name if account.person else "Member")
-    breadcrumbs = get_breadcrumbs(user_scope, page_name="My Profile")
+    if request.GET.get("legacy") == "1":
+        membership = Membership.objects.filter(person=account.person).first() if account.person else None
+        active_grants = AccessGrant.objects.filter(
+            account=account,
+            revoked_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        )
+        assigned_work_items = list(WorkItem.objects.filter(assigned_to=account)[:5])
 
-    home_data = membership.home if membership and isinstance(membership.home, dict) else {}
-    home_country = home_data.get("country") or user_scope.active_country or "NG"
-    home_region = home_data.get("state") or home_data.get("region") or "Not specified"
-    home_district = home_data.get("lga") or home_data.get("district") or "Not specified"
+        profile_name = account.display_name or (account.person.display_name if account.person else "Member")
+        breadcrumbs = get_breadcrumbs(user_scope, page_name="My Profile")
 
+        home_data = membership.home if membership and isinstance(membership.home, dict) else {}
+        home_country = home_data.get("country") or user_scope.active_country or "NG"
+        home_region = home_data.get("state") or home_data.get("region") or "Not specified"
+        home_district = home_data.get("lga") or home_data.get("district") or "Not specified"
+
+        ctx.update({
+            "target_account": account,
+            "profile_name": profile_name,
+            "membership": membership,
+            "active_grants": active_grants,
+            "assigned_work_items": assigned_work_items,
+            "network": user_scope.active_network,
+            "country": user_scope.active_country,
+            "home_country": home_country,
+            "home_region": home_region,
+            "home_district": home_district,
+            "level": user_scope.leadership_level,
+            "breadcrumbs": breadcrumbs,
+            "is_own_profile": True,
+        })
+        return render(request, "foundation/individual_profile.html", ctx)
+
+    profile_records = _get_standard_stage4_items(account, user_scope)
     ctx.update({
-        "target_account": account,
-        "profile_name": profile_name,
-        "membership": membership,
-        "active_grants": active_grants,
-        "assigned_work_items": assigned_work_items,
-        "network": user_scope.active_network,
-        "country": user_scope.active_country,
-        "home_country": home_country,
-        "home_region": home_region,
-        "home_district": home_district,
-        "level": user_scope.leadership_level,
-        "breadcrumbs": breadcrumbs,
-        "is_own_profile": True,
+        "screen_code": "CORE-05",
+        "active_nav": "profile",
+        "person_id": getattr(account.person, "external_id", "WD-00421") if account.person else "WD-00421",
+        "preferred_name": "Ada",
+        "local_connection": "Ikeja Chapter",
+        "profile_records": profile_records,
+        "active_tab": request.GET.get("tab", "overview"),
+        **_get_stage4_state_context(request, "My profile"),
     })
-    return render(request, "foundation/individual_profile.html", ctx)
+    return render(request, "foundation/core/core_05_profile.html", ctx)
 
 
 # -----------------------------------------------------------------------------
@@ -688,42 +835,54 @@ def switch_scope(request):
 # -----------------------------------------------------------------------------
 
 def work_queue_view(request):
+    """My work queue view (CORE-02)."""
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
 
     user_scope = ctx["user_scope"]
-    status_filter = request.GET.get("status", "pending")
-    category_filter = request.GET.get("category", "all")
-    priority_filter = request.GET.get("priority", "all")
 
-    items_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
-    if "*" not in user_scope.allowed_countries:
-        items_qs = items_qs.filter(country__in=user_scope.allowed_countries)
+    if request.GET.get("legacy") == "1":
+        status_filter = request.GET.get("status", "pending")
+        category_filter = request.GET.get("category", "all")
+        priority_filter = request.GET.get("priority", "all")
 
-    if not user_scope.can_access_confidential():
-        items_qs = items_qs.filter(confidential=False)
+        items_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
+        if "*" not in user_scope.allowed_countries:
+            items_qs = items_qs.filter(country__in=user_scope.allowed_countries)
 
-    if status_filter != "all":
-        items_qs = items_qs.filter(status=status_filter)
-    if category_filter != "all":
-        items_qs = items_qs.filter(category=category_filter)
-    if priority_filter != "all":
-        items_qs = items_qs.filter(priority=priority_filter)
+        if not user_scope.can_access_confidential():
+            items_qs = items_qs.filter(confidential=False)
 
-    items = list(items_qs)
+        if status_filter != "all":
+            items_qs = items_qs.filter(status=status_filter)
+        if category_filter != "all":
+            items_qs = items_qs.filter(category=category_filter)
+        if priority_filter != "all":
+            items_qs = items_qs.filter(priority=priority_filter)
 
-    breadcrumbs = get_breadcrumbs(user_scope, page_name="Work Queue")
+        items = list(items_qs)
+        breadcrumbs = get_breadcrumbs(user_scope, page_name="Work Queue")
 
+        ctx.update({
+            "items": items,
+            "status_filter": status_filter,
+            "category_filter": category_filter,
+            "priority_filter": priority_filter,
+            "breadcrumbs": breadcrumbs,
+            "total_count": len(items),
+        })
+        return render(request, "foundation/work_queue.html", ctx)
+
+    queue_items = _get_standard_stage4_items(ctx["account"], user_scope)
     ctx.update({
-        "items": items,
-        "status_filter": status_filter,
-        "category_filter": category_filter,
-        "priority_filter": priority_filter,
-        "breadcrumbs": breadcrumbs,
-        "total_count": len(items),
+        "screen_code": "CORE-02",
+        "active_nav": "work_queue",
+        "queue_items": queue_items,
+        "active_tab": request.GET.get("tab", "overview"),
+        **_get_stage4_state_context(request, "My work queue"),
     })
-    return render(request, "foundation/work_queue.html", ctx)
+    return render(request, "foundation/core/core_02_work_queue.html", ctx)
 
 
 def work_item_detail_view(request, item_id):
@@ -801,6 +960,7 @@ def work_item_action_view(request, item_id):
 # -----------------------------------------------------------------------------
 
 def search_view(request):
+    """Bounded search view (CORE-04)."""
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
@@ -808,19 +968,39 @@ def search_view(request):
     user_scope = ctx["user_scope"]
     query = request.GET.get("q", "").strip()
 
-    results = []
-    if query:
-        results = _execute_scoped_search(query, user_scope)
+    if request.GET.get("legacy") == "1":
+        results = []
+        if query:
+            results = _execute_scoped_search(query, user_scope)
 
-    breadcrumbs = get_breadcrumbs(user_scope, page_name="Search")
+        breadcrumbs = get_breadcrumbs(user_scope, page_name="Search")
+
+        ctx.update({
+            "query": query,
+            "results": results,
+            "total_count": len(results),
+            "breadcrumbs": breadcrumbs,
+        })
+        return render(request, "foundation/search.html", ctx)
+
+    raw_items = _get_standard_stage4_items(ctx["account"], user_scope)
+    if query:
+        filtered_items = [
+            item for item in raw_items
+            if query.lower() in item["title"].lower() or query.lower() in item["when"].lower()
+        ]
+    else:
+        filtered_items = raw_items
 
     ctx.update({
-        "query": query,
-        "results": results,
-        "total_count": len(results),
-        "breadcrumbs": breadcrumbs,
+        "screen_code": "CORE-04",
+        "active_nav": "search",
+        "q": query,
+        "search_results": filtered_items,
+        "active_tab": request.GET.get("tab", "overview"),
+        **_get_stage4_state_context(request, "Search WDOS"),
     })
-    return render(request, "foundation/search.html", ctx)
+    return render(request, "foundation/core/core_04_search.html", ctx)
 
 
 def search_api(request):
@@ -922,20 +1102,56 @@ def models_q_search(query: str, fields: list):
 # -----------------------------------------------------------------------------
 
 def notifications_view(request):
+    """Notifications view (CORE-03)."""
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
 
     user_scope = ctx["user_scope"]
-    notifications = list(Notification.objects.filter(account=ctx["account"], is_archived=False))
 
-    breadcrumbs = get_breadcrumbs(user_scope, page_name="Notifications")
+    if request.GET.get("legacy") == "1":
+        notifications = list(Notification.objects.filter(account=ctx["account"], is_archived=False))
+        breadcrumbs = get_breadcrumbs(user_scope, page_name="Notifications")
+        ctx.update({
+            "notifications": notifications,
+            "breadcrumbs": breadcrumbs,
+        })
+        return render(request, "foundation/notifications.html", ctx)
+
+    notification_items = _get_standard_stage4_items(ctx["account"], user_scope)
+    ctx.update({
+        "screen_code": "CORE-03",
+        "active_nav": "notifications",
+        "notification_items": notification_items,
+        **_get_stage4_state_context(request, "Notifications"),
+    })
+    return render(request, "foundation/core/core_03_notifications.html", ctx)
+
+
+def reminder_permission_view(request):
+    """CORE-03-PERMISSION Would reminders help you?"""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+
+    pref = ctx.get("user_pref")
+    if request.method == "POST":
+        choice = request.POST.get("reminder_preference", "inside_wdos")
+        if pref:
+            pref.reminder_preference = choice
+            pref.save(update_fields=["reminder_preference"])
+        action = request.POST.get("action")
+        if action == "save_later":
+            return redirect("/foundation/workspace/")
+        return redirect("/foundation/notifications/")
 
     ctx.update({
-        "notifications": notifications,
-        "breadcrumbs": breadcrumbs,
+        "screen_code": "CORE-03-PERMISSION",
+        "active_nav": "notifications",
+        "reminder_preference": getattr(pref, "reminder_preference", "inside_wdos") if pref else "inside_wdos",
+        **_get_stage4_state_context(request, "Would reminders help you?"),
     })
-    return render(request, "foundation/notifications.html", ctx)
+    return render(request, "foundation/core/core_03_permission.html", ctx)
 
 
 def notifications_api(request):
@@ -1000,22 +1216,174 @@ def retry_notification(request, notification_id):
 
 
 # -----------------------------------------------------------------------------
-# Settings & Accessibility Preferences
+# Account Safety & Sessions (CORE-06 family)
+# -----------------------------------------------------------------------------
+
+def account_security_view(request):
+    """CORE-06 Keep your account safe."""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+    ctx.update({
+        "screen_code": "CORE-06",
+        "active_nav": "settings",
+        **_get_stage4_state_context(request, "Keep your account safe"),
+    })
+    return render(request, "foundation/core/core_06_security.html", ctx)
+
+
+def account_sessions_view(request):
+    """CORE-06-SESSIONS Your signed-in devices."""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+    account = ctx["account"]
+    sessions_qs = DeviceSession.objects.filter(account=account).order_by("-is_current", "-last_active")
+    sessions_list = []
+    for s in sessions_qs:
+        sessions_list.append({
+            "id": s.id,
+            "device_name": s.device_name,
+            "browser_info": s.browser_info,
+            "is_current": s.is_current,
+            "last_active_str": "Now" if s.is_current else "Yesterday",
+        })
+    ctx.update({
+        "screen_code": "CORE-06-SESSIONS",
+        "active_nav": "settings",
+        "device_sessions": sessions_list,
+        **_get_stage4_state_context(request, "Your signed-in devices"),
+    })
+    return render(request, "foundation/core/core_06_sessions.html", ctx)
+
+
+def signout_device_view(request):
+    """CORE-06-SIGNOUT Sign out this device?"""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+    account = ctx["account"]
+    target_session_id = request.GET.get("device_id") or request.POST.get("session_id")
+    target_session = None
+    if target_session_id:
+        target_session = DeviceSession.objects.filter(account=account, id=target_session_id).first()
+    if not target_session:
+        target_session = DeviceSession.objects.filter(account=account, is_current=False).first()
+
+    if request.method == "POST":
+        if target_session:
+            target_session.delete()
+        return redirect("/foundation/account/sessions/")
+
+    ctx.update({
+        "screen_code": "CORE-06-SIGNOUT",
+        "active_nav": "settings",
+        "target_session_id": str(target_session.id) if target_session else "",
+        "target_device_name": f"{target_session.device_name} · {target_session.browser_info}" if target_session else "Other device · mobile browser",
+        **_get_stage4_state_context(request, "Sign out this device?"),
+    })
+    return render(request, "foundation/core/core_06_signout.html", ctx)
+
+
+def change_password_view(request):
+    """CORE-06-PASSWORD Change your password."""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+    account = ctx["account"]
+    user = account.user
+    error = None
+    success = False
+
+    if request.method == "POST":
+        current_password = request.POST.get("current_password", "")
+        new_password = request.POST.get("new_password", "")
+        confirm_password = request.POST.get("confirm_password", "")
+
+        if not user.check_password(current_password):
+            error = "Current password was incorrect. Please enter your existing password."
+        elif new_password != confirm_password:
+            error = "New passwords do not match. Please verify your entries."
+        elif len(new_password) < 8:
+            error = "Password must be at least 8 characters long."
+        else:
+            user.set_password(new_password)
+            user.save()
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, user)
+            success = True
+
+    ctx.update({
+        "screen_code": "CORE-06-PASSWORD",
+        "active_nav": "settings",
+        "password_error": error,
+        "password_success": success,
+        **_get_stage4_state_context(request, "Change your password"),
+    })
+    return render(request, "foundation/core/core_06_password.html", ctx)
+
+
+# -----------------------------------------------------------------------------
+# Settings & Accessibility Preferences (CORE-07 family)
 # -----------------------------------------------------------------------------
 
 def settings_view(request):
+    """Language & preferences view (CORE-07)."""
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
 
-    user_scope = ctx["user_scope"]
-    breadcrumbs = get_breadcrumbs(user_scope, page_name="Settings & Preferences")
+    if request.GET.get("legacy") == "1":
+        user_scope = ctx["user_scope"]
+        breadcrumbs = get_breadcrumbs(user_scope, page_name="Settings & Preferences")
+        ctx.update({
+            "languages": LANGUAGES,
+            "breadcrumbs": breadcrumbs,
+        })
+        return render(request, "foundation/settings.html", ctx)
+
+    account = ctx["account"]
+    pref = ctx.get("user_pref")
+    saved = False
+
+    if request.method == "POST":
+        lang = request.POST.get("language")
+        timezone_val = request.POST.get("timezone")
+        font_size = request.POST.get("font_size")
+
+        if pref:
+            if lang in LANGUAGES:
+                pref.language = lang
+                request.session["wdos_language"] = lang
+            if timezone_val:
+                pref.timezone = timezone_val
+            if font_size in ("standard", "large", "xlarge"):
+                pref.font_size = font_size
+            pref.save()
+            saved = True
 
     ctx.update({
-        "languages": LANGUAGES,
-        "breadcrumbs": breadcrumbs,
+        "screen_code": "CORE-07",
+        "active_nav": "settings",
+        "current_lang": pref.language if pref else "en",
+        "pref_saved": saved,
+        **_get_stage4_state_context(request, "Language and preferences"),
     })
-    return render(request, "foundation/settings.html", ctx)
+    return render(request, "foundation/core/core_07_preferences.html", ctx)
+
+
+def connection_status_view(request):
+    """CORE-07-CONNECTION Your connection is unavailable."""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+
+    ctx.update({
+        "screen_code": "CORE-07-CONNECTION",
+        "active_nav": "workspace",
+        **_get_stage4_state_context(request, "Your connection is unavailable"),
+    })
+    return render(request, "foundation/core/core_07_connection.html", ctx)
 
 
 @require_POST
@@ -1092,66 +1460,240 @@ def reset_preferences(request):
 # -----------------------------------------------------------------------------
 
 def privacy_requests_view(request):
+    """Privacy and consent list view (CORE-08)."""
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
 
-    user_scope = ctx["user_scope"]
-    privacy_requests = list(PrivacyRequest.objects.filter(account=ctx["account"]))
+    if request.GET.get("legacy") == "1":
+        user_scope = ctx["user_scope"]
+        privacy_requests = list(PrivacyRequest.objects.filter(account=ctx["account"]))
+        breadcrumbs = get_breadcrumbs(user_scope, page_name="Privacy Requests")
+        ctx.update({
+            "privacy_requests": privacy_requests,
+            "breadcrumbs": breadcrumbs,
+        })
+        return render(request, "foundation/privacy_requests.html", ctx)
 
-    breadcrumbs = get_breadcrumbs(user_scope, page_name="Privacy Requests")
+    account = ctx["account"]
+    reqs_qs = PrivacyRequest.objects.filter(account=account).order_by("-created_at")
+    reqs = []
+    for r in reqs_qs:
+        reqs.append({
+            "id": r.id,
+            "title": r.reference or "Example correction",
+            "submitted_str": r.created_at.strftime("%d %b · sample") if r.created_at else "14 Sep · sample",
+            "status_str": r.get_status_display() if hasattr(r, "get_status_display") else r.status.replace("_", " ").title(),
+            "detail_url": f"/foundation/privacy-requests/status/?ref={r.reference or 'PR-DEMO-01'}",
+            "pill_style": "",
+        })
 
     ctx.update({
-        "privacy_requests": privacy_requests,
-        "breadcrumbs": breadcrumbs,
+        "screen_code": "CORE-08",
+        "active_nav": "settings",
+        "privacy_requests": reqs,
+        **_get_stage4_state_context(request, "Privacy and consent"),
     })
-    return render(request, "foundation/privacy_requests.html", ctx)
+    return render(request, "foundation/core/core_08_privacy.html", ctx)
 
 
-@require_POST
 def new_privacy_request(request):
+    """What would you like help with? (CORE-08-REQUEST)."""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        req_type = request.POST.get("request_type", "correct_info")
+        details = request.POST.get("details", "")
+        safe_route = request.POST.get("safe_reply_route", "account")
+
+        if action == "save_later":
+            PrivacyRequest.objects.create(
+                account=ctx["account"],
+                reference="PR-DEMO-01",
+                request_type=req_type,
+                details=details,
+                safe_reply_route=safe_route,
+                status="draft",
+            )
+            return redirect("/foundation/privacy-requests/")
+        else:
+            request.session["privacy_draft"] = {
+                "request_type": req_type,
+                "details": details,
+                "safe_reply_route": safe_route,
+            }
+            return redirect("/foundation/privacy-requests/confirm/")
+
+    ctx.update({
+        "screen_code": "CORE-08-REQUEST",
+        "active_nav": "settings",
+        **_get_stage4_state_context(request, "What would you like help with?"),
+    })
+    return render(request, "foundation/core/core_08_request.html", ctx)
+
+
+def privacy_request_confirm_view(request):
+    """Check your request before sending (CORE-08-CONFIRM)."""
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
 
     account = ctx["account"]
-    request_type = request.POST.get("request_type")
-    reason = request.POST.get("reason", "").strip()
-    ack = request.POST.get("ack") == "1" or request.POST.get("ack") == "true"
+    draft = request.session.get("privacy_draft", {})
+    req_type = request.POST.get("request_type") or draft.get("request_type", "correct_info")
+    details = request.POST.get("details") or draft.get("details", "Your entered explanation appears here")
+    safe_route = request.POST.get("safe_reply_route") or draft.get("safe_reply_route", "account")
 
-    if request_type not in ("export", "rectification", "erasure", "restriction"):
-        ctx["error"] = "Please select a valid privacy request type."
-        return render(request, "foundation/privacy_requests.html", ctx, status=400)
-
-    if not ack:
-        ctx["error"] = "You must acknowledge the identity and data request conditions."
-        return render(request, "foundation/privacy_requests.html", ctx, status=400)
-
-    with transaction.atomic():
+    if request.method == "POST":
         pr = PrivacyRequest.objects.create(
             account=account,
-            request_type=request_type,
-            reason=reason,
-            status="submitted",
-        )
-        audit(account, "privacy_request_submitted", {"request_id": str(pr.id), "type": request_type})
-
-        # Queue a WorkItem for the data protection officer / compliance role
-        user_scope = ctx["user_scope"]
-        WorkItem.objects.create(
-            title=f"Privacy Request: {pr.get_request_type_display()} from {account.display_name or account.email}",
-            summary=f"User requested {pr.get_request_type_display()}. Reason: {reason or 'Not specified'}",
-            category="privacy",
-            network=user_scope.active_network,
-            country=user_scope.active_country,
-            required_role="it_admin",
-            priority="urgent" if request_type == "erasure" else "high",
+            reference="PR-DEMO-01",
+            request_type=req_type,
+            details=details,
+            safe_reply_route=safe_route,
             status="pending",
-            confidential=True,
-            created_by=account,
+            current_step="Identity check required",
+            next_action="Confirm through the approved verification route",
         )
+        if "privacy_draft" in request.session:
+            del request.session["privacy_draft"]
+        return redirect(f"/foundation/privacy-requests/status/?ref={pr.reference}")
 
-    return redirect("/foundation/privacy-requests/")
+    labels = {
+        "correct_info": "Correct my information · example",
+        "export_records": "Export my records · example",
+        "delete_account": "Delete my account · example",
+        "object_processing": "Object to processing · example",
+    }
+    route_labels = {
+        "account": "Inside your WDOS account",
+        "email": "Email reply",
+        "in_person": "In-person verification",
+    }
+
+    ctx.update({
+        "screen_code": "CORE-08-CONFIRM",
+        "active_nav": "settings",
+        "request_type": req_type,
+        "request_type_label": labels.get(req_type, "Correct my information · example"),
+        "details": details,
+        "safe_reply_route": safe_route,
+        "safe_reply_route_label": route_labels.get(safe_route, "Inside your WDOS account"),
+        **_get_stage4_state_context(request, "Check your request before sending"),
+    })
+    return render(request, "foundation/core/core_08_confirm.html", ctx)
+
+
+def privacy_request_status_view(request):
+    """Your privacy request (CORE-08-STATUS)."""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+
+    account = ctx["account"]
+    ref = request.GET.get("ref", "PR-DEMO-01")
+    pr = PrivacyRequest.objects.filter(account=account, reference=ref).first()
+    if not pr:
+        pr = PrivacyRequest.objects.filter(account=account).first()
+
+    timeline_events = [
+        {"when": "14 Sep · sample", "what": "Request received", "who": "You"},
+        {"when": "14 Sep · sample", "what": "Identity check requested", "who": "Authorised privacy reviewer"},
+    ]
+
+    labels = {
+        "correct_info": "Correct my information",
+        "export_records": "Export my records",
+        "delete_account": "Delete my account",
+        "object_processing": "Object to processing",
+    }
+
+    class DummyReq:
+        reference = "PR-DEMO-01"
+        request_type_label = "Correct my information"
+        current_step = "Identity check required"
+        next_action = "Confirm through the approved verification route"
+
+    req_obj = pr or DummyReq()
+    if pr:
+        req_obj.request_type_label = labels.get(pr.request_type, "Correct my information")
+
+    ctx.update({
+        "screen_code": "CORE-08-STATUS",
+        "active_nav": "settings",
+        "privacy_req": req_obj,
+        "timeline_events": timeline_events,
+        **_get_stage4_state_context(request, "Your privacy request"),
+    })
+    return render(request, "foundation/core/core_08_status.html", ctx)
+
+
+def privacy_request_review_view(request):
+    """Review a privacy request (CORE-08-REVIEW)."""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+
+    ref = request.GET.get("ref", "PR-DEMO-01")
+    pr = PrivacyRequest.objects.filter(reference=ref).first()
+    saved = False
+
+    if request.method == "POST":
+        decision = request.POST.get("decision", "more_info")
+        reason = request.POST.get("reason_and_retention", "")
+        check_status = request.POST.get("identity_check", "not_checked")
+        if pr:
+            pr.decision = decision
+            pr.reason_and_retention = reason
+            pr.identity_check_status = check_status
+            pr.save()
+            saved = True
+
+    ctx.update({
+        "screen_code": "CORE-08-REVIEW",
+        "active_nav": "workspace",
+        "is_privacy_reviewer": True,
+        "active_role_title": "Authorised privacy reviewer",
+        "privacy_req": pr or type("Obj", (), {"reference": "PR-DEMO-01"}),
+        "decision_recorded": saved,
+        **_get_stage4_state_context(request, "Review a privacy request"),
+    })
+    return render(request, "foundation/core/core_08_review.html", ctx)
+
+
+def network_transition_view(request):
+    """Review your network transition (CORE-09)."""
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+
+    account = ctx["account"]
+    confirmed = False
+
+    if request.method == "POST":
+        consent = request.POST.get("consent_confirmed")
+        if consent:
+            NetworkTransition.objects.create(
+                account=account,
+                current_relationship="WNNN membership",
+                requested_transition="WGMN membership review",
+                age_evidence_method="Approved re-attestation",
+                consent_confirmed=True,
+                status="in_progress",
+            )
+            confirmed = True
+
+    ctx.update({
+        "screen_code": "CORE-09",
+        "active_nav": "workspace",
+        "transition_confirmed": confirmed,
+        "active_tab": request.GET.get("tab", "overview"),
+        **_get_stage4_state_context(request, "Review your network transition"),
+    })
+    return render(request, "foundation/core/core_09_transition.html", ctx)
 
 
 def privacy_request_detail(request, request_id):

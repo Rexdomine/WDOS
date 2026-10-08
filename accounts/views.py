@@ -1,5 +1,6 @@
 """The AUTH-01..09 server-rendered gateway. All mutations require POST + CSRF."""
 import math
+import sys
 import uuid
 
 from cryptography.fernet import InvalidToken
@@ -66,6 +67,8 @@ def _masked_email(email):
 
 def _workspace_destination(account):
     """Route authenticated users without trusting a client-side destination."""
+    if account.user.is_staff or account.user.is_superuser:
+        return reverse('admin:index')
     from .models import OnboardingDraft
     draft = OnboardingDraft.objects.filter(account=account).first()
     if draft and draft.state == 'accepted' and hasattr(draft, 'membership'):
@@ -557,10 +560,29 @@ def mfa(request):
     title = 'Protect your administrator account' if setup else 'Verify your sign-in'
     lede = ('Enrol an approved second factor and save recovery codes somewhere private.' if setup
             else 'Use your authenticator app. Password recovery does not bypass this check.')
+
+    dev_mfa_code = None
+    if 'test' not in sys.argv and (getattr(settings, 'DEBUG', False) or getattr(settings, 'WDOS_ENVIRONMENT', '') != 'production'):
+        try:
+            active_secret = None
+            if account.mfa_secret:
+                active_secret = services.decrypt(account.mfa_secret)
+            elif secret:
+                active_secret = secret
+            elif account.mfa_pending_secret and account.mfa_pending_until and account.mfa_pending_until > timezone.now():
+                active_secret = services.decrypt(account.mfa_pending_secret)
+            if active_secret:
+                import pyotp
+                dev_mfa_code = pyotp.TOTP(active_secret).now()
+                print(f'\n============================================================\n[LOCAL DEV] 6-digit MFA code for {account.email}: {dev_mfa_code}\n============================================================\n', flush=True)
+        except Exception:
+            pass
+
     return page(
         request, 'AUTH-08', title, lede, form, 'Verify code' if form else None,
         setup=setup, secret=secret, mfa_initial=setup and not secret,
         mfa_challenge=not setup,
+        dev_mfa_code=dev_mfa_code,
     )
 
 

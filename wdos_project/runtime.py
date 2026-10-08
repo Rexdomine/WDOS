@@ -43,8 +43,11 @@ def main():
         if not settings.SESSION_COOKIE_SECURE or settings.DEBUG:
             raise RuntimeError('Deployment requires secure cookies and DEBUG disabled.')
     # Database upgrade and roles finish before either long-running process starts.
-    for command in [['migrate','--noinput'],['seed_roles']]:
-        subprocess.run([sys.executable,'manage.py',*command],check=True)
+    startup_commands = [['migrate', '--noinput'], ['seed_roles']]
+    if os.getenv('WDOS_ENVIRONMENT') != 'production' and os.getenv('WDOS_SETUP_ADMIN') == '1':
+        startup_commands.append(['setup_admin'])
+    for command in startup_commands:
+        subprocess.run([sys.executable, 'manage.py', *command], check=True)
     stop=threading.Event()
     for sig in (signal.SIGTERM,signal.SIGINT):
         signal.signal(sig,lambda *_:stop.set())

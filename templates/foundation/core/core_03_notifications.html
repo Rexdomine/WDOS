@@ -58,13 +58,25 @@
     </thead>
     <tbody>
       {% for item in notification_items %}
-      <tr class="{% if not item.is_read %}stage4-row-unread{% endif %}">
-        <td style="font-weight:600; color:var(--wdos-ink);">{{ item.title }}</td>
+      <tr class="{% if not item.is_read and not item.read %}stage4-row-unread{% endif %}">
+        <td style="font-weight:600; color:var(--wdos-ink);">
+          {{ item.title }}
+          {% if item.delivery_label %}<br><small style="color:var(--wdos-danger, #b91c1c); font-size:11px;">{{ item.delivery_label }}</small>{% endif %}
+        </td>
         <td style="color:var(--wdos-muted);">{{ item.when }}</td>
         <td>
+          {% if item.is_form %}
+          <form method="post" action="{{ item.action_url }}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="action-pill {{ item.pill_style|default:'' }}" style="border:none; cursor:pointer; font-family:inherit; font-size:inherit;">
+              <span class="dot"></span> {{ item.action_label }}
+            </button>
+          </form>
+          {% else %}
           <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
             <span class="dot"></span> {{ item.action_label }}
           </a>
+          {% endif %}
         </td>
       </tr>
       {% empty %}

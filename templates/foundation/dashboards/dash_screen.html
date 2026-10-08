@@ -1,0 +1,284 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}{{ screen.title }} · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head with Eyebrow, Title, Subtitle, and Actions -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow }}</div>
+      <h1 class="dash-title">{{ screen.title }}</h1>
+      <p class="dash-subtitle">{{ screen.subtitle }}</p>
+    </div>
+    <div class="dash-actions">
+      {% if screen.secondary_action %}
+      <a href="{{ screen.secondary_action.url }}" class="dash-btn-secondary">{{ screen.secondary_action.label }}</a>
+      {% endif %}
+      {% if screen.primary_action %}
+      <a href="{{ screen.primary_action.url }}" class="dash-btn-primary">{{ screen.primary_action.label }}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card (when ?state= is requested) -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <!-- Tabs Navigation (if enabled) -->
+  {% if screen.has_tabs %}
+  <div class="dash-tabs" role="tablist">
+    <a href="?tab=overview{% if state_mode %}&state={{ state_mode }}{% endif %}" class="dash-tab {% if active_tab == 'overview' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'overview' %}true{% else %}false{% endif %}">Overview</a>
+    <a href="?tab=my_work{% if state_mode %}&state={{ state_mode }}{% endif %}" class="dash-tab {% if active_tab == 'my_work' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'my_work' %}true{% else %}false{% endif %}">My work</a>
+    <a href="?tab=history{% if state_mode %}&state={{ state_mode }}{% endif %}" class="dash-tab {% if active_tab == 'history' %}active{% endif %}" role="tab" aria-selected="{% if active_tab == 'history' %}true{% else %}false{% endif %}">History</a>
+  </div>
+  {% endif %}
+
+  <!-- Hero Next Step Banner (DASH-14, 15, 16, 17) -->
+  {% if screen.hero_banner %}
+  <div class="dash-hero-banner" role="region" aria-label="Next Step Priority">
+    <div class="dash-hero-waves" aria-hidden="true">
+      <svg viewBox="0 0 320 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="260" cy="110" r="80" stroke="#7E547E" stroke-width="32" opacity="0.45" />
+        <circle cx="260" cy="110" r="140" stroke="#7E547E" stroke-width="28" opacity="0.3" />
+        <circle cx="260" cy="110" r="200" stroke="#7E547E" stroke-width="24" opacity="0.18" />
+      </svg>
+    </div>
+    <div class="dash-hero-content">
+      <div class="dash-hero-eyebrow">{{ screen.hero_banner.eyebrow }}</div>
+      <h2 class="dash-hero-title">{{ screen.hero_banner.title }}</h2>
+      <p class="dash-hero-text">{{ screen.hero_banner.text }}</p>
+      <a href="{{ screen.hero_banner.button_url }}" class="dash-hero-btn">{{ screen.hero_banner.button_label }}</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 3-Column KPI Stat Cards -->
+  {% if kpi_cards %}
+  <div class="dash-kpis-grid" role="region" aria-label="Key Performance Indicators">
+    {% for card in kpi_cards %}
+    <div class="dash-kpi-card {% if card.is_dark %}dark{% endif %}">
+      <div class="dash-kpi-label">{{ card.label }}</div>
+      <div class="dash-kpi-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      </div>
+      <div>
+        <div class="dash-kpi-val">{{ card.value }}</div>
+        <p class="dash-kpi-sub">{{ card.sub }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Search and Filter Bar (Subviews like DASH-10-*) -->
+  {% if screen.has_search_filter %}
+  <div class="dash-toolbar">
+    <div class="dash-search-box">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Search these records" aria-label="Search records in this view">
+    </div>
+    <div class="dash-filter-actions">
+      <span class="dash-filter-pill-active">Current view</span>
+      <button type="button" class="dash-filter-pill">Status ↓</button>
+      <button type="button" class="dash-filter-pill">More filters</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 2-Column / 1-Column Layout -->
+  <div class="dash-layout {% if not screen.attention_card %}full-width{% endif %}">
+    <div class="dash-main-col">
+      <!-- Data Table Card -->
+      {% if screen.table_card %}
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h2 class="dash-card-title">{{ screen.table_card.title }}</h2>
+          {% if screen.table_card.view_all_label %}
+          <a href="{{ screen.table_card.view_all_url }}" class="dash-card-action">{{ screen.table_card.view_all_label }}</a>
+          {% endif %}
+        </div>
+
+        <!-- Desktop Table -->
+        <table class="dash-table dash-desktop-table">
+          <thead>
+            <tr>
+              {% for col in screen.table_card.columns %}
+              <th scope="col">{{ col }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in screen.table_card.rows %}
+            <tr>
+              <td class="item-col">
+                <a href="{{ row.url|default:'/foundation/work-queue/' }}" class="item-link">{{ row.item }}</a>
+              </td>
+              <td>{{ row.col2 }}</td>
+              {% if row.col3 %}
+              <td>{{ row.col3 }}</td>
+              {% endif %}
+              <td>
+                <a href="{{ row.url|default:'/foundation/work-queue/' }}" class="dash-pill dash-pill-{{ row.status_style|default:'amber' }}">
+                  <span class="dot"></span> {{ row.status_label }}
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{{ screen.table_card.columns|length }}" style="text-align: center; padding: 28px; color: var(--wdos-muted);">
+                There are no matching records in this scope.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <!-- Mobile Stacked Card View -->
+        <div class="dash-mobile-list">
+          {% for row in screen.table_card.rows %}
+          <div class="dash-mobile-item">
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">{{ screen.table_card.columns.0 }}</span>
+              <span class="dash-mobile-val">
+                <a href="{{ row.url|default:'/foundation/work-queue/' }}" class="item-link" style="color:var(--wdos-ink);">{{ row.item }}</a>
+              </span>
+            </div>
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">{{ screen.table_card.columns.1 }}</span>
+              <span class="dash-mobile-val" style="font-weight:400; color:#4B5563;">{{ row.col2 }}</span>
+            </div>
+            {% if row.col3 %}
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">{{ screen.table_card.columns.2 }}</span>
+              <span class="dash-mobile-val" style="font-weight:400; color:#4B5563;">{{ row.col3 }}</span>
+            </div>
+            {% endif %}
+            <div class="dash-mobile-row" style="margin-top: 8px;">
+              <span class="dash-mobile-label">{{ screen.table_card.columns|last }}</span>
+              <span class="dash-mobile-val">
+                <a href="{{ row.url|default:'/foundation/work-queue/' }}" class="dash-pill dash-pill-{{ row.status_style|default:'amber' }}">
+                  <span class="dot"></span> {{ row.status_label }}
+                </a>
+              </span>
+            </div>
+          </div>
+          {% empty %}
+          <p style="text-align:center; padding:20px; color:var(--wdos-muted);">There are no matching records in this scope.</p>
+          {% endfor %}
+        </div>
+
+        <!-- Table Footer / Count & Pagination -->
+        <div class="dash-table-foot">
+          <span>Showing {{ screen.table_card.rows|length }} records in this view</span>
+          <div class="dash-pagination">
+            <button type="button" class="dash-pagination-btn" aria-label="Previous page">←</button>
+            <span>1</span>
+            <button type="button" class="dash-pagination-btn" aria-label="Next page">→</button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Chart Card (e.g. DASH-01, DASH-10) -->
+      {% if screen.chart_card %}
+      <div class="dash-chart-card">
+        <div class="dash-card-header">
+          <h2 class="dash-card-title">{{ screen.chart_card.title }}</h2>
+          <span class="dash-chart-sub">{{ screen.chart_card.sub }}</span>
+        </div>
+        <div class="dash-chart-bars" role="img" aria-label="{{ screen.chart_card.title }} chart">
+          {% for bar in screen.chart_card.bars %}
+          <div class="dash-bar-col">
+            <div class="dash-bar-val">{{ bar.value }}</div>
+            <div class="dash-bar {{ bar.color }}" style="height: calc({{ bar.value }} * 18px); min-height: 24px;"></div>
+            <div class="dash-bar-lbl">{{ bar.label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right Side Column (Attention required card) -->
+    {% if screen.attention_card %}
+    <div class="dash-side-col">
+      <div class="dash-attention-card">
+        <h2 class="dash-card-title" style="margin-bottom: 18px;">{{ screen.attention_card.title }}</h2>
+        {% for item in screen.attention_card.items %}
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">{{ item.title }}</h3>
+            <p class="dash-attention-text">{{ item.text }}</p>
+            {% if item.tag %}
+            <div class="dash-attention-tag">{{ item.tag }}</div>
+            {% endif %}
+            {% if item.link_label %}
+            <a href="{{ item.link_url|default:'/foundation/work-queue/' }}" class="dash-card-action" style="font-size:12px;">{{ item.link_label }} →</a>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Scoped Notice Banner -->
+  {% if screen.scoped_notice %}
+  <div class="dash-scoped-notice">
+    <div class="dash-scoped-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+    </div>
+    <span>{{ screen.scoped_notice }}</span>
+  </div>
+  {% endif %}
+
+  <!-- State Contract Dark Banner (only in state artboard mode) -->
+  {% if state_mode %}
+  <div class="dash-contract-banner">
+    <div class="dash-contract-tag">FUTURE FULL-STACK IMPLEMENTATION CONTRACT</div>
+    <p class="dash-contract-body">Future implementation contract: enforce server-owned permissions, scope, expiry, audit, and idempotent transitions before rendering this surface.</p>
+  </div>
+  <p class="dash-contract-note">States are component artboards, not additional routes. Buttons and examples in this PDF are visual proposals, not live system actions. Final policy values remain subject to approval.</p>
+  {% endif %}
+
+  <!-- Related Screens Accordion -->
+  {% if related_screens %}
+  <details class="dash-accordion" style="margin-bottom: 20px;">
+    <summary class="dash-accordion-btn">＋ Related screens · design preview</summary>
+    <div class="dash-related-grid">
+      {% for rel in related_screens %}
+      <a href="/foundation/dashboards/{{ rel|lower }}/" class="dash-related-link">
+        <span>→</span> {{ rel }}
+      </a>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+
+  <!-- Need Help Support Note -->
+  <div class="dash-support-note">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>{{ screen.support_note|default:"Need help? Ask your support team. Never share your password or verification codes." }}</span>
+  </div>
+
+  <!-- Page Artboard Footer -->
+  <footer class="dash-footer">
+    <span>WODDI · No Woman Is Left Out</span>
+    <span>{{ screen.screen_id }} · UI review v2 · Sample data</span>
+  </footer>
+</div>
+{% endblock %}

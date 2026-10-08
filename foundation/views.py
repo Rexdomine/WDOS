@@ -43,6 +43,13 @@ from .scope import (
     get_user_preferences,
     get_user_scope,
 )
+from .dashboard_engine import (
+    build_dashboard_context,
+    check_dashboard_permission,
+    get_dashboard_screen,
+    get_default_screen_for_role,
+    DASHBOARD_SCREENS,
+)
 
 
 def health(request):
@@ -470,7 +477,7 @@ def app_shell(request):
         **extra_context,
     })
 
-    if request.GET.get("view") != "dashboard" and request.GET.get("legacy") != "1":
+    if not request.GET.get("role") and request.GET.get("view") != "dashboard" and request.GET.get("legacy") != "1":
         ctx.update({
             "screen_code": "CORE-01",
             "active_nav": "workspace",
@@ -841,29 +848,28 @@ def work_queue_view(request):
         return redirect_response
 
     user_scope = ctx["user_scope"]
+    status_filter = request.GET.get("status", "all")
+    category_filter = request.GET.get("category", "all")
+    priority_filter = request.GET.get("priority", "all")
+
+    items_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
+    if "*" not in user_scope.allowed_countries:
+        items_qs = items_qs.filter(country__in=user_scope.allowed_countries)
+
+    if not user_scope.can_access_confidential():
+        items_qs = items_qs.filter(confidential=False)
+
+    if status_filter != "all":
+        items_qs = items_qs.filter(status=status_filter)
+    if category_filter != "all":
+        items_qs = items_qs.filter(category=category_filter)
+    if priority_filter != "all":
+        items_qs = items_qs.filter(priority=priority_filter)
+
+    items = list(items_qs)
 
     if request.GET.get("legacy") == "1":
-        status_filter = request.GET.get("status", "pending")
-        category_filter = request.GET.get("category", "all")
-        priority_filter = request.GET.get("priority", "all")
-
-        items_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
-        if "*" not in user_scope.allowed_countries:
-            items_qs = items_qs.filter(country__in=user_scope.allowed_countries)
-
-        if not user_scope.can_access_confidential():
-            items_qs = items_qs.filter(confidential=False)
-
-        if status_filter != "all":
-            items_qs = items_qs.filter(status=status_filter)
-        if category_filter != "all":
-            items_qs = items_qs.filter(category=category_filter)
-        if priority_filter != "all":
-            items_qs = items_qs.filter(priority=priority_filter)
-
-        items = list(items_qs)
         breadcrumbs = get_breadcrumbs(user_scope, page_name="Work Queue")
-
         ctx.update({
             "items": items,
             "status_filter": status_filter,
@@ -874,7 +880,19 @@ def work_queue_view(request):
         })
         return render(request, "foundation/work_queue.html", ctx)
 
-    queue_items = _get_standard_stage4_items(ctx["account"], user_scope)
+    if items:
+        queue_items = []
+        for wi in items:
+            queue_items.append({
+                "title": wi.title,
+                "when": wi.created_at.strftime("%d %b · %H:%M") if wi.created_at else "Recently",
+                "action_label": "View details",
+                "action_url": f"/foundation/work-queue/{wi.id}/",
+                "pill_style": "amber" if wi.status == "pending" else "magenta",
+            })
+    else:
+        queue_items = _get_standard_stage4_items(ctx["account"], user_scope) if not request.GET.get("status") else []
+
     ctx.update({
         "screen_code": "CORE-02",
         "active_nav": "work_queue",
@@ -983,14 +1001,19 @@ def search_view(request):
         })
         return render(request, "foundation/search.html", ctx)
 
-    raw_items = _get_standard_stage4_items(ctx["account"], user_scope)
     if query:
-        filtered_items = [
-            item for item in raw_items
-            if query.lower() in item["title"].lower() or query.lower() in item["when"].lower()
-        ]
+        scoped_res = _execute_scoped_search(query, user_scope)
+        filtered_items = []
+        for res in scoped_res:
+            filtered_items.append({
+                "title": res["title"],
+                "when": res.get("summary", ""),
+                "action_label": "Open ›",
+                "action_url": res["url"],
+                "pill_style": "magenta",
+            })
     else:
-        filtered_items = raw_items
+        filtered_items = _get_standard_stage4_items(ctx["account"], user_scope)
 
     ctx.update({
         "screen_code": "CORE-04",
@@ -1108,9 +1131,9 @@ def notifications_view(request):
         return redirect_response
 
     user_scope = ctx["user_scope"]
+    notifications = list(Notification.objects.filter(account=ctx["account"], is_archived=False))
 
     if request.GET.get("legacy") == "1":
-        notifications = list(Notification.objects.filter(account=ctx["account"], is_archived=False))
         breadcrumbs = get_breadcrumbs(user_scope, page_name="Notifications")
         ctx.update({
             "notifications": notifications,
@@ -1118,7 +1141,25 @@ def notifications_view(request):
         })
         return render(request, "foundation/notifications.html", ctx)
 
-    notification_items = _get_standard_stage4_items(ctx["account"], user_scope)
+    if notifications:
+        notification_items = []
+        for notif in notifications:
+            is_failed = notif.delivery_status == "failed"
+            action_label = "Retry Delivery" if is_failed else ("View invitation" if "meeting" in notif.title.lower() else "Open")
+            action_url = f"/foundation/api/notifications/{notif.id}/retry/" if is_failed else "/foundation/notifications/"
+            notification_items.append({
+                "title": notif.title,
+                "when": notif.created_at.strftime("%d %b · %H:%M") if notif.created_at else "Recently",
+                "action_label": action_label,
+                "action_url": action_url,
+                "pill_style": "danger" if is_failed else ("magenta" if "meeting" in notif.title.lower() else "amber"),
+                "delivery_label": "Delivery Failure" if is_failed else "",
+                "is_read": notif.is_read,
+                "is_form": is_failed,
+            })
+    else:
+        notification_items = _get_standard_stage4_items(ctx["account"], user_scope)
+
     ctx.update({
         "screen_code": "CORE-03",
         "active_nav": "notifications",
@@ -1506,10 +1547,32 @@ def new_privacy_request(request):
     if request.method == "POST":
         action = request.POST.get("action")
         req_type = request.POST.get("request_type", "correct_info")
-        details = request.POST.get("details", "")
+        details = request.POST.get("details", "") or request.POST.get("reason", "")
         safe_route = request.POST.get("safe_reply_route", "account")
+        ack = request.POST.get("ack")
 
-        if action == "save_later":
+        if ack == "1" or action == "submit_direct":
+            pr = PrivacyRequest.objects.create(
+                account=ctx["account"],
+                reference="PR-EXPORT-01" if req_type == "export" else "PR-DEMO-01",
+                request_type=req_type,
+                details=details,
+                safe_reply_route=safe_route,
+                status="submitted",
+            )
+            user_scope = ctx["user_scope"]
+            WorkItem.objects.create(
+                title=f"Privacy Request: {pr.get_request_type_display() if hasattr(pr, 'get_request_type_display') else req_type.title()}",
+                summary=details,
+                category="privacy",
+                network=user_scope.active_network,
+                country=user_scope.active_country if user_scope.active_country != "*" else "NG",
+                confidential=True,
+                status="pending",
+                created_by=ctx["account"],
+            )
+            return redirect("/foundation/privacy-requests/")
+        elif action == "save_later":
             PrivacyRequest.objects.create(
                 account=ctx["account"],
                 reference="PR-DEMO-01",
@@ -2105,4 +2168,61 @@ def dev_switch_user(request, role_or_alias):
     request.session["absolute_expiry"] = now + 43200
     request.session.modified = True
     return redirect("/foundation/")
+
+
+def dashboard_screen_view(request, screen_code=None):
+    """
+    Stage 05 Authorized Role Dashboard Controller (DASH-01 through DASH-17).
+    Renders authentic, server-scoped dashboard views matching the UI Review v2 Artboards.
+    Enforces server-authoritative role, country, and safeguarding access permissions.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    user_scope = ctx["user_scope"]
+    account = ctx["account"]
+
+    # Role resolution & session tracking
+    req_role = request.GET.get("role") or request.session.get("wdos_active_role") or user_scope.active_role
+    if req_role:
+        try:
+            assert_role_authorized(user_scope, req_role)
+            user_scope.active_role = req_role
+            request.session["wdos_active_role"] = req_role
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+
+    # Resolve screen code: from URL param, GET param, or user's active role default
+    resolved_code = screen_code or request.GET.get("screen")
+    if not resolved_code:
+        resolved_code = get_default_screen_for_role(user_scope.active_role)
+
+    norm_code = resolved_code.strip().upper()
+
+    # Enforce server-authoritative permission checks
+    try:
+        check_dashboard_permission(user_scope, norm_code)
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    # Build Stage 05 presentation context
+    dash_ctx = build_dashboard_context(
+        request,
+        norm_code,
+        user_scope,
+        account,
+        state_param=request.GET.get("state"),
+        tab_param=request.GET.get("tab"),
+    )
+
+    ctx.update(dash_ctx)
+    ctx["active_nav"] = "workspace"
+    ctx["breadcrumbs"] = [
+        {"label": "Workspace", "url": "/foundation/", "is_current": False},
+        {"label": "Role-specific dashboard reference screens", "url": None, "is_current": True},
+    ]
+
+    return render(request, "foundation/dashboards/dash_screen.html", ctx)
+
 

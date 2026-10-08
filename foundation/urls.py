@@ -11,6 +11,7 @@ from .views import (
     country_hub_view,
     dashboard_drilldown,
     dashboard_export,
+    dashboard_screen_view,
     dev_switch_user,
     health,
     individual_profile_view,
@@ -113,6 +114,9 @@ urlpatterns = [
     path("foundation/dashboard/meetings/<uuid:meeting_id>/rsvp/", meeting_rsvp, name="dashboard-meeting-rsvp"),
     path("foundation/dashboard/chapters/<uuid:chapter_id>/", chapter_detail_view, name="dashboard-chapter-detail"),
     path("foundation/dashboard/export/", dashboard_export, name="dashboard-export"),
+    # Stage 5 Authorized Role Dashboards (DASH-01 through DASH-17)
+    path("foundation/dashboards/<str:screen_code>/", dashboard_screen_view, name="dashboard-screen"),
+    path("foundation/dashboard/", dashboard_screen_view, name="dashboard-home"),
     path("foundation/dashboard/switch-role/", switch_role_view, name="dashboard-switch-role"),
     path("foundation/dev-switch/<str:role_or_alias>/", dev_switch_user, name="dev-switch-user"),
 ]

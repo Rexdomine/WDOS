@@ -170,8 +170,8 @@
     <div class="topbar">
       <!-- Scoped Breadcrumbs Trail -->
       <nav aria-label="Breadcrumb" class="scoped-breadcrumbs">
-        {% if custom_breadcrumbs %}
-          {% for crumb in custom_breadcrumbs %}
+        {% if custom_breadcrumbs or breadcrumbs %}
+          {% for crumb in custom_breadcrumbs|default:breadcrumbs %}
             {% if not forloop.first %}<span class="sep" aria-hidden="true">/</span>{% endif %}
             {% if crumb.is_current or not crumb.url %}
               <span class="current" aria-current="page">{{ crumb.label }}</span>

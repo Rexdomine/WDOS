@@ -43,18 +43,22 @@ body.reduce-motion *::after {
 
 /* Accessibility: Font Size Variants */
 body.font-size-large {
-  font-size: 16px !important;
+  font-size: 15px !important;
 }
-body.font-size-large h1 { font-size: 38px !important; }
-body.font-size-large h2 { font-size: 22px !important; }
-body.font-size-large .navitem { font-size: 15px !important; }
+body.font-size-large h1,
+body.font-size-large .pagehead h1 { font-size: 26px !important; }
+body.font-size-large h2,
+body.font-size-large .panelhead h2 { font-size: 19px !important; }
+body.font-size-large .navitem { font-size: 14px !important; }
 
 body.font-size-xlarge {
-  font-size: 18px !important;
+  font-size: 16px !important;
 }
-body.font-size-xlarge h1 { font-size: 42px !important; }
-body.font-size-xlarge h2 { font-size: 26px !important; }
-body.font-size-xlarge .navitem { font-size: 17px !important; }
+body.font-size-xlarge h1,
+body.font-size-xlarge .pagehead h1 { font-size: 28px !important; }
+body.font-size-xlarge h2,
+body.font-size-xlarge .panelhead h2 { font-size: 21px !important; }
+body.font-size-xlarge .navitem { font-size: 15px !important; }
 
 /* Breadcrumbs Styling */
 .scoped-breadcrumbs {
@@ -295,4 +299,469 @@ body.font-size-xlarge .navitem { font-size: 17px !important; }
   width: 20px;
   height: 20px;
   accent-color: var(--wdos-magenta);
+}
+
+/* ==========================================================================
+   WDOS Stage 4 Master Responsive Shell Architecture
+   ========================================================================== */
+
+/* Universal Layout & Resets */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body.foundation-shell {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  color: var(--wdos-ink);
+  background-color: var(--wdos-canvas);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Proportional Enterprise Typography Across All Pages */
+.foundation-shell h1,
+.foundation-shell .pagehead h1 {
+  font-family: Manrope, Inter, system-ui, -apple-system, sans-serif !important;
+  font-size: 23px !important;
+  font-weight: 750 !important;
+  letter-spacing: -0.4px !important;
+  line-height: 1.25 !important;
+  color: var(--wdos-ink) !important;
+  margin: 3px 0 6px 0 !important;
+}
+
+.foundation-shell h2,
+.foundation-shell .panelhead h2 {
+  font-family: Manrope, Inter, system-ui, -apple-system, sans-serif !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.2px !important;
+  line-height: 1.3 !important;
+  color: var(--wdos-ink) !important;
+  margin: 0 0 4px 0 !important;
+}
+
+.foundation-shell h3 {
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  margin: 0 0 4px 0 !important;
+}
+
+.foundation-shell .pagehead .eyebrow {
+  font-size: 10.5px !important;
+  font-weight: 750 !important;
+  letter-spacing: 1.2px !important;
+  text-transform: uppercase !important;
+  color: var(--wdos-magenta) !important;
+  margin-bottom: 4px !important;
+}
+
+.foundation-shell .pagehead p {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  color: var(--wdos-muted) !important;
+  margin: 4px 0 0 0 !important;
+  max-width: 680px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Desktop Shell (> 600px)
+   -------------------------------------------------------------------------- */
+@media (min-width: 601px) {
+  body.foundation-shell {
+    background-color: var(--wdos-canvas);
+    background-image: linear-gradient(to right, #FFFFFF 0px, #FFFFFF 232px, var(--wdos-line) 232px, var(--wdos-line) 233px, transparent 233px);
+    background-repeat: repeat-y;
+  }
+
+  [dir="rtl"].foundation-shell,
+  [dir="rtl"] body.foundation-shell,
+  html[dir="rtl"] body.foundation-shell {
+    background-image: linear-gradient(to left, #FFFFFF 0px, #FFFFFF 232px, var(--wdos-line) 232px, var(--wdos-line) 233px, transparent 233px);
+  }
+
+  .foundation-shell .sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 232px !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-height: 100vh !important;
+    background: #FFFFFF !important;
+    border-right: 1px solid var(--wdos-line) !important;
+    padding: 24px 16px !important;
+    z-index: 100 !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  [dir="rtl"] .foundation-shell .sidebar,
+  html[dir="rtl"] .foundation-shell .sidebar,
+  body[dir="rtl"].foundation-shell .sidebar {
+    left: auto !important;
+    right: 0 !important;
+    border-right: none !important;
+    border-left: 1px solid var(--wdos-line) !important;
+  }
+
+  .foundation-shell .mobile-head {
+    display: none !important;
+  }
+
+  .foundation-shell .mobile-nav {
+    display: none !important;
+  }
+
+  .foundation-shell .content {
+    margin-left: 232px !important;
+    margin-right: 0 !important;
+    width: calc(100% - 232px) !important;
+    max-width: calc(100% - 232px) !important;
+    padding: 28px 36px 48px !important;
+    min-height: 100vh !important;
+    box-sizing: border-box !important;
+  }
+
+  [dir="rtl"] .foundation-shell .content,
+  html[dir="rtl"] .foundation-shell .content,
+  body[dir="rtl"].foundation-shell .content {
+    margin-left: 0 !important;
+    margin-right: 232px !important;
+  }
+
+  .foundation-shell .topbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 20px !important;
+    min-height: 56px !important;
+    background: #FFFFFF !important;
+    border: 1px solid var(--wdos-line) !important;
+    border-radius: var(--wdos-radius) !important;
+    padding: 10px 20px !important;
+    margin-bottom: 28px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+  }
+
+  .foundation-shell .toptools {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Mobile & Tablet Shell (<= 600px)
+   -------------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  body.foundation-shell {
+    background-image: none !important;
+  }
+
+  .foundation-shell .sidebar {
+    display: none !important;
+  }
+
+  .foundation-shell .mobile-head {
+    display: flex !important;
+    position: sticky !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 58px !important;
+    background: #FFFFFF !important;
+    border-bottom: 1px solid var(--wdos-line) !important;
+    padding: 0 16px !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    z-index: 900 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  .foundation-shell .mobile-head .brand {
+    height: 32px !important;
+    width: auto !important;
+    margin: 0 !important;
+    object-fit: contain !important;
+  }
+
+  .foundation-shell .mobile-head .right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .foundation-shell .mobile-nav {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 60px !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(10px) !important;
+    border-top: 1px solid var(--wdos-line) !important;
+    z-index: 999 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  .foundation-shell .mobile-nav a {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    color: var(--wdos-muted) !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    padding: 6px 2px !important;
+    transition: color 0.15s ease !important;
+  }
+
+  .foundation-shell .mobile-nav a[aria-current="page"] {
+    color: var(--wdos-magenta) !important;
+    font-weight: 700 !important;
+  }
+
+  .foundation-shell .mobile-nav a span {
+    font-size: 17px !important;
+    line-height: 1 !important;
+  }
+
+  .foundation-shell .content {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 16px 16px 84px 16px !important;
+    box-sizing: border-box !important;
+    min-height: calc(100vh - 58px) !important;
+  }
+
+  /* In mobile topbar, only show breadcrumbs cleanly, hide redundant top tools */
+  .foundation-shell .topbar {
+    display: block !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 0 10px 0 !important;
+    margin-bottom: 12px !important;
+    box-shadow: none !important;
+    min-height: auto !important;
+  }
+
+  .foundation-shell .topbar .toptools {
+    display: none !important;
+  }
+
+  .foundation-shell .scoped-breadcrumbs {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 4px 6px !important;
+    font-size: 11.5px !important;
+    padding: 6px 10px !important;
+    background: #FFFFFF !important;
+    border: 1px solid var(--wdos-line) !important;
+    border-radius: 8px !important;
+  }
+
+  .foundation-shell .scoped-breadcrumbs .sep {
+    font-size: 10px !important;
+    opacity: 0.6 !important;
+  }
+
+  .foundation-shell .pagehead {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin-bottom: 18px !important;
+  }
+
+  .foundation-shell .pagehead h1 {
+    font-size: 20px !important;
+    letter-spacing: -0.4px !important;
+    line-height: 1.25 !important;
+    word-break: break-word !important;
+  }
+
+  .foundation-shell .pagehead p {
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    margin-top: 6px !important;
+  }
+
+  .foundation-shell .pagehead .actions {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 8px !important;
+    margin-top: 4px !important;
+    max-width: none !important;
+  }
+
+  .foundation-shell .pagehead .actions .btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .foundation-shell .role-selector-wrap {
+    width: 100% !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+  }
+
+  .foundation-shell .grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .foundation-shell .stats {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+    gap: 10px !important;
+    margin-bottom: 18px !important;
+  }
+
+  .foundation-shell .stat {
+    padding: 14px 12px !important;
+  }
+
+  .foundation-shell .stat-value {
+    font-size: 26px !important;
+  }
+
+  .foundation-shell .cards,
+  .foundation-shell .board,
+  .foundation-shell .card-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .foundation-shell .fields {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .foundation-shell .definition {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .foundation-shell .workspace-columns {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .foundation-shell .panel {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  .foundation-shell .hero-card {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 18px !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Small Mobile Devices (<= 480px)
+   -------------------------------------------------------------------------- */
+@media (max-width: 480px) {
+  .foundation-shell .content {
+    padding: 12px 12px 80px 12px !important;
+  }
+
+  .foundation-shell .stats {
+    grid-template-columns: 1fr !important;
+  }
+
+  .foundation-shell .pagehead h1 {
+    font-size: 18px !important;
+    letter-spacing: -0.3px !important;
+  }
+
+  .foundation-shell .tabs {
+    gap: 12px !important;
+    font-size: 12px !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 4px !important;
+  }
+
+  .foundation-shell .tab {
+    white-space: nowrap !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Tables & Overflows
+   -------------------------------------------------------------------------- */
+.records-table-wrap,
+.table-wrap,
+.table-responsive {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  border-radius: 8px !important;
+  margin: 12px 0 !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--wdos-line);
+}
+
+table.records-table,
+.records-table-wrap table {
+  width: 100% !important;
+  min-width: 540px !important;
+  border-collapse: collapse !important;
+}
+
+table.records-table th,
+table.records-table td,
+.records-table-wrap table th,
+.records-table-wrap table td {
+  padding: 10px 12px !important;
+  text-align: left !important;
+  font-size: 12.5px !important;
+  vertical-align: middle !important;
+}
+
+table.records-table th,
+.records-table-wrap table th {
+  background: #FAF9FB !important;
+  font-weight: 700 !important;
+  color: var(--wdos-muted) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+
+table.records-table td,
+.records-table-wrap table td {
+  border-bottom: 1px solid #F0EDF2 !important;
+}
+
+table.records-table tr:last-child td,
+.records-table-wrap table tr:last-child td {
+  border-bottom: none !important;
 }

@@ -31,6 +31,7 @@ from .views import (
     settings_view,
     switch_role_view,
     switch_scope,
+    dev_switch_user,
     work_item_action_view,
     work_item_detail_view,
     work_queue_view,
@@ -89,5 +90,6 @@ urlpatterns = [
     path("foundation/dashboard/chapters/<uuid:chapter_id>/", chapter_detail_view, name="dashboard-chapter-detail"),
     path("foundation/dashboard/export/", dashboard_export, name="dashboard-export"),
     path("foundation/dashboard/switch-role/", switch_role_view, name="dashboard-switch-role"),
+    path("foundation/dev-switch/<str:role_or_alias>/", dev_switch_user, name="dev-switch-user"),
 ]
 

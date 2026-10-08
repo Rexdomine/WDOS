@@ -106,6 +106,15 @@ html[dir=rtl] .field .searchable-select-search-wrap input.searchable-select-sear
     min-height: 100vh;
     min-height: 100dvh;
   }
+  body {
+    background-color: #f6f5f7;
+    background-image: linear-gradient(to right, #ffffff 0px, #ffffff 232px, #e8e4e8 232px, #e8e4e8 233px, transparent 233px);
+    background-repeat: repeat-y;
+  }
+  html[dir=rtl] body,
+  body[dir=rtl] {
+    background-image: linear-gradient(to left, #ffffff 0px, #ffffff 232px, #e8e4e8 232px, #e8e4e8 233px, transparent 233px);
+  }
   .sidebar {
     position: fixed !important;
     top: 0 !important;

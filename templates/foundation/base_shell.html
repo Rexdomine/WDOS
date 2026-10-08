@@ -93,11 +93,16 @@
   </aside>
 
   <!-- Mobile Top Header -->
-  <div class="mobile-head">
-    <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
+  <header class="mobile-head">
+    <a href="/foundation/" style="display:flex; align-items:center; text-decoration:none;">
+      <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
+    </a>
     <div class="right" style="display:flex; align-items:center; gap:10px;">
       <span class="scope-badge" style="font-size:10px;">{{ user_scope.active_network }}</span>
-      <a href="/foundation/notifications/" style="text-decoration:none; position:relative; color:inherit;">
+      <a href="/foundation/search/" style="text-decoration:none; color:inherit; display:flex; align-items:center;" aria-label="{{ translations.onb_search|default:'Search' }}">
+        <span class="icon" aria-hidden="true" style="font-size:16px;">⌕</span>
+      </a>
+      <a href="/foundation/notifications/" style="text-decoration:none; position:relative; color:inherit; display:flex; align-items:center;" aria-label="{{ translations.account_notifications|default:'Notifications' }}">
         <span class="icon" aria-hidden="true">♧</span>
         {% if unread_notifications_count > 0 %}
         <span style="position:absolute; top:-4px; right:-4px; background:var(--wdos-magenta); color:white; font-size:9px; border-radius:50%; width:14px; height:14px; display:flex; align-items:center; justify-content:center;">{{ unread_notifications_count }}</span>
@@ -116,7 +121,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </header>
 
   <!-- Mobile Bottom Navigation -->
   <nav class="mobile-nav" aria-label="Mobile Navigation">
@@ -185,7 +190,6 @@
     <footer>{{ translations.onb_footer|default:"WODDI Digital Operating System · Authenticated Session" }}</footer>
   </div>
 
-  <script src="{% static 'accounts/onboarding.js' %}"></script>
   <script src="{% static 'foundation/shell.js' %}"></script>
 </body>
 </html>

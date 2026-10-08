@@ -359,7 +359,7 @@ def app_shell(request):
         "field_lead": "foundation/dashboards/country_lead.html",
         "chapter_lead": "foundation/dashboards/chapter_lead.html",
         "chapter": "foundation/dashboards/chapter_lead.html",
-        "member": "foundation/app_shell.html",
+        "member": "foundation/dashboards/member.html",
         "candidate": "foundation/dashboards/candidate.html",
         "community": "foundation/dashboards/community.html",
     }
@@ -1516,4 +1516,51 @@ def switch_role_view(request):
 
     request.session["wdos_active_role"] = target_role
     return redirect(f"/foundation/?role={target_role}")
+
+
+def dev_switch_user(request, role_or_alias):
+    """
+    Development-only convenience route to quickly switch active test persona in a real browser.
+    Strictly disabled when settings.DEBUG is False.
+    """
+    if not settings.DEBUG and os.getenv("WDOS_ENVIRONMENT", "local") != "local":
+        raise Http404("Development route only.")
+
+    alias_map = {
+        "founder": "founder@example.org",
+        "hq": "founder@example.org",
+        "ops": "ops@example.org",
+        "operations": "ops@example.org",
+        "country_ng": "country.ng@example.org",
+        "country-ng": "country.ng@example.org",
+        "country_ke": "country.ke@example.org",
+        "country-ke": "country.ke@example.org",
+        "chapter_lagos": "chapter.lagos@example.org",
+        "chapter-lagos": "chapter.lagos@example.org",
+        "member": "member.ada@example.org",
+        "ada": "member.ada@example.org",
+        "member_ada": "member.ada@example.org",
+        "wgmn": "wgmn_member@example.org",
+        "wgmn_member": "wgmn_member@example.org",
+        "wnnn": "wnnn_member@example.org",
+        "wnnn_member": "wnnn_member@example.org",
+        "candidate": "candidate.john@example.org",
+        "john": "candidate.john@example.org",
+        "community": "community.amara@example.org",
+        "amara": "community.amara@example.org",
+    }
+    email = alias_map.get(role_or_alias.lower().strip(), role_or_alias.lower().strip())
+    account = Account.objects.select_related("user").filter(email=email).first()
+    if not account:
+        raise Http404(f"Test account '{role_or_alias}' not found.")
+
+    from django.contrib.auth import login as django_login
+    django_login(request, account.user, backend="django.contrib.auth.backends.ModelBackend")
+    request.session["security_version"] = account.security_version
+    request.session["mfa_verified"] = True
+    now = timezone.now().timestamp()
+    request.session["last_activity"] = now
+    request.session["absolute_expiry"] = now + 43200
+    request.session.modified = True
+    return redirect("/foundation/")
 

@@ -2848,11 +2848,11 @@ def switch_role_view(request):
 
 def dev_switch_user(request, role_or_alias):
     """
-    Development-only convenience route to quickly switch active test persona in a real browser.
-    Strictly disabled when settings.DEBUG is False.
+    Development & Staging convenience route to quickly switch active test persona in a real browser.
+    Strictly disabled when settings.DEBUG is False in production.
     """
-    if not settings.DEBUG and os.getenv("WDOS_ENVIRONMENT", "local") != "local":
-        raise Http404("Development route only.")
+    if not settings.DEBUG and os.getenv("WDOS_ENVIRONMENT", "local") == "production":
+        raise Http404("Development and Staging route only.")
 
     alias_map = {
         "founder": "founder@example.org",
@@ -2947,5 +2947,180 @@ def dashboard_screen_view(request, screen_code=None):
     ]
 
     return render(request, "foundation/dashboards/dash_screen.html", ctx)
+ 
+ 
+from django.views.decorators.csrf import csrf_exempt
+ 
+ 
+@csrf_exempt
+def test_approve_account_view(request, email=None):
+    """
+    Unauthenticated testing endpoint to activate and approve any registered user account
+    and their onboarding draft, granting immediate dashboard access without manual CLI commands.
+    Strictly disabled in production.
+    """
+    if not settings.DEBUG and os.getenv("WDOS_ENVIRONMENT", "local") == "production":
+        raise Http404("Test utility route only available in local and staging environments.")
+ 
+    from django.contrib.auth import get_user_model
+    from accounts.models import OnboardingConsent, OnboardingEvent
+ 
+    User = get_user_model()
+    target_email = email or request.POST.get("email") or request.GET.get("email")
+    auto_login = request.POST.get("auto_login") == "1" or request.GET.get("auto_login") == "1"
+ 
+    success_info = None
+    error_message = None
+ 
+    if target_email:
+        target_email = target_email.strip().lower()
+        account = Account.objects.filter(email__iexact=target_email).first()
+        if not account:
+            # Check if user exists but has no account record yet
+            user = User.objects.filter(email__iexact=target_email).first()
+            if not user:
+                user = User.objects.filter(username__iexact=target_email.split("@")[0]).first()
+            if user:
+                account = Account.objects.filter(user=user).first()
+                if not account:
+                    p = Person.objects.create(display_name=user.get_full_name() or user.username)
+                    account = Account.objects.create(
+                        user=user,
+                        email=target_email,
+                        display_name=user.get_full_name() or user.username,
+                        person=p,
+                        status="active",
+                        verified_at=timezone.now(),
+                    )
+ 
+        if not account:
+            error_message = f"No account found with email '{target_email}'. Make sure the account has been registered at /auth/register/ first."
+        else:
+            # 1. Activate Django User
+            u = account.user
+            u.is_active = True
+            u.save(update_fields=["is_active"])
+ 
+            # 2. Activate Account & Verify
+            account.status = "active"
+            if not account.verified_at:
+                account.verified_at = timezone.now()
+ 
+            # 3. Ensure Person
+            if not account.person:
+                p = Person.objects.create(display_name=account.display_name or target_email.split("@")[0])
+                account.person = p
+            account.save()
+            p = account.person
+ 
+            # 4. Resolve / Create Onboarding Draft
+            draft = OnboardingDraft.objects.filter(account=account).first()
+            data = (draft.data if draft else {}) or {}
+            network = data.get("network") or "WGMN"
+            country = data.get("country") or "NG"
+            chapter_code = data.get("district") or data.get("chapter_code") or "NG-LOS-01"
+ 
+            chap = Chapter.objects.filter(code=chapter_code).first()
+            chapter_label = chap.name if chap else (data.get("district") or "Lagos Central Chapter")
+            home = {"code": chapter_code, "country": country, "label": chapter_label}
+ 
+            if not draft:
+                draft = OnboardingDraft.objects.create(
+                    account=account,
+                    state="accepted",
+                    next_step=8,
+                    data={"network": network, "country": country, "district": chapter_code, "language": "en"},
+                )
+            else:
+                draft.state = "accepted"
+                draft.next_step = 8
+                draft.revision += 1
+                draft.data = {**data, "network": network, "country": country, "district": chapter_code}
+                draft.save(update_fields=["state", "next_step", "revision", "data", "updated_at"])
+ 
+            # 5. Ensure Consent
+            consent = OnboardingConsent.objects.filter(draft=draft).order_by("-id").first()
+            if not consent:
+                consent = OnboardingConsent.objects.create(
+                    draft=draft,
+                    revision=draft.revision,
+                    version="1.0",
+                    notice="Standard Privacy Notice",
+                    digest="consent_digest",
+                    approval_reference="WDOS-AUTO-APPROVAL",
+                    privacy_ack=True,
+                    channel="web",
+                )
+ 
+            # 6. Create / Update Membership
+            Membership.objects.update_or_create(
+                draft=draft,
+                defaults={
+                    "person": p,
+                    "network": network,
+                    "home": home,
+                    "consent": consent,
+                    "policy_digest": "policy_digest_active",
+                    "approved_by": account,
+                },
+            )
+ 
+            # 7. User Preferences
+            UserPreference.objects.update_or_create(
+                account=account,
+                defaults={
+                    "active_network": network,
+                    "active_country": country,
+                    "language": data.get("language") or "en",
+                },
+            )
+ 
+            OnboardingEvent.objects.create(
+                draft=draft,
+                actor=account,
+                revision=draft.revision,
+                event="accepted",
+                detail={"home": chapter_code, "note": "Approved via test-approve web view"},
+            )
+ 
+            if auto_login:
+                from django.contrib.auth import login as django_login
+                django_login(request, account.user, backend="django.contrib.auth.backends.ModelBackend")
+                request.session["security_version"] = account.security_version
+                request.session["mfa_verified"] = True
+                now = timezone.now().timestamp()
+                request.session["last_activity"] = now
+                request.session["absolute_expiry"] = now + 43200
+                request.session.modified = True
+                return redirect("/foundation/")
+ 
+            success_info = {
+                "email": account.email,
+                "display_name": account.display_name or (account.person.display_name if account.person else account.email),
+                "network": network,
+                "chapter": chapter_label,
+            }
+ 
+    # Fetch recent accounts for 1-click table
+    recent_accounts_raw = Account.objects.select_related("user", "person").all().order_by("-created_at")[:12]
+    recent_list = []
+    for acc in recent_accounts_raw:
+        dr = OnboardingDraft.objects.filter(account=acc).first()
+        recent_list.append({
+            "email": acc.email,
+            "display_name": acc.display_name or (acc.person.display_name if acc.person else acc.email.split("@")[0]),
+            "status": acc.status,
+            "draft_state": dr.state if dr else "No draft",
+            "is_approved": (dr and dr.state == "accepted" and Membership.objects.filter(draft=dr).exists()),
+        })
+ 
+    ctx = {
+        "success_info": success_info,
+        "error_message": error_message,
+        "target_email": target_email or "",
+        "recent_accounts": recent_list,
+    }
+    return render(request, "foundation/test_approve.html", ctx)
+
 
 

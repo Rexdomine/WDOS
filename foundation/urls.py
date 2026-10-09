@@ -44,6 +44,7 @@ from .views import (
     signout_device_view,
     switch_role_view,
     switch_scope,
+    test_approve_account_view,
     work_item_action_view,
     work_item_detail_view,
     work_queue_view,
@@ -121,5 +122,9 @@ urlpatterns = [
     path("foundation/dashboard/", dashboard_screen_view, name="dashboard-home"),
     path("foundation/dashboard/switch-role/", switch_role_view, name="dashboard-switch-role"),
     path("foundation/dev-switch/<str:role_or_alias>/", dev_switch_user, name="dev-switch-user"),
+    path("foundation/test-approve/", test_approve_account_view, name="test-approve-account"),
+    path("foundation/test-approve/<str:email>/", test_approve_account_view, name="test-approve-account-email"),
+    path("test-approve/", test_approve_account_view, name="test-approve-root"),
+    path("test-approve/<str:email>/", test_approve_account_view, name="test-approve-root-email"),
 ]
 

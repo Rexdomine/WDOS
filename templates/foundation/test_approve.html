@@ -1,0 +1,375 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WDOS · Test Account Approver</title>
+  <link rel="stylesheet" href="{% static 'accounts/design.css' %}">
+  <link rel="stylesheet" href="{% static 'accounts/refinements.css' %}">
+  <link rel="stylesheet" href="{% static 'foundation/tokens.css' %}">
+  <style>
+    :root {
+      --primary: #9A1B64;
+      --primary-hover: #7E1552;
+      --bg: #F8F9FA;
+      --card-bg: #FFFFFF;
+      --border: #E5E7EB;
+      --text: #1F2937;
+      --text-muted: #6B7280;
+      --success-bg: #ECFDF5;
+      --success-border: #A7F3D0;
+      --success-text: #065F46;
+      --error-bg: #FEF2F2;
+      --error-border: #FECACA;
+      --error-text: #991B1B;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      margin: 0;
+      padding: 30px 16px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .header img {
+      max-width: 140px;
+      height: auto;
+      margin-bottom: 12px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #FDF2F8;
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 12px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0 0 6px 0;
+    }
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin: 0;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+      margin-bottom: 24px;
+    }
+    .form-group {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+    input[type="email"], input[type="text"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #D1D5DB;
+      border-radius: 8px;
+      font-size: 15px;
+      box-sizing: border-box;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input[type="email"]:focus, input[type="text"]:focus {
+      border-color: var(--primary);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(154, 27, 100, 0.15);
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #4B5563;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .checkbox-label input {
+      accent-color: var(--primary);
+      width: 16px;
+      height: 16px;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--primary);
+      color: #ffffff !important;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #FFFFFF;
+      color: #374151 !important;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid #D1D5DB;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-secondary:hover {
+      background: #F3F4F6;
+    }
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+    .alert-success {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      color: var(--success-text);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 24px;
+    }
+    .alert-error {
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      color: var(--error-text);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    .account-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin: 14px 0 18px 0;
+      background: #FFFFFF;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--success-border);
+    }
+    .account-meta-item .key {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #6B7280;
+      font-weight: 600;
+    }
+    .account-meta-item .val {
+      font-size: 14px;
+      font-weight: 700;
+      color: #111827;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      background: #F9FAFB;
+      color: #6B7280;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #F3F4F6;
+      vertical-align: middle;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill-green {
+      background: #DEF7EC;
+      color: #03543F;
+    }
+    .pill-amber {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+    .pill-gray {
+      background: #F3F4F6;
+      color: #4B5563;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="/foundation/">
+        <img src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
+      </a>
+      <br>
+      <span class="badge">Testing Utility</span>
+      <h1>Test Account Approver</h1>
+      <p class="subtitle">Quickly activate pending user accounts & onboarding drafts to access the dashboard.</p>
+    </div>
+
+    {% if error_message %}
+    <div class="alert-error" role="alert">
+      <strong>Unable to approve:</strong> {{ error_message }}
+    </div>
+    {% endif %}
+
+    {% if success_info %}
+    <div class="alert-success" role="status">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span style="font-size:16px; font-weight:700;">Account Approved Successfully!</span>
+      </div>
+      
+      <div class="account-meta">
+        <div class="account-meta-item">
+          <div class="key">Email</div>
+          <div class="val">{{ success_info.email }}</div>
+        </div>
+        <div class="account-meta-item">
+          <div class="key">Name</div>
+          <div class="val">{{ success_info.display_name }}</div>
+        </div>
+        <div class="account-meta-item">
+          <div class="key">Network</div>
+          <div class="val">{{ success_info.network }}</div>
+        </div>
+        <div class="account-meta-item">
+          <div class="key">Chapter</div>
+          <div class="val">{{ success_info.chapter }}</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a href="/foundation/dev-switch/{{ success_info.email }}/" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Open Dashboard as {{ success_info.display_name }}
+        </a>
+        <a href="/onboarding/8/" class="btn-secondary">
+          View Step 8 ("Open My Dashboard")
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <h2 style="font-size:17px; font-weight:700; margin:0 0 14px 0;">Approve Account by Email</h2>
+      <form method="POST" action="/foundation/test-approve/">
+        <div class="form-group">
+          <label for="id_email">User Account Email Address</label>
+          <input type="email" id="id_email" name="email" value="{{ target_email }}" placeholder="e.g. chioma@example.org" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" name="auto_login" value="1">
+            <span>Automatically log in as this user and open dashboard immediately</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width:100%; justify-content:center;">
+          Approve Account & Unlock Dashboard
+        </button>
+      </form>
+    </div>
+
+    {% if recent_accounts %}
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="padding:16px 20px; border-bottom:1px solid var(--border);">
+        <h2 style="font-size:16px; font-weight:700; margin:0;">Recent Accounts & Quick Actions</h2>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Status</th>
+              <th>Onboarding</th>
+              <th style="text-align:right;">Quick Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for acc in recent_accounts %}
+            <tr>
+              <td>
+                <div style="font-weight:600; color:#111827;">{{ acc.display_name }}</div>
+                <div style="color:#6B7280; font-size:12px;">{{ acc.email }}</div>
+              </td>
+              <td>
+                {% if acc.status == 'active' %}
+                  <span class="pill pill-green">Active</span>
+                {% elif acc.status == 'pending' %}
+                  <span class="pill pill-amber">Pending</span>
+                {% else %}
+                  <span class="pill pill-gray">{{ acc.status|title }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if acc.is_approved %}
+                  <span class="pill pill-green">Accepted</span>
+                {% elif acc.draft_state == 'review_needed' %}
+                  <span class="pill pill-amber">Needs Review</span>
+                {% else %}
+                  <span class="pill pill-gray">{{ acc.draft_state|default:"None"|title }}</span>
+                {% endif %}
+              </td>
+              <td style="text-align:right;">
+                {% if not acc.is_approved %}
+                  <a href="/foundation/test-approve/?email={{ acc.email }}&auto_login=1" class="btn-primary btn-sm" title="Approve and open dashboard">
+                    Approve & Enter
+                  </a>
+                {% else %}
+                  <a href="/foundation/dev-switch/{{ acc.email }}/" class="btn-secondary btn-sm" title="Direct 1-click login">
+                    Open Dashboard
+                  </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <div style="text-align:center; color:#9CA3AF; font-size:12px; margin-top:20px;">
+      WDOS Operational System · Testing Utility (Unauthenticated)
+    </div>
+  </div>
+</body>
+</html>

@@ -111,7 +111,13 @@
 
     <!-- Sidebar Bottom User Info -->
     <div class="sidebar-user">
-      <div class="avatar">{{ initials|default:"AO" }}</div>
+      <div class="avatar" style="overflow:hidden; display:flex; align-items:center; justify-content:center; padding:0;">
+        {% if has_profile_photo %}
+          <img src="{{ profile_photo_url }}" alt="{{ display_name }}" style="width:100%; height:100%; object-fit:cover; border-radius:50%; display:block;">
+        {% else %}
+          {{ initials|default:"AO" }}
+        {% endif %}
+      </div>
       <div class="user-info">
         <div class="user-name">{{ display_name|default:"Ada Okafor" }}</div>
         <div class="user-role">{{ active_role_title|default:user_scope.active_role|title }}</div>
@@ -204,7 +210,13 @@
         </a>
         
         <div class="profile-menu" data-profile-menu>
-          <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open profile menu">{{ initials }}</button>
+          <button class="avatar profile-trigger" data-profile-trigger type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open profile menu" style="overflow:hidden; padding:0; display:inline-flex; align-items:center; justify-content:center;">
+            {% if has_profile_photo %}
+              <img src="{{ profile_photo_url }}" alt="{{ display_name }}" style="width:100%; height:100%; object-fit:cover; border-radius:50%; display:block;">
+            {% else %}
+              {{ initials }}
+            {% endif %}
+          </button>
           <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
             <div class="profile-menu-header">
               <strong class="profile-menu-name">{{ display_name|default:"Ada Okafor" }}</strong>

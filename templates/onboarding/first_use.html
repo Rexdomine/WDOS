@@ -1,1 +1,163 @@
-<div class="grid"><div class="panel"><div class="panelhead"><h2>{{ ui.onb_first_steps }}</h2><span class="textlink"></span></div><ol class="timeline"><li class="timeline-item"><div class="eyebrow">{{ ui.onb_step }} 01</div><h3><a href="{% if draft.state == 'accepted' %}/onboarding/8/?tab=records{% else %}/onboarding/4/{% endif %}">{{ ui.onb_confirm_home }}</a></h3><p>{{ ui.onb_connected }}</p></li><li class="timeline-item"><div class="eyebrow">{{ ui.onb_step }} 02</div><h3><a href="{% if draft.state == 'accepted' %}/onboarding/8/?tab=records{% else %}/onboarding/2/{% endif %}">{{ ui.onb_review }} {{ ui.onb_profile }}</a></h3><p>{{ ui.onb_chapter }}</p></li><li class="timeline-item"><div class="eyebrow">{{ ui.onb_step }} 03</div><h3><a href="/auth/invitation/">{{ ui.onb_open_invitation }}</a></h3><p>{{ ui.onb_more_body }}</p></li><li class="timeline-item"><div class="eyebrow">{{ ui.onb_step }} 04</div><h3><a href="/auth/help/">{{ ui.onb_find_help }}</a></h3><p>{{ ui.onb_more_body }}</p></li></ol><div class="fields"></div><div style="margin-top:23px"><div class="actions"><a class="btn" href="{% if draft.state == 'accepted' %}/onboarding/8/?tab=records{% else %}{% url 'onboarding:step' 7 %}{% endif %}">{{ ui.onb_back }}</a>{% if draft.state == 'accepted' %}<a class="btn primary" href="/app"><span class="icon"><svg viewBox="0 0 24 24"><path d="M5 12h14 M14 7l5 5-5 5"/></svg></span>{{ ui.onb_action_8 }}</a>{% else %}<button class="btn primary" disabled aria-disabled="true"><span class="icon"><svg viewBox="0 0 24 24"><path d="M5 12h14 M14 7l5 5-5 5"/></svg></span>{{ ui.onb_action_8 }}</button>{% endif %}</div></div></div><div class="panel"><div class="panelhead"><h2>{{ ui.onb_glance }}</h2><span class="textlink"></span></div><span class="pill neutral"><span class="dot"></span>{% if draft.state == 'accepted' %}{{ ui.onb_ready }}{% else %}{{ ui.onb_in_progress }}{% endif %}</span><div class="mini-item"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5z M14 3v6h5 M9 13h6 M9 17h6"/></svg></span><div><h3>{{ ui.onb_identity }}</h3><p>{{ ui.onb_connected }}</p><div class="meta">{{ ui.onb_information }}</div></div></div><div class="mini-item"><span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5z M14 3v6h5 M9 13h6 M9 17h6"/></svg></span><div><h3>{{ ui.onb_local_connection }}</h3><p>{{ ui.onb_chapter }}</p><div class="meta">{{ ui.onb_support }}</div></div></div></div></div>
+<div class="grid">
+  <div class="panel">
+    <div class="panelhead">
+      <h2>{{ ui.onb_first_steps }}</h2>
+      <span class="textlink"></span>
+    </div>
+
+    <!-- Section 1: What you have completed based on steps -->
+    <div class="onb-section-header completed-header">
+      <span class="icon" aria-hidden="true" style="display:inline-flex; width:18px; height:18px; border-radius:50%; background:#e7f0de; color:#4b6b24; align-items:center; justify-content:center; font-size:11px;">✓</span>
+      What you have completed
+    </div>
+
+    <ul class="step-summary-list" aria-label="Completed onboarding steps">
+      <li class="step-summary-card">
+        <div class="step-summary-main">
+          <span class="step-summary-icon" aria-hidden="true">✓</span>
+          <div class="step-summary-text">
+            <h4>{{ ui.onb_profile }} &amp; Identity (Steps 1 &amp; 2)</h4>
+            <p>{{ profile_name }} &middot; {{ timezone_display }} &middot; {% if has_profile_photo %}Photo saved{% else %}Avatar generated{% endif %}</p>
+          </div>
+        </div>
+        <span class="step-summary-badge">Completed ✓</span>
+      </li>
+
+      <li class="step-summary-card">
+        <div class="step-summary-main">
+          <span class="step-summary-icon" aria-hidden="true">✓</span>
+          <div class="step-summary-text">
+            <h4>{{ ui.onb_connection }} &amp; Network (Step 3)</h4>
+            <p>Selected Network: <strong>{{ network }}</strong></p>
+          </div>
+        </div>
+        <span class="step-summary-badge">Completed ✓</span>
+      </li>
+
+      <li class="step-summary-card">
+        <div class="step-summary-main">
+          <span class="step-summary-icon" aria-hidden="true">✓</span>
+          <div class="step-summary-text">
+            <h4>{{ ui.onb_confirm_home }} (Step 4)</h4>
+            <p>{{ local_home }} &middot; Regional coordination aligned</p>
+          </div>
+        </div>
+        <span class="step-summary-badge">Completed ✓</span>
+      </li>
+
+      <li class="step-summary-card">
+        <div class="step-summary-main">
+          <span class="step-summary-icon" aria-hidden="true">✓</span>
+          <div class="step-summary-text">
+            <h4>{{ ui.onb_preferences }} &amp; Consents (Steps 5 &amp; 6)</h4>
+            <p>{{ ui.onb_privacy_notice }} confirmed &middot; Notification preferences saved</p>
+          </div>
+        </div>
+        <span class="step-summary-badge">Completed ✓</span>
+      </li>
+
+      <li class="step-summary-card">
+        <div class="step-summary-main">
+          <span class="step-summary-icon" aria-hidden="true">✓</span>
+          <div class="step-summary-text">
+            <h4>{{ ui.onb_review }} &amp; Submission (Step 7)</h4>
+            <p>{{ ui.onb_confirm_details }} &middot; Application submitted</p>
+          </div>
+        </div>
+        <span class="step-summary-badge">Submitted ✓</span>
+      </li>
+    </ul>
+
+    <!-- Section 2: Actions that can still be taken -->
+    <div class="onb-section-header actions-header">
+      <span class="icon" aria-hidden="true" style="display:inline-flex; width:18px; height:18px; border-radius:50%; background:#fce7f1; color:#d4006a; align-items:center; justify-content:center; font-size:11px;">→</span>
+      Actions that can still be taken
+    </div>
+
+    <ul class="step-actions-list" aria-label="Available actions">
+      <li class="step-action-card primary-action">
+        <div class="step-action-info">
+          <h4>{{ ui.onb_action_8 }}</h4>
+          <p>{% if draft.state == 'accepted' %}Your membership is active. Open your workspace dashboard to view activities, messages, and directory.{% else %}Your application has been received and is currently under coordinator review. The workspace dashboard unlocks upon approval.{% endif %}</p>
+        </div>
+        <div class="step-action-btn">
+          {% if draft.state == 'accepted' %}
+            <a class="btn primary" href="/app">
+              <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14 M14 7l5 5-5 5"/></svg></span>
+              {{ ui.onb_action_8 }}
+            </a>
+          {% else %}
+            <button class="btn primary" disabled aria-disabled="true">
+              <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14 M14 7l5 5-5 5"/></svg></span>
+              {{ ui.onb_action_8 }}
+            </button>
+          {% endif %}
+        </div>
+      </li>
+
+      <li class="step-action-card">
+        <div class="step-action-info">
+          <h4>View your submitted records</h4>
+          <p>Inspect all submitted data, consent history, and audit records in read-only mode.</p>
+        </div>
+        <div class="step-action-btn">
+          <a class="btn" href="/onboarding/8/?tab=records">{{ ui.onb_records }}</a>
+        </div>
+      </li>
+
+      <li class="step-action-card">
+        <div class="step-action-info">
+          <h4>{{ ui.onb_open_invitation }}</h4>
+          <p>Have a special chapter invitation or leadership claim code? Connect it to your profile.</p>
+        </div>
+        <div class="step-action-btn">
+          <a class="btn" href="/auth/invitation/">Claim invitation</a>
+        </div>
+      </li>
+
+      <li class="step-action-card">
+        <div class="step-action-info">
+          <h4>{{ ui.onb_find_help }}</h4>
+          <p>Need support or guidance regarding your chapter or application? Contact official support.</p>
+        </div>
+        <div class="step-action-btn">
+          <a class="btn" href="/auth/help/">{{ ui.onb_help }}</a>
+        </div>
+      </li>
+    </ul>
+
+    <div class="notice">
+      <span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 4c0 8-3 12-9 15C6 19 3 15 3 7z M8 12l3 3 5-6"/></svg></span>
+      <span>{% if draft.state == 'accepted' %}Your application is approved. No further onboarding changes are required.{% else %}Your application has been safely recorded. You cannot edit completed registration details while review is in progress.{% endif %}</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panelhead">
+      <h2>{{ ui.onb_glance }}</h2>
+      <span class="textlink"></span>
+    </div>
+    <span class="pill neutral"><span class="dot"></span>{% if draft.state == 'accepted' %}{{ ui.onb_ready }}{% else %}{{ ui.onb_in_progress }}{% endif %}</span>
+
+    <div class="mini-item">
+      <span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5z M14 3v6h5 M9 13h6 M9 17h6"/></svg></span>
+      <div>
+        <h3>{{ ui.onb_identity }}</h3>
+        <p>{{ ui.onb_connected }}</p>
+        <div class="meta">{{ ui.onb_information }}</div>
+      </div>
+    </div>
+
+    <div class="mini-item">
+      <span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5z M14 3v6h5 M9 13h6 M9 17h6"/></svg></span>
+      <div>
+        <h3>{{ ui.onb_local_connection }}</h3>
+        <p>{{ ui.onb_chapter }}</p>
+        <div class="meta">{{ ui.onb_support }}</div>
+      </div>
+    </div>
+
+    <!-- Dynamic sidebar steps -->
+    {% include "onboarding/sidebar_steps.html" %}
+  </div>
+</div>

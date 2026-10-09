@@ -146,6 +146,10 @@ def _get_authenticated_context(request):
         is_archived=False,
     ).count()
 
+    draft_for_photo = OnboardingDraft.objects.filter(account=account).first()
+    has_profile_photo = bool(draft_for_photo and draft_for_photo.photo and len(bytes(draft_for_photo.photo)) > 0)
+    profile_photo_url = "/onboarding/photo/" if has_profile_photo else None
+
     context = {
         "account": account,
         "user_scope": user_scope,
@@ -156,6 +160,8 @@ def _get_authenticated_context(request):
         "translations": translations,
         "display_name": display_name,
         "initials": initials,
+        "has_profile_photo": has_profile_photo,
+        "profile_photo_url": profile_photo_url,
         "unread_notifications_count": unread_notifications_count,
         "environment": os.getenv("WDOS_ENVIRONMENT", "local"),
         "high_contrast": user_pref.high_contrast if user_pref else False,

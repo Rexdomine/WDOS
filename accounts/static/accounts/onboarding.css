@@ -203,3 +203,35 @@ html[dir=rtl] .field .searchable-select-search-wrap input.searchable-select-sear
 
 .checkbox-control:hover{border-color:#d4006a;background:#fffaff}
 .checkbox-control:hover .checkbox-box{border-color:#b00055}
+
+/* Dynamic timeline states overriding static rules */
+.timeline{padding:0;margin:0;list-style:none}
+.timeline-item{position:relative;padding:0 0 24px 36px;border-left:2px solid #e9e4ea;margin-left:12px}
+.timeline-item:last-child{border-left:2px solid transparent;padding-bottom:4px}
+.timeline-item:before{position:absolute;left:-12px;top:0;width:22px;height:22px;border:3px solid #ffffff !important;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+.timeline-item:nth-child(n):before{background:#f1ecf2;color:#7d7082;content:''}
+.timeline-item.completed:before{background:#e7f0de !important;color:#4b6b24 !important;content:'✓' !important;font-size:11px !important;font-weight:700 !important}
+.timeline-item.active:before{background:#d4006a !important;color:#ffffff !important;content:'•' !important;font-size:22px !important;line-height:1 !important}
+.timeline-item.pending:before{background:#ece7ed !important;color:#8b7d90 !important;content:'' !important}
+.timeline-item.active h3{color:#d4006a !important;font-weight:700}
+.timeline-item.completed h3{color:#1e1822}
+.timeline-item.pending h3{color:#7b6f80}
+
+/* Step 8 / Summary Cards */
+.onb-section-header{font-size:13.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#1e1822;margin:20px 0 12px 0;display:flex;align-items:center;gap:8px}
+.onb-section-header.completed-header{color:#3b5c17}
+.onb-section-header.actions-header{color:#d4006a;margin-top:28px;padding-top:20px;border-top:1px solid #e9e4ea}
+.step-summary-list{display:flex;flex-direction:column;gap:10px;margin:0 0 20px 0;padding:0;list-style:none}
+.step-summary-card{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;background:#fdfcfd;border:1px solid #e6dee8;border-radius:10px;transition:border-color 0.15s ease}
+.step-summary-card:hover{border-color:#d1c7d4;background:#ffffff}
+.step-summary-main{display:flex;align-items:center;gap:12px;min-width:0}
+.step-summary-icon{width:28px;height:28px;border-radius:50%;background:#e7f0de;color:#4b6b24;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.step-summary-text h4{margin:0 0 2px 0;font-size:13.5px;font-weight:650;color:#1e1822}
+.step-summary-text p{margin:0;font-size:12px;color:#5c5061}
+.step-summary-badge{font-size:11px;font-weight:650;padding:3px 9px;border-radius:12px;background:#eef5e7;color:#3b5c17;border:1px solid #c9dec1;white-space:nowrap}
+.step-actions-list{display:flex;flex-direction:column;gap:10px;margin:0 0 24px 0;padding:0;list-style:none}
+.step-action-card{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;background:#ffffff;border:1px solid #e6dee8;border-radius:10px;transition:all 0.15s ease}
+.step-action-card.primary-action{background:#fff8fb;border:1.5px solid #d4006a}
+.step-action-card:hover{box-shadow:0 4px 14px rgba(35,25,38,0.06)}
+.step-action-info h4{margin:0 0 3px 0;font-size:14px;font-weight:700;color:#1e1822}
+.step-action-info p{margin:0;font-size:12.5px;color:#5c5061;line-height:1.4}

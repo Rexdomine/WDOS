@@ -162,14 +162,15 @@ class OnboardingButtonAndActionAuditTests(TestCase):
         self.assertIn('disabled', html)
         self.assertIn('aria-disabled="true"', html)
 
-        # Timeline links exist
-        self.assertIn('/onboarding/4/', html)
-        self.assertIn('/onboarding/2/', html)
+        # Actions exist and form cannot be edited
+        self.assertNotIn('href="/onboarding/4/"', html)
+        self.assertNotIn('href="/onboarding/2/"', html)
         self.assertIn('/auth/invitation/', html)
         self.assertIn('/auth/help/', html)
+        self.assertIn('/onboarding/8/?tab=records', html)
 
-        # Back button points to step 7
-        self.assertIn('/onboarding/7/', html)
+        # Back button to edit step 7 is not present once completed
+        self.assertNotIn('href="/onboarding/7/"', html)
 
         # Direct access to /app and /foundation/ is rejected before acceptance
         app_resp = self.client.get('/app')

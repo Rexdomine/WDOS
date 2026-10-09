@@ -142,21 +142,83 @@ def render_step(request, number, draft, form, notice=None, status=200):
     except Exception:
         pass
 
+    has_profile_photo = bool(draft and draft.photo and len(bytes(draft.photo)) > 0)
+    profile_photo_url = "/onboarding/photo/" if has_profile_photo else None
+    resolved_profile_name = (draft.data.get('full_name') or account.display_name) if draft else account.display_name
+    resolved_network = draft.data.get('network', '—') if draft else '—'
+    resolved_home = membership.home['label'] if membership else (draft.data.get('local_home') or draft.data.get('chapter') or c['onb_pending']) if draft else c['onb_pending']
+
+    # Dynamic 4-phase steps for the right-hand panel
+    p1_status = 'completed' if number >= 3 else ('active' if number <= 2 else 'pending')
+    p2_status = 'completed' if number >= 5 else ('active' if number in (3, 4) else 'pending')
+    p3_status = 'completed' if number >= 7 else ('active' if number in (5, 6) else 'pending')
+    p4_status = 'completed' if number >= 8 else ('active' if number == 7 else 'pending')
+
+    steps_progress = [
+        {
+            'number': 1,
+            'code': '01',
+            'title': c.get('onb_profile', 'Profile'),
+            'status': p1_status,
+            'summary': (
+                f"{resolved_profile_name} · {'Photo saved' if has_profile_photo else 'Avatar generated'}"
+                if (draft and number >= 3)
+                else ("Personal identity, language and timezone" if number <= 2 else "Personal details and photo")
+            ),
+        },
+        {
+            'number': 2,
+            'code': '02',
+            'title': c.get('onb_connection', 'Connection'),
+            'status': p2_status,
+            'summary': (
+                f"{resolved_network} · {resolved_home}"
+                if (draft and draft.data and draft.data.get('network') and number >= 5)
+                else ("Network selection and local home" if number in (3, 4) else "Network and local chapter assignment")
+            ),
+        },
+        {
+            'number': 3,
+            'code': '03',
+            'title': c.get('onb_preferences', 'Preferences'),
+            'status': p3_status,
+            'summary': (
+                "Interests, privacy notice & communication preferences saved"
+                if (draft and number >= 7)
+                else ("Interests and communication preferences" if number in (5, 6) else "Interests and notification preferences")
+            ),
+        },
+        {
+            'number': 4,
+            'code': '04',
+            'title': c.get('onb_review', 'Review'),
+            'status': p4_status,
+            'summary': (
+                "Registration confirmed and submitted"
+                if (draft and number >= 8)
+                else ("Confirm details & complete registration" if number == 7 else "Final verification and submission")
+            ),
+        },
+    ]
+
     try:
         response = render(request, 'onboarding/wizard.html', {
             'account': account, 'form': form, 'step': number,
             'revision': draft.revision if draft else 0,
             'lang': lang, 'direction': LANGUAGES[lang]['dir'], 'screen_id': f'ONB-{number:02d}',
             'initials': ''.join(n[0] for n in account.display_name.split()[:2]),
+            'has_profile_photo': has_profile_photo,
+            'profile_photo_url': profile_photo_url,
             'scope_label': c['onb_membership'], 'state_label': c['onb_more_needed'] if draft and draft.state == 'review_needed' else c['onb_ready'] if draft and draft.state == 'accepted' else c['onb_in_progress'],
             'draft': draft, 'policy': policy, 'tab': tab,
             'geo_data': geo_data,
             'eligibility_data': eligibility_data,
+            'steps_progress': steps_progress,
             'events': draft.events.order_by('-id')[:100] if draft and tab == 'history' else [],
             'consents': draft.consents.order_by('-id')[:100] if draft and tab == 'history' else [],
-            'profile_name': (draft.data.get('full_name') or account.display_name) if draft else account.display_name,
-            'network': draft.data.get('network', '—') if draft else '—',
-            'local_home': membership.home['label'] if membership else c['onb_pending'],
+            'profile_name': resolved_profile_name,
+            'network': resolved_network,
+            'local_home': resolved_home,
             'user_timezone': user_tz_name,
             'timezone_display': user_tz_name,
             'title': c[f'onb_title_{number}'], 'notice': notice,
@@ -193,6 +255,13 @@ def step(request, step):
     lang = lang if lang in LANGUAGES else 'en'
     c = catalog(lang)
     draft = OnboardingDraft.objects.filter(account=account).first()
+    if draft and draft.state in ('review_needed', 'accepted') and step < 8:
+        if step == 7 and request.method == 'POST':
+            return redirect('onboarding:step', step=8)
+        if request.method == 'POST':
+            return render_step(request, step, draft, None, localized_notice(c, CONFLICT_KEYS), 409)
+        target = f"/onboarding/8/?tab={request.GET['tab']}" if request.GET.get('tab') in ('records', 'history') else '/onboarding/8/'
+        return redirect(target)
     if step == 8:
         if not draft or draft.state == 'draft':
             return redirect('onboarding:step', step=draft.next_step if draft else 1)

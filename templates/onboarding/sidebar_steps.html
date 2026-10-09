@@ -1,0 +1,9 @@
+<ol class="timeline" aria-label="{{ ui.onb_step }} progress">
+  {% for item in steps_progress %}
+    <li class="timeline-item {{ item.status }}" {% if item.status == 'active' %}aria-current="step"{% endif %}>
+      <div class="eyebrow">{{ ui.onb_step }} {{ item.code }}</div>
+      <h3>{{ item.title }}</h3>
+      <p>{{ item.summary }}</p>
+    </li>
+  {% endfor %}
+</ol>

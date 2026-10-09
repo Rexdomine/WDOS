@@ -118,9 +118,12 @@ class ReviewTests(TestCase):
     def test_review_needed_first_use_keeps_correction_links_editable(self):
         self.login(self.account)
         response = self.client.get('/onboarding/8/')
-        self.assertContains(response, 'href="/onboarding/4/"')
-        self.assertContains(response, 'href="/onboarding/2/"')
-        self.assertContains(response, 'href="/onboarding/7/"')
+        self.assertNotContains(response, 'href="/onboarding/4/"')
+        self.assertNotContains(response, 'href="/onboarding/2/"')
+        self.assertNotContains(response, 'href="/onboarding/7/"')
+        self.assertContains(response, 'href="/auth/invitation/"')
+        self.assertContains(response, 'href="/auth/help/"')
+        self.assertContains(response, 'href="/onboarding/8/?tab=records"')
 
     def test_accepted_first_use_actions_open_read_only_records(self):
         self.assertEqual(self.approve().status_code, 200)

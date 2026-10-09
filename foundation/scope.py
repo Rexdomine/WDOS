@@ -472,20 +472,50 @@ def get_user_preferences(account: Account) -> UserPreference:
         )
     try:
         draft = OnboardingDraft.objects.filter(account=account).first()
-        draft_lang = (draft.data or {}).get("language") if (draft and draft.data) else None
+        draft_data = (draft.data or {}) if (draft and draft.data) else {}
+        draft_lang = draft_data.get("language")
         init_lang = draft_lang if draft_lang in ("en", "fr", "pt", "ar", "sw") else "en"
-        pref, _ = UserPreference.objects.get_or_create(
+        init_font_size = draft_data.get("reading") if draft_data.get("reading") in ("standard", "large", "xlarge") else "standard"
+        init_reduced_motion = bool(draft_data.get("reduce_motion"))
+
+        # Align activity digest with Step 6 optional updates choice
+        init_digest = "daily"
+        if "optional_updates" in draft_data:
+            init_digest = "daily" if draft_data.get("optional_updates") else "none"
+        elif draft:
+            last_consent = draft.consents.order_by("-revision").first()
+            if last_consent:
+                init_digest = "daily" if last_consent.optional_updates else "none"
+
+        pref, created = UserPreference.objects.get_or_create(
             account=account,
             defaults={
                 "language": init_lang,
                 "high_contrast": False,
-                "reduced_motion": False,
-                "font_size": "standard",
+                "reduced_motion": init_reduced_motion,
+                "font_size": init_font_size,
                 "email_notifications": True,
                 "in_app_notifications": True,
-                "activity_digest": "daily",
+                "activity_digest": init_digest,
             },
         )
+        if not created and draft_data:
+            updated_fields = []
+            if draft_lang in ("en", "fr", "pt", "ar", "sw") and pref.language == "en" and draft_lang != "en":
+                pref.language = draft_lang
+                updated_fields.append("language")
+            if init_font_size != "standard" and pref.font_size == "standard":
+                pref.font_size = init_font_size
+                updated_fields.append("font_size")
+            if init_reduced_motion and not pref.reduced_motion:
+                pref.reduced_motion = True
+                updated_fields.append("reduced_motion")
+            if ("optional_updates" in draft_data or (draft and draft.consents.exists())) and init_digest == "none" and pref.activity_digest == "daily":
+                pref.activity_digest = "none"
+                updated_fields.append("activity_digest")
+            if updated_fields:
+                pref.save(update_fields=updated_fields)
+
         return pref
     except Exception:
         # Fallback in-memory default if database read fails

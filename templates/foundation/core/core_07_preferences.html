@@ -43,23 +43,22 @@
           <div class="stage4-form-group" style="margin-bottom:0;">
             <label for="language" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Interface language</label>
             <select name="language" id="language" class="stage4-select" style="width:100%; padding:10px 14px; font-size:13.5px;">
-              <option value="en" {% if current_lang == 'en' or not current_lang %}selected{% endif %}>English</option>
-              <option value="ha" {% if current_lang == 'ha' %}selected{% endif %}>Hausa</option>
-              <option value="yo" {% if current_lang == 'yo' %}selected{% endif %}>Yorùbá</option>
-              <option value="ig" {% if current_lang == 'ig' %}selected{% endif %}>Igbo</option>
-              <option value="fr" {% if current_lang == 'fr' %}selected{% endif %}>Français</option>
-              <option value="es" {% if current_lang == 'es' %}selected{% endif %}>Español</option>
+              {% for code, info in languages.items %}
+                <option value="{{ code }}" {% if current_lang == code %}selected{% endif %}>{{ info.name }}</option>
+              {% empty %}
+                <option value="en" selected>English</option>
+              {% endfor %}
             </select>
           </div>
 
           <div class="stage4-form-group" style="margin-bottom:0;">
             <label for="timezone" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Timezone</label>
             <select name="timezone" id="timezone" class="stage4-select" style="width:100%; padding:10px 14px; font-size:13.5px;">
-              <option value="Africa/Lagos" {% if request.session.wdos_timezone == 'Africa/Lagos' or not request.session.wdos_timezone %}selected{% endif %}>Africa/Lagos</option>
-              <option value="UTC" {% if request.session.wdos_timezone == 'UTC' %}selected{% endif %}>UTC</option>
-              <option value="Africa/Accra" {% if request.session.wdos_timezone == 'Africa/Accra' %}selected{% endif %}>Africa/Accra</option>
-              <option value="Africa/Nairobi" {% if request.session.wdos_timezone == 'Africa/Nairobi' %}selected{% endif %}>Africa/Nairobi</option>
-              <option value="Europe/London" {% if request.session.wdos_timezone == 'Europe/London' %}selected{% endif %}>Europe/London</option>
+              {% for tz in available_timezones %}
+                <option value="{{ tz }}" {% if current_timezone == tz or request.session.wdos_timezone == tz %}selected{% endif %}>{{ tz }}</option>
+              {% empty %}
+                <option value="{{ current_timezone|default:'UTC' }}" selected>{{ current_timezone|default:'UTC' }}</option>
+              {% endfor %}
             </select>
           </div>
         </div>
@@ -68,18 +67,18 @@
           <div class="stage4-form-group" style="margin-bottom:0;">
             <label for="font_size" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Display preference</label>
             <select name="font_size" id="font_size" class="stage4-select" style="width:100%; padding:10px 14px; font-size:13.5px;">
-              <option value="standard" {% if user_pref.font_size == 'standard' or not user_pref.font_size %}selected{% endif %}>Standard text</option>
-              <option value="large" {% if user_pref.font_size == 'large' %}selected{% endif %}>Large text</option>
-              <option value="xlarge" {% if user_pref.font_size == 'xlarge' %}selected{% endif %}>Extra large text</option>
+              <option value="standard" {% if current_font_size == 'standard' or user_pref.font_size == 'standard' or not current_font_size and not user_pref.font_size %}selected{% endif %}>Standard text</option>
+              <option value="large" {% if current_font_size == 'large' or user_pref.font_size == 'large' %}selected{% endif %}>Large text</option>
+              <option value="xlarge" {% if current_font_size == 'xlarge' or user_pref.font_size == 'xlarge' %}selected{% endif %}>Extra large text</option>
             </select>
           </div>
 
           <div class="stage4-form-group" style="margin-bottom:0;">
             <label for="email_updates" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Optional email updates</label>
             <select name="email_updates" id="email_updates" class="stage4-select" style="width:100%; padding:10px 14px; font-size:13.5px;">
-              <option value="weekly" {% if user_pref.activity_digest == 'weekly' or not user_pref.activity_digest %}selected{% endif %}>Weekly summary</option>
-              <option value="daily" {% if user_pref.activity_digest == 'daily' %}selected{% endif %}>Daily digest</option>
-              <option value="none" {% if user_pref.activity_digest == 'none' %}selected{% endif %}>Off</option>
+              <option value="weekly" {% if current_email_updates == 'weekly' or user_pref.activity_digest == 'weekly' %}selected{% endif %}>Weekly summary</option>
+              <option value="daily" {% if current_email_updates == 'daily' or user_pref.activity_digest == 'daily' %}selected{% endif %}>Daily digest</option>
+              <option value="none" {% if current_email_updates == 'none' or user_pref.activity_digest == 'none' or not current_email_updates and not user_pref.activity_digest %}selected{% endif %}>Off</option>
             </select>
           </div>
         </div>

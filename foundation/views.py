@@ -147,8 +147,19 @@ def _get_authenticated_context(request):
     ).count()
 
     draft_for_photo = OnboardingDraft.objects.filter(account=account).first()
+    effective_draft = draft or draft_for_photo
+    draft_data = (effective_draft.data or {}) if (effective_draft and effective_draft.data) else {}
     has_profile_photo = bool(draft_for_photo and draft_for_photo.photo and len(bytes(draft_for_photo.photo)) > 0)
     profile_photo_url = "/onboarding/photo/" if has_profile_photo else None
+
+    # Resolve timezone with priority: session -> draft data -> active country default -> UTC
+    from accounts.african_geography import get_country_default_timezone
+    session_tz = request.session.get("wdos_timezone")
+    draft_tz = draft_data.get("timezone")
+    country_default_tz = get_country_default_timezone(user_scope.active_country) if (user_scope and user_scope.active_country) else None
+    current_tz = session_tz or draft_tz or country_default_tz or "UTC"
+    if not session_tz:
+        request.session["wdos_timezone"] = current_tz
 
     context = {
         "account": account,
@@ -167,6 +178,8 @@ def _get_authenticated_context(request):
         "high_contrast": user_pref.high_contrast if user_pref else False,
         "reduced_motion": user_pref.reduced_motion if user_pref else False,
         "font_size": user_pref.font_size if user_pref else "standard",
+        "current_timezone": current_tz,
+        "timezone": current_tz,
     }
     return context, None
 
@@ -1945,6 +1958,7 @@ def settings_view(request):
     account = ctx["account"]
     pref = ctx.get("user_pref")
     saved = False
+    effective_draft = OnboardingDraft.objects.filter(account=account).order_by("-updated_at").first()
 
     if request.method == "POST":
         lang = request.POST.get("language")
@@ -1956,23 +1970,57 @@ def settings_view(request):
             if lang in LANGUAGES:
                 pref.language = lang
                 request.session["wdos_language"] = lang
+                if effective_draft and effective_draft.data is not None:
+                    effective_draft.data["language"] = lang
             if timezone_val:
                 request.session["wdos_timezone"] = timezone_val
+                if effective_draft and effective_draft.data is not None:
+                    effective_draft.data["timezone"] = timezone_val
             if font_size in ("standard", "large", "xlarge"):
                 pref.font_size = font_size
+                if effective_draft and effective_draft.data is not None:
+                    effective_draft.data["reading"] = font_size
             if email_updates in ("weekly", "daily", "none"):
                 pref.activity_digest = email_updates
+                if effective_draft and effective_draft.data is not None:
+                    effective_draft.data["optional_updates"] = (email_updates != "none")
             pref.save()
+            if effective_draft and effective_draft.data is not None:
+                effective_draft.save(update_fields=["data", "updated_at"])
             saved = True
+
+    # Resolve timezone with priority: session -> draft data -> active country default -> UTC
+    from accounts.african_geography import get_country_default_timezone
+    from zoneinfo import available_timezones
+    user_scope = ctx.get("user_scope")
+    country_default_tz = get_country_default_timezone(user_scope.active_country) if (user_scope and user_scope.active_country) else None
+    draft_tz = (effective_draft.data or {}).get("timezone") if (effective_draft and effective_draft.data) else None
+    current_tz = request.session.get("wdos_timezone") or draft_tz or country_default_tz or "UTC"
+    request.session["wdos_timezone"] = current_tz
+
+    tz_list = sorted(available_timezones())
+    if current_tz and current_tz not in tz_list:
+        tz_list.insert(0, current_tz)
+
+    current_font_size = pref.font_size if pref else "standard"
+    current_email_updates = pref.activity_digest if pref else "daily"
 
     ctx.update({
         "screen_code": "CORE-07",
         "active_nav": "settings",
-        "current_lang": pref.language if pref else "en",
+        "languages": LANGUAGES,
+        "current_lang": pref.language if (pref and pref.language in LANGUAGES) else ctx.get("lang", "en"),
+        "current_timezone": current_tz,
+        "available_timezones": tz_list,
+        "current_font_size": current_font_size,
+        "current_email_updates": current_email_updates,
         "pref_saved": saved,
         **_get_stage4_state_context(request, "Language and preferences"),
     })
-    return render(request, "foundation/core/core_07_preferences.html", ctx)
+    response = render(request, "foundation/core/core_07_preferences.html", ctx)
+    if saved and request.method == "POST" and request.POST.get("language") in LANGUAGES:
+        response.set_cookie("wdos_language", request.POST.get("language"), max_age=31536000, samesite="Lax")
+    return response
 
 
 def connection_status_view(request):
@@ -2034,6 +2082,22 @@ def preferences_api(request):
         user_pref.activity_digest = digest
 
     user_pref.save()
+
+    timezone_val = request.POST.get("timezone")
+    if timezone_val:
+        request.session["wdos_timezone"] = timezone_val
+
+    effective_draft = OnboardingDraft.objects.filter(account=account).order_by("-updated_at").first()
+    if effective_draft and effective_draft.data is not None:
+        if lang in LANGUAGES:
+            effective_draft.data["language"] = lang
+        if timezone_val:
+            effective_draft.data["timezone"] = timezone_val
+        if font_size in ("standard", "large", "xlarge"):
+            effective_draft.data["reading"] = font_size
+        if digest in ("realtime", "daily", "weekly", "none"):
+            effective_draft.data["optional_updates"] = (digest != "none")
+        effective_draft.save(update_fields=["data", "updated_at"])
 
     response = redirect("/foundation/settings/")
     if lang in LANGUAGES:
@@ -3072,12 +3136,17 @@ def test_approve_account_view(request, email=None):
             )
  
             # 7. User Preferences
+            opt_updates = data.get("optional_updates")
+            init_digest = "daily" if opt_updates else ("none" if opt_updates is not None else "daily")
             UserPreference.objects.update_or_create(
                 account=account,
                 defaults={
                     "active_network": network,
                     "active_country": country,
                     "language": data.get("language") or "en",
+                    "font_size": data.get("reading") if data.get("reading") in ("standard", "large", "xlarge") else "standard",
+                    "reduced_motion": bool(data.get("reduce_motion")),
+                    "activity_digest": init_digest,
                 },
             )
  
@@ -3094,6 +3163,10 @@ def test_approve_account_view(request, email=None):
                 django_login(request, account.user, backend="django.contrib.auth.backends.ModelBackend")
                 request.session["security_version"] = account.security_version
                 request.session["mfa_verified"] = True
+                if data.get("timezone"):
+                    request.session["wdos_timezone"] = data["timezone"]
+                if data.get("language"):
+                    request.session["wdos_language"] = data["language"]
                 now = timezone.now().timestamp()
                 request.session["last_activity"] = now
                 request.session["absolute_expiry"] = now + 43200

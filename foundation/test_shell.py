@@ -558,6 +558,59 @@ class SettingsAndAccessibilityPreferencesTests(ShellTestCaseBase):
         self.assertEqual(pref.language, "en")
         self.assertFalse(pref.high_contrast)
 
+    def test_settings_view_populates_from_onboarding_draft(self):
+        self.login_as(self.user_wgmn)
+        # Configure draft with onboarding choices (e.g. Ethiopia / Addis Ababa, French, large text, opt-out of updates)
+        self.draft_wgmn.data = {
+            "network": "WGMN",
+            "country": "ET",
+            "country_iso2": "ET",
+            "timezone": "Africa/Addis_Ababa",
+            "language": "fr",
+            "reading": "large",
+            "reduce_motion": True,
+            "optional_updates": False,
+        }
+        self.draft_wgmn.save(update_fields=["data"])
+        UserPreference.objects.filter(account=self.account_wgmn).delete()
+
+        response = self.client.get("/foundation/settings/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["current_timezone"], "Africa/Addis_Ababa")
+        self.assertEqual(response.context["current_lang"], "fr")
+        self.assertEqual(response.context["current_font_size"], "large")
+        self.assertEqual(response.context["current_email_updates"], "none")
+        self.assertContains(response, '<option value="Africa/Addis_Ababa" selected>Africa/Addis_Ababa</option>')
+        self.assertContains(response, '<option value="fr" selected>Français</option>')
+        self.assertContains(response, '<option value="large" selected>Large text</option>')
+        self.assertContains(response, '<option value="none" selected>Off</option>')
+
+    def test_settings_view_post_updates_preferences_session_and_draft(self):
+        self.login_as(self.user_wgmn)
+        response = self.client.post(
+            "/foundation/settings/",
+            {
+                "language": "pt",
+                "timezone": "Africa/Nairobi",
+                "font_size": "xlarge",
+                "email_updates": "weekly",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies["wdos_language"].value, "pt")
+        self.assertEqual(self.client.session.get("wdos_timezone"), "Africa/Nairobi")
+
+        pref = UserPreference.objects.get(account=self.account_wgmn)
+        self.assertEqual(pref.language, "pt")
+        self.assertEqual(pref.font_size, "xlarge")
+        self.assertEqual(pref.activity_digest, "weekly")
+
+        self.draft_wgmn.refresh_from_db()
+        self.assertEqual(self.draft_wgmn.data.get("timezone"), "Africa/Nairobi")
+        self.assertEqual(self.draft_wgmn.data.get("language"), "pt")
+        self.assertEqual(self.draft_wgmn.data.get("reading"), "xlarge")
+        self.assertTrue(self.draft_wgmn.data.get("optional_updates"))
+
 
 class PrivacyRequestsTests(ShellTestCaseBase):
     def test_submit_privacy_request_creates_record_and_work_item(self):

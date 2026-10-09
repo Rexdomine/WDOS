@@ -22,6 +22,13 @@
   <a href="?tab=history" class="stage4-tab {% if active_tab == 'history' %}active{% endif %}">History</a>
 </div>
 
+{% if notice == 'no_priority' %}
+<div class="stage4-notice-banner" style="margin-bottom:18px; background:#F0FDF4; border:1px solid #BBF7D0; color:#166534; padding:12px 16px; border-radius:10px; display:flex; align-items:center; gap:10px;">
+  <span style="font-weight:700; color:#16A34A; font-size:16px;">✓</span>
+  <span style="font-size:13px; font-weight:600;">All priority items in your scope have been addressed.</span>
+</div>
+{% endif %}
+
 {% if state_mode %}
 <div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta);">
   <div class="stage4-state-icon">✓</div>
@@ -31,6 +38,195 @@
 </div>
 {% endif %}
 
+{% if active_tab == 'records' %}
+<!-- RECORDS TAB VIEW -->
+<div class="stage4-card">
+  <div class="stage4-card-head" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h2 style="font-size:18px; margin:0;">Active records</h2>
+      <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Browse and claim operational work items assigned to your scope.</p>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <a href="?tab=records&status=all" class="action-pill {% if status_filter == 'all' %}magenta{% endif %}" style="text-decoration:none;">All active</a>
+      <a href="?tab=records&status=pending" class="action-pill {% if status_filter == 'pending' %}magenta{% endif %}" style="text-decoration:none;"><span class="dot"></span> Pending ({{ pending_count }})</a>
+      <a href="?tab=records&status=in_progress" class="action-pill {% if status_filter == 'in_progress' %}magenta{% endif %}" style="text-decoration:none;"><span class="dot"></span> In progress ({{ in_progress_count }})</a>
+    </div>
+  </div>
+
+  <table class="stage4-table stage4-desktop-table">
+    <thead>
+      <tr>
+        <th>ITEM</th>
+        <th>CATEGORY</th>
+        <th>WHEN</th>
+        <th>NEXT ACTION</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in queue_items %}
+      <tr>
+        <td>
+          <a href="{{ item.action_url }}" style="font-weight:600; color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a>
+          {% if item.priority == 'urgent' or item.priority == 'critical' %}
+          <span style="display:inline-block; font-size:10px; font-weight:700; color:#D4006A; background:#FFF0F6; padding:2px 6px; border-radius:4px; margin-left:6px; text-transform:uppercase;">Urgent</span>
+          {% endif %}
+          <div style="font-size:11.5px; color:var(--wdos-muted); margin-top:2px;">{{ item.summary|truncatewords:10 }}</div>
+        </td>
+        <td><span style="font-size:12px; color:var(--wdos-muted); background:var(--wdos-surface-hover); padding:3px 8px; border-radius:4px;">{{ item.category }}</span></td>
+        <td style="color:var(--wdos-muted); font-size:12.5px;">{{ item.when }}</td>
+        <td>
+          <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
+            <span class="dot"></span> {{ item.action_label }}
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" style="text-align:center; padding:32px; color:var(--wdos-muted);">
+          There are no matching records for this status filter. Check the current scope or clear the filter.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Mobile Stacked List -->
+  <div class="stage4-mobile-list">
+    {% for item in queue_items %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row">
+        <span class="label">Item</span>
+        <span class="value"><a href="{{ item.action_url }}" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a></span>
+      </div>
+      <div class="mobile-stacked-row">
+        <span class="label">Category</span>
+        <span class="value">{{ item.category }}</span>
+      </div>
+      <div class="mobile-stacked-row">
+        <span class="label">When</span>
+        <span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ item.when }}</span>
+      </div>
+      <div class="mobile-stacked-row" style="margin-top:6px;">
+        <span class="label">Next action</span>
+        <span class="value">
+          <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
+            <span class="dot"></span> {{ item.action_label }}
+          </a>
+        </span>
+      </div>
+    </div>
+    {% empty %}
+    <div style="text-align:center; padding:24px; color:var(--wdos-muted);">No records found.</div>
+    {% endfor %}
+  </div>
+
+  <div class="stage4-table-foot">
+    <span>Showing {{ page_obj.start_index|default:0 }}–{{ page_obj.end_index|default:0 }} of {{ page_obj.paginator.count }} records</span>
+    <div class="pagination-controls">
+      {% if page_obj.has_previous %}
+      <a href="?tab=records&status={{ status_filter }}&page={{ page_obj.previous_page_number }}" class="btn small" style="text-decoration:none; padding:4px 10px;">←</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;">←</button>
+      {% endif %}
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">{{ page_obj.number }} of {{ page_obj.paginator.num_pages|default:1 }}</span>
+      {% if page_obj.has_next %}
+      <a href="?tab=records&status={{ status_filter }}&page={{ page_obj.next_page_number }}" class="btn small" style="text-decoration:none; padding:4px 10px;">→</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;">→</button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% elif active_tab == 'history' %}
+<!-- HISTORY TAB VIEW -->
+<div class="stage4-card">
+  <div class="stage4-card-head" style="margin-bottom:14px;">
+    <div>
+      <h2 style="font-size:18px; margin:0;">Resolution history ({{ completed_count }})</h2>
+      <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Records and tasks completed within your authorized scope.</p>
+    </div>
+  </div>
+
+  <table class="stage4-table stage4-desktop-table">
+    <thead>
+      <tr>
+        <th>ITEM</th>
+        <th>CATEGORY</th>
+        <th>RESOLVED BY</th>
+        <th>COMPLETED</th>
+        <th>ACTION</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in queue_items %}
+      <tr>
+        <td>
+          <a href="{{ item.action_url }}" style="font-weight:600; color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a>
+        </td>
+        <td><span style="font-size:12px; color:var(--wdos-muted); background:var(--wdos-surface-hover); padding:3px 8px; border-radius:4px;">{{ item.category }}</span></td>
+        <td style="font-size:12.5px; color:var(--wdos-ink);">{{ item.assigned_to }}</td>
+        <td style="color:var(--wdos-muted); font-size:12.5px;">{{ item.when }}</td>
+        <td>
+          <a href="{{ item.action_url }}" class="action-pill" style="text-decoration:none;">
+            View record
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align:center; padding:32px; color:var(--wdos-muted);">
+          No completed records in this scope yet. When work items are finished, their audit record appears here.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Mobile Stacked List -->
+  <div class="stage4-mobile-list">
+    {% for item in queue_items %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row">
+        <span class="label">Item</span>
+        <span class="value"><a href="{{ item.action_url }}" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a></span>
+      </div>
+      <div class="mobile-stacked-row">
+        <span class="label">Status</span>
+        <span class="value">Completed</span>
+      </div>
+      <div class="mobile-stacked-row" style="margin-top:6px;">
+        <span class="label">Action</span>
+        <span class="value">
+          <a href="{{ item.action_url }}" class="action-pill" style="text-decoration:none;">View record</a>
+        </span>
+      </div>
+    </div>
+    {% empty %}
+    <div style="text-align:center; padding:24px; color:var(--wdos-muted);">No completed records found.</div>
+    {% endfor %}
+  </div>
+
+  <div class="stage4-table-foot">
+    <span>Showing {{ page_obj.start_index|default:0 }}–{{ page_obj.end_index|default:0 }} of {{ page_obj.paginator.count }} records</span>
+    <div class="pagination-controls">
+      {% if page_obj.has_previous %}
+      <a href="?tab=history&page={{ page_obj.previous_page_number }}" class="btn small" style="text-decoration:none; padding:4px 10px;">←</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;">←</button>
+      {% endif %}
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">{{ page_obj.number }} of {{ page_obj.paginator.num_pages|default:1 }}</span>
+      {% if page_obj.has_next %}
+      <a href="?tab=history&page={{ page_obj.next_page_number }}" class="btn small" style="text-decoration:none; padding:4px 10px;">→</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;">→</button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- OVERVIEW TAB VIEW (DEFAULT) -->
 <!-- Top Summary Cards (2-column layout matching PDF p.159) -->
 <div class="stage4-related-grid" style="margin-bottom: 20px;">
   <div class="stage4-overview-box">
@@ -41,7 +237,7 @@
     <div class="stage4-overview-inner-card">
       <div style="font-size:11px; font-weight:700; color:var(--wdos-muted); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;">{{ user_scope.active_network|default:"WGMN" }} / {{ country_name|default:"Nigeria"|upper }}</div>
       <h3 style="font-size:15px; font-weight:700; color:var(--wdos-ink); margin:0 0 6px 0;">Your local connection</h3>
-      <p style="font-size:12px; color:var(--wdos-muted); margin:0 0 10px 0;">{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }} · Lagos · Ikeja.</p>
+      <p style="font-size:12px; color:var(--wdos-muted); margin:0 0 10px 0;">{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }}{% if local_location %} · {{ local_location }}{% else %} · Lagos · Ikeja{% endif %}.</p>
       <a href="/foundation/profile/" style="color:var(--wdos-magenta); font-size:12.5px; font-weight:600; text-decoration:none;">My membership</a>
     </div>
   </div>
@@ -62,8 +258,9 @@
 
 <!-- Main Full-Width Work Queue Card -->
 <div class="stage4-card">
-  <div class="stage4-card-head" style="margin-bottom:12px;">
+  <div class="stage4-card-head" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
     <h2 style="font-size:18px; margin:0;">My work queue</h2>
+    <a href="?tab=records" style="font-size:12px; color:var(--wdos-magenta); font-weight:600; text-decoration:none;">View all records ›</a>
   </div>
 
   <table class="stage4-table stage4-desktop-table">
@@ -77,7 +274,12 @@
     <tbody>
       {% for item in queue_items %}
       <tr>
-        <td style="font-weight:600; color:var(--wdos-ink);">{{ item.title }}</td>
+        <td style="font-weight:600; color:var(--wdos-ink);">
+          <a href="{{ item.action_url }}" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a>
+          {% if item.priority == 'urgent' or item.priority == 'critical' %}
+          <span style="display:inline-block; font-size:10px; font-weight:700; color:#D4006A; background:#FFF0F6; padding:1px 5px; border-radius:4px; margin-left:6px; text-transform:uppercase;">Priority</span>
+          {% endif %}
+        </td>
         <td style="color:var(--wdos-muted);">{{ item.when }}</td>
         <td>
           <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
@@ -101,7 +303,7 @@
     <div class="mobile-stacked-item">
       <div class="mobile-stacked-row">
         <span class="label">Item</span>
-        <span class="value">{{ item.title }}</span>
+        <span class="value"><a href="{{ item.action_url }}" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a></span>
       </div>
       <div class="mobile-stacked-row">
         <span class="label">When</span>
@@ -116,18 +318,29 @@
         </span>
       </div>
     </div>
+    {% empty %}
+    <div style="text-align:center; padding:20px; color:var(--wdos-muted);">No records found in this view.</div>
     {% endfor %}
   </div>
 
   <div class="stage4-table-foot">
     <span>Showing {{ queue_items|length }} records in this view</span>
     <div class="pagination-controls">
-      <button type="button" aria-label="Previous page">←</button>
-      <span>1</span>
-      <button type="button" aria-label="Next page">→</button>
+      {% if page_obj.has_previous %}
+      <a href="?tab=overview&page={{ page_obj.previous_page_number }}" class="btn small" style="text-decoration:none; padding:4px 10px;">←</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;">←</button>
+      {% endif %}
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">{{ page_obj.number }} of {{ page_obj.paginator.num_pages|default:1 }}</span>
+      {% if page_obj.has_next %}
+      <a href="?tab=overview&page={{ page_obj.next_page_number }}" class="btn small" style="text-decoration:none; padding:4px 10px;">→</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;">→</button>
+      {% endif %}
     </div>
   </div>
 </div>
+{% endif %}
 
 <div class="stage4-notice-banner" style="margin-top:16px;">
   <span class="shield-icon" aria-hidden="true">

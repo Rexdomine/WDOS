@@ -35,6 +35,133 @@
 </div>
 {% endif %}
 
+{% if active_tab == 'records' %}
+<!-- Records Tab -->
+<div class="stage4-card">
+  <div class="stage4-card-head" style="margin-bottom:14px;">
+    <h2>Network transition records</h2>
+  </div>
+  <table class="stage4-table stage4-desktop-table">
+    <thead>
+      <tr>
+        <th>CURRENT</th>
+        <th>REQUESTED TRANSITION</th>
+        <th>AGE EVIDENCE</th>
+        <th>STATUS</th>
+        <th>WHEN</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in transitions %}
+      <tr>
+        <td style="font-weight:600; color:var(--wdos-ink);">{{ t.current_relationship }}</td>
+        <td style="color:var(--wdos-ink);">{{ t.requested_transition }}</td>
+        <td style="color:var(--wdos-muted);">{{ t.age_evidence_method }}</td>
+        <td>
+          <span class="action-pill {% if t.status == 'Completed' %}magenta{% else %}amber{% endif %}">
+            <span class="dot"></span> {{ t.status }}
+          </span>
+        </td>
+        <td style="color:var(--wdos-muted);">{{ t.when }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align:center; padding:32px 16px; color:var(--wdos-muted);">
+          <div style="font-size:14px; font-weight:600; color:var(--wdos-ink); margin-bottom:4px;">No past transition records</div>
+          <div style="font-size:12.5px; margin-bottom:12px;">You are currently active in {{ user_scope.active_network|default:"WGMN" }}. Submit a review request on the Overview tab to request a transition.</div>
+          <a href="?tab=overview" class="btn primary small" style="text-decoration:none;">→ Go to overview</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Mobile Stacked List -->
+  <div class="stage4-mobile-list">
+    {% for t in transitions %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row"><span class="label">Current</span><span class="value">{{ t.current_relationship }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">Requested</span><span class="value">{{ t.requested_transition }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">Evidence</span><span class="value">{{ t.age_evidence_method }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">Status</span><span class="value">{{ t.status }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">When</span><span class="value">{{ t.when }}</span></div>
+    </div>
+    {% empty %}
+    <div style="text-align:center; padding:24px; color:var(--wdos-muted);">
+      No past transition records.
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="stage4-table-foot">
+    <span>Showing {{ transitions|length }} record{{ transitions|length|pluralize }} in this view</span>
+    <div class="pagination-controls">
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Previous page">←</button>
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">1 of 1</span>
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Next page">→</button>
+    </div>
+  </div>
+</div>
+
+{% elif active_tab == 'history' %}
+<!-- History Tab -->
+<div class="stage4-card">
+  <div class="stage4-card-head" style="margin-bottom:14px;">
+    <h2>Network &amp; relationship history</h2>
+  </div>
+  <table class="stage4-table stage4-desktop-table">
+    <thead>
+      <tr>
+        <th>WHEN</th>
+        <th>EVENT / OUTCOME</th>
+        <th>INITIATED BY</th>
+        <th>STATUS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in history_events %}
+      <tr>
+        <td style="color:var(--wdos-muted);">{{ h.when }}</td>
+        <td style="font-weight:600; color:var(--wdos-ink);">{{ h.what }}</td>
+        <td>{{ h.who }}</td>
+        <td>
+          <span class="action-pill magenta"><span class="dot"></span> {{ h.status }}</span>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" style="text-align:center; padding:24px; color:var(--wdos-muted);">
+          No history events recorded yet.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Mobile Stacked List -->
+  <div class="stage4-mobile-list">
+    {% for h in history_events %}
+    <div class="mobile-stacked-item">
+      <div class="mobile-stacked-row"><span class="label">When</span><span class="value">{{ h.when }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">Event</span><span class="value">{{ h.what }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">By</span><span class="value">{{ h.who }}</span></div>
+      <div class="mobile-stacked-row"><span class="label">Status</span><span class="value">{{ h.status }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="stage4-table-foot">
+    <span>Showing {{ history_events|length }} historical event{{ history_events|length|pluralize }}</span>
+    <div class="pagination-controls">
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Previous page">←</button>
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">1 of 1</span>
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Next page">→</button>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- Overview Tab -->
 <div class="stage4-layout">
   <!-- Main Decision Card -->
   <div class="stage4-main-col">
@@ -75,11 +202,11 @@
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:18px;">
           <div class="stage4-form-group" style="margin-bottom:0;">
             <label style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Current relationship</label>
-            <input type="text" readonly value="WNNN membership" class="stage4-input" style="background:#FFFFFF; cursor:default;">
+            <input type="text" readonly value="{{ current_relationship|default:'WGMN membership' }}" class="stage4-input" style="background:#FFFFFF; cursor:default;">
           </div>
           <div class="stage4-form-group" style="margin-bottom:0;">
             <label style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Requested transition</label>
-            <input type="text" readonly value="WGMN membership review" class="stage4-input" style="background:#FFFFFF; cursor:default;">
+            <input type="text" readonly value="{{ requested_transition|default:'WNNN transition review' }}" class="stage4-input" style="background:#FFFFFF; cursor:default;">
           </div>
         </div>
 
@@ -191,6 +318,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 <div class="stage4-preview-banner">
   <a href="?view_mode=state" class="stage4-preview-link">＋ Related screens · design preview</a>

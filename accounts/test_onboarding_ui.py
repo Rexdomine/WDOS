@@ -125,6 +125,7 @@ class OnboardingUITests(TestCase):
         response=self.client.get('/onboarding/privacy/')
         self.assertEqual(response.status_code,200)
         self.assertContains(response,TEST_POLICY['privacy_notice'])
+        self.assertContains(response, 'https://thewoddi.org/contact.html')
         self.assertContains(self.client.get('/onboarding/6/'),'/onboarding/privacy/')
 
     def test_history_tab_uses_real_saved_history(self):

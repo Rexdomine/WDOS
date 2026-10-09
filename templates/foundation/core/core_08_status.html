@@ -81,14 +81,9 @@
       </tr>
       {% empty %}
       <tr>
-        <td style="color:var(--wdos-muted);">14 Sep · sample</td>
-        <td style="font-weight:600; color:var(--wdos-ink);">Request received</td>
-        <td><span class="action-pill"><span class="dot"></span> You</span></td>
-      </tr>
-      <tr>
-        <td style="color:var(--wdos-muted);">14 Sep · sample</td>
-        <td style="font-weight:600; color:var(--wdos-ink);">Identity check requested</td>
-        <td style="color:var(--wdos-ink);">Authorised privacy reviewer</td>
+        <td colspan="3" style="text-align:center; padding:24px; color:var(--wdos-muted);">
+          No timeline events recorded yet.
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -100,28 +95,21 @@
     <div class="mobile-stacked-item">
       <div class="mobile-stacked-row"><span class="label">When</span><span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ event.when }}</span></div>
       <div class="mobile-stacked-row"><span class="label">What happened</span><span class="value">{{ event.what }}</span></div>
-      <div class="mobile-stacked-row"><span class="label">Who</span><span class="value">{% if event.is_you %}<span class="action-pill"><span class="dot"></span> You</span>{% else %}{{ event.who }}{% endif %}</span></div>
+      <div class="mobile-stacked-row"><span class="label">Who</span><span class="value">{% if event.is_you or event.who == 'You' %}<span class="action-pill"><span class="dot"></span> You</span>{% else %}{{ event.who }}{% endif %}</span></div>
     </div>
     {% empty %}
-    <div class="mobile-stacked-item">
-      <div class="mobile-stacked-row"><span class="label">When</span><span class="value" style="font-weight:400; color:var(--wdos-muted);">14 Sep · sample</span></div>
-      <div class="mobile-stacked-row"><span class="label">What happened</span><span class="value">Request received</span></div>
-      <div class="mobile-stacked-row"><span class="label">Who</span><span class="value"><span class="action-pill"><span class="dot"></span> You</span></span></div>
-    </div>
-    <div class="mobile-stacked-item">
-      <div class="mobile-stacked-row"><span class="label">When</span><span class="value" style="font-weight:400; color:var(--wdos-muted);">14 Sep · sample</span></div>
-      <div class="mobile-stacked-row"><span class="label">What happened</span><span class="value">Identity check requested</span></div>
-      <div class="mobile-stacked-row"><span class="label">Who</span><span class="value">Authorised privacy reviewer</span></div>
+    <div style="text-align:center; padding:20px; color:var(--wdos-muted);">
+      No timeline events recorded yet.
     </div>
     {% endfor %}
   </div>
 
   <div class="stage4-table-foot">
-    <span>Showing 2 records in this view</span>
+    <span>Showing {{ timeline_events|length|default:1 }} event{{ timeline_events|length|pluralize }} in this view</span>
     <div class="pagination-controls">
-      <button type="button" aria-label="Previous page">←</button>
-      <span>1</span>
-      <button type="button" aria-label="Next page">→</button>
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Previous page">←</button>
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">1 of 1</span>
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Next page">→</button>
     </div>
   </div>
 

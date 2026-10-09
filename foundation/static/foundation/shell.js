@@ -88,12 +88,46 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  // Generic Dropdown trigger (for Status, More filters, etc.)
+  document.querySelectorAll('[data-dropdown-trigger]').forEach(function (trigger) {
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const dropdown = this.closest('[data-dropdown]');
+      const menu = dropdown ? dropdown.querySelector('[data-dropdown-menu]') : null;
+      if (menu) {
+        const isHidden = menu.hasAttribute('hidden');
+        document.querySelectorAll('[data-dropdown-menu]').forEach(function (m) {
+          if (m !== menu) m.setAttribute('hidden', '');
+        });
+        document.querySelectorAll('[data-dropdown-trigger]').forEach(function (t) {
+          if (t !== trigger) t.setAttribute('aria-expanded', 'false');
+        });
+        if (isHidden) {
+          menu.removeAttribute('hidden');
+          this.setAttribute('aria-expanded', 'true');
+        } else {
+          menu.setAttribute('hidden', '');
+          this.setAttribute('aria-expanded', 'false');
+        }
+      }
+    });
+  });
+
+  document.addEventListener('click', function () {
+    document.querySelectorAll('[data-dropdown-menu]').forEach(function (menu) {
+      menu.setAttribute('hidden', '');
+    });
+    document.querySelectorAll('[data-dropdown-trigger]').forEach(function (trigger) {
+      trigger.setAttribute('aria-expanded', 'false');
+    });
+  });
+
   // Mark notification read via API
   document.querySelectorAll('[data-mark-read]').forEach(function (btn) {
     btn.addEventListener('click', function (e) {
       e.preventDefault();
       const notifId = this.getAttribute('data-mark-read');
-      const card = this.closest('.notification-card');
+      const row = this.closest('tr') || this.closest('.mobile-stacked-item') || this.closest('.notification-card');
       fetch('/foundation/api/notifications/' + notifId + '/read/', {
         method: 'POST',
         headers: {
@@ -103,18 +137,20 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .then(function (res) { return res.json(); })
       .then(function (data) {
-        if (data.status === 'ok' && card) {
-          card.classList.remove('unread');
+        if (data.status === 'ok') {
+          if (row) {
+            row.classList.remove('stage4-row-unread');
+            row.classList.remove('unread');
+          }
           btn.remove();
-          const badge = document.querySelector('[data-notif-badge]');
-          if (badge) {
+          document.querySelectorAll('[data-notif-badge]').forEach(function (badge) {
             let count = parseInt(badge.textContent, 10);
             if (!isNaN(count) && count > 0) {
               count -= 1;
               badge.textContent = count;
               if (count === 0) badge.style.display = 'none';
             }
-          }
+          });
         }
       })
       .catch(function (err) {
@@ -122,6 +158,28 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
   });
+
+  // Live client-side instant filter helper
+  function bindInstantFilter(inputId, rowSelector) {
+    const input = document.querySelector(inputId);
+    if (!input) return;
+    input.addEventListener('input', function () {
+      const q = this.value.toLowerCase().trim();
+      const rows = document.querySelectorAll(rowSelector);
+      rows.forEach(function (row) {
+        const text = row.textContent.toLowerCase();
+        if (!q || text.indexOf(q) !== -1) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+  }
+  bindInstantFilter('#notif-search', '[data-notif-row]');
+  bindInstantFilter('#sessions-search', '[data-session-row]');
+  bindInstantFilter('#privacy-search', '[data-privacy-row]');
+  bindInstantFilter('#security-search', '[data-security-row]');
 
   // Live accessibility toggle handlers (in settings)
   const highContrastToggle = document.querySelector('#high_contrast_toggle');

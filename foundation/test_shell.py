@@ -13,7 +13,17 @@ from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import AccessGrant, Account, Membership, OnboardingConsent, OnboardingDraft, Person
-from foundation.models import CountryHub, LeadershipLevel, Notification, PrivacyRequest, Role, UserPreference, WorkItem
+from foundation.models import (
+    CountryHub,
+    DeviceSession,
+    LeadershipLevel,
+    NetworkTransition,
+    Notification,
+    PrivacyRequest,
+    Role,
+    UserPreference,
+    WorkItem,
+)
 from foundation.scope import get_breadcrumbs, get_user_preferences, get_user_scope
 
 User = get_user_model()
@@ -345,6 +355,41 @@ class WorkQueueAndDeepLinkTests(ShellTestCaseBase):
         self.assertEqual(self.item_wgmn_ng.status, "in_progress")
         self.assertEqual(self.item_wgmn_ng.assigned_to, self.account_wgmn)
 
+    def test_priority_work_item_redirects_to_highest_priority(self):
+        self.login_as(self.user_wgmn)
+        response = self.client.get("/foundation/work-queue/priority/")
+        self.assertEqual(response.status_code, 302)
+        # Should redirect to highest priority pending/in_progress item in scope
+        self.assertIn(f"/foundation/work-queue/{self.item_wgmn_ng.id}/", response.url)
+
+    def test_work_queue_tabs_and_lifecycle_in_history(self):
+        self.login_as(self.user_wgmn)
+
+        # 1. Overview tab shows active item
+        res_overview = self.client.get("/foundation/work-queue/?tab=overview")
+        self.assertEqual(res_overview.status_code, 200)
+        self.assertContains(res_overview, "Nigeria Chapter Outreach")
+
+        # 2. Records tab shows filter pills and item
+        res_records = self.client.get("/foundation/work-queue/?tab=records")
+        self.assertEqual(res_records.status_code, 200)
+        self.assertContains(res_records, "Active records")
+        self.assertContains(res_records, "Nigeria Chapter Outreach")
+
+        # 3. Mark item completed
+        self.client.post(
+            f"/foundation/work-queue/{self.item_wgmn_ng.id}/action/",
+            {"action": "complete"},
+        )
+        self.item_wgmn_ng.refresh_from_db()
+        self.assertEqual(self.item_wgmn_ng.status, "completed")
+
+        # 4. History tab now contains the completed item
+        res_history = self.client.get("/foundation/work-queue/?tab=history")
+        self.assertEqual(res_history.status_code, 200)
+        self.assertContains(res_history, "Resolution history")
+        self.assertContains(res_history, "Nigeria Chapter Outreach")
+
 
 class ConfidentialSearchBoundaryTests(ShellTestCaseBase):
     def setUp(self):
@@ -438,6 +483,38 @@ class NotificationsTests(ShellTestCaseBase):
         self.notif_failed.refresh_from_db()
         self.assertEqual(self.notif_failed.delivery_status, "delivered")
 
+    def test_notifications_filter_by_status_and_search(self):
+        self.login_as(self.user_wgmn)
+        # Search by query
+        resp_search = self.client.get("/foundation/notifications/?q=Meeting")
+        self.assertContains(resp_search, "Meeting Scheduled")
+        self.assertNotContains(resp_search, "SMS Dispatch Failed")
+
+        # Filter by status=failed
+        resp_failed = self.client.get("/foundation/notifications/?status=failed")
+        self.assertContains(resp_failed, "SMS Dispatch Failed")
+        self.assertNotContains(resp_failed, "Meeting Scheduled")
+
+    def test_notifications_seed_default_for_empty_account(self):
+        # Empty notifications for WNNN user
+        Notification.objects.filter(account=self.account_wnnn).delete()
+        self.login_as(self.user_wnnn)
+        response = self.client.get("/foundation/notifications/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Local welcome meeting")
+        self.assertContains(response, "Communication preferences")
+        self.assertContains(response, "Membership profile")
+        # Ensure they are saved in the DB
+        self.assertEqual(Notification.objects.filter(account=self.account_wnnn).count(), 3)
+
+    def test_mark_all_notifications_read_post(self):
+        self.login_as(self.user_wgmn)
+        self.assertFalse(self.notif_delivered.is_read)
+        response = self.client.post("/foundation/api/notifications/mark-all-read/")
+        self.assertEqual(response.status_code, 302)
+        self.notif_delivered.refresh_from_db()
+        self.assertTrue(self.notif_delivered.is_read)
+
 
 class SettingsAndAccessibilityPreferencesTests(ShellTestCaseBase):
     def test_missing_preference_recovers_with_safe_defaults(self):
@@ -528,3 +605,119 @@ class RevocationAndSuspendedSessionTests(ShellTestCaseBase):
         response = self.client.get("/foundation/")
         # Suspended account redirected to status/login
         self.assertRedirects(response, "/auth/status/")
+
+
+class Stage4DynamicShellTests(ShellTestCaseBase):
+    def test_device_sessions_view_auto_creation_and_signout(self):
+        self.login_as(self.user_wgmn)
+        # 1. Visiting sessions view registers the current session + auxiliary demo session
+        response = self.client.get("/foundation/account/sessions/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your signed-in devices")
+        self.assertContains(response, "Keep signed in")
+        self.assertContains(response, "Review sign-out")
+
+        # 2. Check DeviceSession records in DB
+        sessions = list(self.account_wgmn.device_sessions.all())
+        self.assertGreaterEqual(len(sessions), 2)
+        other_session = self.account_wgmn.device_sessions.filter(is_current=False).first()
+        self.assertIsNotNone(other_session)
+
+        # 3. Visit signout page for other session
+        resp_signout = self.client.get(f"/foundation/account/signout-device/?device_id={other_session.id}")
+        self.assertEqual(resp_signout.status_code, 200)
+        self.assertContains(resp_signout, "Sign out this device?")
+
+        # 4. Confirm signout via POST
+        post_signout = self.client.post("/foundation/account/signout-device/", {
+            "session_id": str(other_session.id),
+            "confirm_signout": "1",
+        })
+        self.assertRedirects(post_signout, "/foundation/account/sessions/?signed_out=1")
+
+        # 5. Verify session deleted and success message displayed
+        self.assertFalse(self.account_wgmn.device_sessions.filter(id=other_session.id).exists())
+        resp_after = self.client.get("/foundation/account/sessions/?signed_out=1")
+        self.assertContains(resp_after, "Device signed out successfully")
+
+    def test_connection_status_live_check(self):
+        self.login_as(self.user_wgmn)
+        # Normal GET
+        resp = self.client.get("/foundation/connection-status/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Your connection is unavailable")
+
+        # GET with ?check=1 tests real DB connection
+        resp_check = self.client.get("/foundation/connection-status/?check=1")
+        self.assertEqual(resp_check.status_code, 200)
+        self.assertContains(resp_check, "Connection verified")
+        self.assertContains(resp_check, "Return to your workspace")
+
+    def test_privacy_request_full_lifecycle_and_review(self):
+        self.login_as(self.user_wgmn)
+        # 1. Submit request via confirm page
+        resp_submit = self.client.post("/foundation/privacy-requests/confirm/", {
+            "request_type": "correct_info",
+            "details": "Please correct my middle name in chapter records.",
+            "safe_reply_route": "account",
+        })
+        self.assertEqual(resp_submit.status_code, 302)
+
+        pr = PrivacyRequest.objects.filter(account=self.account_wgmn).first()
+        self.assertIsNotNone(pr)
+        self.assertTrue(pr.reference.startswith("PR-"))
+        self.assertGreaterEqual(len(pr.timeline), 2)
+
+        # 2. Status page renders dynamic timeline
+        resp_status = self.client.get(f"/foundation/privacy-requests/status/?ref={pr.reference}")
+        self.assertEqual(resp_status.status_code, 200)
+        self.assertContains(resp_status, pr.reference)
+        self.assertContains(resp_status, "Identity check requested")
+
+        # 3. Staff / Reviewer records approval decision
+        resp_review = self.client.post("/foundation/privacy-requests/review/", {
+            "request_ref": pr.reference,
+            "identity_check": "verified",
+            "decision": "approve",
+            "reason_and_retention": "Identity card verified. Name corrected per policy.",
+        })
+        self.assertEqual(resp_review.status_code, 200)
+        pr.refresh_from_db()
+        self.assertEqual(pr.decision, "approve")
+        self.assertEqual(pr.status, "Approved")
+        self.assertEqual(pr.current_step, "Decision approved")
+        # Timeline includes the review event
+        self.assertTrue(any("Review recorded: Approve" in ev.get("what", "") for ev in pr.timeline))
+
+    def test_network_transition_submission_and_tabs(self):
+        self.login_as(self.user_wgmn)
+        # 1. Overview tab renders dynamic relationship (WGMN -> WNNN transition review)
+        resp_overview = self.client.get("/foundation/network-transition/?tab=overview")
+        self.assertEqual(resp_overview.status_code, 200)
+        self.assertContains(resp_overview, "WGMN membership")
+        self.assertContains(resp_overview, "WNNN transition review")
+
+        # 2. Submit transition request
+        resp_submit = self.client.post("/foundation/network-transition/", {
+            "consent_confirmed": "1",
+        })
+        self.assertEqual(resp_submit.status_code, 200)
+        self.assertContains(resp_submit, "Review request submitted")
+
+        trans = NetworkTransition.objects.filter(account=self.account_wgmn).first()
+        self.assertIsNotNone(trans)
+        self.assertEqual(trans.current_relationship, "WGMN membership")
+
+        # 3. Records tab shows the created transition
+        resp_records = self.client.get("/foundation/network-transition/?tab=records")
+        self.assertEqual(resp_records.status_code, 200)
+        self.assertContains(resp_records, "Network transition records")
+        self.assertContains(resp_records, "WGMN membership")
+        self.assertContains(resp_records, "WNNN transition review")
+
+        # 4. History tab shows history events
+        resp_history = self.client.get("/foundation/network-transition/?tab=history")
+        self.assertEqual(resp_history.status_code, 200)
+        self.assertContains(resp_history, "Network &amp; relationship history")
+        self.assertContains(resp_history, "Transition requested")
+

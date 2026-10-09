@@ -356,7 +356,7 @@ def photo(request):
 def privacy(request):
     if not request.wdos_account:
         return redirect('accounts:login')
-    from .views import page
+    from .views import SUPPORT_URL, page
     policy = current_policy()
     notice_text = policy['privacy_notice'] if policy and policy.get('privacy_notice') else 'WDOS collects and processes your personal details, chapter affiliation, and communication preferences solely for membership administration, leadership services, and community coordination under authorized WODDI community privacy standards.'
-    return page(request, 'PRIVACY', 'Privacy notice', notice_text, policy_page=True)
+    return page(request, 'PRIVACY', 'Privacy notice', notice_text, policy_page=True, contact_url=SUPPORT_URL)

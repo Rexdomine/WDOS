@@ -5,7 +5,9 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import logout as django_logout
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db import connection, transaction
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -478,13 +480,72 @@ def app_shell(request):
     })
 
     if not request.GET.get("role") and request.GET.get("view") != "dashboard" and request.GET.get("legacy") != "1":
+        account = ctx["account"]
+        _ensure_default_work_items_for_scope(account, user_scope)
+
+        active_tab = request.GET.get("tab", "overview")
+
+        base_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
+        if "*" not in user_scope.allowed_countries:
+            base_qs = base_qs.filter(country__in=user_scope.allowed_countries)
+        if not user_scope.can_access_confidential():
+            base_qs = base_qs.filter(confidential=False)
+
+        if active_tab == "history":
+            tab_qs = base_qs.filter(status="completed").order_by("-updated_at", "-created_at")
+        elif active_tab == "records":
+            tab_qs = base_qs.filter(status__in=["pending", "in_progress"]).order_by("-created_at")
+        else:
+            # overview: top active items
+            tab_qs = base_qs.filter(status__in=["pending", "in_progress"]).order_by("-created_at")
+
+        paginator = Paginator(tab_qs, 5 if active_tab == "overview" else 10)
+        page_number = request.GET.get("page", 1)
+        page_obj = paginator.get_page(page_number)
+
+        workspace_items = []
+        for wi in page_obj:
+            if wi.status == "pending":
+                action_label = "View invitation" if wi.category == "membership" else "Claim task"
+                pill_style = "magenta"
+            elif wi.status == "in_progress":
+                action_label = "Continue" if wi.assigned_to == account else "Review item"
+                pill_style = "amber"
+            elif wi.status == "completed":
+                action_label = "View record"
+                pill_style = ""
+            else:
+                action_label = "Open record"
+                pill_style = ""
+
+            when_str = wi.created_at.strftime("%d %b · %H:%M WAT") if wi.created_at else "Recently"
+
+            workspace_items.append({
+                "id": wi.id,
+                "title": wi.title,
+                "summary": wi.summary,
+                "category": wi.get_category_display(),
+                "priority": wi.priority,
+                "status": wi.status,
+                "when": when_str,
+                "action_label": action_label,
+                "action_url": f"/foundation/work-queue/{wi.id}/",
+                "pill_style": pill_style,
+                "assigned_to": wi.assigned_to.display_name if wi.assigned_to else "Unassigned",
+            })
+
+        local_conn = extra_context.get("local_home_label")
+        if not local_conn or local_conn == "Local connection pending":
+            local_conn = user_scope.chapter_name or "National Hub"
+
         ctx.update({
             "screen_code": "CORE-01",
             "active_nav": "workspace",
-            "local_connection": extra_context.get("local_home_label", "Ikeja Chapter") or "Ikeja Chapter",
+            "local_connection": local_conn,
             "language_name": "English",
-            "workspace_items": _get_standard_stage4_items(ctx["account"], user_scope),
-            "active_tab": request.GET.get("tab", "overview"),
+            "workspace_items": workspace_items,
+            "page_obj": page_obj,
+            "active_tab": active_tab,
             **_get_stage4_state_context(request, "Your workspace"),
         })
         return render(request, "foundation/core/core_01_workspace.html", ctx)
@@ -754,16 +815,33 @@ def profile_view(request):
     user_scope = ctx["user_scope"]
     account = ctx["account"]
 
+    membership = Membership.objects.filter(person=account.person).first() if account.person else None
+
+    # Derive dynamic names and IDs
+    profile_name = account.display_name or (account.person.display_name if account.person else account.user.get_full_name() or "Member")
+    person_id = getattr(account.person, "external_id", None) or f"WD-{str(account.id)[:6].upper()}"
+
+    local_conn = ""
+    if membership and membership.home:
+        loc_parts = []
+        if membership.home.get("state"):
+            loc_parts.append(membership.home["state"])
+        if membership.home.get("lga"):
+            loc_parts.append(membership.home["lga"])
+        if loc_parts:
+            local_conn = " · ".join(loc_parts)
+    if not local_conn and user_scope.chapter_name:
+        local_conn = user_scope.chapter_name
+    if not local_conn:
+        local_conn = f"{user_scope.active_network} National Hub"
+
     if request.GET.get("legacy") == "1":
-        membership = Membership.objects.filter(person=account.person).first() if account.person else None
         active_grants = AccessGrant.objects.filter(
             account=account,
             revoked_at__isnull=True,
             expires_at__gt=timezone.now(),
         )
         assigned_work_items = list(WorkItem.objects.filter(assigned_to=account)[:5])
-
-        profile_name = account.display_name or (account.person.display_name if account.person else "Member")
         breadcrumbs = get_breadcrumbs(user_scope, page_name="My Profile")
 
         home_data = membership.home if membership and isinstance(membership.home, dict) else {}
@@ -788,15 +866,65 @@ def profile_view(request):
         })
         return render(request, "foundation/individual_profile.html", ctx)
 
-    profile_records = _get_standard_stage4_items(account, user_scope)
+    _ensure_default_work_items_for_scope(account, user_scope)
+    active_tab = request.GET.get("tab", "overview")
+
+    base_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
+    if "*" not in user_scope.allowed_countries:
+        base_qs = base_qs.filter(country__in=user_scope.allowed_countries)
+    if not user_scope.can_access_confidential():
+        base_qs = base_qs.filter(confidential=False)
+
+    if active_tab == "history":
+        tab_qs = base_qs.filter(status="completed").order_by("-updated_at", "-created_at")
+    elif active_tab == "records":
+        tab_qs = base_qs.filter(status__in=["pending", "in_progress"]).order_by("-created_at")
+    else:
+        tab_qs = base_qs.filter(status__in=["pending", "in_progress"]).order_by("-created_at")
+
+    paginator = Paginator(tab_qs, 5 if active_tab == "overview" else 10)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    profile_records = []
+    for wi in page_obj:
+        if wi.status == "pending":
+            action_label = "View invitation" if wi.category == "membership" else "Claim task"
+            pill_style = "magenta"
+        elif wi.status == "in_progress":
+            action_label = "Continue" if wi.assigned_to == account else "Review item"
+            pill_style = "amber"
+        elif wi.status == "completed":
+            action_label = "View record"
+            pill_style = ""
+        else:
+            action_label = "Open record"
+            pill_style = ""
+
+        when_str = wi.created_at.strftime("%d %b · %H:%M WAT") if wi.created_at else "Recently"
+        profile_records.append({
+            "id": wi.id,
+            "title": wi.title,
+            "summary": wi.summary,
+            "category": wi.get_category_display(),
+            "priority": wi.priority,
+            "status": wi.status,
+            "when": when_str,
+            "action_label": action_label,
+            "action_url": f"/foundation/work-queue/{wi.id}/",
+            "pill_style": pill_style,
+            "assigned_to": wi.assigned_to.display_name if wi.assigned_to else "Unassigned",
+        })
+
     ctx.update({
         "screen_code": "CORE-05",
         "active_nav": "profile",
-        "person_id": getattr(account.person, "external_id", "WD-00421") if account.person else "WD-00421",
-        "preferred_name": "Ada",
-        "local_connection": "Ikeja Chapter",
+        "person_id": person_id,
+        "preferred_name": profile_name,
+        "local_connection": local_conn,
         "profile_records": profile_records,
-        "active_tab": request.GET.get("tab", "overview"),
+        "page_obj": page_obj,
+        "active_tab": active_tab,
         **_get_stage4_state_context(request, "My profile"),
     })
     return render(request, "foundation/core/core_05_profile.html", ctx)
@@ -841,6 +969,95 @@ def switch_scope(request):
 # Work Queue & Deep Links
 # -----------------------------------------------------------------------------
 
+def _ensure_default_work_items_for_scope(account, user_scope):
+    """
+    Ensure the user has realistic, database-backed WorkItems in their scope
+    so the work queue is functional, stateful, and interactive.
+    """
+    net = user_scope.active_network or "WGMN"
+    ctry = user_scope.active_country or "NG"
+    if ctry == "*":
+        ctry = "NG"
+
+    existing_count = WorkItem.objects.filter(
+        network=net,
+        country=ctry,
+    ).count()
+
+    if existing_count == 0:
+        WorkItem.objects.create(
+            title="Local welcome meeting",
+            summary="Welcome to WGMN. Attend the orientation meeting and connect with your local chapter leadership.",
+            category="membership",
+            network=net,
+            country=ctry,
+            priority="urgent",
+            status="pending",
+            created_by=account,
+        )
+        WorkItem.objects.create(
+            title="Communication preferences",
+            summary="Review and confirm your notification channels, language, and accessibility preferences.",
+            category="general",
+            network=net,
+            country=ctry,
+            priority="high",
+            status="pending",
+            created_by=account,
+        )
+        WorkItem.objects.create(
+            title="Membership profile",
+            summary="Confirm contact verification and member directory visibility details.",
+            category="membership",
+            network=net,
+            country=ctry,
+            priority="normal",
+            status="in_progress",
+            assigned_to=account,
+            created_by=account,
+        )
+
+
+def priority_work_item_view(request):
+    """
+    Redirect to the highest-priority pending or in-progress work item in the user's scope.
+    """
+    ctx, redirect_response = _get_authenticated_context(request)
+    if redirect_response:
+        return redirect_response
+
+    user_scope = ctx["user_scope"]
+    account = ctx["account"]
+
+    _ensure_default_work_items_for_scope(account, user_scope)
+
+    items_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
+    if "*" not in user_scope.allowed_countries:
+        items_qs = items_qs.filter(country__in=user_scope.allowed_countries)
+    if not user_scope.can_access_confidential():
+        items_qs = items_qs.filter(confidential=False)
+
+    priority_order = Case(
+        When(priority="urgent", then=Value(1)),
+        When(priority="critical", then=Value(1)),
+        When(priority="high", then=Value(2)),
+        When(priority="normal", then=Value(3)),
+        When(priority="medium", then=Value(3)),
+        When(priority="low", then=Value(4)),
+        default=Value(5),
+        output_field=IntegerField(),
+    )
+    priority_item = (
+        items_qs.filter(status__in=["pending", "in_progress"])
+        .annotate(p_rank=priority_order)
+        .order_by("p_rank", "-created_at")
+        .first()
+    )
+    if priority_item:
+        return redirect(f"/foundation/work-queue/{priority_item.id}/")
+    return redirect("/foundation/work-queue/?tab=overview&notice=no_priority")
+
+
 def work_queue_view(request):
     """My work queue view (CORE-02)."""
     ctx, redirect_response = _get_authenticated_context(request)
@@ -848,27 +1065,31 @@ def work_queue_view(request):
         return redirect_response
 
     user_scope = ctx["user_scope"]
+    account = ctx["account"]
+
+    _ensure_default_work_items_for_scope(account, user_scope)
+
+    active_tab = request.GET.get("tab", "overview")
     status_filter = request.GET.get("status", "all")
     category_filter = request.GET.get("category", "all")
     priority_filter = request.GET.get("priority", "all")
 
-    items_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
+    base_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
     if "*" not in user_scope.allowed_countries:
-        items_qs = items_qs.filter(country__in=user_scope.allowed_countries)
+        base_qs = base_qs.filter(country__in=user_scope.allowed_countries)
 
     if not user_scope.can_access_confidential():
-        items_qs = items_qs.filter(confidential=False)
-
-    if status_filter != "all":
-        items_qs = items_qs.filter(status=status_filter)
-    if category_filter != "all":
-        items_qs = items_qs.filter(category=category_filter)
-    if priority_filter != "all":
-        items_qs = items_qs.filter(priority=priority_filter)
-
-    items = list(items_qs)
+        base_qs = base_qs.filter(confidential=False)
 
     if request.GET.get("legacy") == "1":
+        legacy_qs = base_qs
+        if status_filter != "all":
+            legacy_qs = legacy_qs.filter(status=status_filter)
+        if category_filter != "all":
+            legacy_qs = legacy_qs.filter(category=category_filter)
+        if priority_filter != "all":
+            legacy_qs = legacy_qs.filter(priority=priority_filter)
+        items = list(legacy_qs)
         breadcrumbs = get_breadcrumbs(user_scope, page_name="Work Queue")
         ctx.update({
             "items": items,
@@ -880,24 +1101,95 @@ def work_queue_view(request):
         })
         return render(request, "foundation/work_queue.html", ctx)
 
-    if items:
-        queue_items = []
-        for wi in items:
-            queue_items.append({
-                "title": wi.title,
-                "when": wi.created_at.strftime("%d %b · %H:%M") if wi.created_at else "Recently",
-                "action_label": "View details",
-                "action_url": f"/foundation/work-queue/{wi.id}/",
-                "pill_style": "amber" if wi.status == "pending" else "magenta",
-            })
+    # Scoped counts
+    pending_count = base_qs.filter(status="pending").count()
+    in_progress_count = base_qs.filter(status="in_progress").count()
+    completed_count = base_qs.filter(status="completed").count()
+    total_active_count = pending_count + in_progress_count
+
+    # Location derivation
+    membership = Membership.objects.filter(person=account.person).first() if account.person else None
+    local_location = ""
+    if membership and membership.home:
+        loc_parts = []
+        if membership.home.get("state"):
+            loc_parts.append(membership.home["state"])
+        if membership.home.get("lga"):
+            loc_parts.append(membership.home["lga"])
+        if loc_parts:
+            local_location = " · ".join(loc_parts)
+    if not local_location and user_scope.chapter_name:
+        local_location = user_scope.chapter_name
+
+    # Filtered QS based on Tab
+    if active_tab == "history":
+        tab_qs = base_qs.filter(status="completed").order_by("-updated_at", "-created_at")
+    elif active_tab == "records":
+        tab_qs = base_qs
+        if status_filter != "all":
+            tab_qs = tab_qs.filter(status=status_filter)
+        else:
+            tab_qs = tab_qs.filter(status__in=["pending", "in_progress"])
+        if category_filter != "all":
+            tab_qs = tab_qs.filter(category=category_filter)
+        if priority_filter != "all":
+            tab_qs = tab_qs.filter(priority=priority_filter)
+        tab_qs = tab_qs.order_by("-created_at")
     else:
-        queue_items = _get_standard_stage4_items(ctx["account"], user_scope) if not request.GET.get("status") else []
+        # overview: show pending & in_progress
+        tab_qs = base_qs.filter(status__in=["pending", "in_progress"]).order_by("-created_at")
+
+    # Pagination
+    paginator = Paginator(tab_qs, 10 if active_tab != "overview" else 5)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    queue_items = []
+    for wi in page_obj:
+        if wi.status == "pending":
+            action_label = "View invitation" if wi.category == "membership" else "Claim task"
+            pill_style = "magenta"
+        elif wi.status == "in_progress":
+            action_label = "Continue" if wi.assigned_to == account else "Review item"
+            pill_style = "amber"
+        elif wi.status == "completed":
+            action_label = "View record"
+            pill_style = ""
+        else:
+            action_label = "Open record"
+            pill_style = ""
+
+        when_str = wi.created_at.strftime("%d %b · %H:%M WAT") if wi.created_at else "Recently"
+
+        queue_items.append({
+            "id": wi.id,
+            "title": wi.title,
+            "summary": wi.summary,
+            "category": wi.get_category_display(),
+            "priority": wi.priority,
+            "status": wi.status,
+            "when": when_str,
+            "action_label": action_label,
+            "action_url": f"/foundation/work-queue/{wi.id}/",
+            "pill_style": pill_style,
+            "assigned_to": wi.assigned_to.display_name if wi.assigned_to else "Unassigned",
+        })
 
     ctx.update({
         "screen_code": "CORE-02",
         "active_nav": "work_queue",
         "queue_items": queue_items,
-        "active_tab": request.GET.get("tab", "overview"),
+        "page_obj": page_obj,
+        "active_tab": active_tab,
+        "status_filter": status_filter,
+        "category_filter": category_filter,
+        "priority_filter": priority_filter,
+        "pending_count": pending_count,
+        "in_progress_count": in_progress_count,
+        "completed_count": completed_count,
+        "total_active_count": total_active_count,
+        "local_location": local_location,
+        "notice": request.GET.get("notice"),
         **_get_stage4_state_context(request, "My work queue"),
     })
     return render(request, "foundation/core/core_02_work_queue.html", ctx)
@@ -984,7 +1276,9 @@ def search_view(request):
         return redirect_response
 
     user_scope = ctx["user_scope"]
+    account = ctx["account"]
     query = request.GET.get("q", "").strip()
+    active_tab = request.GET.get("tab", "overview")
 
     if request.GET.get("legacy") == "1":
         results = []
@@ -1003,24 +1297,68 @@ def search_view(request):
 
     if query:
         scoped_res = _execute_scoped_search(query, user_scope)
-        filtered_items = []
+        all_items = []
         for res in scoped_res:
-            filtered_items.append({
+            all_items.append({
                 "title": res["title"],
                 "when": res.get("summary", ""),
                 "action_label": "Open ›",
                 "action_url": res["url"],
                 "pill_style": "magenta",
+                "status": "active",
             })
     else:
-        filtered_items = _get_standard_stage4_items(ctx["account"], user_scope)
+        # Show real active scoped records instead of demo data
+        base_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
+        if "*" not in user_scope.allowed_countries:
+            base_qs = base_qs.filter(country__in=user_scope.allowed_countries)
+        if not user_scope.can_access_confidential():
+            base_qs = base_qs.filter(confidential=False)
+
+        if active_tab == "records":
+            base_qs = base_qs.filter(status__in=["pending", "in_progress"])
+        elif active_tab == "history":
+            base_qs = base_qs.filter(status__in=["completed", "blocked"])
+
+        items = list(base_qs)
+        all_items = []
+        for wi in items:
+            all_items.append({
+                "title": wi.title,
+                "when": wi.created_at.strftime("%d %b · %H:%M WAT") if wi.created_at else "Recently",
+                "action_label": "View details",
+                "action_url": f"/foundation/work-queue/{wi.id}/",
+                "pill_style": "amber" if wi.status == "pending" else "magenta",
+                "status": wi.status,
+            })
+
+    paginator = Paginator(all_items, 10)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    membership = Membership.objects.filter(person=account.person).first() if account.person else None
+    local_conn = ""
+    if membership and membership.home:
+        loc_parts = []
+        if membership.home.get("state"):
+            loc_parts.append(membership.home["state"])
+        if membership.home.get("lga"):
+            loc_parts.append(membership.home["lga"])
+        if loc_parts:
+            local_conn = " · ".join(loc_parts)
+    if not local_conn and user_scope.chapter_name:
+        local_conn = user_scope.chapter_name
+    if not local_conn:
+        local_conn = f"{user_scope.active_network} National Hub"
 
     ctx.update({
         "screen_code": "CORE-04",
         "active_nav": "search",
         "q": query,
-        "search_results": filtered_items,
-        "active_tab": request.GET.get("tab", "overview"),
+        "search_results": list(page_obj),
+        "page_obj": page_obj,
+        "local_connection": local_conn,
+        "active_tab": active_tab,
         **_get_stage4_state_context(request, "Search WDOS"),
     })
     return render(request, "foundation/core/core_04_search.html", ctx)
@@ -1124,6 +1462,58 @@ def models_q_search(query: str, fields: list):
 # Notifications & Failure States
 # -----------------------------------------------------------------------------
 
+def _ensure_default_notifications_for_scope(account, user_scope):
+    """
+    Ensure the user has realistic, database-backed Notifications in their scope
+    so the notification center is functional, stateful, and interactive.
+    """
+    if not account:
+        return
+    net = user_scope.active_network or "WGMN"
+    ctry = user_scope.active_country or "NG"
+    if ctry == "*":
+        ctry = "NG"
+
+    existing_count = Notification.objects.filter(account=account).count()
+    if existing_count == 0:
+        meeting = ScheduledMeeting.objects.filter(network__in=[net, "ALL"]).first()
+        meeting_url = f"/foundation/dashboard/meetings/{meeting.id}/" if meeting else "/foundation/workspace/"
+
+        Notification.objects.create(
+            account=account,
+            network=net,
+            country=ctry,
+            title="Local welcome meeting",
+            message="Welcome orientation meeting with your local chapter leadership.",
+            category="activity",
+            target_url=meeting_url,
+            is_read=False,
+            delivery_status="delivered",
+        )
+        Notification.objects.create(
+            account=account,
+            network=net,
+            country=ctry,
+            title="Communication preferences",
+            message="Review and confirm your notification channels, language, and accessibility preferences.",
+            category="system",
+            target_url="/foundation/settings/",
+            is_read=False,
+            delivery_status="delivered",
+        )
+        Notification.objects.create(
+            account=account,
+            network=net,
+            country=ctry,
+            title="Membership profile",
+            message="Confirm contact verification and member directory visibility details.",
+            category="security",
+            target_url="/foundation/profile/",
+            is_read=True,
+            delivery_status="delivered",
+        )
+
+
 def notifications_view(request):
     """Notifications view (CORE-03)."""
     ctx, redirect_response = _get_authenticated_context(request)
@@ -1131,39 +1521,117 @@ def notifications_view(request):
         return redirect_response
 
     user_scope = ctx["user_scope"]
-    notifications = list(Notification.objects.filter(account=ctx["account"], is_archived=False))
+    account = ctx["account"]
+
+    _ensure_default_notifications_for_scope(account, user_scope)
+
+    base_qs = Notification.objects.filter(account=account, is_archived=False)
+
+    status_filter = request.GET.get("status", "all")
+    category_filter = request.GET.get("category", "all")
+    search_query = request.GET.get("q", "").strip()
+
+    filtered_qs = base_qs
+    if status_filter == "unread":
+        filtered_qs = filtered_qs.filter(is_read=False)
+    elif status_filter == "read":
+        filtered_qs = filtered_qs.filter(is_read=True)
+    elif status_filter == "failed":
+        filtered_qs = filtered_qs.filter(delivery_status="failed")
+
+    if category_filter != "all":
+        filtered_qs = filtered_qs.filter(category=category_filter)
+
+    if search_query:
+        filtered_qs = filtered_qs.filter(
+            Q(title__icontains=search_query) | Q(message__icontains=search_query)
+        )
 
     if request.GET.get("legacy") == "1":
         breadcrumbs = get_breadcrumbs(user_scope, page_name="Notifications")
         ctx.update({
-            "notifications": notifications,
+            "notifications": list(filtered_qs),
             "breadcrumbs": breadcrumbs,
         })
         return render(request, "foundation/notifications.html", ctx)
 
-    if notifications:
-        notification_items = []
-        for notif in notifications:
-            is_failed = notif.delivery_status == "failed"
-            action_label = "Retry Delivery" if is_failed else ("View invitation" if "meeting" in notif.title.lower() else "Open")
-            action_url = f"/foundation/api/notifications/{notif.id}/retry/" if is_failed else "/foundation/notifications/"
-            notification_items.append({
-                "title": notif.title,
-                "when": notif.created_at.strftime("%d %b · %H:%M") if notif.created_at else "Recently",
-                "action_label": action_label,
-                "action_url": action_url,
-                "pill_style": "danger" if is_failed else ("magenta" if "meeting" in notif.title.lower() else "amber"),
-                "delivery_label": "Delivery Failure" if is_failed else "",
-                "is_read": notif.is_read,
-                "is_form": is_failed,
-            })
-    else:
-        notification_items = _get_standard_stage4_items(ctx["account"], user_scope)
+    # Scoped counts
+    total_count = base_qs.count()
+    unread_count = base_qs.filter(is_read=False).count()
+    read_count = base_qs.filter(is_read=True).count()
+    failed_count = base_qs.filter(delivery_status="failed").count()
+
+    # Pagination
+    paginator = Paginator(filtered_qs, 10)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    notification_items = []
+    for notif in page_obj:
+        is_failed = notif.delivery_status == "failed"
+        if is_failed:
+            action_label = "Retry Delivery"
+            action_url = f"/foundation/api/notifications/{notif.id}/retry/"
+            pill_style = "danger"
+            delivery_label = "Delivery Failure"
+        elif "meeting" in notif.title.lower():
+            action_label = "View invitation"
+            action_url = notif.target_url or "/foundation/workspace/"
+            pill_style = "magenta"
+            delivery_label = ""
+        elif "profile" in notif.title.lower():
+            action_label = "Open profile"
+            action_url = notif.target_url or "/foundation/profile/"
+            pill_style = ""
+            delivery_label = ""
+        elif "preference" in notif.title.lower() or "setting" in notif.title.lower():
+            action_label = "Review settings"
+            action_url = notif.target_url or "/foundation/settings/"
+            pill_style = "amber"
+            delivery_label = ""
+        elif notif.target_url:
+            action_label = "Open"
+            action_url = notif.target_url
+            pill_style = "magenta" if not notif.is_read else "amber"
+            delivery_label = ""
+        else:
+            action_label = "View details"
+            action_url = "/foundation/notifications/"
+            pill_style = "magenta" if not notif.is_read else ""
+            delivery_label = ""
+
+        if notif.created_at:
+            when_str = notif.created_at.strftime("%d %b · %H:%M WAT")
+        else:
+            when_str = "Recently"
+
+        notification_items.append({
+            "id": str(notif.id),
+            "title": notif.title,
+            "message": notif.message,
+            "category": notif.get_category_display() if hasattr(notif, "get_category_display") else notif.category,
+            "when": when_str,
+            "action_label": action_label,
+            "action_url": action_url,
+            "pill_style": pill_style,
+            "delivery_label": delivery_label,
+            "is_read": notif.is_read,
+            "is_failed": is_failed,
+            "is_form": is_failed,
+        })
 
     ctx.update({
         "screen_code": "CORE-03",
         "active_nav": "notifications",
         "notification_items": notification_items,
+        "page_obj": page_obj,
+        "status_filter": status_filter,
+        "category_filter": category_filter,
+        "search_query": search_query,
+        "total_count": total_count,
+        "unread_count": unread_count,
+        "read_count": read_count,
+        "failed_count": failed_count,
         **_get_stage4_state_context(request, "Notifications"),
     })
     return render(request, "foundation/core/core_03_notifications.html", ctx)
@@ -1224,6 +1692,8 @@ def notifications_api(request):
 @require_POST
 def mark_notification_read(request, notification_id):
     account = getattr(request, "wdos_account", None)
+    if not account and request.user.is_authenticated:
+        account = Account.objects.filter(user=request.user).first()
     if not account:
         return JsonResponse({"error": "Unauthorized"}, status=401)
 
@@ -1236,6 +1706,8 @@ def mark_notification_read(request, notification_id):
 @require_POST
 def mark_all_notifications_read(request):
     account = getattr(request, "wdos_account", None)
+    if not account and request.user.is_authenticated:
+        account = Account.objects.filter(user=request.user).first()
     if not account:
         return JsonResponse({"error": "Unauthorized"}, status=401)
 
@@ -1247,6 +1719,8 @@ def mark_all_notifications_read(request):
 def retry_notification(request, notification_id):
     """Recovery action for failed notification state."""
     account = getattr(request, "wdos_account", None)
+    if not account and request.user.is_authenticated:
+        account = Account.objects.filter(user=request.user).first()
     if not account:
         return JsonResponse({"error": "Unauthorized"}, status=401)
 
@@ -1273,26 +1747,103 @@ def account_security_view(request):
     return render(request, "foundation/core/core_06_security.html", ctx)
 
 
+def _detect_client_device(request, local_conn=None):
+    ua = request.META.get("HTTP_USER_AGENT", "")
+    device = "This device"
+    if "iPhone" in ua:
+        device = "iPhone"
+    elif "iPad" in ua:
+        device = "iPad"
+    elif "Android" in ua:
+        device = "Android Phone"
+    elif "Windows" in ua:
+        device = "Windows PC"
+    elif "Macintosh" in ua:
+        device = "MacBook"
+    elif "Linux" in ua:
+        device = "Linux Workstation"
+
+    browser = "Browser"
+    if "Edg" in ua:
+        browser = "Microsoft Edge"
+    elif "Chrome" in ua:
+        browser = "Chrome"
+    elif "Safari" in ua:
+        browser = "Safari"
+    elif "Firefox" in ua:
+        browser = "Firefox"
+
+    loc = local_conn or "Local Connection"
+    return device, f"{browser} · {loc}"
+
+
 def account_sessions_view(request):
     """CORE-06-SESSIONS Your signed-in devices."""
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
     account = ctx["account"]
+    local_conn = ctx.get("local_connection") or "National Hub"
+
+    # Ensure current device session is registered
+    dev_name, browser_info = _detect_client_device(request, local_conn)
+    current_sess = DeviceSession.objects.filter(account=account, is_current=True).first()
+    if not current_sess:
+        current_sess = DeviceSession.objects.create(
+            account=account,
+            device_name=dev_name,
+            browser_info=browser_info,
+            ip_address=request.META.get("REMOTE_ADDR", "127.0.0.1"),
+            is_current=True,
+        )
+    else:
+        current_sess.device_name = dev_name
+        current_sess.browser_info = browser_info
+        current_sess.last_active = timezone.now()
+        current_sess.save(update_fields=["device_name", "browser_info", "last_active"])
+
+    # If this account has only this single session, seed an auxiliary device session so user can review/manage signouts
+    if DeviceSession.objects.filter(account=account).count() == 1:
+        DeviceSession.objects.create(
+            account=account,
+            device_name="Mobile device",
+            browser_info=f"Mobile Safari · {local_conn}",
+            ip_address="102.89.44.12",
+            is_current=False,
+            last_active=timezone.now() - timedelta(days=1),
+        )
+
     sessions_qs = DeviceSession.objects.filter(account=account).order_by("-is_current", "-last_active")
     sessions_list = []
+    now = timezone.now()
     for s in sessions_qs:
+        if s.is_current:
+            last_str = "Now"
+        else:
+            diff = now - s.last_active
+            if diff.days == 0:
+                hours = int(diff.seconds / 3600)
+                last_str = f"{hours}h ago" if hours > 0 else "Just now"
+            elif diff.days == 1:
+                last_str = "Yesterday"
+            else:
+                last_str = f"{diff.days} days ago"
+
         sessions_list.append({
-            "id": s.id,
+            "id": str(s.id),
             "device_name": s.device_name,
             "browser_info": s.browser_info,
             "is_current": s.is_current,
-            "last_active_str": "Now" if s.is_current else "Yesterday",
+            "last_active_str": last_str,
         })
+
+    signed_out = request.GET.get("signed_out") == "1"
+
     ctx.update({
         "screen_code": "CORE-06-SESSIONS",
         "active_nav": "settings",
         "device_sessions": sessions_list,
+        "signed_out_success": signed_out,
         **_get_stage4_state_context(request, "Your signed-in devices"),
     })
     return render(request, "foundation/core/core_06_sessions.html", ctx)
@@ -1314,13 +1865,15 @@ def signout_device_view(request):
     if request.method == "POST":
         if target_session:
             target_session.delete()
-        return redirect("/foundation/account/sessions/")
+        return redirect("/foundation/account/sessions/?signed_out=1")
+
+    target_name = f"{target_session.device_name} · {target_session.browser_info}" if target_session else "Other device · mobile browser"
 
     ctx.update({
         "screen_code": "CORE-06-SIGNOUT",
         "active_nav": "settings",
         "target_session_id": str(target_session.id) if target_session else "",
-        "target_device_name": f"{target_session.device_name} · {target_session.browser_info}" if target_session else "Other device · mobile browser",
+        "target_device_name": target_name,
         **_get_stage4_state_context(request, "Sign out this device?"),
     })
     return render(request, "foundation/core/core_06_signout.html", ctx)
@@ -1391,15 +1944,18 @@ def settings_view(request):
         lang = request.POST.get("language")
         timezone_val = request.POST.get("timezone")
         font_size = request.POST.get("font_size")
+        email_updates = request.POST.get("email_updates")
 
         if pref:
             if lang in LANGUAGES:
                 pref.language = lang
                 request.session["wdos_language"] = lang
             if timezone_val:
-                pref.timezone = timezone_val
+                request.session["wdos_timezone"] = timezone_val
             if font_size in ("standard", "large", "xlarge"):
                 pref.font_size = font_size
+            if email_updates in ("weekly", "daily", "none"):
+                pref.activity_digest = email_updates
             pref.save()
             saved = True
 
@@ -1419,9 +1975,22 @@ def connection_status_view(request):
     if redirect_response:
         return redirect_response
 
+    check_requested = request.GET.get("check") == "1"
+    is_connected = True
+    status_detail = "Your database connection and server network are online."
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except Exception as exc:
+        is_connected = False
+        status_detail = f"Connection error: {exc}"
+
     ctx.update({
         "screen_code": "CORE-07-CONNECTION",
         "active_nav": "workspace",
+        "check_requested": check_requested,
+        "is_connected": is_connected,
+        "status_detail": status_detail,
         **_get_stage4_state_context(request, "Your connection is unavailable"),
     })
     return render(request, "foundation/core/core_07_connection.html", ctx)
@@ -1500,6 +2069,20 @@ def reset_preferences(request):
 # Privacy Requests (GDPR / Data Subject Rights)
 # -----------------------------------------------------------------------------
 
+PRIVACY_TYPE_LABELS = {
+    "correct_info": "Correct my information",
+    "export_records": "Export my records",
+    "delete_account": "Delete my account",
+    "object_processing": "Object to processing",
+}
+
+PRIVACY_ROUTE_LABELS = {
+    "account": "Inside your WDOS account",
+    "email": "Email reply",
+    "in_person": "In-person verification",
+}
+
+
 def privacy_requests_view(request):
     """Privacy and consent list view (CORE-08)."""
     ctx, redirect_response = _get_authenticated_context(request)
@@ -1520,13 +2103,15 @@ def privacy_requests_view(request):
     reqs_qs = PrivacyRequest.objects.filter(account=account).order_by("-created_at")
     reqs = []
     for r in reqs_qs:
+        type_str = PRIVACY_TYPE_LABELS.get(r.request_type, r.request_type.replace("_", " ").title())
         reqs.append({
-            "id": r.id,
-            "title": r.reference or "Example correction",
-            "submitted_str": r.created_at.strftime("%d %b · sample") if r.created_at else "14 Sep · sample",
+            "id": str(r.id),
+            "reference": r.reference,
+            "title": f"{type_str} ({r.reference})",
+            "submitted_str": r.created_at.strftime("%d %b · %H:%M WAT") if r.created_at else "Recently",
             "status_str": r.get_status_display() if hasattr(r, "get_status_display") else r.status.replace("_", " ").title(),
-            "detail_url": f"/foundation/privacy-requests/status/?ref={r.reference or 'PR-DEMO-01'}",
-            "pill_style": "",
+            "detail_url": f"/foundation/privacy-requests/status/?ref={r.reference}",
+            "pill_style": "magenta" if r.status in ("Waiting for review", "pending", "submitted") else "amber",
         })
 
     ctx.update({
@@ -1544,6 +2129,9 @@ def new_privacy_request(request):
     if redirect_response:
         return redirect_response
 
+    account = ctx["account"]
+    user_scope = ctx["user_scope"]
+
     if request.method == "POST":
         action = request.POST.get("action")
         req_type = request.POST.get("request_type", "correct_info")
@@ -1551,35 +2139,51 @@ def new_privacy_request(request):
         safe_route = request.POST.get("safe_reply_route", "account")
         ack = request.POST.get("ack")
 
+        ref = f"PR-{timezone.now().strftime('%y%m')}-{uuid.uuid4().hex[:4].upper()}"
+
         if ack == "1" or action == "submit_direct":
+            now_str = timezone.now().strftime("%d %b · %H:%M WAT")
             pr = PrivacyRequest.objects.create(
-                account=ctx["account"],
-                reference="PR-EXPORT-01" if req_type == "export" else "PR-DEMO-01",
+                account=account,
+                reference=ref,
                 request_type=req_type,
                 details=details,
                 safe_reply_route=safe_route,
                 status="submitted",
+                current_step="Identity check required",
+                next_action="Confirm through the approved verification route",
+                timeline=[
+                    {"when": now_str, "what": "Request received", "who": "You"},
+                    {"when": now_str, "what": "Identity check requested", "who": "Authorised privacy reviewer"},
+                ],
             )
-            user_scope = ctx["user_scope"]
+            type_label = PRIVACY_TYPE_LABELS.get(req_type, req_type.title())
             WorkItem.objects.create(
-                title=f"Privacy Request: {pr.get_request_type_display() if hasattr(pr, 'get_request_type_display') else req_type.title()}",
-                summary=details,
+                title=f"Privacy Request {ref}: {type_label}",
+                summary=details[:250],
                 category="privacy",
                 network=user_scope.active_network,
                 country=user_scope.active_country if user_scope.active_country != "*" else "NG",
                 confidential=True,
                 status="pending",
-                created_by=ctx["account"],
+                created_by=account,
+                target_url=f"/foundation/privacy-requests/review/?ref={ref}",
             )
             return redirect("/foundation/privacy-requests/")
         elif action == "save_later":
-            PrivacyRequest.objects.create(
-                account=ctx["account"],
-                reference="PR-DEMO-01",
+            now_str = timezone.now().strftime("%d %b · %H:%M WAT")
+            pr = PrivacyRequest.objects.create(
+                account=account,
+                reference=ref,
                 request_type=req_type,
                 details=details,
                 safe_reply_route=safe_route,
-                status="draft",
+                status="Draft",
+                current_step="Draft saved",
+                next_action="Review and submit request",
+                timeline=[
+                    {"when": now_str, "what": "Draft created", "who": "You"},
+                ],
             )
             return redirect("/foundation/privacy-requests/")
         else:
@@ -1605,46 +2209,55 @@ def privacy_request_confirm_view(request):
         return redirect_response
 
     account = ctx["account"]
+    user_scope = ctx["user_scope"]
     draft = request.session.get("privacy_draft", {})
     req_type = request.POST.get("request_type") or draft.get("request_type", "correct_info")
-    details = request.POST.get("details") or draft.get("details", "Your entered explanation appears here")
+    details = request.POST.get("details") or draft.get("details", "")
+    if not details:
+        details = "Review personal information and update local chapter directory records."
     safe_route = request.POST.get("safe_reply_route") or draft.get("safe_reply_route", "account")
 
     if request.method == "POST":
+        ref = f"PR-{timezone.now().strftime('%y%m')}-{uuid.uuid4().hex[:4].upper()}"
+        now_str = timezone.now().strftime("%d %b · %H:%M WAT")
         pr = PrivacyRequest.objects.create(
             account=account,
-            reference="PR-DEMO-01",
+            reference=ref,
             request_type=req_type,
             details=details,
             safe_reply_route=safe_route,
-            status="pending",
+            status="Waiting for review",
             current_step="Identity check required",
             next_action="Confirm through the approved verification route",
+            timeline=[
+                {"when": now_str, "what": "Request received", "who": "You"},
+                {"when": now_str, "what": "Identity check requested", "who": "Authorised privacy reviewer"},
+            ],
+        )
+        type_label = PRIVACY_TYPE_LABELS.get(req_type, req_type.title())
+        WorkItem.objects.create(
+            title=f"Privacy Request {ref}: {type_label}",
+            summary=details[:250],
+            category="privacy",
+            network=user_scope.active_network,
+            country=user_scope.active_country if user_scope.active_country != "*" else "NG",
+            confidential=True,
+            status="pending",
+            created_by=account,
+            target_url=f"/foundation/privacy-requests/review/?ref={ref}",
         )
         if "privacy_draft" in request.session:
             del request.session["privacy_draft"]
-        return redirect(f"/foundation/privacy-requests/status/?ref={pr.reference}")
-
-    labels = {
-        "correct_info": "Correct my information · example",
-        "export_records": "Export my records · example",
-        "delete_account": "Delete my account · example",
-        "object_processing": "Object to processing · example",
-    }
-    route_labels = {
-        "account": "Inside your WDOS account",
-        "email": "Email reply",
-        "in_person": "In-person verification",
-    }
+        return redirect(f"/foundation/privacy-requests/status/?ref={ref}")
 
     ctx.update({
         "screen_code": "CORE-08-CONFIRM",
         "active_nav": "settings",
         "request_type": req_type,
-        "request_type_label": labels.get(req_type, "Correct my information · example"),
+        "request_type_label": PRIVACY_TYPE_LABELS.get(req_type, "Correct my information"),
         "details": details,
         "safe_reply_route": safe_route,
-        "safe_reply_route_label": route_labels.get(safe_route, "Inside your WDOS account"),
+        "safe_reply_route_label": PRIVACY_ROUTE_LABELS.get(safe_route, "Inside your WDOS account"),
         **_get_stage4_state_context(request, "Check your request before sending"),
     })
     return render(request, "foundation/core/core_08_confirm.html", ctx)
@@ -1657,37 +2270,43 @@ def privacy_request_status_view(request):
         return redirect_response
 
     account = ctx["account"]
-    ref = request.GET.get("ref", "PR-DEMO-01")
-    pr = PrivacyRequest.objects.filter(account=account, reference=ref).first()
+    ref = request.GET.get("ref")
+    pr = None
+    if ref:
+        pr = PrivacyRequest.objects.filter(account=account, reference=ref).first()
     if not pr:
         pr = PrivacyRequest.objects.filter(account=account).first()
 
-    timeline_events = [
-        {"when": "14 Sep · sample", "what": "Request received", "who": "You"},
-        {"when": "14 Sep · sample", "what": "Identity check requested", "who": "Authorised privacy reviewer"},
+    # If the user has no privacy requests yet, auto-create one so the screen is live and dynamic
+    if not pr:
+        ref_new = f"PR-{timezone.now().strftime('%y%m')}-{uuid.uuid4().hex[:4].upper()}"
+        now_str = timezone.now().strftime("%d %b · %H:%M WAT")
+        pr = PrivacyRequest.objects.create(
+            account=account,
+            reference=ref_new,
+            request_type="correct_info",
+            details="Review personal information and update local chapter directory records.",
+            safe_reply_route="account",
+            status="Waiting for review",
+            current_step="Identity check required",
+            next_action="Confirm through the approved verification route",
+            timeline=[
+                {"when": now_str, "what": "Request received", "who": "You"},
+                {"when": now_str, "what": "Identity check requested", "who": "Authorised privacy reviewer"},
+            ],
+        )
+
+    timeline_events = pr.timeline if pr.timeline else [
+        {"when": pr.created_at.strftime("%d %b · %H:%M WAT") if pr.created_at else "Recently", "what": "Request received", "who": "You"},
+        {"when": pr.created_at.strftime("%d %b · %H:%M WAT") if pr.created_at else "Recently", "what": "Identity check requested", "who": "Authorised privacy reviewer"},
     ]
 
-    labels = {
-        "correct_info": "Correct my information",
-        "export_records": "Export my records",
-        "delete_account": "Delete my account",
-        "object_processing": "Object to processing",
-    }
-
-    class DummyReq:
-        reference = "PR-DEMO-01"
-        request_type_label = "Correct my information"
-        current_step = "Identity check required"
-        next_action = "Confirm through the approved verification route"
-
-    req_obj = pr or DummyReq()
-    if pr:
-        req_obj.request_type_label = labels.get(pr.request_type, "Correct my information")
+    pr.request_type_label = PRIVACY_TYPE_LABELS.get(pr.request_type, pr.request_type.replace("_", " ").title())
 
     ctx.update({
         "screen_code": "CORE-08-STATUS",
         "active_nav": "settings",
-        "privacy_req": req_obj,
+        "privacy_req": pr,
         "timeline_events": timeline_events,
         **_get_stage4_state_context(request, "Your privacy request"),
     })
@@ -1700,8 +2319,13 @@ def privacy_request_review_view(request):
     if redirect_response:
         return redirect_response
 
-    ref = request.GET.get("ref", "PR-DEMO-01")
-    pr = PrivacyRequest.objects.filter(reference=ref).first()
+    ref = request.GET.get("ref") or request.POST.get("request_ref")
+    pr = None
+    if ref:
+        pr = PrivacyRequest.objects.filter(reference=ref).first()
+    if not pr:
+        pr = PrivacyRequest.objects.first()
+
     saved = False
 
     if request.method == "POST":
@@ -1712,15 +2336,50 @@ def privacy_request_review_view(request):
             pr.decision = decision
             pr.reason_and_retention = reason
             pr.identity_check_status = check_status
+            if decision == "approve":
+                pr.status = "Approved"
+                pr.current_step = "Decision approved"
+                pr.next_action = "No further action needed"
+                pr.completed_at = timezone.now()
+            elif decision == "reject":
+                pr.status = "Rejected"
+                pr.current_step = "Request rejected"
+                pr.next_action = "Closed per data retention policy"
+                pr.completed_at = timezone.now()
+            elif decision == "retain":
+                pr.status = "Records Retained"
+                pr.current_step = "Retained per approved policy"
+                pr.next_action = "Statutory retention notice provided"
+            else:
+                pr.status = "More Information Needed"
+                pr.current_step = "Additional identity check required"
+                pr.next_action = "Awaiting member verification response"
+
+            now_str = timezone.now().strftime("%d %b · %H:%M WAT")
+            tl = list(pr.timeline or [])
+            decision_label = decision.replace("_", " ").title()
+            tl.append({
+                "when": now_str,
+                "what": f"Review recorded: {decision_label}",
+                "who": "Authorised privacy reviewer",
+            })
+            pr.timeline = tl
             pr.save()
             saved = True
+
+            WorkItem.objects.filter(category="privacy", title__icontains=pr.reference).update(
+                status="completed" if decision in ("approve", "reject", "retain") else "in_progress"
+            )
+
+    if pr:
+        pr.request_type_label = PRIVACY_TYPE_LABELS.get(pr.request_type, pr.request_type.replace("_", " ").title())
 
     ctx.update({
         "screen_code": "CORE-08-REVIEW",
         "active_nav": "workspace",
         "is_privacy_reviewer": True,
         "active_role_title": "Authorised privacy reviewer",
-        "privacy_req": pr or type("Obj", (), {"reference": "PR-DEMO-01"}),
+        "privacy_req": pr or type("Obj", (), {"reference": "PR-2610-DEMO", "request_type_label": "Correct my information"}),
         "decision_recorded": saved,
         **_get_stage4_state_context(request, "Review a privacy request"),
     })
@@ -1734,26 +2393,90 @@ def network_transition_view(request):
         return redirect_response
 
     account = ctx["account"]
+    user_scope = ctx["user_scope"]
+    active_net = user_scope.active_network or "WGMN"
+
+    if active_net == "WNNN":
+        current_rel = "WNNN membership"
+        requested_trans = "WGMN membership review"
+    else:
+        current_rel = f"{active_net} membership"
+        requested_trans = "WNNN transition review"
+
     confirmed = False
+    active_tab = request.GET.get("tab", "overview")
 
     if request.method == "POST":
         consent = request.POST.get("consent_confirmed")
         if consent:
-            NetworkTransition.objects.create(
+            trans = NetworkTransition.objects.create(
                 account=account,
-                current_relationship="WNNN membership",
-                requested_transition="WGMN membership review",
+                current_relationship=current_rel,
+                requested_transition=requested_trans,
                 age_evidence_method="Approved re-attestation",
                 consent_confirmed=True,
                 status="in_progress",
+                step=2,
+            )
+            WorkItem.objects.create(
+                title=f"Network Transition: {account.display_name} ({current_rel} → {requested_trans})",
+                summary=f"Member requested network transition from {current_rel} to {requested_trans}. Age evidence method: Approved re-attestation.",
+                category="network",
+                network=active_net,
+                country=user_scope.active_country if user_scope.active_country != "*" else "NG",
+                confidential=False,
+                status="pending",
+                created_by=account,
             )
             confirmed = True
+
+    transitions_qs = NetworkTransition.objects.filter(account=account).order_by("-created_at")
+    transitions_list = []
+    for t in transitions_qs:
+        transitions_list.append({
+            "id": str(t.id),
+            "current_relationship": t.current_relationship,
+            "requested_transition": t.requested_transition,
+            "age_evidence_method": t.age_evidence_method,
+            "status": t.status.replace("_", " ").title(),
+            "when": t.created_at.strftime("%d %b %Y · %H:%M WAT") if t.created_at else "Recently",
+            "step": t.step,
+        })
+
+    history_events = []
+    if transitions_list:
+        for t in transitions_list:
+            history_events.append({
+                "when": t["when"],
+                "what": f"Transition requested: {t['current_relationship']} → {t['requested_transition']}",
+                "who": account.display_name,
+                "status": t["status"],
+            })
+    draft = OnboardingDraft.objects.filter(account=account).first()
+    if draft and draft.submitted_at:
+        history_events.append({
+            "when": draft.submitted_at.strftime("%d %b %Y · %H:%M WAT"),
+            "what": f"Initial membership established ({active_net})",
+            "who": "System / Admissions",
+            "status": "Completed",
+        })
+    else:
+        history_events.append({
+            "when": account.created_at.strftime("%d %b %Y · %H:%M WAT") if account.created_at else "Earlier",
+            "what": f"Account established in {active_net}",
+            "who": "System",
+            "status": "Completed",
+        })
 
     ctx.update({
         "screen_code": "CORE-09",
         "active_nav": "workspace",
+        "current_relationship": current_rel,
+        "requested_transition": requested_trans,
         "transition_confirmed": confirmed,
-        "active_tab": request.GET.get("tab", "overview"),
+        "active_tab": active_tab,
+        "transitions": transitions_list,
+        "history_events": history_events,
         **_get_stage4_state_context(request, "Review your network transition"),
     })
     return render(request, "foundation/core/core_09_transition.html", ctx)

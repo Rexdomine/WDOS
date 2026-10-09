@@ -2,6 +2,7 @@
 import base64
 import hashlib
 import json
+import logging
 import secrets
 import sys
 import uuid
@@ -18,6 +19,8 @@ from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
 from .email_templates import render_email
 from .models import Account, ActionToken, AuditEvent, EmailIntent, Invitation, Person, RecoveryCode, Throttle
+
+logger = logging.getLogger(__name__)
 
 
 def digest(value):
@@ -94,9 +97,17 @@ def _email_locked(account, purpose):
     # A supervised outbox worker sends after commit; request timing never waits on Brevo.
     if 'test' not in sys.argv and (getattr(settings, 'DEBUG', False) or not getattr(settings, 'BREVO_API_KEY', None)):
         if purpose == 'verify':
-            print(f'\n============================================================\n[LOCAL DEV] Verification code for {account.email}: {secret}\n============================================================\n', flush=True)
+            msg = f'\n============================================================\n[LOCAL DEV] Verification code for {account.email}: {secret}\n============================================================\n'
         else:
-            print(f'\n============================================================\n[LOCAL DEV] Password reset link for {account.email}: {url}\n============================================================\n', flush=True)
+            msg = f'\n============================================================\n[LOCAL DEV] Password reset link for {account.email}: {url}\n============================================================\n'
+        try:
+            logger.info(msg)
+        except Exception:
+            pass
+        try:
+            print(msg, flush=True)
+        except (OSError, ValueError):
+            pass
     return intent
 
 

@@ -55,7 +55,7 @@
     </thead>
     <tbody>
       {% for req in privacy_requests %}
-      <tr>
+      <tr data-privacy-row>
         <td style="font-weight:600; color:var(--wdos-ink);">{{ req.title }}</td>
         <td style="color:var(--wdos-muted);">{{ req.submitted_str }}</td>
         <td>{{ req.status_str }}</td>
@@ -67,13 +67,10 @@
       </tr>
       {% empty %}
       <tr>
-        <td style="font-weight:600; color:var(--wdos-ink);">Example correction</td>
-        <td style="color:var(--wdos-muted);">14 Sep · sample</td>
-        <td style="color:var(--wdos-ink);">Waiting for review</td>
-        <td>
-          <a href="/foundation/privacy-requests/status/" class="action-pill" style="text-decoration:none;">
-            <span class="dot"></span> View progress
-          </a>
+        <td colspan="4" style="text-align:center; padding:32px 16px; color:var(--wdos-muted);">
+          <div style="font-size:14px; font-weight:600; color:var(--wdos-ink); margin-bottom:4px;">No privacy requests</div>
+          <div style="font-size:12.5px; margin-bottom:12px;">You haven't submitted any data subject or privacy requests yet.</div>
+          <a href="/foundation/privacy-requests/new/" class="btn primary small" style="text-decoration:none;">→ Start a privacy request</a>
         </td>
       </tr>
       {% endfor %}
@@ -83,7 +80,7 @@
   <!-- Mobile Stacked List -->
   <div class="stage4-mobile-list">
     {% for req in privacy_requests %}
-    <div class="mobile-stacked-item">
+    <div class="mobile-stacked-item" data-privacy-row>
       <div class="mobile-stacked-row"><span class="label">Request</span><span class="value">{{ req.title }}</span></div>
       <div class="mobile-stacked-row"><span class="label">Submitted</span><span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ req.submitted_str }}</span></div>
       <div class="mobile-stacked-row"><span class="label">Status</span><span class="value">{{ req.status_str }}</span></div>
@@ -93,24 +90,20 @@
       </div>
     </div>
     {% empty %}
-    <div class="mobile-stacked-item">
-      <div class="mobile-stacked-row"><span class="label">Request</span><span class="value">Example correction</span></div>
-      <div class="mobile-stacked-row"><span class="label">Submitted</span><span class="value" style="font-weight:400; color:var(--wdos-muted);">14 Sep · sample</span></div>
-      <div class="mobile-stacked-row"><span class="label">Status</span><span class="value">Waiting for review</span></div>
-      <div class="mobile-stacked-row" style="margin-top:6px;">
-        <span class="label">Next step</span>
-        <span class="value"><a href="/foundation/privacy-requests/status/" class="action-pill" style="text-decoration:none;"><span class="dot"></span> View progress</a></span>
-      </div>
+    <div style="text-align:center; padding:24px; color:var(--wdos-muted);">
+      <div style="font-size:13px; font-weight:600; color:var(--wdos-ink); margin-bottom:4px;">No privacy requests</div>
+      <div style="font-size:12px; margin-bottom:10px;">You haven't submitted any data subject or privacy requests yet.</div>
+      <a href="/foundation/privacy-requests/new/" class="btn primary small" style="text-decoration:none;">Start a request</a>
     </div>
     {% endfor %}
   </div>
 
   <div class="stage4-table-foot">
-    <span>Showing 1 records in this view</span>
+    <span>Showing {{ privacy_requests|length }} record{{ privacy_requests|length|pluralize }} in this view</span>
     <div class="pagination-controls">
-      <button type="button" aria-label="Previous page">←</button>
-      <span>1</span>
-      <button type="button" aria-label="Next page">→</button>
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Previous page">←</button>
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">1 of 1</span>
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Next page">→</button>
     </div>
   </div>
 </div>

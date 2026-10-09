@@ -25,6 +25,14 @@
 </div>
 {% endif %}
 
+{% if signed_out_success %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid #35581B; background:#EDF5E6;">
+  <div class="stage4-state-icon" style="color:#35581B; border-color:#35581B;">✓</div>
+  <h3 style="color:#35581B;">Device signed out successfully</h3>
+  <p>The selected device session has been revoked and must sign in again before accessing WDOS.</p>
+</div>
+{% endif %}
+
 <div class="stage4-card">
   <div class="stage4-card-head" style="margin-bottom:14px;">
     <h2>Your signed-in devices</h2>
@@ -54,7 +62,7 @@
     </thead>
     <tbody>
       {% for session in device_sessions %}
-      <tr>
+      <tr data-session-row>
         <td style="font-weight:600; color:var(--wdos-ink);">{{ session.device_name }}</td>
         <td style="color:var(--wdos-muted);">{{ session.browser_info }}</td>
         <td style="color:var(--wdos-muted);">{{ session.last_active_str }}</td>
@@ -70,19 +78,8 @@
       </tr>
       {% empty %}
       <tr>
-        <td style="font-weight:600; color:var(--wdos-ink);">This device</td>
-        <td style="color:var(--wdos-muted);">Chrome · Lagos</td>
-        <td style="color:var(--wdos-muted);">Now</td>
-        <td><span class="action-pill"><span class="dot"></span> Keep signed in</span></td>
-      </tr>
-      <tr>
-        <td style="font-weight:600; color:var(--wdos-ink);">Other device</td>
-        <td style="color:var(--wdos-muted);">Mobile browser</td>
-        <td style="color:var(--wdos-muted);">Yesterday</td>
-        <td>
-          <a href="/foundation/account/signout-device/" class="action-pill amber" style="text-decoration:none;">
-            <span class="dot"></span> Review sign-out
-          </a>
+        <td colspan="4" style="text-align:center; padding:24px; color:var(--wdos-muted);">
+          No device sessions found.
         </td>
       </tr>
       {% endfor %}
@@ -92,7 +89,7 @@
   <!-- Mobile Stacked List -->
   <div class="stage4-mobile-list">
     {% for session in device_sessions %}
-    <div class="mobile-stacked-item">
+    <div class="mobile-stacked-item" data-session-row>
       <div class="mobile-stacked-row">
         <span class="label">Device</span>
         <span class="value">{{ session.device_name }}</span>
@@ -119,27 +116,18 @@
       </div>
     </div>
     {% empty %}
-    <div class="mobile-stacked-item">
-      <div class="mobile-stacked-row"><span class="label">Device</span><span class="value">This device</span></div>
-      <div class="mobile-stacked-row"><span class="label">Browser / area</span><span class="value">Chrome · Lagos</span></div>
-      <div class="mobile-stacked-row"><span class="label">Last active</span><span class="value">Now</span></div>
-      <div class="mobile-stacked-row"><span class="label">Action</span><span class="value"><span class="action-pill"><span class="dot"></span> Keep signed in</span></span></div>
-    </div>
-    <div class="mobile-stacked-item">
-      <div class="mobile-stacked-row"><span class="label">Device</span><span class="value">Other device</span></div>
-      <div class="mobile-stacked-row"><span class="label">Browser / area</span><span class="value">Mobile browser</span></div>
-      <div class="mobile-stacked-row"><span class="label">Last active</span><span class="value">Yesterday</span></div>
-      <div class="mobile-stacked-row"><span class="label">Action</span><span class="value"><a href="/foundation/account/signout-device/" class="action-pill amber" style="text-decoration:none;"><span class="dot"></span> Review sign-out</a></span></div>
+    <div style="text-align:center; padding:20px; color:var(--wdos-muted);">
+      No device sessions found.
     </div>
     {% endfor %}
   </div>
 
   <div class="stage4-table-foot">
-    <span>Showing {{ device_sessions|length|default:2 }} records in this view</span>
+    <span>Showing {{ device_sessions|length|default:1 }} record{{ device_sessions|length|pluralize }} in this view</span>
     <div class="pagination-controls">
-      <button type="button" aria-label="Previous page">←</button>
-      <span>1</span>
-      <button type="button" aria-label="Next page">→</button>
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Previous page">←</button>
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">1 of 1</span>
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Next page">→</button>
     </div>
   </div>
 </div>

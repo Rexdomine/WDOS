@@ -32,8 +32,8 @@
       <label for="reminder_preference" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">My preference</label>
       <select name="reminder_preference" id="reminder_preference" class="stage4-select" style="width:100%; max-width:440px; padding:10px 14px; border:1px solid var(--wdos-line); border-radius:8px; font-size:13.5px; background:white;">
         <option value="inside_wdos" {% if reminder_preference == 'inside_wdos' or not reminder_preference %}selected{% endif %}>Keep reminders inside WDOS</option>
-        <option value="browser_alerts" {% if reminder_preference == 'browser_alerts' %}selected{% endif %}>Enable browser reminders</option>
-        <option value="disabled" {% if reminder_preference == 'disabled' %}selected{% endif %}>Turn off reminders</option>
+        <option value="browser" {% if reminder_preference == 'browser' or reminder_preference == 'browser_alerts' %}selected{% endif %}>Send browser notifications</option>
+        <option value="none" {% if reminder_preference == 'none' or reminder_preference == 'disabled' %}selected{% endif %}>Do not send reminders</option>
       </select>
     </div>
 

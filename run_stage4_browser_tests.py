@@ -765,8 +765,14 @@ def run_all_tests():
 
     finally:
         print(">>> Terminating Django server...")
-        server_proc.terminate()
-        server_proc.wait()
+        try:
+            if sys.platform == "win32":
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(server_proc.pid)], capture_output=True)
+            else:
+                server_proc.terminate()
+            server_proc.wait(timeout=5)
+        except Exception:
+            pass
 
     # Generate Markdown Report
     report_path = EVIDENCE_DIR / "STAGE4_EVIDENCE_REPORT.md"

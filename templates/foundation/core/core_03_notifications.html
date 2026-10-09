@@ -36,14 +36,48 @@
 
   <!-- Toolbar -->
   <div class="stage4-filter-toolbar">
-    <div class="stage4-search-box">
+    <form method="get" action="/foundation/notifications/" class="stage4-search-box" id="notif-search-form" style="margin:0;">
+      {% if status_filter and status_filter != 'all' %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+      {% if category_filter and category_filter != 'all' %}<input type="hidden" name="category" value="{{ category_filter }}">{% endif %}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" placeholder="Search these records" id="notif-search">
-    </div>
+      <input type="text" name="q" value="{{ search_query|default:'' }}" placeholder="Search these records" id="notif-search" autocomplete="off">
+    </form>
     <div class="stage4-filter-actions">
-      <span class="stage4-filter-pill-active">Current view</span>
-      <button type="button" class="stage4-filter-pill">Status ↓</button>
-      <button type="button" class="stage4-filter-pill">More filters</button>
+      <a href="?status=all{% if search_query %}&q={{ search_query }}{% endif %}" class="{% if status_filter == 'all' and category_filter == 'all' %}stage4-filter-pill-active{% else %}stage4-filter-pill{% endif %}" style="text-decoration:none;">Current view</a>
+      
+      <!-- Status Filter Dropdown / Toggle -->
+      <div style="position:relative; display:inline-block;" data-dropdown>
+        <button type="button" class="stage4-filter-pill {% if status_filter != 'all' %}stage4-filter-pill-active{% endif %}" data-dropdown-trigger aria-haspopup="true" aria-expanded="false">
+          Status{% if status_filter != 'all' %}: {{ status_filter|title }}{% endif %} ↓
+        </button>
+        <div class="stage4-filter-menu" data-dropdown-menu hidden style="position:absolute; top:calc(100% + 4px); left:0; background:#FFF; border:1px solid var(--wdos-line, #E8E6E1); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); min-width:160px; z-index:50; padding:6px 0;">
+          <a href="?status=all{% if search_query %}&q={{ search_query }}{% endif %}{% if category_filter and category_filter != 'all' %}&category={{ category_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if status_filter == 'all' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">All ({{ total_count }})</a>
+          <a href="?status=unread{% if search_query %}&q={{ search_query }}{% endif %}{% if category_filter and category_filter != 'all' %}&category={{ category_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if status_filter == 'unread' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">Unread ({{ unread_count }})</a>
+          <a href="?status=read{% if search_query %}&q={{ search_query }}{% endif %}{% if category_filter and category_filter != 'all' %}&category={{ category_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if status_filter == 'read' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">Read ({{ read_count }})</a>
+          {% if failed_count > 0 %}
+          <a href="?status=failed{% if search_query %}&q={{ search_query }}{% endif %}{% if category_filter and category_filter != 'all' %}&category={{ category_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-danger, #b91c1c); text-decoration:none; {% if status_filter == 'failed' %}font-weight:700;{% endif %}">Failures ({{ failed_count }})</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- More Filters (Category) Dropdown -->
+      <div style="position:relative; display:inline-block;" data-dropdown>
+        <button type="button" class="stage4-filter-pill {% if category_filter and category_filter != 'all' %}stage4-filter-pill-active{% endif %}" data-dropdown-trigger aria-haspopup="true" aria-expanded="false">
+          {% if category_filter and category_filter != 'all' %}Category: {{ category_filter|title }}{% else %}More filters{% endif %} ↓
+        </button>
+        <div class="stage4-filter-menu" data-dropdown-menu hidden style="position:absolute; top:calc(100% + 4px); left:0; background:#FFF; border:1px solid var(--wdos-line, #E8E6E1); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); min-width:160px; z-index:50; padding:6px 0;">
+          <a href="?category=all{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if not category_filter or category_filter == 'all' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">All categories</a>
+          <a href="?category=activity{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if category_filter == 'activity' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">Activity</a>
+          <a href="?category=security{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if category_filter == 'security' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">Security</a>
+          <a href="?category=system{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if category_filter == 'system' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">System</a>
+          <a href="?category=work_queue{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if category_filter == 'work_queue' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">Work Queue</a>
+          <a href="?category=privacy{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}" style="display:block; padding:6px 14px; font-size:12.5px; color:var(--wdos-ink); text-decoration:none; {% if category_filter == 'privacy' %}font-weight:700; color:var(--wdos-magenta);{% endif %}">Privacy</a>
+        </div>
+      </div>
+
+      {% if status_filter and status_filter != 'all' or category_filter and category_filter != 'all' or search_query %}
+      <a href="/foundation/notifications/" class="stage4-filter-pill" style="text-decoration:none; color:var(--wdos-muted);">✕ Clear filters</a>
+      {% endif %}
     </div>
   </div>
 
@@ -58,13 +92,65 @@
     </thead>
     <tbody>
       {% for item in notification_items %}
-      <tr class="{% if not item.is_read and not item.read %}stage4-row-unread{% endif %}">
+      <tr class="{% if not item.is_read %}stage4-row-unread{% endif %}" data-notif-row data-notif-id="{{ item.id }}">
         <td style="font-weight:600; color:var(--wdos-ink);">
-          {{ item.title }}
-          {% if item.delivery_label %}<br><small style="color:var(--wdos-danger, #b91c1c); font-size:11px;">{{ item.delivery_label }}</small>{% endif %}
+          <a href="{{ item.action_url }}" style="color:inherit; text-decoration:none;">{{ item.title }}</a>
+          {% if item.delivery_label %}<br><small style="color:var(--wdos-danger, #b91c1c); font-size:11px; font-weight:700;">{{ item.delivery_label }}</small>{% endif %}
+          {% if item.message %}<div style="font-size:11.5px; color:var(--wdos-muted); font-weight:normal; margin-top:2px;">{{ item.message|truncatewords:14 }}</div>{% endif %}
         </td>
-        <td style="color:var(--wdos-muted);">{{ item.when }}</td>
+        <td style="color:var(--wdos-muted); font-size:12.5px;">{{ item.when }}</td>
         <td>
+          {% if item.is_form %}
+          <form method="post" action="{{ item.action_url }}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="action-pill {{ item.pill_style|default:'' }}" style="border:none; cursor:pointer; font-family:inherit; font-size:inherit;">
+              <span class="dot"></span> {{ item.action_label }}
+            </button>
+          </form>
+          {% else %}
+          <div style="display:inline-flex; align-items:center; gap:8px;">
+            <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
+              <span class="dot"></span> {{ item.action_label }}
+            </a>
+            {% if not item.is_read and item.id %}
+            <button type="button" class="btn secondary small" data-mark-read="{{ item.id }}" title="Mark as read" style="font-size:11px; padding:3px 8px; border-radius:12px; cursor:pointer;">
+              Mark read
+            </button>
+            {% endif %}
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="3" style="text-align:center; padding:32px 16px; color:var(--wdos-muted);">
+          <div style="font-size:14px; font-weight:600; color:var(--wdos-ink); margin-bottom:4px;">No records in this view</div>
+          <div style="font-size:12.5px; margin-bottom:12px;">There are no my workspace records matching the selected scope.</div>
+          <a href="/foundation/notifications/" class="btn primary small" style="display:inline-block; text-decoration:none;">Clear filters</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Mobile Stacked List -->
+  <div class="stage4-mobile-list">
+    {% for item in notification_items %}
+    <div class="mobile-stacked-item {% if not item.is_read %}stage4-row-unread{% endif %}" data-notif-row data-notif-id="{{ item.id }}">
+      <div class="mobile-stacked-row">
+        <span class="label">Item</span>
+        <span class="value">
+          <a href="{{ item.action_url }}" style="color:inherit; text-decoration:none; font-weight:600;">{{ item.title }}</a>
+          {% if item.delivery_label %}<br><small style="color:var(--wdos-danger, #b91c1c); font-size:11px; font-weight:700;">{{ item.delivery_label }}</small>{% endif %}
+        </span>
+      </div>
+      <div class="mobile-stacked-row">
+        <span class="label">When</span>
+        <span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ item.when }}</span>
+      </div>
+      <div class="mobile-stacked-row" style="margin-top:6px;">
+        <span class="label">Next action</span>
+        <span class="value">
           {% if item.is_form %}
           <form method="post" action="{{ item.action_url }}" style="display:inline;">
             {% csrf_token %}
@@ -76,49 +162,38 @@
           <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
             <span class="dot"></span> {{ item.action_label }}
           </a>
+          {% if not item.is_read and item.id %}
+          <button type="button" class="btn secondary small" data-mark-read="{{ item.id }}" title="Mark as read" style="font-size:11px; padding:3px 8px; border-radius:12px; margin-left:6px; cursor:pointer;">
+            Mark read
+          </button>
           {% endif %}
-        </td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="3" style="text-align:center; padding:24px; color:var(--wdos-muted);">
-          There are no notifications matching the selected scope.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <!-- Mobile Stacked List -->
-  <div class="stage4-mobile-list">
-    {% for item in notification_items %}
-    <div class="mobile-stacked-item">
-      <div class="mobile-stacked-row">
-        <span class="label">Item</span>
-        <span class="value">{{ item.title }}</span>
-      </div>
-      <div class="mobile-stacked-row">
-        <span class="label">When</span>
-        <span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ item.when }}</span>
-      </div>
-      <div class="mobile-stacked-row" style="margin-top:6px;">
-        <span class="label">Next action</span>
-        <span class="value">
-          <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
-            <span class="dot"></span> {{ item.action_label }}
-          </a>
+          {% endif %}
         </span>
       </div>
+    </div>
+    {% empty %}
+    <div style="text-align:center; padding:24px; color:var(--wdos-muted);">
+      <div style="font-size:13px; font-weight:600; color:var(--wdos-ink); margin-bottom:4px;">No records in this view</div>
+      <div style="font-size:12px; margin-bottom:10px;">There are no my workspace records matching the selected scope.</div>
+      <a href="/foundation/notifications/" class="btn primary small" style="text-decoration:none;">Clear filters</a>
     </div>
     {% endfor %}
   </div>
 
   <div class="stage4-table-foot">
-    <span>Showing {{ notification_items|length }} records in this view</span>
+    <span>Showing {{ page_obj.start_index|default:0 }}–{{ page_obj.end_index|default:0 }} of {{ page_obj.paginator.count|default:0 }} records in this view</span>
     <div class="pagination-controls">
-      <button type="button" aria-label="Previous page">←</button>
-      <span>1</span>
-      <button type="button" aria-label="Next page">→</button>
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if category_filter and category_filter != 'all' %}&category={{ category_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}" class="btn small" style="text-decoration:none; padding:4px 10px;" aria-label="Previous page">←</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Previous page">←</button>
+      {% endif %}
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">{{ page_obj.number|default:1 }} of {{ page_obj.paginator.num_pages|default:1 }}</span>
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if category_filter and category_filter != 'all' %}&category={{ category_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}" class="btn small" style="text-decoration:none; padding:4px 10px;" aria-label="Next page">→</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Next page">→</button>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -137,7 +212,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
     </div>
     <h3 style="font-size:15px; font-weight:700; color:var(--wdos-ink); margin:0 0 6px 0;">Your local connection</h3>
-    <p style="font-size:12px; color:var(--wdos-muted); margin:0 0 10px 0;">{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }} · Lagos · Ikeja.</p>
+    <p style="font-size:12px; color:var(--wdos-muted); margin:0 0 10px 0;">{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }}{% if local_connection %} · {{ local_connection }}{% endif %}.</p>
     <a href="/foundation/profile/" style="color:var(--wdos-magenta); font-size:12.5px; font-weight:600; text-decoration:none;">My membership →</a>
   </div>
 

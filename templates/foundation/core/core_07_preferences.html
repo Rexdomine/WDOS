@@ -55,11 +55,11 @@
           <div class="stage4-form-group" style="margin-bottom:0;">
             <label for="timezone" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Timezone</label>
             <select name="timezone" id="timezone" class="stage4-select" style="width:100%; padding:10px 14px; font-size:13.5px;">
-              <option value="Africa/Lagos" {% if user_pref.timezone == 'Africa/Lagos' or not user_pref.timezone %}selected{% endif %}>Africa/Lagos</option>
-              <option value="UTC" {% if user_pref.timezone == 'UTC' %}selected{% endif %}>UTC</option>
-              <option value="Africa/Accra" {% if user_pref.timezone == 'Africa/Accra' %}selected{% endif %}>Africa/Accra</option>
-              <option value="Africa/Nairobi" {% if user_pref.timezone == 'Africa/Nairobi' %}selected{% endif %}>Africa/Nairobi</option>
-              <option value="Europe/London" {% if user_pref.timezone == 'Europe/London' %}selected{% endif %}>Europe/London</option>
+              <option value="Africa/Lagos" {% if request.session.wdos_timezone == 'Africa/Lagos' or not request.session.wdos_timezone %}selected{% endif %}>Africa/Lagos</option>
+              <option value="UTC" {% if request.session.wdos_timezone == 'UTC' %}selected{% endif %}>UTC</option>
+              <option value="Africa/Accra" {% if request.session.wdos_timezone == 'Africa/Accra' %}selected{% endif %}>Africa/Accra</option>
+              <option value="Africa/Nairobi" {% if request.session.wdos_timezone == 'Africa/Nairobi' %}selected{% endif %}>Africa/Nairobi</option>
+              <option value="Europe/London" {% if request.session.wdos_timezone == 'Europe/London' %}selected{% endif %}>Europe/London</option>
             </select>
           </div>
         </div>
@@ -77,9 +77,9 @@
           <div class="stage4-form-group" style="margin-bottom:0;">
             <label for="email_updates" style="display:block; font-size:13.5px; font-weight:700; color:#171717; margin-bottom:8px;">Optional email updates</label>
             <select name="email_updates" id="email_updates" class="stage4-select" style="width:100%; padding:10px 14px; font-size:13.5px;">
-              <option value="weekly" selected>Weekly summary</option>
-              <option value="daily">Daily digest</option>
-              <option value="none">Off</option>
+              <option value="weekly" {% if user_pref.activity_digest == 'weekly' or not user_pref.activity_digest %}selected{% endif %}>Weekly summary</option>
+              <option value="daily" {% if user_pref.activity_digest == 'daily' %}selected{% endif %}>Daily digest</option>
+              <option value="none" {% if user_pref.activity_digest == 'none' %}selected{% endif %}>Off</option>
             </select>
           </div>
         </div>

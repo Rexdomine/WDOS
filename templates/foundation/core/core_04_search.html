@@ -106,11 +106,19 @@
   </div>
 
   <div class="stage4-table-foot">
-    <span>Showing {{ search_results|length }} records in this view</span>
+    <span>Showing {{ page_obj.start_index|default:0 }}–{{ page_obj.end_index|default:0 }} of {{ page_obj.paginator.count|default:search_results|length }} records in this view</span>
     <div class="pagination-controls">
-      <button type="button" aria-label="Previous page">←</button>
-      <span>1</span>
-      <button type="button" aria-label="Next page">→</button>
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}{% if active_tab %}&tab={{ active_tab }}{% endif %}{% if q %}&q={{ q }}{% endif %}" class="btn small" style="text-decoration:none; padding:4px 10px;" aria-label="Previous page">←</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Previous page">←</button>
+      {% endif %}
+      <span style="font-size:12px; font-weight:600; padding:0 8px;">{{ page_obj.number|default:1 }} of {{ page_obj.paginator.num_pages|default:1 }}</span>
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if active_tab %}&tab={{ active_tab }}{% endif %}{% if q %}&q={{ q }}{% endif %}" class="btn small" style="text-decoration:none; padding:4px 10px;" aria-label="Next page">→</a>
+      {% else %}
+      <button type="button" disabled style="opacity:0.4; cursor:not-allowed;" aria-label="Next page">→</button>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -130,7 +138,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
     </div>
     <h3 style="font-size:15px; font-weight:700; color:#171717; margin:0 0 6px 0;">Your local connection</h3>
-    <p style="font-size:12.5px; color:#6B6B6B; margin:0 0 12px 0;">{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }} · Lagos · Ikeja.</p>
+    <p style="font-size:12.5px; color:#6B6B6B; margin:0 0 12px 0;">{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }}{% if local_connection %} · {{ local_connection }}{% endif %}.</p>
     <a href="/foundation/profile/" class="text-link" style="color:var(--wdos-magenta); font-size:12.5px; font-weight:600; text-decoration:none;">My membership →</a>
   </div>
 

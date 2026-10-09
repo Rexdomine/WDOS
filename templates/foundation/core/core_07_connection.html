@@ -25,6 +25,26 @@
 </div>
 {% endif %}
 
+{% if check_requested %}
+  {% if is_connected %}
+  <div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid #35581B; background:#EDF5E6;">
+    <div class="stage4-state-icon" style="color:#35581B; border-color:#35581B;">✓</div>
+    <h3 style="color:#35581B;">Connection verified</h3>
+    <p>{{ status_detail }} You can safely continue your work.</p>
+    <a href="/foundation/workspace/" class="btn primary small" style="margin-top:8px;">→ Return to your workspace</a>
+  </div>
+  {% else %}
+  <div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid #CF1322; background:#FFF1F0;">
+    <div class="stage4-state-icon" style="color:#CF1322; border-color:#CF1322;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <h3 style="color:#CF1322;">Connection unavailable</h3>
+    <p>{{ status_detail }} Your unsent work is protected on this device. Reconnect before submitting changes.</p>
+    <a href="/foundation/connection-status/?check=1" class="btn primary small" style="margin-top:8px;">Try again</a>
+  </div>
+  {% endif %}
+{% endif %}
+
 <div class="stage4-card" style="margin-bottom:24px;">
   <div class="stage4-card-head" style="margin-bottom:20px;">
     <div class="stage4-avatar-icon stage4-icon-circle-purple">

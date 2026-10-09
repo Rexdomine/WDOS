@@ -26,6 +26,7 @@ from .views import (
     notifications_api,
     notifications_view,
     preferences_api,
+    priority_work_item_view,
     privacy_request_confirm_view,
     privacy_request_detail,
     privacy_request_export_download,
@@ -65,6 +66,7 @@ urlpatterns = [
     path("foundation/scope/switch/", switch_scope, name="switch-scope"),
 
     # Work Queue
+    path("foundation/work-queue/priority/", priority_work_item_view, name="work-queue-priority"),
     path("foundation/work-queue/", work_queue_view, name="work-queue"),
     path("foundation/work-queue/<uuid:item_id>/", work_item_detail_view, name="work-item-detail"),
     path("foundation/work-queue/<uuid:item_id>/action/", work_item_action_view, name="work-item-action"),

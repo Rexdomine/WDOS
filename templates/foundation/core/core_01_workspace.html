@@ -71,6 +71,11 @@
         <thead>
           <tr>
             <th>ITEM</th>
+            {% if active_tab == 'records' %}
+            <th>CATEGORY</th>
+            {% elif active_tab == 'history' %}
+            <th>RESOLVED BY</th>
+            {% endif %}
             <th>WHEN</th>
             <th>NEXT ACTION</th>
           </tr>
@@ -78,7 +83,17 @@
         <tbody>
           {% for item in workspace_items %}
           <tr>
-            <td style="font-weight:600; color:var(--wdos-ink);">{{ item.title }}</td>
+            <td style="font-weight:600; color:var(--wdos-ink);">
+              <a href="{{ item.action_url }}" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a>
+              {% if item.priority == 'urgent' or item.priority == 'critical' %}
+              <span style="display:inline-block; font-size:10px; font-weight:700; color:#D4006A; background:#FFF0F6; padding:1px 5px; border-radius:4px; margin-left:6px; text-transform:uppercase;">Priority</span>
+              {% endif %}
+            </td>
+            {% if active_tab == 'records' %}
+            <td><span style="font-size:12px; color:var(--wdos-muted); background:var(--wdos-surface-hover); padding:3px 8px; border-radius:4px;">{{ item.category }}</span></td>
+            {% elif active_tab == 'history' %}
+            <td style="font-size:12.5px; color:var(--wdos-ink);">{{ item.assigned_to }}</td>
+            {% endif %}
             <td style="color:var(--wdos-muted);">{{ item.when }}</td>
             <td>
               <a href="{{ item.action_url }}" class="action-pill {{ item.pill_style|default:'' }}" style="text-decoration:none;">
@@ -88,8 +103,14 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="3" style="text-align:center; padding:24px; color:var(--wdos-muted);">
+            <td colspan="4" style="text-align:center; padding:28px; color:var(--wdos-muted);">
+              {% if active_tab == 'history' %}
+              No completed records in this workspace yet. Completed work items will appear here.
+              {% elif active_tab == 'records' %}
+              No active records found for this scope.
+              {% else %}
               No workspace records found for this scope.
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -102,8 +123,19 @@
         <div class="mobile-stacked-item">
           <div class="mobile-stacked-row">
             <span class="label">Item</span>
-            <span class="value">{{ item.title }}</span>
+            <span class="value"><a href="{{ item.action_url }}" style="color:var(--wdos-ink); text-decoration:none;">{{ item.title }}</a></span>
           </div>
+          {% if active_tab == 'records' %}
+          <div class="mobile-stacked-row">
+            <span class="label">Category</span>
+            <span class="value">{{ item.category }}</span>
+          </div>
+          {% elif active_tab == 'history' %}
+          <div class="mobile-stacked-row">
+            <span class="label">Resolved by</span>
+            <span class="value">{{ item.assigned_to }}</span>
+          </div>
+          {% endif %}
           <div class="mobile-stacked-row">
             <span class="label">When</span>
             <span class="value" style="font-weight:400; color:var(--wdos-muted);">{{ item.when }}</span>
@@ -117,6 +149,8 @@
             </span>
           </div>
         </div>
+        {% empty %}
+        <div style="text-align:center; padding:20px; color:var(--wdos-muted);">No records found in this view.</div>
         {% endfor %}
       </div>
 
@@ -124,9 +158,17 @@
       <div class="stage4-table-foot">
         <span>Showing {{ workspace_items|length }} records in this view</span>
         <div class="pagination-controls">
-          <button type="button" aria-label="Previous page">←</button>
-          <span>1</span>
-          <button type="button" aria-label="Next page">→</button>
+          {% if page_obj.has_previous %}
+          <a href="?tab={{ active_tab }}&page={{ page_obj.previous_page_number }}" class="btn small" style="text-decoration:none; padding:4px 10px;">←</a>
+          {% else %}
+          <button type="button" disabled style="opacity:0.4; cursor:not-allowed;">←</button>
+          {% endif %}
+          <span style="font-size:12px; font-weight:600; padding:0 8px;">{{ page_obj.number }} of {{ page_obj.paginator.num_pages|default:1 }}</span>
+          {% if page_obj.has_next %}
+          <a href="?tab={{ active_tab }}&page={{ page_obj.next_page_number }}" class="btn small" style="text-decoration:none; padding:4px 10px;">→</a>
+          {% else %}
+          <button type="button" disabled style="opacity:0.4; cursor:not-allowed;">→</button>
+          {% endif %}
         </div>
       </div>
 
@@ -149,7 +191,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <div>
             <h4>Your local connection</h4>
-            <p>{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }} · Lagos · Ikeja.</p>
+            <p>{{ user_scope.active_network|default:"WGMN" }} · {{ country_name|default:"Nigeria" }}{% if local_connection %} · {{ local_connection }}{% endif %}.</p>
             <a href="/foundation/profile/" class="text-link">My membership →</a>
           </div>
         </div>

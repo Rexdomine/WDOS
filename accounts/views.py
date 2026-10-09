@@ -1,5 +1,7 @@
 """The AUTH-01..09 server-rendered gateway. All mutations require POST + CSRF."""
+import json
 import math
+import re
 import sys
 import uuid
 
@@ -21,13 +23,13 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from . import forms, services
 from .locale import LANGUAGES, catalog, localize_form, logout_preserving_language as django_logout, translate
-from .models import Account, ActionToken, OnboardingDraft
+from .models import Account, ActionToken, EmailIntent, OnboardingDraft
 
 
 LOCALE_COOKIE = 'wdos_language'
 LOCALE_COOKIE_AGE = 31536000
 VERIFY_RESEND_SECONDS = 60
-SUPPORT_URL = 'https://thewoddi.org/contact.html'
+SUPPORT_URL = getattr(settings, 'WDOS_SUPPORT_URL', 'https://thewoddi.org/contact.html')
 RESET_RETRY_SESSION_KEY = 'reset_retry_proof'
 RESET_FLOW_QUERY_KEY = 'reset_flow'
 EXPLICIT_LOCALE_COOKIE = 'wdos_explicit_language'
@@ -94,6 +96,7 @@ def page(request, screen, title, lede, form=None, action=None, **extra):
         'language': LANGUAGES[lang],
         'languages': LANGUAGES,
         'translations': translations,
+        'contact_url': extra.pop('contact_url', SUPPORT_URL),
         **extra,
     }
     response = _set_locale_cookie(render(request, 'accounts/auth.html', values), lang)
@@ -144,6 +147,18 @@ def _verification_page(request, account, form=None, feedback=None):
             'Start from registration or sign in again so we can safely identify the account to verify.',
             verification_unbound=True,
         )
+    dev_verify_code = None
+    if 'test' not in sys.argv and (getattr(settings, 'DEBUG', False) or not getattr(settings, 'BREVO_API_KEY', None)):
+        try:
+            latest_intent = EmailIntent.objects.filter(account=account).order_by('-created_at').first()
+            if latest_intent and latest_intent.encrypted_payload:
+                payload = json.loads(services.decrypt(latest_intent.encrypted_payload))
+                m = re.search(r'\b\d{6}\b', payload.get('textContent', ''))
+                if m:
+                    dev_verify_code = m.group(0)
+        except Exception:
+            pass
+
     return page(
         request, 'AUTH-04', 'Verify your contact details',
         'Enter the code sent to your email. Request another after the timer ends.',
@@ -151,6 +166,7 @@ def _verification_page(request, account, form=None, feedback=None):
         masked_destination=_masked_email(account.email),
         verification_bound=True,
         resend_feedback=translate(_locale(request), feedback) if feedback else None,
+        dev_verify_code=dev_verify_code,
         **_verify_resend_context(account),
     )
 

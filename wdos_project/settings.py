@@ -100,12 +100,13 @@ DEFAULT_ONBOARDING_POLICY = {
     'privacy_notice': 'WDOS collects and processes your personal details, chapter affiliation, and communication preferences solely for membership administration, leadership services, and community coordination under authorized WODDI community privacy standards.',
     'eligibility': [
         {'code': 'adult', 'label': 'Adult Member (18+)', 'network': 'WGMN', 'basis': 'Adult membership criteria verified'},
-        {'code': 'youth', 'label': 'Youth Member (15–24)', 'network': 'WGMN', 'basis': 'Youth membership criteria verified'},
-        {'code': 'pending', 'label': 'More information needed', 'network': 'WGMN', 'basis': 'Pending review'},
+        {'code': 'youth', 'label': 'Youth Member (15–24)', 'network': 'WNNN', 'basis': 'Youth membership criteria verified'},
     ],
     'homes': [
         {'code': 'lagos-hq', 'label': 'Lagos Central Chapter', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'},
         {'code': 'nairobi-hq', 'label': 'Nairobi Kilimani Chapter', 'network': 'WGMN', 'country': 'Kenya', 'region': 'Nairobi', 'district': 'Kilimani', 'kind': 'chapter'},
+        {'code': 'lagos-youth', 'label': 'Lagos Next-Gen Youth Hub', 'network': 'WNNN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'},
+        {'code': 'nairobi-youth', 'label': 'Nairobi Youth Tech Chapter', 'network': 'WNNN', 'country': 'Kenya', 'region': 'Nairobi', 'district': 'Kilimani', 'kind': 'chapter'},
     ],
     'review_role': 'onboarding-reviewer',
     'review_function': 'onboarding-approval',

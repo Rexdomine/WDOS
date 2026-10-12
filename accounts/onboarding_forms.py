@@ -72,13 +72,13 @@ DEFAULT_ELIGIBILITY = [
         'code': 'adult',
         'label': 'Adult Member (18+)',
         'network': 'WGMN',
-        'basis': 'Identity verification on file',
+        'basis': 'Adult membership criteria verified',
     },
     {
         'code': 'youth',
         'label': 'Youth Member (15–24)',
         'network': 'WNNN',
-        'basis': 'Self attestation with guarantor',
+        'basis': 'Youth membership criteria verified',
     },
 ]
 

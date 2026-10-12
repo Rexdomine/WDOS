@@ -39,12 +39,13 @@ def bootstrap():
         'privacy_notice': 'WDOS Privacy Notice: Your data is protected under authorized community scope.',
         'eligibility': [
             {'code': 'adult', 'label': 'Adult Member (18+)', 'network': 'WGMN', 'basis': 'Adult membership criteria verified'},
-            {'code': 'youth', 'label': 'Youth Member (15–24)', 'network': 'WGMN', 'basis': 'Youth membership criteria verified'},
-            {'code': 'pending', 'label': 'More information needed', 'network': 'WGMN', 'basis': 'Pending review'},
+            {'code': 'youth', 'label': 'Youth Member (15–24)', 'network': 'WNNN', 'basis': 'Youth membership criteria verified'},
         ],
         'homes': [
             {'code': 'lagos-home', 'label': 'Lagos Central Chapter', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'},
             {'code': 'nairobi-home', 'label': 'Nairobi Kilimani Chapter', 'network': 'WGMN', 'country': 'Kenya', 'region': 'Nairobi', 'district': 'Kilimani', 'kind': 'chapter'},
+            {'code': 'lagos-youth', 'label': 'Lagos Next-Gen Youth Hub', 'network': 'WNNN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'},
+            {'code': 'nairobi-youth', 'label': 'Nairobi Youth Tech Chapter', 'network': 'WNNN', 'country': 'Kenya', 'region': 'Nairobi', 'district': 'Kilimani', 'kind': 'chapter'},
         ],
         'review_role': 'qa-reviewer',
         'review_function': 'qa-onboarding',
@@ -269,8 +270,15 @@ def run_audit():
         assert any("Adult Member (18+)" in opt for opt in options), "Adult option missing"
         assert any("Youth Member (15–24)" in opt for opt in options), "Youth option missing"
 
+        page.select_option("#id_eligibility", "youth")
+        page.wait_for_timeout(200)
+        assert page.locator("#id_network").input_value() == "WNNN", "Selecting youth did not auto-select WNNN"
+        assert page.locator("#id_verification_basis").input_value() == "Youth membership criteria verified", "Selecting youth did not set correct basis"
+
         page.select_option("#id_eligibility", "adult")
         page.wait_for_timeout(200)
+        assert page.locator("#id_network").input_value() == "WGMN", "Selecting adult did not auto-select WGMN"
+        assert page.locator("#id_verification_basis").input_value() == "Adult membership criteria verified", "Selecting adult did not set correct basis"
 
         # Confirm checkbox
         page.check("#id_eligibility_confirmed", force=True)

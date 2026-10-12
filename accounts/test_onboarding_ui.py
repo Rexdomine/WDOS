@@ -202,4 +202,24 @@ class OnboardingUITests(TestCase):
         self.assertIn('.main {', css)
         self.assertIn('margin-left: 232px !important', css)
 
+    def test_eligibility_tier_network_mapping_and_json_script(self):
+        """Youth Member (15-24) maps to WNNN and Adult Member (18+) maps to WGMN in step 3 policy data."""
+        response = self.client.get('/onboarding/3/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="eligibility-data"')
+
+        import json
+        eligibility_data = response.context['eligibility_data']
+        youth_entry = next((e for e in eligibility_data if e['code'] == 'youth'), None)
+        adult_entry = next((e for e in eligibility_data if e['code'] == 'adult'), None)
+
+        self.assertIsNotNone(youth_entry, 'youth tier missing from eligibility_data')
+        self.assertEqual(youth_entry['network'], 'WNNN', 'Youth Member must map to WNNN')
+        self.assertEqual(youth_entry['basis'], 'Youth membership criteria verified')
+
+        self.assertIsNotNone(adult_entry, 'adult tier missing from eligibility_data')
+        self.assertEqual(adult_entry['network'], 'WGMN', 'Adult Member must map to WGMN')
+        self.assertEqual(adult_entry['basis'], 'Adult membership criteria verified')
+
+
 

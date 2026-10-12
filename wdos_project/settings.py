@@ -101,7 +101,7 @@ DEFAULT_ONBOARDING_POLICY = {
     'eligibility': [
         {'code': 'adult', 'label': 'Adult Member (18+)', 'network': 'WGMN', 'basis': 'Adult membership criteria verified'},
         {'code': 'youth', 'label': 'Youth Member (15–24)', 'network': 'WGMN', 'basis': 'Youth membership criteria verified'},
-        {'code': 'more_info', 'label': 'More information needed', 'network': 'WGMN', 'basis': 'Pending review'},
+        {'code': 'pending', 'label': 'More information needed', 'network': 'WGMN', 'basis': 'Pending review'},
     ],
     'homes': [
         {'code': 'lagos-hq', 'label': 'Lagos Central Chapter', 'network': 'WGMN', 'country': 'Nigeria', 'region': 'Lagos', 'district': 'Ikeja', 'kind': 'chapter'},

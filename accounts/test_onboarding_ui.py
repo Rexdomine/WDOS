@@ -177,6 +177,7 @@ class OnboardingUITests(TestCase):
         network_choices = [c[1] for c in form.fields['network'].choices]
         self.assertIn('Select age eligibility', eligibility_choices)
         self.assertNotIn('—', eligibility_choices)
+        self.assertEqual(eligibility_choices.count('More information needed'), 1)
         self.assertIn('Select network', network_choices)
         self.assertNotIn('—', network_choices)
 

@@ -103,11 +103,23 @@ class NetworkForm(BaseForm):
         super().__init__(*args, **kwargs)
         policy = current_policy()
         eligibility_list = (policy.get('eligibility') if policy and policy.get('eligibility') else None) or DEFAULT_ELIGIBILITY
-        self.fields['eligibility'].choices = (
-            [('', 'Select age eligibility')]
-            + [(r['code'], r['label']) for r in eligibility_list]
-            + [('pending', 'More information needed')]
-        )
+
+        choices = [('', 'Select age eligibility')]
+        seen_codes = set()
+        seen_labels = set()
+
+        for r in eligibility_list:
+            code = r.get('code')
+            label = r.get('label')
+            if code and label and code not in seen_codes and label not in seen_labels:
+                choices.append((code, label))
+                seen_codes.add(code)
+                seen_labels.add(label)
+
+        if 'More information needed' not in seen_labels and 'pending' not in seen_codes and 'more_info' not in seen_codes:
+            choices.append(('pending', 'More information needed'))
+
+        self.fields['eligibility'].choices = choices
         selected_el = None
         if self.data and self.data.get('eligibility'):
             selected_el = self.data.get('eligibility')
@@ -124,7 +136,7 @@ class NetworkForm(BaseForm):
         eligibility_list = (policy.get('eligibility') if policy and policy.get('eligibility') else None) or DEFAULT_ELIGIBILITY
         selected_el = data.get('eligibility')
         selected_net = data.get('network')
-        if selected_el and selected_el != 'pending':
+        if selected_el and selected_el not in ('pending', 'more_info'):
             if not any(r['code'] == selected_el and r['network'] == selected_net for r in eligibility_list):
                 self.add_error('eligibility', 'More information needed')
         return data

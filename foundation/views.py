@@ -1315,16 +1315,16 @@ def search_view(request):
         return render(request, "foundation/search.html", ctx)
 
     if query:
-        scoped_res = _execute_scoped_search(query, user_scope)
+        scoped_res = _execute_scoped_search(query, user_scope, active_tab=active_tab)
         all_items = []
         for res in scoped_res:
             all_items.append({
                 "title": res["title"],
-                "when": res.get("summary", ""),
-                "action_label": "Open ›",
+                "when": res.get("when") or res.get("summary") or "Recently",
+                "action_label": res.get("action_label", "View details"),
                 "action_url": res["url"],
-                "pill_style": "magenta",
-                "status": "active",
+                "pill_style": res.get("pill_style", "magenta"),
+                "status": res.get("status", "active"),
             })
     else:
         # Show real active scoped records instead of demo data
@@ -1338,7 +1338,11 @@ def search_view(request):
             base_qs = base_qs.filter(status__in=["pending", "in_progress"])
         elif active_tab == "history":
             base_qs = base_qs.filter(status__in=["completed", "blocked"])
+        else:
+            # overview: active items
+            base_qs = base_qs.filter(status__in=["pending", "in_progress"])
 
+        base_qs = base_qs.order_by("-created_at")
         items = list(base_qs)
         all_items = []
         for wi in items:
@@ -1351,6 +1355,7 @@ def search_view(request):
                 "status": wi.status,
             })
 
+    total_count = len(all_items)
     paginator = Paginator(all_items, 10)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
@@ -1376,6 +1381,7 @@ def search_view(request):
         "q": query,
         "search_results": list(page_obj),
         "page_obj": page_obj,
+        "total_count": total_count,
         "local_connection": local_conn,
         "active_tab": active_tab,
         **_get_stage4_state_context(request, "Search WDOS"),
@@ -1413,7 +1419,7 @@ def search_api(request):
     })
 
 
-def _execute_scoped_search(query: str, user_scope: UserScope):
+def _execute_scoped_search(query: str, user_scope: UserScope, active_tab: str = None, limit: int = None):
     """
     Search work items, country hubs, and profiles strictly within the user's
     authorized network, geography, and confidentiality scope.
@@ -1430,40 +1436,64 @@ def _execute_scoped_search(query: str, user_scope: UserScope):
     if not user_scope.can_access_confidential():
         items_qs = items_qs.filter(confidential=False)
 
-    matching_items = items_qs.filter(
+    if active_tab == "records":
+        items_qs = items_qs.filter(status__in=["pending", "in_progress"])
+    elif active_tab == "history":
+        items_qs = items_qs.filter(status__in=["completed", "blocked"])
+
+    items_qs = items_qs.filter(
         models_q_search(query, ["title", "summary", "category"])
-    )[:15]
+    ).order_by("-created_at")
+
+    if limit:
+        matching_items = items_qs[:limit]
+    else:
+        matching_items = items_qs
 
     for item in matching_items:
+        when_str = item.created_at.strftime("%d %b · %H:%M WAT") if item.created_at else "Recently"
         results.append({
             "id": item.id,
             "type": "work_item",
             "title": item.title,
             "summary": item.summary,
+            "when": when_str,
+            "action_label": "View details",
+            "pill_style": "amber" if item.status == "pending" else "magenta",
+            "status": item.status,
             "network": item.network,
             "country": item.country,
             "url": f"/foundation/work-queue/{item.id}/",
         })
 
-    # 2. Search Country Hubs
-    hubs_qs = CountryHub.objects.filter(status="active")
-    if "*" not in user_scope.allowed_countries:
-        hubs_qs = hubs_qs.filter(code__in=user_scope.allowed_countries)
+    # 2. Search Country Hubs (only included for overview/directory, not history)
+    if active_tab != "history":
+        hubs_qs = CountryHub.objects.filter(status="active")
+        if "*" not in user_scope.allowed_countries:
+            hubs_qs = hubs_qs.filter(code__in=user_scope.allowed_countries)
 
-    matching_hubs = hubs_qs.filter(
-        models_q_search(query, ["name", "code", "region", "lead_name"])
-    )[:5]
+        hubs_qs = hubs_qs.filter(
+            models_q_search(query, ["name", "code", "region", "lead_name"])
+        )
+        if limit:
+            matching_hubs = hubs_qs[:5]
+        else:
+            matching_hubs = hubs_qs
 
-    for hub in matching_hubs:
-        results.append({
-            "id": hub.code,
-            "type": "country_hub",
-            "title": f"{hub.name} Country Hub ({hub.code})",
-            "summary": f"Region: {hub.region or 'Africa'}. Lead: {hub.lead_name or 'N/A'}",
-            "network": user_scope.active_network,
-            "country": hub.code,
-            "url": f"/foundation/network/{user_scope.active_network}/country/{hub.code}/",
-        })
+        for hub in matching_hubs:
+            results.append({
+                "id": hub.code,
+                "type": "country_hub",
+                "title": f"{hub.name} Country Hub ({hub.code})",
+                "summary": f"Region: {hub.region or 'Africa'}. Lead: {hub.lead_name or 'N/A'}",
+                "when": "Active Hub",
+                "action_label": "Open ›",
+                "pill_style": "magenta",
+                "status": "active",
+                "network": user_scope.active_network,
+                "country": hub.code,
+                "url": f"/foundation/network/{user_scope.active_network}/country/{hub.code}/",
+            })
 
     return results
 

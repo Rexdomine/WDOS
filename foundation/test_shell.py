@@ -441,6 +441,59 @@ class ConfidentialSearchBoundaryTests(ShellTestCaseBase):
         self.assertEqual(data["total_count"], 0)
         self.assertEqual(data["results"], [])
 
+    def test_search_footer_reconciles_records_count_with_displayed_records(self):
+        self.login_as(self.user_wgmn)
+        
+        # 1. Unfiltered search overview
+        res_default = self.client.get("/foundation/search/")
+        self.assertEqual(res_default.status_code, 200)
+        default_count = len(res_default.context["search_results"])
+        self.assertGreater(default_count, 0)
+        self.assertContains(
+            res_default,
+            f"Showing 1–{default_count} of {default_count} records in this view",
+        )
+        self.assertNotContains(res_default, "of 0 records in this view")
+
+        # 2. Filtered search query with 1 match
+        res_water = self.client.get("/foundation/search/?q=Water")
+        self.assertEqual(res_water.status_code, 200)
+        self.assertContains(res_water, "Showing 1–1 of 1 records in this view")
+        self.assertNotContains(res_water, "of 0 records in this view")
+
+        # 3. Filtered search with 0 matches
+        res_none = self.client.get("/foundation/search/?q=NonExistentTerm")
+        self.assertEqual(res_none.status_code, 200)
+        self.assertContains(res_none, "Showing 0–0 of 0 records in this view")
+        self.assertContains(res_none, "No matching records found")
+
+    def test_search_pagination_count_reconciliation(self):
+        self.login_as(self.user_wgmn)
+        # Create 12 additional tasks to trigger multi-page pagination
+        extra_items = []
+        for i in range(12):
+            extra_items.append(WorkItem(
+                title=f"Extra Scoped Task {i+1}",
+                summary="Pagination test item",
+                network="WGMN",
+                country="NG",
+                status="pending",
+                confidential=False,
+            ))
+        WorkItem.objects.bulk_create(extra_items)
+
+        # Page 1
+        res_p1 = self.client.get("/foundation/search/?page=1")
+        self.assertEqual(res_p1.status_code, 200)
+        total = res_p1.context["total_count"]
+        self.assertGreater(total, 10)
+        self.assertContains(res_p1, f"Showing 1–10 of {total} records in this view")
+
+        # Page 2
+        res_p2 = self.client.get("/foundation/search/?page=2")
+        self.assertEqual(res_p2.status_code, 200)
+        self.assertContains(res_p2, f"Showing 11–{total} of {total} records in this view")
+
 
 class NotificationsTests(ShellTestCaseBase):
     def setUp(self):

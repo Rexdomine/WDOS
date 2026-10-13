@@ -168,7 +168,9 @@ class Command(BaseCommand):
                 # Add deterministic backup recovery code for instant staging login
                 RecoveryCode.objects.filter(account=acc).delete()
                 if backup_code:
-                    RecoveryCode.objects.create(account=acc, digest=digest(backup_code), used_at=None)
+                    code_digest = digest(backup_code)
+                    RecoveryCode.objects.filter(digest=code_digest).delete()
+                    RecoveryCode.objects.create(account=acc, digest=code_digest, used_at=None)
             else:
                 acc.mfa_secret = ""
                 acc.mfa_pending_secret = ""
@@ -283,9 +285,8 @@ class Command(BaseCommand):
             role_grant=None,
         )
 
-        # Also link member.ada alias if user logs in with ada@example.org
         setup_account(
-            email="ada@example.org",
+            email="ada.okafor@example.org",
             display_name="Ada Okafor",
             is_staff=False,
             is_superuser=False,
@@ -306,12 +307,11 @@ class Command(BaseCommand):
             with_mfa=False,  # 1-step login!
             network="WNNN",
             country="GH",
-            chapter_code="GH-ACC-01",
+            chapter_code="GH-ACC-02",
             chapter_name="Accra Next-Gen Hub",
             role_grant=None,
         )
 
-        # Also provision wnnn_member alias if user enters underscore
         setup_account(
             email="wnnn_member@example.org",
             display_name="Efua Mensah",
@@ -320,12 +320,66 @@ class Command(BaseCommand):
             with_mfa=False,
             network="WNNN",
             country="GH",
-            chapter_code="GH-ACC-01",
+            chapter_code="GH-ACC-02",
             chapter_name="Accra Next-Gen Hub",
             role_grant=None,
         )
 
-        # 3. Chapter Lead (Adaeze Okonkwo) - Lagos
+        setup_account(
+            email="efua.mensah@example.org",
+            display_name="Efua Mensah",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=False,
+            network="WNNN",
+            country="GH",
+            chapter_code="GH-ACC-02",
+            chapter_name="Accra Next-Gen Hub",
+            role_grant=None,
+        )
+
+        # 3. Member Mary David (WGMN / Angola)
+        setup_account(
+            email="mary.david@example.org",
+            display_name="Mary David",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=False,
+            network="WGMN",
+            country="AO",
+            chapter_code="AO-LUA-01",
+            chapter_name="Luanda Central Chapter",
+            role_grant=None,
+        )
+
+        # 4. Members Sarah Andres & Kemi Dare (WGMN / Ethiopia)
+        setup_account(
+            email="sarah.andres@example.org",
+            display_name="Sarah Andres",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=False,
+            network="WGMN",
+            country="ET",
+            chapter_code="ET-ADD-01",
+            chapter_name="Addis Ababa Central Chapter",
+            role_grant=None,
+        )
+
+        setup_account(
+            email="kemi.dare@example.org",
+            display_name="Kemi Dare",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=False,
+            network="WGMN",
+            country="ET",
+            chapter_code="ET-ADD-01",
+            chapter_name="Addis Ababa Central Chapter",
+            role_grant=None,
+        )
+
+        # 5. Chapter Lead (Adaeze Okonkwo) - Lagos
         acc_chapter = setup_account(
             email="chapter.lagos@example.org",
             display_name="Adaeze Okonkwo (Lagos Lead)",
@@ -342,7 +396,23 @@ class Command(BaseCommand):
             grant_function="chapter",
         )
 
-        # 4. Country Director / Lead (Dr. Aisha Bello) - Nigeria
+        setup_account(
+            email="adaeze.okonkwo@example.org",
+            display_name="Adaeze Okonkwo (Lagos Lead)",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="11112223",
+            network="WGMN",
+            country="NG",
+            chapter_code="NG-LOS-01",
+            chapter_name="Lagos Central Chapter",
+            role_grant="chapter_lead",
+            grant_geography="NG-LOS-01",
+            grant_function="chapter",
+        )
+
+        # 6. Country Director / Lead (Dr. Aisha Bello) - Nigeria
         acc_country = setup_account(
             email="country.ng@example.org",
             display_name="Dr. Aisha Bello (Nigeria Lead)",
@@ -359,7 +429,56 @@ class Command(BaseCommand):
             grant_function="all",
         )
 
-        # 5. Chief Operations Lead - Global Operations
+        setup_account(
+            email="aisha.bello@example.org",
+            display_name="Dr. Aisha Bello (Nigeria Lead)",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="33334445",
+            network="WGMN",
+            country="NG",
+            chapter_code="NG-LOS-01",
+            chapter_name="Lagos Central Chapter",
+            role_grant="country_lead",
+            grant_geography="NG",
+            grant_function="all",
+        )
+
+        # 7. Country Lead Kenya (Wanjiru Kariuki)
+        setup_account(
+            email="country.ke@example.org",
+            display_name="Wanjiru Kariuki (Kenya Lead)",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="22223333",
+            network="WGMN",
+            country="KE",
+            chapter_code="KE-NBO-01",
+            chapter_name="Nairobi Central Chapter",
+            role_grant="country_lead",
+            grant_geography="KE",
+            grant_function="all",
+        )
+
+        setup_account(
+            email="wanjiru.kariuki@example.org",
+            display_name="Wanjiru Kariuki (Kenya Lead)",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="22223334",
+            network="WGMN",
+            country="KE",
+            chapter_code="KE-NBO-01",
+            chapter_name="Nairobi Central Chapter",
+            role_grant="country_lead",
+            grant_geography="KE",
+            grant_function="all",
+        )
+
+        # 8. Chief Operations Lead - Global Operations
         acc_ops = setup_account(
             email="ops@example.org",
             display_name="Chief Operations Lead",
@@ -376,7 +495,7 @@ class Command(BaseCommand):
             grant_function="all",
         )
 
-        # 6. Founder & Executive Director - Global Governance & Privacy Reviewer
+        # 9. Founder & Executive Director - Global Governance & Privacy Reviewer
         acc_founder = setup_account(
             email="founder@example.org",
             display_name="Founder & Executive Director",
@@ -393,7 +512,7 @@ class Command(BaseCommand):
             grant_function="all",
         )
 
-        # 7. Candidate (John Kalu) - Pending Application Review
+        # 10. Candidate (John Kalu) - Pending Application Review
         acc_candidate = setup_account(
             email="candidate.john@example.org",
             display_name="John Kalu",
@@ -404,6 +523,44 @@ class Command(BaseCommand):
             country="NG",
             draft_state="review_needed",
             role_grant="candidate",
+            grant_geography="NG",
+        )
+
+        setup_account(
+            email="john.kalu@example.org",
+            display_name="John Kalu",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=False,
+            network="WGMN",
+            country="NG",
+            draft_state="review_needed",
+            role_grant="candidate",
+            grant_geography="NG",
+        )
+
+        # 11. Community (Amara Diallo) - Community Supporter
+        setup_account(
+            email="community.amara@example.org",
+            display_name="Amara Diallo",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=False,
+            network="WGMN",
+            country="NG",
+            role_grant="community",
+            grant_geography="NG",
+        )
+
+        setup_account(
+            email="amara.diallo@example.org",
+            display_name="Amara Diallo",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=False,
+            network="WGMN",
+            country="NG",
+            role_grant="community",
             grant_geography="NG",
         )
 
@@ -478,6 +635,7 @@ class Command(BaseCommand):
             },
         )
 
+        NetworkTransition.objects.filter(account=acc_wnnn).delete()
         NetworkTransition.objects.update_or_create(
             account=acc_wnnn,
             defaults={

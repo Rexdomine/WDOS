@@ -12,6 +12,9 @@ design-review/
 source/
 notes/
 qa/
+test_evidence/
+verify_*.py
+scratch/
 
 # Python
 __pycache__/

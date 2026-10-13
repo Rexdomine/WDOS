@@ -1,15 +1,15 @@
 {% extends "foundation/base_shell.html" %}
 {% load static %}
 
-{% block title %}{{ screen.title }} · WDOS{% endblock %}
+{% block title %}{{ screen_title|default:screen.title }} · WDOS{% endblock %}
 
 {% block content %}
 <div class="dash-container">
   <!-- Page Head with Eyebrow, Title, Subtitle, and Actions -->
   <div class="dash-pagehead">
     <div>
-      <div class="dash-eyebrow">{{ screen.eyebrow }}</div>
-      <h1 class="dash-title">{{ screen.title }}</h1>
+      <div class="dash-eyebrow">{{ eyebrow|default:screen.eyebrow }}</div>
+      <h1 class="dash-title">{{ screen_title|default:screen.title }}</h1>
       <p class="dash-subtitle">{{ screen.subtitle }}</p>
     </div>
     <div class="dash-actions">
@@ -55,8 +55,8 @@
     </div>
     <div class="dash-hero-content">
       <div class="dash-hero-eyebrow">{{ screen.hero_banner.eyebrow }}</div>
-      <h2 class="dash-hero-title">{{ screen.hero_banner.title }}</h2>
-      <p class="dash-hero-text">{{ screen.hero_banner.text }}</p>
+      <h2 class="dash-hero-title">{{ screen.hero_banner.heading|default:screen.hero_banner.title }}</h2>
+      <p class="dash-hero-text">{{ screen.hero_banner.body|default:screen.hero_banner.text }}</p>
       <a href="{{ screen.hero_banner.button_url }}" class="dash-hero-btn">{{ screen.hero_banner.button_label }}</a>
     </div>
   </div>

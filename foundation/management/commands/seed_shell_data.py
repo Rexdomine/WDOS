@@ -12,6 +12,8 @@ COUNTRY_HUBS = [
     ("KE", "Kenya", "East Africa", "active", "Wanjiru Kariuki", "wanjiru.kariuki@example.org"),
     ("ZA", "South Africa", "Southern Africa", "active", "Nandi Khumalo", "nandi.khumalo@example.org"),
     ("RW", "Rwanda", "East Africa", "active", "Aline Uwase", "aline.uwase@example.org"),
+    ("AO", "Angola", "Central Africa", "active", "Manuel dos Santos", "manuel.santos@example.org"),
+    ("ET", "Ethiopia", "East Africa", "active", "Almaz Tadesse", "almaz.tadesse@example.org"),
 ]
 
 LEADERSHIP_LEVELS = [

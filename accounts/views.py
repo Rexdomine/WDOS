@@ -69,12 +69,12 @@ def _masked_email(email):
 
 def _workspace_destination(account):
     """Route authenticated users without trusting a client-side destination."""
-    if account.user.is_staff or account.user.is_superuser:
-        return reverse('admin:index')
     from .models import OnboardingDraft
     draft = OnboardingDraft.objects.filter(account=account).first()
-    if draft and draft.state == 'accepted' and hasattr(draft, 'membership'):
-        return reverse('app-shell')
+    if (draft and draft.state == 'accepted') or account.user.is_staff or account.user.is_superuser or account.access_grants.exists():
+        return '/foundation/dashboard/'
+    if draft and draft.state in ('review_needed', 'submitted'):
+        return '/foundation/dashboard/'
     return reverse('onboarding:step', args=[draft.next_step if draft else 1])
 
 

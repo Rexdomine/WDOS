@@ -48,6 +48,19 @@ from .views import (
     work_item_action_view,
     work_item_detail_view,
     work_queue_view,
+    # Stage 06 Views
+    add_or_link_person_view,
+    africa_network_coverage_view,
+    community_relationships_view,
+    country_command_profile_view,
+    geography_terminology_view,
+    local_organisation_view,
+    manage_relationships_view,
+    people_directory_view,
+    person_profile_view,
+    review_reassignment_view,
+    stage6_screen_router,
+    verify_country_dossier_view,
 )
 
 urlpatterns = [
@@ -126,5 +139,20 @@ urlpatterns = [
     path("foundation/test-approve/<str:email>/", test_approve_account_view, name="test-approve-account-email"),
     path("test-approve/", test_approve_account_view, name="test-approve-root"),
     path("test-approve/<str:email>/", test_approve_account_view, name="test-approve-root-email"),
+
+    # Stage 06: People, Community, and Geography Spine
+    path("foundation/people/", people_directory_view, name="people-directory"),
+    path("foundation/people/add-or-link/", add_or_link_person_view, name="people-add-or-link"),
+    path("foundation/people/<str:person_code>/", person_profile_view, name="person-profile"),
+    path("foundation/community/relationships/", community_relationships_view, name="community-relationships"),
+    path("foundation/community/relationships/manage/", manage_relationships_view, name="community-relationships-manage"),
+    path("foundation/community/reassignment/review/", review_reassignment_view, name="community-reassignment-review"),
+    path("foundation/geography/coverage/", africa_network_coverage_view, name="geography-coverage"),
+    path("foundation/geography/country/<str:country_code>/command/", country_command_profile_view, name="country-command-profile"),
+    path("foundation/geography/local-org/", local_organisation_view, name="geography-local-org"),
+    path("foundation/geography/dossier/verify/", verify_country_dossier_view, name="geography-dossier-verify"),
+    path("foundation/geography/terminology/", geography_terminology_view, name="geography-terminology"),
+    path("foundation/stage6/<str:screen_code>/", stage6_screen_router, name="stage6-screen"),
+    path("foundation/screens/<str:screen_code>/", stage6_screen_router, name="stage6-screen-alias"),
 ]
 

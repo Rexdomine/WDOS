@@ -69,15 +69,49 @@ class UserScope:
     def can_access_role(self, role: str) -> bool:
         if not role:
             return False
-        role = role.lower().strip()
-        if self.is_management_or_admin or "founder" in self.roles or "hq" in self.roles or "it_admin" in self.roles:
+        role = role.lower().strip().replace("-", "_")
+
+        # Top-tier governance and IT administration can access all role views
+        if self.is_management_or_admin or bool(self.roles.intersection({"founder", "hq", "it_admin"})):
             return True
-        if role in self.roles or role == self.primary_role:
+
+        # Check explicit roles assigned via AccessGrant or primary role
+        normalized_roles = {r.lower().strip().replace("-", "_") for r in self.roles}
+        normalized_primary = (self.primary_role or "").lower().strip().replace("-", "_")
+        if role in normalized_roles or role == normalized_primary:
             return True
-        if role == "member" and (self.account.person and hasattr(self.account.person, "membership") or self.leadership_tier <= 5):
+
+        # Role aliases mapping
+        role_aliases = {
+            "country_lead": {"country_lead", "country_director", "country_representative", "field_lead"},
+            "chapter_lead": {"chapter_lead", "chapter_coordinator", "chapter"},
+            "operations": {"operations", "ops"},
+            "founder": {"founder", "hq", "executive"},
+            "member": {"member", "membership"},
+            "candidate": {"candidate", "applicant"},
+            "community": {"community", "supporter"},
+            "network_secretary": {"network_secretary", "secretary"},
+        }
+        for canon, aliases in role_aliases.items():
+            if role in aliases:
+                if canon in normalized_roles or canon == normalized_primary:
+                    return True
+                if normalized_roles.intersection(aliases):
+                    return True
+
+        # Member role accessibility: authorized if account has a membership or is leadership tier <= 5
+        if role in ("member", "membership"):
+            has_mem = bool(
+                (self.account.person and hasattr(self.account.person, "membership"))
+                or (hasattr(self.account, "onboardingdraft") and getattr(self.account.onboardingdraft, "membership", None))
+            )
+            if has_mem or self.leadership_tier <= 5:
+                return True
+
+        # Community role accessibility: public/community views available to all authenticated participants
+        if role in ("community", "supporter"):
             return True
-        if role == "community":
-            return True
+
         return False
 
 
@@ -193,7 +227,7 @@ def get_user_scope(account: Account, session=None) -> UserScope:
     leadership_tier = 5
     primary_role = "member"
 
-    if "founder" in roles or "hq" in roles:
+    if "founder" in roles or "hq" in roles or "hofco" in roles:
         leadership_level = "founder"
         leadership_tier = 1
         primary_role = "founder"
@@ -209,6 +243,10 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         leadership_level = "operations"
         leadership_tier = 2
         primary_role = "operations"
+    elif "network_secretary" in roles:
+        leadership_level = "network_secretary"
+        leadership_tier = 2
+        primary_role = "network_secretary"
     elif "regional_coordinator" in roles or "country_director" in roles or "country_lead" in roles or "field_lead" in roles:
         leadership_level = "country_lead"
         leadership_tier = 3
@@ -266,9 +304,23 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         active_country = "NG" if "*" in allowed_countries else sorted(list(allowed_countries))[0]
 
     # Active role determination
+    temp_scope = UserScope(
+        account=account,
+        allowed_networks=sorted(list(allowed_networks)),
+        allowed_countries=sorted(list(allowed_countries)),
+        leadership_level=leadership_level,
+        leadership_tier=leadership_tier,
+        roles=roles,
+        is_management_or_admin=is_management_or_admin,
+        primary_role=primary_role,
+    )
     active_role = None
     if session:
-        active_role = session.get("wdos_active_role")
+        cand_role = session.get("wdos_active_role")
+        if cand_role and temp_scope.can_access_role(cand_role):
+            active_role = cand_role
+        elif session.get("wdos_active_role") is not None:
+            session["wdos_active_role"] = primary_role
     if not active_role:
         active_role = primary_role
 

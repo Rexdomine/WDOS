@@ -1,0 +1,150 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Community relationships · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Community relationships</h1>
+      <p class="dash-subtitle">See the relevant people and relationships records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="{{ screen.secondary_action.url|default:'/foundation/people/' }}" class="dash-btn-secondary">Back</a>
+      <a href="{{ screen.primary_action.url|default:'/foundation/community/relationships/manage/' }}" class="dash-btn-primary">Open category</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card (when ?state= is requested) -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="?tab=overview{% if state_mode %}&state={{ state_mode }}{% endif %}" class="stage6-subnav-item {% if active_tab == 'overview' %}active{% endif %}" role="tab">Overview</a>
+    <a href="?tab=records{% if state_mode %}&state={{ state_mode }}{% endif %}" class="stage6-subnav-item {% if active_tab == 'records' or not active_tab %}active{% endif %}" role="tab">Records</a>
+    <a href="?tab=history{% if state_mode %}&state={{ state_mode }}{% endif %}" class="stage6-subnav-item {% if active_tab == 'history' %}active{% endif %}" role="tab">History</a>
+  </div>
+
+  <!-- Filter Pills Bar -->
+  <div class="stage6-filter-bar">
+    <span class="stage6-pill-active">Find a resource</span>
+    <span class="stage6-pill-btn">For my role</span>
+    <span class="stage6-pill-btn">All types &darr;</span>
+  </div>
+
+  <!-- Cards at Top of Records -->
+  <div class="stage6-cards-grid">
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Connected relationships</h3>
+        <p class="stage6-info-card-text">Membership, participation and leadership attach to one person identity.</p>
+      </div>
+      <a href="/foundation/community/relationships/manage/" class="stage6-info-card-link">No duplicate registration &rarr;</a>
+    </div>
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Verification required</h3>
+        <p class="stage6-info-card-text">Confirm material changes against approved evidence.</p>
+      </div>
+      <a href="/foundation/community/reassignment/review/" class="stage6-info-card-link">Record history retained &rarr;</a>
+    </div>
+  </div>
+
+  <!-- Records Table Card -->
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Community relationships</h2>
+    </div>
+
+    <!-- Desktop Table -->
+    <table class="dash-table dash-desktop-table" aria-label="Community Relationships">
+      <thead>
+        <tr>
+          <th scope="col">PERSON</th>
+          <th scope="col">LOCAL HOME</th>
+          <th scope="col">RELATIONSHIP</th>
+          <th scope="col">STATUS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for person in people %}
+        <tr>
+          <td>
+            <a href="/foundation/people/{{ person.person_code }}/" style="color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">{{ person.full_name }}</a>
+          </td>
+          <td>{{ person.local_home }}</td>
+          <td>{{ person.primary_relationship }}</td>
+          <td>
+            <span class="dash-pill {% if person.status == 'Active' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">
+              {{ person.status }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Mobile View Cards -->
+    <div class="dash-mobile-list">
+      {% for person in people %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Person</span>
+          <span class="dash-mobile-val" style="color:var(--wdos-magenta, #D4006A); font-weight:700;">{{ person.full_name }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Local home</span>
+          <span class="dash-mobile-val">{{ person.local_home }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Relationship</span>
+          <span class="dash-mobile-val">{{ person.primary_relationship }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Status</span>
+          <span class="dash-pill {% if person.status == 'Active' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">
+            {{ person.status }}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination & Record Count -->
+    <div class="dash-pagination">
+      <span>Showing {{ people|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scoped Notice -->
+  <div class="stage6-shield-notice">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Only authorized profile fields and relationships are visible in this view.</div>
+  </div>
+
+  <!-- Footer Banner -->
+  <div class="dash-footer">
+    <div>WODDI · No Woman Is Left Out</div>
+    <div>PEOPLE-04 · UI review v2 · Sample data</div>
+  </div>
+</div>
+{% endblock %}

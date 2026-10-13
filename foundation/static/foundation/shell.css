@@ -2830,5 +2830,477 @@ table.records-table tr:last-child td,
   }
 }
 
+/* ==========================================================================
+   WDOS STAGE 06: PEOPLE, COMMUNITY AND GEOGRAPHY SPINE STYLING
+   ========================================================================== */
+
+/* Multi-Step Horizontal Wizard Stepper (PEOPLE-03, PEOPLE-05) */
+.stage6-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 32px;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+}
+.stage6-step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #6B7280;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.stage6-step-item.active {
+  color: var(--wdos-magenta, #D4006A);
+  font-weight: 700;
+}
+.stage6-step-item.completed {
+  color: #10B981;
+}
+.stage6-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #F3F4F6;
+  color: #4B5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.stage6-step-item.active .stage6-step-circle {
+  background: var(--wdos-magenta, #D4006A);
+  color: #FFFFFF;
+}
+.stage6-step-item.completed .stage6-step-circle {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+/* Sub-Navigation Bar (Overview · Records · History / Map & countries · Country table · Verification) */
+.stage6-subnav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #E5E7EB;
+  padding-bottom: 0;
+}
+.stage6-subnav-item {
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: #6B7280;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+.stage6-subnav-item:hover {
+  color: var(--wdos-magenta, #D4006A);
+}
+.stage6-subnav-item.active {
+  color: var(--wdos-magenta, #D4006A);
+  border-bottom-color: var(--wdos-magenta, #D4006A);
+  font-weight: 700;
+}
+
+/* Filter / Resource Pills Bar (PEOPLE-04) */
+.stage6-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.stage6-pill-active {
+  padding: 6px 14px;
+  background: var(--wdos-rose, #FFF0F6);
+  color: var(--wdos-magenta, #D4006A);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.stage6-pill-btn {
+  padding: 6px 14px;
+  background: #F3F4F6;
+  color: #374151;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 550;
+  border: 1px solid #E5E7EB;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.stage6-pill-btn:hover {
+  background: #E5E7EB;
+}
+
+/* Profile Summary Box (PEOPLE-02 & GEO-02) */
+.stage6-profile-box {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.stage6-profile-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 4px;
+}
+.stage6-profile-subtitle {
+  font-size: 13px;
+  color: #6B7280;
+  margin-bottom: 16px;
+}
+.stage6-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #F3F4F6;
+}
+.stage6-profile-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B7280;
+  margin-bottom: 4px;
+}
+.stage6-profile-field-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2937;
+}
+
+/* Bottom Information & Connected Cards */
+.stage6-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+.stage6-info-card {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.stage6-info-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+.stage6-info-card-text {
+  font-size: 13px;
+  color: #4B5563;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.stage6-info-card-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--wdos-magenta, #D4006A);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.stage6-info-card-link:hover {
+  text-decoration: underline;
+}
+
+/* Scoped Access Shield Notice */
+.stage6-shield-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  margin-top: 16px;
+  font-size: 12.5px;
+  color: #4B5563;
+}
+.stage6-shield-icon {
+  color: #6B7280;
+  flex-shrink: 0;
+}
+
+/* 2-Column Form Layout with Sidebar (PEOPLE-03, PEOPLE-05, PEOPLE-06, GEO-04, GEO-05) */
+.stage6-form-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+.stage6-form-main {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 28px;
+}
+.stage6-form-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.stage6-sidebar-box {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 20px;
+}
+.stage6-sidebar-box-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 6px;
+}
+.stage6-sidebar-box-text {
+  font-size: 12.5px;
+  color: #6B7280;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.stage6-sidebar-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 650;
+  background: #F3F4F6;
+  color: #374151;
+}
+
+/* Form Controls */
+.stage6-field-group {
+  margin-bottom: 20px;
+}
+.stage6-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+.stage6-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #111827;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+.stage6-input:focus {
+  outline: none;
+  border-color: var(--wdos-magenta, #D4006A);
+  box-shadow: 0 0 0 2px rgba(212, 0, 106, 0.15);
+}
+.stage6-readonly-field {
+  padding: 10px 14px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+.stage6-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+.stage6-checkbox {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--wdos-magenta, #D4006A);
+}
+.stage6-checkbox-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Continental Africa Interactive Map Container (GEO-01) */
+.stage6-continental-card {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.stage6-map-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: center;
+}
+.stage6-map-graphic {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  margin: 0 auto;
+}
+.stage6-map-legend {
+  font-size: 11.5px;
+  color: #6B7280;
+  line-height: 1.5;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #F3F4F6;
+}
+.stage6-map-selection-box {
+  background: #FDF2F8;
+  border: 1px solid #FBCFE8;
+  border-radius: 12px;
+  padding: 20px;
+}
+.stage6-map-selection-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #831843;
+  margin-bottom: 4px;
+}
+.stage6-map-selection-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #DCFCE7;
+  color: #166534;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  margin-bottom: 12px;
+}
+.stage6-map-selection-text {
+  font-size: 13px;
+  color: #4B5563;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* Vertical Organizational Hierarchy Flow (GEO-03) */
+.stage6-hierarchy-container {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+.stage6-hierarchy-tree {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 24px;
+}
+.stage6-hierarchy-item {
+  position: relative;
+  padding-left: 28px;
+}
+.stage6-hierarchy-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 24px;
+  bottom: -16px;
+  width: 2px;
+  background: #E5E7EB;
+}
+.stage6-hierarchy-bullet {
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--wdos-magenta, #D4006A);
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 0 0 1px #E5E7EB;
+}
+.stage6-hierarchy-item-card {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+.stage6-hierarchy-unit-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 2px;
+}
+.stage6-hierarchy-unit-desc {
+  font-size: 12.5px;
+  color: #6B7280;
+  margin-bottom: 6px;
+}
+.stage6-hierarchy-unit-level {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--wdos-magenta, #D4006A);
+  background: #FFF0F6;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.stage6-hierarchy-arrow-down {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9CA3AF;
+  margin: -8px 0 8px 12px;
+  font-size: 16px;
+}
+
+/* Responsive Overrides for Stage 06 */
+@media (max-width: 1024px) {
+  .stage6-form-layout {
+    grid-template-columns: 1fr;
+  }
+  .stage6-map-wrapper {
+    grid-template-columns: 1fr;
+  }
+  .stage6-hierarchy-container {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .stage6-stepper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .stage6-subnav {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+
 
 

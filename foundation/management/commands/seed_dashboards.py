@@ -27,6 +27,7 @@ from foundation.models import (
     DashboardReport,
     LeadershipLevel,
     ScheduledMeeting,
+    UserPreference,
     WorkItem,
 )
 
@@ -50,6 +51,8 @@ class Command(BaseCommand):
             ("KE", "Kenya", "East Africa", "active", "Wanjiru Kariuki", "wanjiru.kariuki@example.org"),
             ("ZA", "South Africa", "Southern Africa", "active", "Nandi Khumalo", "nandi.khumalo@example.org"),
             ("RW", "Rwanda", "East Africa", "active", "Aline Uwase", "aline.uwase@example.org"),
+            ("AO", "Angola", "Central Africa", "active", "Manuel dos Santos", "manuel.santos@example.org"),
+            ("ET", "Ethiopia", "East Africa", "active", "Almaz Tadesse", "almaz.tadesse@example.org"),
         ]
         for code, name, region, status, lead_name, lead_email in hubs_data:
             CountryHub.objects.update_or_create(
@@ -76,7 +79,7 @@ class Command(BaseCommand):
             ("NG-LOS-02", "Lagos Next-Gen Youth Hub", "WNNN", "NG", "Lagos", "Surulere", "Chinedu Eze", "chinedu@example.org", 35),
             ("NG-KAN-01", "Kano Youth Empowerment Hub", "WNNN", "NG", "Kano", "Kano Municipal", "Ibrahim Sani", "ibrahim@example.org", 18),
             # Kenya - WGMN & WNNN
-            ("KE-NBO-01", "Nairobi Kilimani Chapter", "WGMN", "KE", "Nairobi", "Kilimani", "Wanjiku Mwangi", "wanjiku@example.org", 31),
+            ("KE-NBO-01", "Nairobi Central Chapter", "WGMN", "KE", "Nairobi", "Kilimani", "Wanjiru Kariuki", "wanjiru.kariuki@example.org", 31),
             ("KE-NBO-02", "Nairobi Youth Tech Chapter", "WNNN", "KE", "Nairobi", "Westlands", "Brian Otieno", "brian@example.org", 24),
             ("KE-MSA-01", "Mombasa Coastal Chapter", "WGMN", "KE", "Coast", "Mombasa", "Halima Bakari", "halima@example.org", 15),
             # Ghana - WGMN & WNNN
@@ -85,6 +88,9 @@ class Command(BaseCommand):
             # South Africa & Rwanda
             ("ZA-JHB-01", "Johannesburg Chapter", "WGMN", "ZA", "Gauteng", "Johannesburg", "Thandiwe Molefe", "thandi@example.org", 27),
             ("RW-KGL-01", "Kigali Peace Chapter", "WGMN", "RW", "Kigali", "Gasabo", "Jeanette Mukamana", "jeanette@example.org", 18),
+            # Angola & Ethiopia - WGMN
+            ("AO-LUA-01", "Luanda Central Chapter", "WGMN", "AO", "Luanda", "Ingombota", "Mary David", "mary.david@example.org", 20),
+            ("ET-ADD-01", "Addis Ababa Central Chapter", "WGMN", "ET", "Addis Ababa", "Bole", "Sarah Andres", "sarah.andres@example.org", 26),
         ]
         for code, name, net, country, region, district, lead, email, count in chapters_data:
             Chapter.objects.update_or_create(
@@ -108,30 +114,47 @@ class Command(BaseCommand):
         # ---------------------------------------------------------------------
         # Helper creator
         def ensure_user_account(email, display_name, is_staff=False, is_superuser=False):
-            u, _ = User.objects.get_or_create(
-                username=email.split("@")[0],
-                defaults={"email": email, "is_staff": is_staff, "is_superuser": is_superuser},
-            )
+            u = User.objects.filter(email=email).first()
+            if not u:
+                u = User.objects.filter(username=email.split("@")[0]).first()
+            if not u:
+                u = User.objects.create(
+                    username=email.split("@")[0],
+                    email=email,
+                    is_staff=is_staff,
+                    is_superuser=is_superuser,
+                )
             u.set_password(DEFAULT_PASSWORD)
             u.is_staff = is_staff
             u.is_superuser = is_superuser
             u.save()
 
-            p, _ = Person.objects.get_or_create(display_name=display_name)
-            acc, _ = Account.objects.get_or_create(
-                user=u,
-                defaults={
-                    "email": email,
-                    "display_name": display_name,
-                    "person": p,
-                    "status": "active",
-                    "verified_at": now,
-                },
-            )
-            acc.status = "active"
-            acc.display_name = display_name
-            acc.person = p
-            acc.save()
+            acc = Account.objects.filter(user=u).first() or Account.objects.filter(email=email).first()
+            if acc and acc.person:
+                p = acc.person
+                p.display_name = display_name
+                p.save(update_fields=["display_name"])
+            else:
+                p = Person.objects.create(display_name=display_name)
+
+            if not acc:
+                acc = Account.objects.create(
+                    user=u,
+                    email=email,
+                    display_name=display_name,
+                    person=p,
+                    status="active",
+                    verified_at=now,
+                )
+            else:
+                acc.user = u
+                acc.email = email
+                acc.display_name = display_name
+                acc.person = p
+                acc.status = "active"
+                if not acc.verified_at:
+                    acc.verified_at = now
+                acc.save()
             return u, acc, p
 
         # 3.1 Founder/HQ
@@ -151,19 +174,50 @@ class Command(BaseCommand):
         )
 
         # 3.3 Country Lead Nigeria
-        _, acc_country_ng, _ = ensure_user_account("country.ng@example.org", "Dr. Aisha Bello (Nigeria Lead)")
+        _, acc_country_ng, person_country_ng = ensure_user_account("country.ng@example.org", "Dr. Aisha Bello (Nigeria Lead)")
         AccessGrant.objects.update_or_create(
             account=acc_country_ng,
             role="country_lead",
             defaults={"network": "*", "geography": "NG", "function": "all", "expires_at": now + timedelta(days=365)},
         )
+        UserPreference.objects.update_or_create(
+            account=acc_country_ng,
+            defaults={"active_network": "WGMN", "active_country": "NG", "language": "en"},
+        )
 
-        # 3.4 Country Lead Kenya
-        _, acc_country_ke, _ = ensure_user_account("country.ke@example.org", "Wanjiru Kariuki (Kenya Lead)")
+        # 3.4 Country Lead Kenya (Wanjiru Kariuki)
+        _, acc_country_ke, person_country_ke = ensure_user_account("country.ke@example.org", "Wanjiru Kariuki (Kenya Lead)")
         AccessGrant.objects.update_or_create(
             account=acc_country_ke,
             role="country_lead",
-            defaults={"network": "*", "geography": "KE", "function": "all", "expires_at": now + timedelta(days=365)},
+            defaults={"network": "WGMN", "geography": "KE", "function": "all", "expires_at": now + timedelta(days=365)},
+        )
+        draft_ke, _ = OnboardingDraft.objects.get_or_create(
+            account=acc_country_ke,
+            defaults={"state": "accepted", "next_step": 8, "data": {"network": "WGMN", "country": "KE", "district": "KE-NBO-01", "language": "en"}},
+        )
+        draft_ke.state = "accepted"
+        draft_ke.data = {"network": "WGMN", "country": "KE", "district": "KE-NBO-01", "language": "en"}
+        draft_ke.save()
+        consent_ke, _ = OnboardingConsent.objects.get_or_create(
+            draft=draft_ke,
+            revision=1,
+            defaults={"version": "1.0", "notice": "Notice", "digest": "d", "approval_reference": "ref", "privacy_ack": True, "channel": "web"},
+        )
+        Membership.objects.update_or_create(
+            draft=draft_ke,
+            defaults={
+                "person": person_country_ke,
+                "network": "WGMN",
+                "home": {"code": "KE-NBO-01", "country": "KE", "state": "Nairobi", "label": "Nairobi Central Chapter"},
+                "consent": consent_ke,
+                "policy_digest": "country_lead_digest",
+                "approved_by": acc_founder,
+            },
+        )
+        UserPreference.objects.update_or_create(
+            account=acc_country_ke,
+            defaults={"active_network": "WGMN", "active_country": "KE", "language": "en"},
         )
 
         # 3.5 Chapter Lead Lagos
@@ -195,9 +249,13 @@ class Command(BaseCommand):
                 "approved_by": acc_founder,
             },
         )
+        UserPreference.objects.update_or_create(
+            account=acc_chapter_lagos,
+            defaults={"active_network": "WGMN", "active_country": "NG", "language": "en"},
+        )
 
-        # 3.6 Member Ada (WGMN, NG, Lagos)
-        _, acc_member_ada, person_ada = ensure_user_account("member.ada@example.org", "Ada Obinna")
+        # 3.6 Member Ada Okafor (WGMN, NG, Lagos)
+        _, acc_member_ada, person_ada = ensure_user_account("member.ada@example.org", "Ada Okafor")
         draft_ada, _ = OnboardingDraft.objects.get_or_create(
             account=acc_member_ada,
             defaults={"state": "accepted", "next_step": 8, "data": {"network": "WGMN", "country": "NG", "language": "en"}},
@@ -220,31 +278,133 @@ class Command(BaseCommand):
                 "approved_by": acc_founder,
             },
         )
-
-        # 3.7 Candidate John (review_needed)
-        _, acc_candidate, _ = ensure_user_account("candidate.john@example.org", "John Kalu")
-        draft_john, _ = OnboardingDraft.objects.get_or_create(
-            account=acc_candidate,
-            defaults={"state": "review_needed", "next_step": 6, "data": {"network": "WGMN", "country": "NG", "language": "en"}},
-        )
-        draft_john.state = "review_needed"
-        draft_john.save()
-        # Also grant candidate role access
-        AccessGrant.objects.update_or_create(
-            account=acc_candidate,
-            role="candidate",
-            defaults={"network": "WGMN", "geography": "NG", "expires_at": now + timedelta(days=30)},
+        UserPreference.objects.update_or_create(
+            account=acc_member_ada,
+            defaults={"active_network": "WGMN", "active_country": "NG", "language": "en"},
         )
 
-        # 3.8 Community Amara (Community access)
-        _, acc_community, _ = ensure_user_account("community.amara@example.org", "Amara Diallo")
-        AccessGrant.objects.update_or_create(
-            account=acc_community,
-            role="community",
-            defaults={"network": "WGMN", "geography": "NG", "expires_at": now + timedelta(days=90)},
+        # 3.7 Member Mary David (WGMN, AO, Luanda)
+        _, acc_mary, person_mary = ensure_user_account("mary.david@example.org", "Mary David")
+        draft_mary, _ = OnboardingDraft.objects.get_or_create(
+            account=acc_mary,
+            defaults={"state": "accepted", "next_step": 8, "data": {"network": "WGMN", "country": "AO", "district": "AO-LUA-01", "language": "pt"}},
+        )
+        draft_mary.state = "accepted"
+        draft_mary.save()
+        consent_mary, _ = OnboardingConsent.objects.get_or_create(
+            draft=draft_mary,
+            revision=1,
+            defaults={"version": "1.0", "notice": "Notice", "digest": "d", "approval_reference": "ref", "privacy_ack": True, "channel": "web"},
+        )
+        Membership.objects.update_or_create(
+            draft=draft_mary,
+            defaults={
+                "person": person_mary,
+                "network": "WGMN",
+                "home": {"code": "AO-LUA-01", "country": "AO", "label": "Luanda Central Chapter"},
+                "consent": consent_mary,
+                "policy_digest": "policy_digest",
+                "approved_by": acc_founder,
+            },
+        )
+        UserPreference.objects.update_or_create(
+            account=acc_mary,
+            defaults={"active_network": "WGMN", "active_country": "AO", "language": "pt"},
         )
 
-        self.stdout.write("Eight distinct test accounts established.")
+        # 3.8 Members Sarah Andres & Kemi Dare (WGMN, ET, Addis Ababa)
+        for et_email, et_name in [("sarah.andres@example.org", "Sarah Andres"), ("kemi.dare@example.org", "Kemi Dare")]:
+            _, acc_et, person_et = ensure_user_account(et_email, et_name)
+            dr_et, _ = OnboardingDraft.objects.get_or_create(
+                account=acc_et,
+                defaults={"state": "accepted", "next_step": 8, "data": {"network": "WGMN", "country": "ET", "district": "ET-ADD-01", "language": "en"}},
+            )
+            dr_et.state = "accepted"
+            dr_et.save()
+            cons_et, _ = OnboardingConsent.objects.get_or_create(
+                draft=dr_et,
+                revision=1,
+                defaults={"version": "1.0", "notice": "Notice", "digest": "d", "approval_reference": "ref", "privacy_ack": True, "channel": "web"},
+            )
+            Membership.objects.update_or_create(
+                draft=dr_et,
+                defaults={
+                    "person": person_et,
+                    "network": "WGMN",
+                    "home": {"code": "ET-ADD-01", "country": "ET", "label": "Addis Ababa Central Chapter"},
+                    "consent": cons_et,
+                    "policy_digest": "policy_digest",
+                    "approved_by": acc_founder,
+                },
+            )
+            UserPreference.objects.update_or_create(
+                account=acc_et,
+                defaults={"active_network": "WGMN", "active_country": "ET", "language": "en"},
+            )
+
+        # 3.9 Member Efua Mensah (WNNN, GH, Accra)
+        for gh_email in ["wnnn.member@example.org", "wnnn_member@example.org", "efua.mensah@example.org"]:
+            _, acc_gh, person_gh = ensure_user_account(gh_email, "Efua Mensah")
+            dr_gh, _ = OnboardingDraft.objects.get_or_create(
+                account=acc_gh,
+                defaults={"state": "accepted", "next_step": 8, "data": {"network": "WNNN", "country": "GH", "district": "GH-ACC-02", "language": "en"}},
+            )
+            dr_gh.state = "accepted"
+            dr_gh.save()
+            cons_gh, _ = OnboardingConsent.objects.get_or_create(
+                draft=dr_gh,
+                revision=1,
+                defaults={"version": "1.0", "notice": "Notice", "digest": "d", "approval_reference": "ref", "privacy_ack": True, "channel": "web"},
+            )
+            Membership.objects.update_or_create(
+                draft=dr_gh,
+                defaults={
+                    "person": person_gh,
+                    "network": "WNNN",
+                    "home": {"code": "GH-ACC-02", "country": "GH", "label": "Accra Next-Gen Hub"},
+                    "consent": cons_gh,
+                    "policy_digest": "policy_digest",
+                    "approved_by": acc_founder,
+                },
+            )
+            UserPreference.objects.update_or_create(
+                account=acc_gh,
+                defaults={"active_network": "WNNN", "active_country": "GH", "language": "en"},
+            )
+
+        # 3.10 Candidate John Kalu (review_needed)
+        for cand_email in ["candidate.john@example.org", "john.kalu@example.org"]:
+            _, acc_candidate, _ = ensure_user_account(cand_email, "John Kalu")
+            draft_john, _ = OnboardingDraft.objects.get_or_create(
+                account=acc_candidate,
+                defaults={"state": "review_needed", "next_step": 6, "data": {"network": "WGMN", "country": "NG", "language": "en"}},
+            )
+            draft_john.state = "review_needed"
+            draft_john.save()
+            AccessGrant.objects.update_or_create(
+                account=acc_candidate,
+                role="candidate",
+                defaults={"network": "WGMN", "geography": "NG", "expires_at": now + timedelta(days=30)},
+            )
+            UserPreference.objects.update_or_create(
+                account=acc_candidate,
+                defaults={"active_network": "WGMN", "active_country": "NG", "language": "en"},
+            )
+
+        # 3.11 Community Amara Diallo (Community access)
+        for comm_email in ["community.amara@example.org", "amara.diallo@example.org"]:
+            _, acc_community, _ = ensure_user_account(comm_email, "Amara Diallo")
+            AccessGrant.objects.update_or_create(
+                account=acc_community,
+                role="community",
+                defaults={"network": "WGMN", "geography": "NG", "expires_at": now + timedelta(days=90)},
+            )
+            UserPreference.objects.update_or_create(
+                account=acc_community,
+                defaults={"active_network": "WGMN", "active_country": "NG", "language": "en"},
+            )
+
+        self.stdout.write("Distinct test accounts established across all roles and countries.")
 
         # ---------------------------------------------------------------------
         # 4. Dashboard Alerts
@@ -279,6 +439,10 @@ class Command(BaseCommand):
             ("Lagos Central Weekly Chapter Fellowship", "chapter_meetup", "WGMN", "NG", "member", now + timedelta(days=2), "Ikeja Community Center, Lagos", "Adaeze Okonkwo", 26),
             ("Next-Gen Digital Literacy Bootcamp", "community_open", "WNNN", "GH", "community", now + timedelta(days=5), "Virtual Classroom Alpha (https://meet.woddi.org/nextgen-gh)", "Kwame Asante", 45),
             ("East Africa New Member Orientation", "orientation", "WGMN", "KE", "candidate", now + timedelta(days=4), "Nairobi Hub Conference Room 2", "Wanjiru Kariuki", 14),
+            ("Kenya Leadership Advisory Council", "country_assembly", "WGMN", "KE", "country_lead", now + timedelta(days=3), "Nairobi Central Executive Boardroom", "Wanjiru Kariuki", 16),
+            ("Luanda Chapter Community Fellowship", "chapter_meetup", "WGMN", "AO", "member", now + timedelta(days=2), "Luanda City Center Hall", "Mary David", 20),
+            ("Addis Ababa Monthly Chapter Assembly", "chapter_meetup", "WGMN", "ET", "member", now + timedelta(days=3), "Addis Ababa Central Pavilion", "Sarah Andres", 25),
+            ("Accra Next-Gen Chapter Assembly", "chapter_meetup", "WNNN", "GH", "member", now + timedelta(days=2), "Accra Community Center", "Efua Mensah", 30),
         ]
         for title, m_type, net, country, target, dt, loc, org, count in meetings_data:
             m, _ = ScheduledMeeting.objects.update_or_create(
@@ -306,6 +470,9 @@ class Command(BaseCommand):
             ("Q3 2026 Continental Impact & Growth Audit", "executive_summary", "WGMN", "ALL", "Q3 2026", "Comprehensive audit of 12 regional hubs, 200+ chapters, and community micro-grants across Africa.", {"total_enrolled": 1420, "chapters_active": 45, "grants_disbursed_usd": 125000, "governance_score": 99.4}, "Founder & Executive Director"),
             ("West Africa Regional Field Report", "country_health", "WGMN", "NG", "September 2026", "Operational summary covering Lagos, Abuja, and Port Harcourt chapter activities and health outreaches.", {"active_members": 520, "meetings_held": 24, "retention_rate": 96.2}, "Dr. Aisha Bello"),
             ("Next-Gen Youth Education Progress: Ghana", "onboarding_throughput", "WNNN", "GH", "Q3 2026", "Assessment of youth chapter activities, digital bootcamps, and high-school leadership mentorship.", {"youth_participants": 340, "workshops": 12, "completion_rate": 91.5}, "Chief Operations Lead"),
+            ("East Africa Hub Progress Report", "country_health", "WGMN", "KE", "September 2026", "Regional evaluation of chapter growth, community health sessions, and membership expansion across Kenya.", {"active_members": 380, "meetings_held": 18, "retention_rate": 94.8}, "Wanjiru Kariuki"),
+            ("Southern Africa Regional Field Report", "country_health", "WGMN", "AO", "September 2026", "Luanda chapter activity, member onboarding metrics, and health outreach.", {"active_members": 210, "meetings_held": 10, "retention_rate": 95.0}, "Mary David"),
+            ("Horn of Africa Regional Field Report", "country_health", "WGMN", "ET", "September 2026", "Addis Ababa chapter programs, youth vocational training, and member welfare.", {"active_members": 290, "meetings_held": 14, "retention_rate": 93.5}, "Sarah Andres"),
         ]
         for title, r_type, net, country, period, summary, metrics, author in reports_data:
             DashboardReport.objects.update_or_create(

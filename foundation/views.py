@@ -20,13 +20,19 @@ from .models import (
     Chapter,
     Communication,
     CountryHub,
+    CountryDossier,
     DashboardActivity,
     DashboardAlert,
     DashboardReport,
     DeviceSession,
+    GeographyTerminology,
     LeadershipLevel,
+    LocalHomeReassignment,
+    LocalOrganisationUnit,
     NetworkTransition,
     Notification,
+    PersonProfile,
+    PersonRelationship,
     PrivacyRequest,
     Role,
     ScheduledMeeting,
@@ -51,6 +57,17 @@ from .dashboard_engine import (
     get_dashboard_screen,
     get_default_screen_for_role,
     DASHBOARD_SCREENS,
+)
+from .people_geo_engine import (
+    STAGE6_SCREENS,
+    assert_stage6_authorized,
+    seed_stage6_fixtures,
+    check_for_duplicate_person,
+    add_or_link_person_record,
+    save_person_relationship,
+    submit_reassignment_decision,
+    verify_country_dossier_submission,
+    save_geography_terminology_revision,
 )
 
 
@@ -322,16 +339,28 @@ def app_shell(request):
     if redirect_response:
         return redirect_response
 
+    # Stage 5 primary starting view: Route authenticated users directly to their authorized role dashboard
+    # when landing on /foundation/ without query parameters
+    if not request.GET or request.GET.get("view") == "dashboard":
+        return redirect("/foundation/dashboard/")
+
     user_scope = ctx["user_scope"]
 
     # Role resolution & authorization
-    req_role = request.GET.get("role") or request.GET.get("view") or request.session.get("wdos_active_role") or user_scope.active_role
-    try:
-        assert_role_authorized(user_scope, req_role)
-    except ScopePermissionDenied as exc:
-        return _render_scope_error(request, ctx, exc)
+    explicit_role = request.GET.get("role") or (request.GET.get("view") if request.GET.get("view") not in ("workspace", "core", "tasks", "queue") else None)
+    if explicit_role:
+        try:
+            assert_role_authorized(user_scope, explicit_role)
+            role = explicit_role
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+    else:
+        sess_role = request.session.get("wdos_active_role")
+        if sess_role and user_scope.can_access_role(sess_role):
+            role = sess_role
+        else:
+            role = user_scope.primary_role
 
-    role = req_role
     request.session["wdos_active_role"] = role
     user_scope.active_role = role
 
@@ -2937,13 +2966,22 @@ def switch_role_view(request):
     user_scope = ctx["user_scope"]
     target_role = (request.POST.get("role") or request.GET.get("role", "")).lower().strip()
 
+    if not target_role:
+        allowed = list(user_scope.roles) if hasattr(user_scope, "roles") and user_scope.roles else [user_scope.primary_role]
+        current = user_scope.active_role
+        if current in allowed and len(allowed) > 1:
+            idx = allowed.index(current)
+            target_role = allowed[(idx + 1) % len(allowed)]
+        else:
+            target_role = user_scope.primary_role
+
     try:
         assert_role_authorized(user_scope, target_role)
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
     request.session["wdos_active_role"] = target_role
-    return redirect(f"/foundation/?role={target_role}")
+    return redirect(f"/foundation/dashboard/?role={target_role}")
 
 
 def dev_switch_user(request, role_or_alias):
@@ -2961,36 +2999,67 @@ def dev_switch_user(request, role_or_alias):
         "operations": "ops@example.org",
         "country_ng": "country.ng@example.org",
         "country-ng": "country.ng@example.org",
+        "aisha": "country.ng@example.org",
+        "aisha_bello": "country.ng@example.org",
         "country_ke": "country.ke@example.org",
         "country-ke": "country.ke@example.org",
+        "kenya": "country.ke@example.org",
+        "kenya_lead": "country.ke@example.org",
+        "wanjiru": "country.ke@example.org",
+        "wanjiru_kariuki": "country.ke@example.org",
         "chapter_lagos": "chapter.lagos@example.org",
         "chapter-lagos": "chapter.lagos@example.org",
+        "adaeze": "chapter.lagos@example.org",
+        "adaeze_okonkwo": "chapter.lagos@example.org",
         "member": "member.ada@example.org",
         "ada": "member.ada@example.org",
+        "ada_okafor": "member.ada@example.org",
         "member_ada": "member.ada@example.org",
+        "mary": "mary.david@example.org",
+        "mary_david": "mary.david@example.org",
+        "angola": "mary.david@example.org",
+        "sarah": "sarah.andres@example.org",
+        "sarah_andres": "sarah.andres@example.org",
+        "kemi": "kemi.dare@example.org",
+        "kemi_dare": "kemi.dare@example.org",
+        "ethiopia": "sarah.andres@example.org",
         "wgmn": "wgmn_member@example.org",
         "wgmn_member": "wgmn_member@example.org",
         "wnnn": "wnnn_member@example.org",
         "wnnn_member": "wnnn_member@example.org",
+        "efua": "wnnn_member@example.org",
+        "efua_mensah": "wnnn_member@example.org",
+        "ghana": "wnnn_member@example.org",
         "candidate": "candidate.john@example.org",
         "john": "candidate.john@example.org",
+        "john_kalu": "candidate.john@example.org",
         "community": "community.amara@example.org",
         "amara": "community.amara@example.org",
+        "amara_diallo": "community.amara@example.org",
+        "secretary": "ada.secretary@example.org",
+        "network_secretary": "ada.secretary@example.org",
+        "hofco": "founder@example.org",
     }
     email = alias_map.get(role_or_alias.lower().strip(), role_or_alias.lower().strip())
-    account = Account.objects.select_related("user").filter(email=email).first()
+    account = Account.objects.select_related("user").filter(email__iexact=email).first()
     if not account:
-        raise Http404(f"Test account '{role_or_alias}' not found.")
+        raise Http404(f"Test account '{role_or_alias}' ({email}) not found.")
 
     from django.contrib.auth import login as django_login
     django_login(request, account.user, backend="django.contrib.auth.backends.ModelBackend")
     request.session["security_version"] = account.security_version
     request.session["mfa_verified"] = True
+
+    # Clear stale session scope state
+    request.session.pop("wdos_active_role", None)
+    request.session.pop("wdos_active_network", None)
+    request.session.pop("wdos_active_country", None)
+
     now = timezone.now().timestamp()
     request.session["last_activity"] = now
     request.session["absolute_expiry"] = now + 43200
     request.session.modified = True
-    return redirect("/foundation/")
+    return redirect("/foundation/dashboard/")
 
 
 def dashboard_screen_view(request, screen_code=None):
@@ -3007,25 +3076,32 @@ def dashboard_screen_view(request, screen_code=None):
     account = ctx["account"]
 
     # Role resolution & session tracking
-    req_role = request.GET.get("role") or request.session.get("wdos_active_role") or user_scope.active_role
-    if req_role:
+    explicit_role = request.GET.get("role")
+    if explicit_role:
         try:
-            assert_role_authorized(user_scope, req_role)
-            user_scope.active_role = req_role
-            request.session["wdos_active_role"] = req_role
+            assert_role_authorized(user_scope, explicit_role)
+            user_scope.active_role = explicit_role
+            request.session["wdos_active_role"] = explicit_role
         except ScopePermissionDenied as exc:
             return _render_scope_error(request, ctx, exc)
+    else:
+        sess_role = request.session.get("wdos_active_role")
+        if sess_role and user_scope.can_access_role(sess_role):
+            user_scope.active_role = sess_role
+        else:
+            user_scope.active_role = user_scope.primary_role
+            request.session["wdos_active_role"] = user_scope.primary_role
 
     # Resolve screen code: from URL param, GET param, or user's active role default
-    resolved_code = screen_code or request.GET.get("screen")
-    if not resolved_code:
-        resolved_code = get_default_screen_for_role(user_scope.active_role)
+    explicit_screen = screen_code or request.GET.get("screen")
+    is_explicit = bool(explicit_screen)
+    resolved_code = explicit_screen or get_default_screen_for_role(user_scope.active_role)
 
     norm_code = resolved_code.strip().upper()
 
     # Enforce server-authoritative permission checks
     try:
-        check_dashboard_permission(user_scope, norm_code)
+        check_dashboard_permission(user_scope, norm_code, is_explicit=is_explicit)
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
@@ -3037,6 +3113,7 @@ def dashboard_screen_view(request, screen_code=None):
         account,
         state_param=request.GET.get("state"),
         tab_param=request.GET.get("tab"),
+        is_explicit=is_explicit,
     )
 
     ctx.update(dash_ctx)
@@ -3113,15 +3190,56 @@ def test_approve_account_view(request, email=None):
             account.save()
             p = account.person
  
-            # 4. Resolve / Create Onboarding Draft
+            # 4. Resolve / Create Onboarding Draft and Authoritative Scope
             draft = OnboardingDraft.objects.filter(account=account).first()
             data = (draft.data if draft else {}) or {}
-            network = data.get("network") or "WGMN"
-            country = data.get("country") or "NG"
-            chapter_code = data.get("district") or data.get("chapter_code") or "NG-LOS-01"
+
+            # Detect country and network: prioritize explicit AccessGrant, then draft data, then email heuristics
+            existing_grant = AccessGrant.objects.filter(account=account, revoked_at__isnull=True).exclude(geography="*").first()
+            if existing_grant and existing_grant.geography and existing_grant.geography != "*":
+                country = existing_grant.geography[:2].upper()
+            else:
+                country = data.get("country")
+            if not country:
+                lower_email = target_email.lower()
+                if ".ke" in lower_email or "kenya" in lower_email or "wanjiru" in lower_email:
+                    country = "KE"
+                elif ".gh" in lower_email or "ghana" in lower_email or "efua" in lower_email:
+                    country = "GH"
+                elif ".ao" in lower_email or "angola" in lower_email or "mary" in lower_email:
+                    country = "AO"
+                elif ".et" in lower_email or "ethiopia" in lower_email or "sarah" in lower_email or "kemi" in lower_email:
+                    country = "ET"
+                else:
+                    country = "NG"
+
+            existing_net_grant = AccessGrant.objects.filter(account=account, revoked_at__isnull=True).exclude(network="*").first()
+            if existing_net_grant and existing_net_grant.network and existing_net_grant.network != "*":
+                network = existing_net_grant.network
+            else:
+                network = data.get("network")
+            if not network:
+                lower_email = target_email.lower()
+                if "wnnn" in lower_email or "efua" in lower_email:
+                    network = "WNNN"
+                else:
+                    network = "WGMN"
+
+            country_default_chapters = {
+                "KE": ("KE-NBO-01", "Nairobi Central Chapter"),
+                "GH": ("GH-ACC-02", "Accra Central Chapter"),
+                "AO": ("AO-LUA-01", "Luanda Chapter"),
+                "ET": ("ET-ADD-01", "Addis Ababa Chapter"),
+                "NG": ("NG-LOS-01", "Lagos Central Chapter"),
+            }
+            default_chap_code, default_chap_name = country_default_chapters.get(country, ("NG-LOS-01", "Lagos Central Chapter"))
+            if existing_grant and "-" in (existing_grant.geography or ""):
+                chapter_code = existing_grant.geography
+            else:
+                chapter_code = data.get("district") or data.get("chapter_code") or default_chap_code
  
             chap = Chapter.objects.filter(code=chapter_code).first()
-            chapter_label = chap.name if chap else (data.get("district") or "Lagos Central Chapter")
+            chapter_label = chap.name if chap else default_chap_name
             home = {"code": chapter_code, "country": country, "label": chapter_label}
  
             if not draft:
@@ -3193,6 +3311,9 @@ def test_approve_account_view(request, email=None):
                 django_login(request, account.user, backend="django.contrib.auth.backends.ModelBackend")
                 request.session["security_version"] = account.security_version
                 request.session["mfa_verified"] = True
+                request.session.pop("wdos_active_role", None)
+                request.session.pop("wdos_active_network", None)
+                request.session.pop("wdos_active_country", None)
                 if data.get("timezone"):
                     request.session["wdos_timezone"] = data["timezone"]
                 if data.get("language"):
@@ -3201,7 +3322,7 @@ def test_approve_account_view(request, email=None):
                 request.session["last_activity"] = now
                 request.session["absolute_expiry"] = now + 43200
                 request.session.modified = True
-                return redirect("/foundation/")
+                return redirect("/foundation/dashboard/")
  
             success_info = {
                 "email": account.email,
@@ -3230,6 +3351,619 @@ def test_approve_account_view(request, email=None):
         "recent_accounts": recent_list,
     }
     return render(request, "foundation/test_approve.html", ctx)
+
+
+# =============================================================================
+# WDOS STAGE 06: PEOPLE, COMMUNITY, AND GEOGRAPHY SPINE VIEWS
+# =============================================================================
+
+def people_directory_view(request):
+    """
+    PEOPLE-01: People directory.
+    Provides scoped operating list of people, memberships, and relationships.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+
+    try:
+        assert_stage6_authorized(user_scope, "PEOPLE-01")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["PEOPLE-01"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    # Scoped query
+    qs = PersonProfile.objects.all()
+    if user_scope.active_network not in {"ALL", "HQ / Both networks"}:
+        qs = qs.filter(network__in=[user_scope.active_network, "BOTH"])
+    if user_scope.active_country not in {"ALL", "BOTH"}:
+        qs = qs.filter(country=user_scope.active_country)
+
+    query = request.GET.get("q", "").strip()
+    if query:
+        qs = qs.filter(Q(full_name__icontains=query) | Q(local_home__icontains=query) | Q(person_code__icontains=query))
+
+    status_filter = request.GET.get("status", "").strip()
+    if status_filter:
+        qs = qs.filter(status__iexact=status_filter)
+
+    people = list(qs)
+    if state_mode == "empty":
+        people = []
+
+    ctx.update({
+        "screen": screen,
+        "people": people,
+        "active_nav": "people",
+        "active_tab": request.GET.get("tab", "records"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+        "query": query,
+    })
+    return render(request, "foundation/stage6/people_01_directory.html", ctx)
+
+
+def person_profile_view(request, person_code="WD-00421"):
+    """
+    PEOPLE-02: Ada Okafor profile.
+    Shows profile summary, verified status, and attached community relationships.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+
+    try:
+        assert_stage6_authorized(user_scope, "PEOPLE-02")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["PEOPLE-02"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    try:
+        person = PersonProfile.objects.get(person_code=person_code)
+    except PersonProfile.DoesNotExist:
+        try:
+            person = PersonProfile.objects.get(id=person_code)
+        except Exception:
+            person = PersonProfile.objects.first()
+
+    people = list(PersonProfile.objects.filter(network=person.network, country=person.country))
+    if state_mode == "empty":
+        people = []
+
+    ctx.update({
+        "screen": screen,
+        "person": person,
+        "people": people,
+        "active_nav": "people",
+        "active_tab": request.GET.get("tab", "overview"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+    })
+    return render(request, "foundation/stage6/people_02_profile.html", ctx)
+
+
+def add_or_link_person_view(request):
+    """
+    PEOPLE-03: Add or link a person wizard.
+    Safe add-or-link duplicate handling preventing multiple person identity registrations.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+    account = ctx["account"]
+
+    try:
+        assert_stage6_authorized(user_scope, "PEOPLE-03")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["PEOPLE-03"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    result_message = None
+    result_success = True
+    form_data = {
+        "full_name": "Ada Okafor",
+        "email": "ada@example.org",
+        "country": "Nigeria",
+        "relationship_to_add": "WGMN membership",
+    }
+
+    if request.method == "POST":
+        full_name = request.POST.get("full_name", "").strip()
+        email = request.POST.get("email", "").strip()
+        country = request.POST.get("country", "").strip()
+        relationship = request.POST.get("relationship_to_add", "").strip()
+        form_data.update({
+            "full_name": full_name,
+            "email": email,
+            "country": country,
+            "relationship_to_add": relationship,
+        })
+
+        if not full_name:
+            result_message = "Full name is required."
+            result_success = False
+        else:
+            res = add_or_link_person_record(
+                full_name=full_name,
+                email=email,
+                country="NG" if country.lower() in {"nigeria", "ng"} else "KE",
+                relationship_to_add=relationship,
+                network=user_scope.active_network if user_scope.active_network in {"WGMN", "WNNN"} else "WGMN",
+                actor_account=account,
+            )
+            if res["action_type"] == "linked":
+                result_message = f"Existing person record found ({res['person'].person_code} · {res['person'].full_name}). Relationship linked successfully without creating a duplicate identity."
+            else:
+                result_message = f"New authoritative person record created ({res['person'].person_code} · {res['person'].full_name}) and relationship linked."
+            result_success = True
+
+    ctx.update({
+        "screen": screen,
+        "active_nav": "people",
+        "active_tab": request.GET.get("tab", "records"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+        "result_message": result_message,
+        "result_success": result_success,
+        "form_data": form_data,
+    })
+    return render(request, "foundation/stage6/people_03_add_or_link.html", ctx)
+
+
+def community_relationships_view(request):
+    """
+    PEOPLE-04: Community relationships.
+    Displays people and connected relationships matching scope.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+
+    try:
+        assert_stage6_authorized(user_scope, "PEOPLE-04")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["PEOPLE-04"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    qs = PersonProfile.objects.all()
+    if user_scope.active_network not in {"ALL", "HQ / Both networks"}:
+        qs = qs.filter(network__in=[user_scope.active_network, "BOTH"])
+    if user_scope.active_country not in {"ALL", "BOTH"}:
+        qs = qs.filter(country=user_scope.active_country)
+
+    people = list(qs)
+    if state_mode == "empty":
+        people = []
+
+    ctx.update({
+        "screen": screen,
+        "people": people,
+        "active_nav": "people",
+        "active_tab": request.GET.get("tab", "records"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+    })
+    return render(request, "foundation/stage6/people_04_community_relationships.html", ctx)
+
+
+def manage_relationships_view(request):
+    """
+    PEOPLE-05: Manage relationships.
+    Attaches membership, participation and leadership to a single person identity.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+    account = ctx["account"]
+
+    try:
+        assert_stage6_authorized(user_scope, "PEOPLE-05")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["PEOPLE-05"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    result_message = None
+    form_data = {
+        "relationship_category": "Programme participant",
+        "related_programme": "Community Skills Exchange",
+        "effective_date": "18 September 2026",
+    }
+
+    if request.method == "POST":
+        category = request.POST.get("relationship_category", "").strip()
+        programme = request.POST.get("related_programme", "").strip()
+        eff_date = request.POST.get("effective_date", "").strip()
+        person_code = request.POST.get("person_code", "WD-00421").strip()
+        form_data.update({
+            "relationship_category": category,
+            "related_programme": programme,
+            "effective_date": eff_date,
+        })
+
+        res = save_person_relationship(
+            person_id_or_code=person_code,
+            relationship_category=category,
+            related_programme=programme,
+            effective_date_str=eff_date,
+            actor_account=account,
+        )
+        result_message = f"Relationship successfully saved and attached to {res['person'].full_name} ({res['person'].person_code})."
+
+    ctx.update({
+        "screen": screen,
+        "active_nav": "people",
+        "active_tab": request.GET.get("tab", "records"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+        "result_message": result_message,
+        "form_data": form_data,
+    })
+    return render(request, "foundation/stage6/people_05_manage_relationships.html", ctx)
+
+
+def review_reassignment_view(request):
+    """
+    PEOPLE-06: Review local-home reassignment.
+    Enforces role authority, member confirmation, and durable audit history.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+    account = ctx["account"]
+
+    try:
+        assert_stage6_authorized(user_scope, "PEOPLE-06")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["PEOPLE-06"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    reassignment = LocalHomeReassignment.objects.select_related("person").first()
+
+    result_message = None
+    result_success = True
+
+    if request.method == "POST":
+        person_code = request.POST.get("person_code", "WD-00421")
+        proposed_home = request.POST.get("proposed_local_home", "").strip()
+        reason = request.POST.get("reason", "").strip()
+        confirmation = request.POST.get("member_confirmation") in {"true", "True", "1", "on"}
+
+        try:
+            res = submit_reassignment_decision(
+                person_code=person_code,
+                proposed_local_home=proposed_home,
+                reason=reason,
+                member_confirmation=confirmation,
+                actor_account=account,
+                user_scope=user_scope,
+            )
+            reassignment = res["reassignment"]
+            result_message = f"Reassignment to '{proposed_home}' submitted and approved with confirmation linked."
+            result_success = True
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+        except Exception as exc:
+            result_message = str(exc)
+            result_success = False
+
+    ctx.update({
+        "screen": screen,
+        "reassignment": reassignment,
+        "active_nav": "people",
+        "active_tab": request.GET.get("tab", "records"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+        "result_message": result_message,
+        "result_success": result_success,
+    })
+    return render(request, "foundation/stage6/people_06_review_reassignment.html", ctx)
+
+
+def africa_network_coverage_view(request):
+    """
+    GEO-01: Africa and network coverage.
+    Continental view with interactive vector map and separate network country tables.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+
+    try:
+        assert_stage6_authorized(user_scope, "GEO-01")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["GEO-01"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    dossiers = list(CountryDossier.objects.all())
+    if state_mode == "empty":
+        dossiers = []
+
+    ctx.update({
+        "screen": screen,
+        "dossiers": dossiers,
+        "active_nav": "reports",
+        "active_tab": request.GET.get("tab", "map"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+    })
+    return render(request, "foundation/stage6/geo_01_africa_coverage.html", ctx)
+
+
+def country_command_profile_view(request, country_code="NG"):
+    """
+    GEO-02: Nigeria · Country Command Profile.
+    Shows country leadership, timezone reference, and dossier verification status.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+
+    try:
+        assert_stage6_authorized(user_scope, "GEO-02")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["GEO-02"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    norm_cc = (country_code or "NG").strip().upper()
+    dossier = CountryDossier.objects.filter(country_code=norm_cc).first() or CountryDossier.objects.first()
+    dossiers = list(CountryDossier.objects.all())
+    if state_mode == "empty":
+        dossiers = []
+
+    ctx.update({
+        "screen": screen,
+        "dossier": dossier,
+        "dossiers": dossiers,
+        "active_nav": "reports",
+        "active_tab": request.GET.get("tab", "overview"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+    })
+    return render(request, "foundation/stage6/geo_02_country_command.html", ctx)
+
+
+def local_organisation_view(request):
+    """
+    GEO-03: Local organisation.
+    Visual 5-tier organizational hierarchy and unit directory.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+
+    try:
+        assert_stage6_authorized(user_scope, "GEO-03")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["GEO-03"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    units = list(LocalOrganisationUnit.objects.filter(country="NG", network="WGMN").order_by("level_order"))
+    if state_mode == "empty":
+        units = []
+
+    ctx.update({
+        "screen": screen,
+        "units": units,
+        "active_nav": "reports",
+        "active_tab": request.GET.get("tab", "structure"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+    })
+    return render(request, "foundation/stage6/geo_03_local_organisation.html", ctx)
+
+
+def verify_country_dossier_view(request):
+    """
+    GEO-04: Verify the country dossier.
+    Enforces HOFCO / QA authority for country dossier verification.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+    account = ctx["account"]
+
+    try:
+        assert_stage6_authorized(user_scope, "GEO-04")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["GEO-04"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    dossier = CountryDossier.objects.filter(country_code="NG", network="WGMN").first() or CountryDossier.objects.first()
+    result_message = None
+    result_success = True
+
+    if request.method == "POST":
+        country_code = request.POST.get("country_code", "NG")
+        network = request.POST.get("network", "WGMN")
+        stage = request.POST.get("verification_stage", "").strip()
+        ref = request.POST.get("evidence_reference", "").strip()
+        notes = request.POST.get("verification_notes", "").strip()
+
+        try:
+            res = verify_country_dossier_submission(
+                country_code=country_code,
+                network=network,
+                verification_stage=stage,
+                evidence_reference=ref,
+                verification_notes=notes,
+                actor_account=account,
+                user_scope=user_scope,
+            )
+            dossier = res["dossier"]
+            result_message = f"Country dossier for {dossier.country_name} ({dossier.network}) verified successfully."
+            result_success = True
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+        except Exception as exc:
+            result_message = str(exc)
+            result_success = False
+
+    ctx.update({
+        "screen": screen,
+        "dossier": dossier,
+        "active_nav": "reports",
+        "active_tab": request.GET.get("tab", "records"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+        "result_message": result_message,
+        "result_success": result_success,
+    })
+    return render(request, "foundation/stage6/geo_04_verify_dossier.html", ctx)
+
+
+def geography_terminology_view(request):
+    """
+    GEO-05: Geography and local terminology.
+    Controlled terminology change for country administrative divisions.
+    """
+    ctx, redirect_res = _get_authenticated_context(request)
+    if redirect_res:
+        return redirect_res
+
+    seed_stage6_fixtures()
+    user_scope = ctx["user_scope"]
+    account = ctx["account"]
+
+    try:
+        assert_stage6_authorized(user_scope, "GEO-05")
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = STAGE6_SCREENS["GEO-05"]
+    state_mode = request.GET.get("state")
+    state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    term = GeographyTerminology.objects.filter(country="NG").first()
+    result_message = None
+    result_success = True
+
+    if request.method == "POST":
+        country_code = request.POST.get("country_code", "NG")
+        first_level = request.POST.get("first_level_term", "").strip()
+        second_level = request.POST.get("second_level_term", "").strip()
+        eff_date_str = request.POST.get("effective_date", "").strip()
+
+        try:
+            res = save_geography_terminology_revision(
+                country_code=country_code,
+                first_level_term=first_level,
+                second_level_term=second_level,
+                effective_date_str=eff_date_str,
+                actor_account=account,
+                user_scope=user_scope,
+            )
+            term = res["terminology"]
+            result_message = f"Proposed terminology revision for {term.country_name} saved. Effective date: {eff_date_str}."
+            result_success = True
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+        except Exception as exc:
+            result_message = str(exc)
+            result_success = False
+
+    effective_date_display = "01 October 2026"
+    if term and term.effective_date:
+        effective_date_display = term.effective_date.strftime("%d %B %Y")
+
+    ctx.update({
+        "screen": screen,
+        "terminology": term,
+        "effective_date_display": effective_date_display,
+        "active_nav": "reports",
+        "active_tab": request.GET.get("tab", "records"),
+        "state_mode": state_mode,
+        "state_card": state_card,
+        "result_message": result_message,
+        "result_success": result_success,
+    })
+    return render(request, "foundation/stage6/geo_05_geography_terminology.html", ctx)
+
+
+def stage6_screen_router(request, screen_code):
+    """
+    Direct screen code dispatcher for PEOPLE-01 through GEO-05.
+    Allows exact testing, artboard verification, and responsive QA.
+    """
+    code = (screen_code or "").strip().upper()
+    mapping = {
+        "PEOPLE-01": people_directory_view,
+        "PEOPLE-02": person_profile_view,
+        "PEOPLE-03": add_or_link_person_view,
+        "PEOPLE-04": community_relationships_view,
+        "PEOPLE-05": manage_relationships_view,
+        "PEOPLE-06": review_reassignment_view,
+        "GEO-01": africa_network_coverage_view,
+        "GEO-02": country_command_profile_view,
+        "GEO-03": local_organisation_view,
+        "GEO-04": verify_country_dossier_view,
+        "GEO-05": geography_terminology_view,
+    }
+
+    view_fn = mapping.get(code)
+    if not view_fn:
+        raise Http404(f"Stage 06 screen code '{screen_code}' not found.")
+    return view_fn(request)
+
 
 
 

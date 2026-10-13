@@ -2482,7 +2482,7 @@ def get_default_screen_for_role(role: str) -> str:
     return "DASH-01"
 
 
-def check_dashboard_permission(user_scope, screen_code: str):
+def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool = False):
     """
     Enforces server-authoritative boundary checks:
     - Safeguarding: DASH-10-SAFEGUARDING is strictly restricted.
@@ -2502,25 +2502,63 @@ def check_dashboard_permission(user_scope, screen_code: str):
                 recovery_url="/foundation/dashboard/",
             )
 
-    # Country-scoped screens verification
+    norm_code = screen_code.strip().upper()
+
+    # Universal role dashboards adapt dynamically to the user's authorized country and network.
+    UNIVERSAL_ROLE_SCREENS = {
+        "DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05",
+        "DASH-06", "DASH-07", "DASH-08", "DASH-09",
+        "DASH-10", "DASH-11", "DASH-12", "DASH-13", "DASH-14",
+        "DASH-15", "DASH-16", "DASH-17"
+    }
+
+    # Role authorization check for the dashboard
+    screen_role = screen.get("default_role_code")
+    if screen_role:
+        if not user_scope.can_access_role(screen_role):
+            # Check hierarchy permissions
+            tier_allows = False
+            if screen_role in ("candidate", "community"):
+                tier_allows = True
+            elif screen_role == "member" and user_scope.can_access_role("member"):
+                tier_allows = True
+            elif screen_role == "chapter_lead" and (user_scope.can_access_role("chapter_lead") or user_scope.leadership_tier <= 4):
+                tier_allows = True
+            elif screen_role == "country_lead" and (user_scope.can_access_role("country_lead") or user_scope.leadership_tier <= 3):
+                tier_allows = True
+            elif screen_role in ("operations", "founder") and (user_scope.is_management_or_admin or user_scope.leadership_tier <= 2):
+                tier_allows = True
+
+            if not tier_allows:
+                raise ScopePermissionDenied(
+                    f"Access Denied: You do not have authorization to view the {screen.get('default_role_title', screen_role)} dashboard.",
+                    reason_code="unauthorized_role",
+                    attempted_scope={"screen": norm_code, "role": screen_role},
+                    authorized_scope={"roles": list(user_scope.roles), "primary_role": user_scope.primary_role},
+                    recovery_url="/foundation/dashboard/",
+                )
+
+    # Country isolation check
     screen_country = screen.get("default_country")
     if screen_country and screen_country != "ALL":
-        if not user_scope.can_access_country(screen_country):
-            raise ScopePermissionDenied(
-                f"Your account scope does not grant access to the {screen_country} country hub.",
-                reason_code="wrong_country",
-                recovery_url="/foundation/dashboard/",
-            )
+        if is_explicit or norm_code not in UNIVERSAL_ROLE_SCREENS:
+            if not user_scope.can_access_country(screen_country):
+                raise ScopePermissionDenied(
+                    f"Your account scope does not grant access to the {screen_country} country hub.",
+                    reason_code="wrong_country",
+                    recovery_url="/foundation/dashboard/",
+                )
 
     # Network-scoped screens verification
     screen_network = screen.get("default_network")
-    if screen_network and screen_network not in ("HQ / Both networks", "ALL", "*", "WODDI", "PUBLIC"):
-        if not user_scope.can_access_network(screen_network):
-            raise ScopePermissionDenied(
-                f"Your account scope does not grant access to the {screen_network} network workspace.",
-                reason_code="network_mismatch",
-                recovery_url="/foundation/dashboard/",
-            )
+    if screen_network and screen_network not in ("HQ / Both networks", "ALL", "*", "WODDI", "PUBLIC", "My application"):
+        if norm_code not in UNIVERSAL_ROLE_SCREENS:
+            if not user_scope.can_access_network(screen_network):
+                raise ScopePermissionDenied(
+                    f"Your account scope does not grant access to the {screen_network} network workspace.",
+                    reason_code="network_mismatch",
+                    recovery_url="/foundation/dashboard/",
+                )
 
 
 def build_dashboard_context(
@@ -2530,6 +2568,7 @@ def build_dashboard_context(
     account: Account,
     state_param: Optional[str] = None,
     tab_param: Optional[str] = None,
+    is_explicit: bool = False,
 ) -> Dict[str, Any]:
     """
     Assembles complete, authentic, scoped dashboard presentation context.
@@ -2539,6 +2578,7 @@ def build_dashboard_context(
     if not screen:
         screen = DASHBOARD_SCREENS["DASH-01"]
 
+    norm_code = screen_code.strip().upper()
     active_tab = tab_param or "overview"
 
     # Interaction contract state handling
@@ -2579,10 +2619,6 @@ def build_dashboard_context(
         }
         state_card = states.get(state_mode)
 
-    # Dynamic KPI reconciliation where authentic database records exist
-    kpi_cards = [dict(c) for c in screen.get("kpi_cards", [])]
-    table_card = dict(screen.get("table_card", {})) if screen.get("table_card") else None
-
     # Leadership tier flag for sidebar navigation
     is_leadership_tier = user_scope.active_role not in ("member", "candidate", "community")
 
@@ -2590,11 +2626,100 @@ def build_dashboard_context(
     active_network = user_scope.active_network or screen.get("default_network", "WGMN")
     active_country = user_scope.active_country or screen.get("default_country", "NG")
 
+    from .scope import get_country_display_name, get_scoped_kpis
+    country_display = get_country_display_name(active_country)
+
+    # Dynamic title & eyebrow for universal role screens
+    screen_title = screen["title"]
+    eyebrow = screen["eyebrow"]
+
+    if not is_explicit:
+        if norm_code == "DASH-10":
+            screen_title = f"{country_display} country overview"
+            eyebrow = f"{active_network} / {country_display.upper()}"
+        elif norm_code == "DASH-14":
+            chap_name = user_scope.chapter_name or "Chapter"
+            screen_title = f"{chap_name} · Command desk"
+            eyebrow = f"{active_network} / {country_display.upper()}"
+        elif norm_code == "DASH-15":
+            first_name = (account.display_name or (account.person.display_name if account.person else account.email)).split()[0]
+            screen_title = f"Good morning, {first_name}"
+            eyebrow = f"{active_network} / {country_display.upper()}"
+        elif norm_code == "DASH-16":
+            screen_title = "Your next step is clear"
+            eyebrow = f"{active_network} / {country_display.upper()}"
+        elif norm_code == "DASH-17":
+            screen_title = "Stay connected with WODDI"
+            eyebrow = f"{active_network} / MY RELATIONSHIPS"
+
+    # Dynamic KPI reconciliation where authentic database records exist
+    kpi_cards = [dict(c) for c in screen.get("kpi_cards", [])]
+    table_card = dict(screen.get("table_card", {})) if screen.get("table_card") else None
+
+    from .models import ScheduledMeeting
+    if norm_code == "DASH-10":
+        kpis = get_scoped_kpis(user_scope, "country_lead", active_network, active_country)
+        if len(kpi_cards) >= 4:
+            kpi_cards[0]["value"] = str(kpis.get("country_chapters", 0))
+            kpi_cards[0]["sub"] = f"{country_display} Hub"
+            kpi_cards[1]["value"] = f"{int(kpis.get('country_leadership_coverage', 85))}%"
+            kpi_cards[2]["value"] = f"{kpis.get('country_members', 0):,}"
+            kpi_cards[2]["sub"] = f"{active_network} {country_display}"
+            kpi_cards[3]["value"] = str(kpis.get("country_verifications", 0))
+    elif norm_code == "DASH-14":
+        kpis = get_scoped_kpis(user_scope, "chapter_lead", active_network, active_country)
+        if len(kpi_cards) >= 4:
+            kpi_cards[0]["value"] = kpis.get("chapter_name", user_scope.chapter_name or "Local Chapter")
+            kpi_cards[0]["sub"] = country_display
+            kpi_cards[1]["value"] = str(kpis.get("chapter_members", 0))
+            kpi_cards[2]["value"] = str(kpis.get("chapter_meetings", 0))
+            kpi_cards[3]["value"] = str(kpis.get("chapter_notices", 0))
+    elif norm_code == "DASH-15":
+        local_home = user_scope.chapter_name or "National Hub"
+        meet_count = ScheduledMeeting.objects.filter(
+            network__in=[active_network, "ALL"],
+            country__in=[active_country, "ALL"]
+        ).count()
+        if len(kpi_cards) >= 3:
+            kpi_cards[0]["value"] = local_home
+            kpi_cards[0]["sub"] = f"{active_network} {country_display}"
+            kpi_cards[1]["value"] = "Active"
+            kpi_cards[1]["sub"] = "Good standing"
+            kpi_cards[2]["value"] = str(meet_count)
+            kpi_cards[2]["sub"] = "Confirmed & open"
+        if table_card:
+            next_meet = ScheduledMeeting.objects.filter(
+                network__in=[active_network, "ALL"],
+                country__in=[active_country, "ALL"]
+            ).order_by("scheduled_at").first()
+            if next_meet:
+                rows = list(table_card.get("rows", []))
+                if rows:
+                    row0 = dict(rows[0])
+                    row0["item"] = next_meet.title
+                    row0["col2"] = next_meet.scheduled_at.strftime("%d %b · %H:%M")
+                    row0["status_label"] = "View invitation"
+                    row0["url"] = f"/foundation/dashboard/meetings/{next_meet.id}/"
+                    rows[0] = row0
+                    table_card["rows"] = rows
+
+    # Clone screen dict to preserve immutability of registry while providing dynamic context
+    screen = dict(screen)
+    screen["title"] = screen_title
+    screen["eyebrow"] = eyebrow
+    screen["kpi_cards"] = kpi_cards
+    screen["table_card"] = table_card
+    if screen.get("hero_banner"):
+        hb = dict(screen["hero_banner"])
+        hb["title"] = hb.get("heading") or hb.get("title", "")
+        hb["text"] = hb.get("body") or hb.get("text", "")
+        screen["hero_banner"] = hb
+
     return {
         "screen": screen,
         "screen_code": screen["screen_id"],
-        "screen_title": screen["title"],
-        "eyebrow": screen["eyebrow"],
+        "screen_title": screen_title,
+        "eyebrow": eyebrow,
         "subtitle": screen["subtitle"],
         "primary_action": screen.get("primary_action"),
         "secondary_action": screen.get("secondary_action"),
@@ -2615,4 +2740,5 @@ def build_dashboard_context(
         "active_role_title": screen.get("default_role_title") or user_scope.active_role.title(),
         "active_network": active_network,
         "active_country": active_country,
+        "country_name": country_display,
     }

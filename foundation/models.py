@@ -502,3 +502,175 @@ class Communication(models.Model):
     def __str__(self):
         return self.subject
 
+
+class PersonProfile(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    person_code = models.CharField(max_length=32, unique=True, default="WD-00421")
+    full_name = models.CharField(max_length=150)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=32, blank=True)
+    network = models.CharField(max_length=8, choices=[("WGMN", "WGMN"), ("WNNN", "WNNN"), ("BOTH", "Both Networks")], default="WGMN")
+    country = models.CharField(max_length=8, default="NG")
+    local_home = models.CharField(max_length=150, default="Ikeja Chapter")
+    chapter = models.ForeignKey(Chapter, null=True, blank=True, on_delete=models.SET_NULL, related_name="members")
+    account = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="person_profiles")
+    contact_verification = models.CharField(max_length=32, default="Verified", choices=[("Verified", "Verified"), ("Pending", "Pending"), ("Unverified", "Unverified")])
+    primary_relationship = models.CharField(max_length=100, default="Member")
+    status = models.CharField(max_length=32, default="Active", choices=[("Active", "Active"), ("Review due", "Review due"), ("Inactive", "Inactive")])
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["full_name"]
+        indexes = [
+            models.Index(fields=["network", "country", "status"]),
+            models.Index(fields=["person_code"]),
+        ]
+
+    def __str__(self):
+        return f"{self.full_name} ({self.person_code})"
+
+
+class PersonRelationship(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    person = models.ForeignKey(PersonProfile, on_delete=models.CASCADE, related_name="relationships")
+    category = models.CharField(max_length=64, default="membership")
+    relationship_label = models.CharField(max_length=100, default="Member")
+    related_programme = models.CharField(max_length=150, blank=True)
+    effective_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=32, default="Active", choices=[("Active", "Active"), ("Review due", "Review due"), ("Former", "Former")])
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.person.full_name} - {self.relationship_label}"
+
+
+class LocalHomeReassignment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    person = models.ForeignKey(PersonProfile, on_delete=models.CASCADE, related_name="reassignments")
+    current_local_home = models.CharField(max_length=150)
+    proposed_local_home = models.CharField(max_length=150)
+    reason = models.TextField()
+    member_confirmation = models.BooleanField(default=False)
+    evidence_reference = models.CharField(max_length=150, blank=True)
+    status = models.CharField(
+        max_length=32,
+        default="in_progress",
+        choices=[
+            ("draft", "Draft"),
+            ("in_progress", "In progress"),
+            ("submitted", "Submitted"),
+            ("approved", "Approved"),
+            ("rejected", "Rejected"),
+        ],
+    )
+    submitted_by = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="submitted_reassignments")
+    reviewed_by = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="reviewed_reassignments")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Reassignment for {self.person.full_name} ({self.current_local_home} -> {self.proposed_local_home})"
+
+
+class CountryDossier(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    country_code = models.CharField(max_length=8, default="NG")
+    country_name = models.CharField(max_length=100, default="Nigeria")
+    network = models.CharField(max_length=8, choices=[("WGMN", "WGMN"), ("WNNN", "WNNN")], default="WGMN")
+    country_lead_name = models.CharField(max_length=150, default="Ada Okafor")
+    country_lead = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="lead_dossiers")
+    timezone_reference = models.CharField(max_length=100, default="Africa/Lagos · WAT")
+    verification_status = models.CharField(
+        max_length=48,
+        default="Country verified",
+        choices=[
+            ("Country verified", "Country verified"),
+            ("HQ review", "HQ review"),
+            ("Update requested", "Update requested"),
+            ("Pending review", "Pending review"),
+        ],
+    )
+    verification_stage = models.CharField(max_length=100, default="Country custodian review")
+    next_review_date = models.CharField(max_length=32, default="30 Sep")
+    evidence_reference = models.CharField(max_length=150, default="Country register revision 03")
+    verification_notes = models.TextField(
+        default="Leadership corrections resolved; language readiness remains under review."
+    )
+    verified_by = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="verified_dossiers")
+    verified_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["country_name", "network"]
+        indexes = [
+            models.Index(fields=["network", "country_code"]),
+        ]
+
+    def __str__(self):
+        return f"{self.network} · {self.country_name} ({self.verification_status})"
+
+
+class LocalOrganisationUnit(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    network = models.CharField(max_length=8, choices=[("WGMN", "WGMN"), ("WNNN", "WNNN")], default="WGMN")
+    country = models.CharField(max_length=8, default="NG")
+    unit_name = models.CharField(max_length=150)
+    level = models.CharField(
+        max_length=64,
+        choices=[
+            ("Country", "Country"),
+            ("Region / State", "Region / State"),
+            ("District / LGA", "District / LGA"),
+            ("Community Cluster", "Community Cluster"),
+            ("Chapter", "Chapter"),
+        ],
+    )
+    level_order = models.PositiveSmallIntegerField(default=1)
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE, related_name="children")
+    description = models.TextField(blank=True)
+    responsible_leader_name = models.CharField(max_length=150)
+    responsible_leader = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="led_org_units")
+    evidence_type = models.CharField(max_length=64, default="Unit record")
+    record_state = models.CharField(max_length=64, default="Active unit records")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["level_order", "unit_name"]
+        indexes = [
+            models.Index(fields=["network", "country", "level_order"]),
+        ]
+
+    def __str__(self):
+        return f"{self.unit_name} ({self.level})"
+
+
+class GeographyTerminology(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    country = models.CharField(max_length=8, default="NG")
+    country_name = models.CharField(max_length=100, default="Nigeria")
+    first_level_term = models.CharField(max_length=100, default="State / FCT")
+    second_level_term = models.CharField(max_length=100, default="LGA")
+    effective_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=32, default="effective", choices=[("effective", "Effective"), ("proposed", "Proposed"), ("archived", "Archived")])
+    proposed_by = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="proposed_terminologies")
+    approved_by = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="approved_terminologies")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["country_name"]
+
+    def __str__(self):
+        return f"{self.country_name}: {self.first_level_term} / {self.second_level_term}"
+
+

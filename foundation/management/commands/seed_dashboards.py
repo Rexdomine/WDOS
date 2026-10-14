@@ -519,6 +519,12 @@ class Command(BaseCommand):
             ("Verify Applicant: Fatima Garba (WGMN Nigeria)", "review", "WGMN", "NG", "operations", "high", "pending", False, acc_ops),
             ("Audit Chapter Roster: Lagos Central Chapter", "audit", "WGMN", "NG", "operations", "medium", "in_progress", False, acc_ops),
             ("Data Privacy Subject Access Request: #PR-8821", "privacy", "ALL", "NG", "it_admin", "urgent", "pending", True, acc_founder),
+            ("Verify Applicant: Sharon Chebet (WGMN Kenya)", "review", "WGMN", "KE", "country_lead", "high", "pending", False, acc_ops),
+            ("Audit Chapter Roster: Nairobi Central Chapter", "audit", "WGMN", "KE", "country_lead", "medium", "in_progress", False, acc_ops),
+            ("Review Sub-County Leadership Nominees: Nairobi", "review", "WGMN", "KE", "country_lead", "urgent", "pending", False, acc_ops),
+            ("Review Youth Digital Bootcamp Rosters: Accra", "review", "WNNN", "GH", "operations", "medium", "pending", False, acc_ops),
+            ("Member Verification Batch: Luanda Central", "review", "WGMN", "AO", "operations", "normal", "in_progress", False, acc_ops),
+            ("Community Health Outreach Planning: Addis Ababa", "review", "WGMN", "ET", "operations", "normal", "pending", False, acc_ops),
         ]
         for title, cat, net, country, req_role, prio, st, conf, creator in work_items_data:
             WorkItem.objects.update_or_create(
@@ -544,6 +550,12 @@ class Command(BaseCommand):
             ("Lagos Chapter Monthly Fellowship Concluded", "meeting", "WGMN", "NG", "Adaeze Okonkwo", "/foundation/dashboard/chapters/"),
             ("New Verification Batch Dispatched", "verification", "WGMN", "NG", "Chief Operations Lead", "/foundation/work-queue/"),
             ("Executive Strategic Audit Q3 Published", "report", "WGMN", "NG", "Founder & Executive Director", "/foundation/dashboard/drilldown/reports/"),
+            ("Nairobi Central Monthly Fellowship Concluded", "meeting", "WGMN", "KE", "Wanjiru Kariuki", "/foundation/dashboard/chapters/"),
+            ("Kenya Regional Verification Batch Dispatched", "verification", "WGMN", "KE", "Wanjiru Kariuki", "/foundation/work-queue/"),
+            ("East Africa Hub Progress Report Published", "report", "WGMN", "KE", "Wanjiru Kariuki", "/foundation/dashboard/drilldown/reports/"),
+            ("Accra Youth Tech Bootcamp Concluded", "meeting", "WNNN", "GH", "Efua Mensah", "/foundation/dashboard/chapters/"),
+            ("Luanda Chapter Onboarding Completed", "verification", "WGMN", "AO", "Mary David", "/foundation/work-queue/"),
+            ("Addis Ababa Fellowship Assembly Held", "meeting", "WGMN", "ET", "Sarah Andres", "/foundation/dashboard/chapters/"),
         ]
         for title, act_type, net, country, actor, url in activities_data:
             DashboardActivity.objects.update_or_create(

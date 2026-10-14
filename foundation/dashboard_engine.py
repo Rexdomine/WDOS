@@ -2124,7 +2124,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         "default_role_title": "Candidate",
         "default_network": "WGMN",
         "default_country": "NG",
-        "primary_action": {"label": "→ Continue my journey", "url": "/onboarding/step/4/"},
+        "primary_action": {"label": "→ Continue my journey", "url": "/onboarding/4/"},
         "secondary_action": None,
         "has_tabs": True,
         "hero_banner": {
@@ -2132,7 +2132,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             "heading": "Continue your day 4 reflection",
             "body": "Read the prompt, add your response and save your progress before the deadline.",
             "button_label": "→ Continue my journey",
-            "button_url": "/onboarding/step/4/",
+            "button_url": "/onboarding/4/",
         },
         "kpi_cards": [
             {
@@ -2168,21 +2168,21 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
                     "col2": "Completed",
                     "status_label": "Read again",
                     "status_style": "purple",
-                    "url": "/onboarding/step/1/",
+                    "url": "/onboarding/1/",
                 },
                 {
                     "item": "Local community context",
                     "col2": "Completed",
                     "status_label": "View response",
                     "status_style": "purple",
-                    "url": "/onboarding/step/2/",
+                    "url": "/onboarding/2/",
                 },
                 {
                     "item": "Evidence and reflection",
                     "col2": "In progress",
                     "status_label": "Continue",
                     "status_style": "purple",
-                    "url": "/onboarding/step/4/",
+                    "url": "/onboarding/4/",
                 },
             ],
             "record_count_text": "Showing 3 records in this view",
@@ -2195,7 +2195,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
                     "body": "Read the prompt, add your response and save your progress before the deadline.",
                     "action_label": "Day 4 of 7",
                     "action_style": "magenta",
-                    "url": "/onboarding/step/4/",
+                    "url": "/onboarding/4/",
                 },
                 {
                     "title": "Support is available",
@@ -2227,7 +2227,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         "default_role_title": "Network Volunteer Applicant",
         "default_network": "My application",
         "default_country": "NG",
-        "primary_action": {"label": "→ Open my next step", "url": "/onboarding/step/4/"},
+        "primary_action": {"label": "→ Open my next step", "url": "/onboarding/4/"},
         "secondary_action": {"label": "Back", "url": "/foundation/dashboards/dash-16/"},
         "has_tabs": False,
         "hero_banner": None,
@@ -2242,14 +2242,14 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
                     "col2": "Waiting for your next step",
                     "status_label": "Waiting for your next step",
                     "status_style": "amber",
-                    "url": "/onboarding/step/4/",
+                    "url": "/onboarding/4/",
                 },
                 {
                     "item": "What to do next",
                     "col2": "Complete the assigned introduction",
                     "status_label": "Complete the assigned introduction",
                     "status_style": "plain",
-                    "url": "/onboarding/step/4/",
+                    "url": "/onboarding/4/",
                 },
                 {
                     "item": "Need more time?",
@@ -2294,7 +2294,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         "default_role_title": "Event Volunteer",
         "default_network": "My application",
         "default_country": "NG",
-        "primary_action": {"label": "→ Open my next step", "url": "/onboarding/step/4/"},
+        "primary_action": {"label": "→ Open my next step", "url": "/onboarding/4/"},
         "secondary_action": {"label": "Back", "url": "/foundation/dashboards/dash-16/"},
         "has_tabs": False,
         "hero_banner": None,
@@ -2461,8 +2461,22 @@ def get_default_screen_for_role(role: str) -> str:
     r = (role or "").strip().lower()
     if r in ("founder", "hq", "executive"):
         return "DASH-01"
-    elif r in ("operations", "hofco"):
+    elif r in ("operations", "hofco", "ops"):
         return "DASH-02"
+    elif r in ("coordination", "coordinator", "regional_coordinator"):
+        return "DASH-03"
+    elif r in ("admin", "administration", "secretary"):
+        return "DASH-04"
+    elif r in ("programmes", "program_director", "programme_portfolio"):
+        return "DASH-05"
+    elif r in ("communications", "comms", "media"):
+        return "DASH-06"
+    elif r in ("resources", "finance", "treasurer"):
+        return "DASH-07"
+    elif r in ("systems", "it_admin", "tech_ops"):
+        return "DASH-08"
+    elif r in ("quality", "controls", "compliance", "reviewer"):
+        return "DASH-09"
     elif r in ("country_lead", "country_representative", "country_director"):
         return "DASH-10"
     elif r in ("state_lead", "regional_lead", "state_coordinator"):
@@ -2655,6 +2669,9 @@ def build_dashboard_context(
     # Dynamic KPI reconciliation where authentic database records exist
     kpi_cards = [dict(c) for c in screen.get("kpi_cards", [])]
     table_card = dict(screen.get("table_card", {})) if screen.get("table_card") else None
+    attention_card = dict(screen.get("attention_card", {})) if screen.get("attention_card") else None
+    chart_card = dict(screen.get("chart_card", {})) if screen.get("chart_card") else None
+    related_screens = list(screen.get("related_screens", []))
 
     from .models import ScheduledMeeting
     if norm_code == "DASH-10":
@@ -2666,6 +2683,87 @@ def build_dashboard_context(
             kpi_cards[2]["value"] = f"{kpis.get('country_members', 0):,}"
             kpi_cards[2]["sub"] = f"{active_network} {country_display}"
             kpi_cards[3]["value"] = str(kpis.get("country_verifications", 0))
+
+        if active_country != "NG":
+            country_profiles = {
+                "KE": {
+                    "rows": [
+                        {"item": "County Coordinator", "col2": "Nairobi", "col3": "Grace Waweru", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"item": "Assistant Coordinator", "col2": "Mombasa", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                        {"item": "Sub-County Coordinator", "col2": "Westlands", "col3": "David Ochieng", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
+                    ],
+                    "attention": [
+                        {"title": "County Coordinator (Nairobi)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"title": "Assistant Coordinator (Mombasa)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                    ],
+                    "bars": [
+                        {"label": "Nairobi", "value": 7, "color": "#E4C1D6"},
+                        {"label": "Mombasa", "value": 5, "color": "#E4C1D6"},
+                        {"label": "Kisumu", "value": 4, "color": "#E4C1D6"},
+                        {"label": "Nakuru", "value": 3, "color": "#D4006A"},
+                    ],
+                },
+                "GH": {
+                    "rows": [
+                        {"item": "Regional Coordinator", "col2": "Accra", "col3": "Kwesi Mensah", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"item": "Assistant Coordinator", "col2": "Kumasi", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                        {"item": "District Lead", "col2": "Tamale", "col3": "Abena Osei", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
+                    ],
+                    "attention": [
+                        {"title": "Regional Coordinator (Accra)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"title": "Assistant Coordinator (Kumasi)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                    ],
+                    "bars": [
+                        {"label": "Accra", "value": 6, "color": "#E4C1D6"},
+                        {"label": "Kumasi", "value": 5, "color": "#E4C1D6"},
+                        {"label": "Takoradi", "value": 3, "color": "#E4C1D6"},
+                        {"label": "Tamale", "value": 2, "color": "#D4006A"},
+                    ],
+                },
+                "AO": {
+                    "rows": [
+                        {"item": "Provincial Coordinator", "col2": "Luanda", "col3": "Manuel David", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"item": "Assistant Coordinator", "col2": "Benguela", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                        {"item": "Municipal Lead", "col2": "Huambo", "col3": "Rosa Santos", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
+                    ],
+                    "attention": [
+                        {"title": "Provincial Coordinator (Luanda)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"title": "Assistant Coordinator (Benguela)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                    ],
+                    "bars": [
+                        {"label": "Luanda", "value": 5, "color": "#E4C1D6"},
+                        {"label": "Benguela", "value": 3, "color": "#E4C1D6"},
+                        {"label": "Huambo", "value": 2, "color": "#E4C1D6"},
+                        {"label": "Lobito", "value": 1, "color": "#D4006A"},
+                    ],
+                },
+                "ET": {
+                    "rows": [
+                        {"item": "Regional Director", "col2": "Addis Ababa", "col3": "Tigist Bekele", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"item": "Assistant Director", "col2": "Dire Dawa", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                        {"item": "Zonal Coordinator", "col2": "Hawassa", "col3": "Abebe Haile", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
+                    ],
+                    "attention": [
+                        {"title": "Regional Director (Addis Ababa)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"title": "Assistant Director (Dire Dawa)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                    ],
+                    "bars": [
+                        {"label": "Addis Ababa", "value": 6, "color": "#E4C1D6"},
+                        {"label": "Dire Dawa", "value": 4, "color": "#E4C1D6"},
+                        {"label": "Hawassa", "value": 3, "color": "#E4C1D6"},
+                        {"label": "Adama", "value": 2, "color": "#D4006A"},
+                    ],
+                },
+            }
+            prof = country_profiles.get(active_country)
+            if prof:
+                if table_card:
+                    table_card["rows"] = prof["rows"]
+                if attention_card:
+                    attention_card["items"] = prof["attention"]
+                if chart_card:
+                    chart_card["bars"] = prof["bars"]
+                related_screens = ["DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION"]
     elif norm_code == "DASH-14":
         kpis = get_scoped_kpis(user_scope, "chapter_lead", active_network, active_country)
         if len(kpi_cards) >= 4:
@@ -2709,6 +2807,9 @@ def build_dashboard_context(
     screen["eyebrow"] = eyebrow
     screen["kpi_cards"] = kpi_cards
     screen["table_card"] = table_card
+    screen["attention_card"] = attention_card
+    screen["chart_card"] = chart_card
+    screen["related_screens"] = related_screens
     if screen.get("hero_banner"):
         hb = dict(screen["hero_banner"])
         hb["title"] = hb.get("heading") or hb.get("title", "")
@@ -2728,10 +2829,10 @@ def build_dashboard_context(
         "hero_banner": screen.get("hero_banner"),
         "kpi_cards": kpi_cards,
         "table_card": table_card,
-        "attention_card": screen.get("attention_card"),
-        "chart_card": screen.get("chart_card"),
+        "attention_card": attention_card,
+        "chart_card": chart_card,
         "scoped_notice": screen.get("scoped_notice"),
-        "related_screens": screen.get("related_screens", []),
+        "related_screens": related_screens,
         "support_note": screen.get("support_note"),
         "has_search_filter": screen.get("has_search_filter", False),
         "state_mode": state_mode,

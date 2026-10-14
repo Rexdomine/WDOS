@@ -84,9 +84,9 @@ class UserScope:
         # Role aliases mapping
         role_aliases = {
             "country_lead": {"country_lead", "country_director", "country_representative", "field_lead"},
-            "chapter_lead": {"chapter_lead", "chapter_coordinator", "chapter"},
-            "operations": {"operations", "ops"},
-            "founder": {"founder", "hq", "executive"},
+            "chapter_lead": {"chapter_lead", "chapter_coordinator", "chapter", "cluster_lead", "cluster_coordinator", "local_operations", "lga_lead", "lga_coordinator"},
+            "operations": {"operations", "ops", "coordinator", "coordination", "regional_coordinator", "programmes", "program_director", "communications", "comms", "resources", "finance", "systems", "quality", "reviewer", "compliance", "safeguarding"},
+            "founder": {"founder", "hq", "executive", "admin", "administration", "secretary"},
             "member": {"member", "membership"},
             "candidate": {"candidate", "applicant"},
             "community": {"community", "supporter"},
@@ -231,14 +231,38 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         leadership_level = "founder"
         leadership_tier = 1
         primary_role = "founder"
+    elif "admin" in roles or "administration" in roles:
+        leadership_level = "founder"
+        leadership_tier = 1
+        primary_role = "admin"
+    elif "it_admin" in roles or "systems" in roles:
+        leadership_level = "it_admin"
+        leadership_tier = 1
+        primary_role = "systems"
     elif "management" in roles or account.user.is_superuser:
         leadership_level = "global_executive"
         leadership_tier = 1
         primary_role = "founder"
-    elif "it_admin" in roles:
-        leadership_level = "it_admin"
-        leadership_tier = 1
-        primary_role = "founder"
+    elif "coordination" in roles or "coordinator" in roles or "regional_coordinator" in roles:
+        leadership_level = "operations"
+        leadership_tier = 2
+        primary_role = "coordinator"
+    elif "programmes" in roles or "program_director" in roles:
+        leadership_level = "operations"
+        leadership_tier = 2
+        primary_role = "programmes"
+    elif "communications" in roles or "comms" in roles:
+        leadership_level = "operations"
+        leadership_tier = 2
+        primary_role = "comms"
+    elif "resources" in roles or "finance" in roles:
+        leadership_level = "operations"
+        leadership_tier = 2
+        primary_role = "resources"
+    elif "quality" in roles or "reviewer" in roles:
+        leadership_level = "reviewer"
+        leadership_tier = 2
+        primary_role = "quality"
     elif "operations" in roles:
         leadership_level = "operations"
         leadership_tier = 2
@@ -247,10 +271,18 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         leadership_level = "network_secretary"
         leadership_tier = 2
         primary_role = "network_secretary"
-    elif "regional_coordinator" in roles or "country_director" in roles or "country_lead" in roles or "field_lead" in roles:
+    elif "country_director" in roles or "country_lead" in roles or "field_lead" in roles:
         leadership_level = "country_lead"
         leadership_tier = 3
         primary_role = "country_lead"
+    elif "local_operations" in roles or "lga_lead" in roles or "lga_coordinator" in roles:
+        leadership_level = "chapter_lead"
+        leadership_tier = 4
+        primary_role = "local_operations"
+    elif "cluster_lead" in roles or "cluster_coordinator" in roles:
+        leadership_level = "chapter_lead"
+        leadership_tier = 4
+        primary_role = "cluster_lead"
     elif "chapter_lead" in roles or "chapter" in roles:
         leadership_level = "chapter_lead"
         leadership_tier = 4

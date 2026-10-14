@@ -339,9 +339,8 @@ def app_shell(request):
     if redirect_response:
         return redirect_response
 
-    # Stage 5 primary starting view: Route authenticated users directly to their authorized role dashboard
-    # when landing on /foundation/ without query parameters
-    if not request.GET or request.GET.get("view") == "dashboard":
+    # Route to dashboard if explicitly requested via ?view=dashboard
+    if request.GET.get("view") == "dashboard":
         return redirect("/foundation/dashboard/")
 
     user_scope = ctx["user_scope"]
@@ -3036,8 +3035,26 @@ def dev_switch_user(request, role_or_alias):
         "community": "community.amara@example.org",
         "amara": "community.amara@example.org",
         "amara_diallo": "community.amara@example.org",
-        "secretary": "ada.secretary@example.org",
-        "network_secretary": "ada.secretary@example.org",
+        "secretary": "admin.hq@example.org",
+        "network_secretary": "admin.hq@example.org",
+        "admin": "admin.hq@example.org",
+        "admin_hq": "admin.hq@example.org",
+        "coordinator": "coordinator@example.org",
+        "coordination": "coordinator@example.org",
+        "programmes": "programmes@example.org",
+        "comms": "comms@example.org",
+        "communications": "comms@example.org",
+        "resources": "resources@example.org",
+        "finance": "resources@example.org",
+        "systems": "systems@example.org",
+        "it_admin": "systems@example.org",
+        "quality": "quality@example.org",
+        "reviewer": "quality@example.org",
+        "safeguarding": "safeguarding@example.org",
+        "ikeja": "ikeja.lead@example.org",
+        "ikeja_lead": "ikeja.lead@example.org",
+        "cluster": "cluster.lead@example.org",
+        "cluster_lead": "cluster.lead@example.org",
         "hofco": "founder@example.org",
     }
     email = alias_map.get(role_or_alias.lower().strip(), role_or_alias.lower().strip())

@@ -179,17 +179,18 @@ class Command(BaseCommand):
                 RecoveryCode.objects.filter(account=acc).delete()
 
             # 3. Onboarding Draft & Consent & Membership
+            effective_network = network if network in ["WGMN", "WNNN"] else "WGMN"
             draft = OnboardingDraft.objects.filter(account=acc).first()
             if not draft:
                 draft = OnboardingDraft.objects.create(
                     account=acc,
                     state=draft_state,
                     next_step=8 if draft_state == "accepted" else 6,
-                    data={"network": network, "country": country, "language": "en"},
+                    data={"network": effective_network, "country": country, "language": "en"},
                 )
             else:
                 draft.state = draft_state
-                draft.data = {"network": network, "country": country, "language": "en"}
+                draft.data = {"network": effective_network, "country": country, "language": "en"}
                 draft.save()
 
             consent = OnboardingConsent.objects.filter(draft=draft).first()
@@ -210,7 +211,7 @@ class Command(BaseCommand):
                     draft=draft,
                     defaults={
                         "person": p,
-                        "network": network,
+                        "network": effective_network,
                         "home": {
                             "code": chapter_code,
                             "country": country,
@@ -247,7 +248,7 @@ class Command(BaseCommand):
                     "font_size": "standard",
                     "high_contrast": False,
                     "reduced_motion": False,
-                    "active_network": network,
+                    "active_network": effective_network,
                     "active_country": country,
                     "reminder_preference": "inside_wdos",
                 },
@@ -564,6 +565,160 @@ class Command(BaseCommand):
             grant_geography="NG",
         )
 
+        # 12. Continental / Regional Coordination Desk (DASH-03, DASH-13)
+        setup_account(
+            email="coordinator@example.org",
+            display_name="Continental Coordinator",
+            is_staff=True,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="55556666",
+            network="WGMN",
+            country="NG",
+            role_grant="coordinator",
+            grant_geography="*",
+            grant_function="coordination",
+        )
+
+        # 13. HQ Administration Lead (DASH-04)
+        setup_account(
+            email="admin.hq@example.org",
+            display_name="HQ Administration Lead",
+            is_staff=True,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="77778888",
+            network="WGMN",
+            country="NG",
+            role_grant="admin",
+            grant_geography="*",
+            grant_function="administration",
+        )
+
+        # 14. Director of Programmes (DASH-05)
+        setup_account(
+            email="programmes@example.org",
+            display_name="Director of Programmes",
+            is_staff=True,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="55556666",
+            network="WGMN",
+            country="NG",
+            role_grant="programmes",
+            grant_geography="*",
+            grant_function="programmes",
+        )
+
+        # 15. Head of Communications (DASH-06)
+        setup_account(
+            email="comms@example.org",
+            display_name="Head of Communications",
+            is_staff=True,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="55556666",
+            network="WGMN",
+            country="NG",
+            role_grant="comms",
+            grant_geography="*",
+            grant_function="communications",
+        )
+
+        # 16. Resource & Financial Accountability Lead (DASH-07)
+        setup_account(
+            email="resources@example.org",
+            display_name="Resource & Finance Director",
+            is_staff=True,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="55556666",
+            network="WGMN",
+            country="NG",
+            role_grant="resources",
+            grant_geography="*",
+            grant_function="resources",
+        )
+
+        # 17. Systems Operations / IT Administrator (DASH-08)
+        setup_account(
+            email="systems@example.org",
+            display_name="Systems Operations Administrator",
+            is_staff=True,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="55556666",
+            network="ALL",
+            country="NG",
+            role_grant="systems",
+            grant_geography="*",
+            grant_function="systems",
+        )
+
+        # 18. Quality & Controls / Compliance Reviewer (DASH-09)
+        setup_account(
+            email="quality@example.org",
+            display_name="Quality & Controls Officer",
+            is_staff=True,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="55556666",
+            network="ALL",
+            country="NG",
+            role_grant="quality",
+            grant_geography="*",
+            grant_function="quality",
+        )
+
+        # 19. Safeguarding Officer (DASH-10-SAFEGUARDING)
+        setup_account(
+            email="safeguarding@example.org",
+            display_name="Confidential Safeguarding Lead",
+            is_staff=True,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="55556666",
+            network="ALL",
+            country="NG",
+            role_grant="operations",
+            grant_geography="*",
+            grant_function="safeguarding",
+        )
+
+        # 20. Ikeja Local Operations Lead / LGA Coordinator (DASH-12)
+        setup_account(
+            email="ikeja.lead@example.org",
+            display_name="Ikeja LGA Coordinator",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="11112222",
+            network="WGMN",
+            country="NG",
+            chapter_code="NG-LOS-01",
+            chapter_name="Ikeja Local Chapter",
+            role_grant="local_operations",
+            grant_geography="NG-LOS-01",
+            grant_function="local_ops",
+        )
+
+        # 21. Cluster Lead / Regional Chapter Coordinator (DASH-13)
+        setup_account(
+            email="cluster.lead@example.org",
+            display_name="Lagos West Cluster Lead",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="11112222",
+            network="WGMN",
+            country="NG",
+            chapter_code="NG-LOS-01",
+            chapter_name="Lagos Central Chapter",
+            role_grant="cluster_lead",
+            grant_geography="NG-LOS-01",
+            grant_function="cluster_coord",
+        )
+
         # =====================================================================
         # Seed Notifications
         # =====================================================================
@@ -657,27 +812,43 @@ class Command(BaseCommand):
 
         origin = getattr(settings, "WDOS_PUBLIC_ORIGIN", "http://127.0.0.1:8008").rstrip("/")
 
-        self.stdout.write("\n" + "=" * 88)
-        self.stdout.write(self.style.SUCCESS("  WDOS TEST ACCOUNTS SEEDED SUCCESSFULLY FOR LOCAL & STAGING"))
-        self.stdout.write("=" * 88)
-        self.stdout.write(f"  Login URL:            {origin}/auth/login/")
+        self.stdout.write("\n" + "=" * 115)
+        self.stdout.write(self.style.SUCCESS("       WDOS COMPREHENSIVE TEST ACCOUNTS MATRIX FOR LOCAL & STAGING (STAGE 05 DASHBOARDS)"))
+        self.stdout.write("=" * 115)
+        self.stdout.write(f"  Login Gateway:        {origin}/auth/login/")
         self.stdout.write(f"  Shared Password:      {password}")
-        self.stdout.write(f"  Shared TOTP Secret:   {totp_secret}  (Add to Google Authenticator/Authy)")
+        self.stdout.write(f"  Shared TOTP Secret:   {totp_secret}  (Add to Google Authenticator or Authy)")
         self.stdout.write(self.style.NOTICE(f"  Live 6-Digit TOTP:    {current_code}  (Valid for ~{remaining}s)"))
-        self.stdout.write("-" * 88)
+        self.stdout.write(f"  Dev 1-Click Switch:   {origin}/foundation/dev-switch/<role_or_alias>/")
+        self.stdout.write("-" * 115)
 
         accounts_table = [
-            ("member.ada@example.org", "Member (Ada Okafor)", "WGMN / Nigeria", "NO (1-Step Login)", "N/A"),
-            ("wnnn.member@example.org", "Member (Efua Mensah)", "WNNN / Ghana", "NO (1-Step Login)", "N/A"),
-            ("chapter.lagos@example.org", "Chapter Lead", "WGMN / Lagos", "Yes (TOTP)", "11112222"),
-            ("country.ng@example.org", "Country Director", "Nigeria Hub (All)", "Yes (TOTP)", "33334444"),
-            ("ops@example.org", "Operations Lead", "Global / Multi-Hub", "Yes (TOTP)", "55556666"),
-            ("founder@example.org", "Founder & Exec Director", "Global / All", "Yes (TOTP)", "77778888"),
-            ("candidate.john@example.org", "Candidate (John Kalu)", "WGMN / Nigeria", "NO (1-Step Login)", "N/A"),
+            ("founder@example.org", "Founder & Exec Director", "Global / Multi-Network", "Yes (TOTP)", "77778888", "DASH-01, DASH-04"),
+            ("ops@example.org", "Chief Operations Lead", "Global / Multi-Hub", "Yes (TOTP)", "55556666", "DASH-02, DASH-10-*"),
+            ("coordinator@example.org", "Continental Coordinator", "Global / Coordination", "Yes (TOTP)", "55556666", "DASH-03, DASH-13"),
+            ("admin.hq@example.org", "HQ Administration Lead", "Global / Administration", "Yes (TOTP)", "77778888", "DASH-04"),
+            ("programmes@example.org", "Director of Programmes", "Global / Programmes", "Yes (TOTP)", "55556666", "DASH-05"),
+            ("comms@example.org", "Head of Communications", "Global / Media", "Yes (TOTP)", "55556666", "DASH-06"),
+            ("resources@example.org", "Resource & Finance Lead", "Global / Resources", "Yes (TOTP)", "55556666", "DASH-07"),
+            ("systems@example.org", "Systems / IT Admin", "Global / Infrastructure", "Yes (TOTP)", "55556666", "DASH-08"),
+            ("quality@example.org", "Quality & Controls Officer", "Global / Compliance", "Yes (TOTP)", "55556666", "DASH-09"),
+            ("safeguarding@example.org", "Safeguarding Officer", "Global / Confidential", "Yes (TOTP)", "55556666", "DASH-10-SAFEGUARDING"),
+            ("country.ng@example.org", "Nigeria Country Lead", "WGMN / Nigeria", "Yes (TOTP)", "33334444", "DASH-10 (NG), DASH-11"),
+            ("country.ke@example.org", "Kenya Country Lead", "WGMN / Kenya", "Yes (TOTP)", "33334444", "DASH-10 (KE Scoped)"),
+            ("ikeja.lead@example.org", "Ikeja LGA Coordinator", "WGMN / Nigeria (Ikeja)", "Yes (TOTP)", "11112222", "DASH-12, DASH-14"),
+            ("cluster.lead@example.org", "Lagos Cluster Lead", "WGMN / Nigeria (Cluster)", "Yes (TOTP)", "11112222", "DASH-13, DASH-14"),
+            ("chapter.lagos@example.org", "Chapter Lead Lagos", "WGMN / Lagos Central", "Yes (TOTP)", "11112222", "DASH-14"),
+            ("member.ada@example.org", "Member (Ada Okafor)", "WGMN / Nigeria", "NO (1-Step)", "N/A", "DASH-15"),
+            ("wnnn.member@example.org", "Member (Efua Mensah)", "WNNN / Ghana", "NO (1-Step)", "N/A", "DASH-15"),
+            ("mary.david@example.org", "Member (Mary David)", "WGMN / Angola", "NO (1-Step)", "N/A", "DASH-15"),
+            ("sarah.andres@example.org", "Member (Sarah Andres)", "WGMN / Ethiopia", "NO (1-Step)", "N/A", "DASH-15"),
+            ("kemi.dare@example.org", "Member (Kemi Dare)", "WGMN / Ethiopia", "NO (1-Step)", "N/A", "DASH-15"),
+            ("candidate.john@example.org", "Candidate (John Kalu)", "WGMN / Nigeria", "NO (1-Step)", "N/A", "DASH-16 (and variants)"),
+            ("community.amara@example.org", "Community (Amara Diallo)", "WGMN / Nigeria", "NO (1-Step)", "N/A", "DASH-17"),
         ]
 
-        self.stdout.write(f"{'Email':<27} | {'Role / Persona':<24} | {'Scope':<18} | {'2FA Required?':<16} | {'Backup Code'}")
-        self.stdout.write("-" * 88)
-        for email, role, scope, mfa, backup in accounts_table:
-            self.stdout.write(f"{email:<27} | {role:<24} | {scope:<18} | {mfa:<16} | {backup}")
-        self.stdout.write("=" * 88 + "\n")
+        self.stdout.write(f"{'Email':<28} | {'Role / Persona':<25} | {'Scope':<23} | {'2FA':<11} | {'Backup':<8} | {'Unlocked Screens'}")
+        self.stdout.write("-" * 115)
+        for email, role, scope, mfa, backup, screens in accounts_table:
+            self.stdout.write(f"{email:<28} | {role:<25} | {scope:<23} | {mfa:<11} | {backup:<8} | {screens}")
+        self.stdout.write("=" * 115 + "\n")

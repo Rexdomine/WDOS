@@ -207,6 +207,7 @@ class Command(BaseCommand):
                 )
 
             if draft_state == "accepted":
+                Membership.objects.filter(person=p).exclude(draft=draft).delete()
                 Membership.objects.update_or_create(
                     draft=draft,
                     defaults={
@@ -225,6 +226,7 @@ class Command(BaseCommand):
 
             # 4. Access Grant (if role is privileged)
             if role_grant:
+                AccessGrant.objects.filter(account=acc).exclude(role=role_grant).delete()
                 AccessGrant.objects.update_or_create(
                     account=acc,
                     role=role_grant,
@@ -685,7 +687,24 @@ class Command(BaseCommand):
             grant_function="safeguarding",
         )
 
-        # 20. Ikeja Local Operations Lead / LGA Coordinator (DASH-12)
+        # 20. Lagos State / Regional Coordinator (DASH-11)
+        setup_account(
+            email="state.lagos@example.org",
+            display_name="Lina Mensah (Lagos State Coordinator)",
+            is_staff=False,
+            is_superuser=False,
+            with_mfa=True,
+            backup_code="11112222",
+            network="WGMN",
+            country="NG",
+            chapter_code="NG-LOS-01",
+            chapter_name="Lagos Central Chapter",
+            role_grant="state_lead",
+            grant_geography="NG",
+            grant_function="state_coord",
+        )
+
+        # 21. Ikeja Local Operations Lead / LGA Coordinator (DASH-12)
         setup_account(
             email="ikeja.lead@example.org",
             display_name="Ikeja LGA Coordinator",
@@ -702,7 +721,7 @@ class Command(BaseCommand):
             grant_function="local_ops",
         )
 
-        # 21. Cluster Lead / Regional Chapter Coordinator (DASH-13)
+        # 22. Cluster Lead / Regional Chapter Coordinator (DASH-13)
         setup_account(
             email="cluster.lead@example.org",
             display_name="Lagos West Cluster Lead",

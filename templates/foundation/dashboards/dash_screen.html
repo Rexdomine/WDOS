@@ -221,12 +221,12 @@
           </div>
           <div class="dash-attention-body">
             <h3 class="dash-attention-title">{{ item.title }}</h3>
-            <p class="dash-attention-text">{{ item.text }}</p>
+            <p class="dash-attention-text">{{ item.body }}</p>
             {% if item.tag %}
             <div class="dash-attention-tag">{{ item.tag }}</div>
             {% endif %}
-            {% if item.link_label %}
-            <a href="{{ item.link_url|default:'/foundation/work-queue/' }}" class="dash-card-action" style="font-size:12px;">{{ item.link_label }} →</a>
+            {% if item.action_label %}
+            <a href="{{ item.url|default:'/foundation/work-queue/' }}" class="dash-card-action" style="font-size:12px;">{{ item.action_label }} →</a>
             {% endif %}
           </div>
         </div>

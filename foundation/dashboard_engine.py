@@ -2459,11 +2459,11 @@ def get_dashboard_screen(screen_code: str) -> Optional[Dict[str, Any]]:
 def get_default_screen_for_role(role: str) -> str:
     """Map user role to its canonical default dashboard screen."""
     r = (role or "").strip().lower()
-    if r in ("founder", "hq", "executive"):
+    if r in ("founder", "hq", "executive", "management"):
         return "DASH-01"
     elif r in ("operations", "hofco", "ops"):
         return "DASH-02"
-    elif r in ("coordination", "coordinator", "regional_coordinator"):
+    elif r in ("coordination", "coordinator", "regional_coordinator", "network_secretary"):
         return "DASH-03"
     elif r in ("admin", "administration", "secretary"):
         return "DASH-04"
@@ -2477,6 +2477,8 @@ def get_default_screen_for_role(role: str) -> str:
         return "DASH-08"
     elif r in ("quality", "controls", "compliance", "reviewer"):
         return "DASH-09"
+    elif r in ("safeguarding", "safeguarding_officer"):
+        return "DASH-10-SAFEGUARDING"
     elif r in ("country_lead", "country_representative", "country_director"):
         return "DASH-10"
     elif r in ("state_lead", "regional_lead", "state_coordinator"):
@@ -2522,7 +2524,8 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
     UNIVERSAL_ROLE_SCREENS = {
         "DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05",
         "DASH-06", "DASH-07", "DASH-08", "DASH-09",
-        "DASH-10", "DASH-11", "DASH-12", "DASH-13", "DASH-14",
+        "DASH-10", "DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION", "DASH-10-CR",
+        "DASH-13", "DASH-14",
         "DASH-15", "DASH-16", "DASH-17"
     }
 
@@ -2552,10 +2555,10 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
                     recovery_url="/foundation/dashboard/",
                 )
 
-    # Country isolation check
+    # Country isolation check: DASH-11 (Lagos) and DASH-12 (Ikeja) and explicit DASH-10 (Nigeria overview)
     screen_country = screen.get("default_country")
     if screen_country and screen_country != "ALL":
-        if is_explicit or norm_code not in UNIVERSAL_ROLE_SCREENS:
+        if (is_explicit and norm_code in ("DASH-10", "DASH-11", "DASH-12")) or norm_code not in UNIVERSAL_ROLE_SCREENS:
             if not user_scope.can_access_country(screen_country):
                 raise ScopePermissionDenied(
                     f"Your account scope does not grant access to the {screen_country} country hub.",
@@ -2647,22 +2650,30 @@ def build_dashboard_context(
     screen_title = screen["title"]
     eyebrow = screen["eyebrow"]
 
-    if not is_explicit:
+    if not is_explicit or active_country != "NG":
         if norm_code == "DASH-10":
             screen_title = f"{country_display} country overview"
             eyebrow = f"{active_network} / {country_display.upper()}"
-        elif norm_code == "DASH-14":
+        elif norm_code == "DASH-10-COVERAGE" and active_country != "NG":
+            screen_title = f"{country_display} leadership coverage"
+            eyebrow = f"{active_network} / {country_display.upper()}"
+        elif norm_code in ("DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION") and active_country != "NG":
+            eyebrow = f"{active_network} / {country_display.upper()}"
+        elif norm_code == "DASH-10-CR" and active_country != "NG":
+            screen_title = f"{country_display} · what needs attention"
+            eyebrow = f"{active_network} / {country_display.upper()}"
+        elif norm_code == "DASH-14" and not is_explicit:
             chap_name = user_scope.chapter_name or "Chapter"
             screen_title = f"{chap_name} · Command desk"
             eyebrow = f"{active_network} / {country_display.upper()}"
-        elif norm_code == "DASH-15":
+        elif norm_code == "DASH-15" and not is_explicit:
             first_name = (account.display_name or (account.person.display_name if account.person else account.email)).split()[0]
             screen_title = f"Good morning, {first_name}"
             eyebrow = f"{active_network} / {country_display.upper()}"
-        elif norm_code == "DASH-16":
+        elif norm_code == "DASH-16" and not is_explicit:
             screen_title = "Your next step is clear"
             eyebrow = f"{active_network} / {country_display.upper()}"
-        elif norm_code == "DASH-17":
+        elif norm_code == "DASH-17" and not is_explicit:
             screen_title = "Stay connected with WODDI"
             eyebrow = f"{active_network} / MY RELATIONSHIPS"
 
@@ -2764,6 +2775,14 @@ def build_dashboard_context(
                 if chart_card:
                     chart_card["bars"] = prof["bars"]
                 related_screens = ["DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION"]
+    elif norm_code == "DASH-10-COVERAGE" and active_country == "KE":
+        if table_card:
+            table_card["title"] = "Kenya leadership coverage"
+            table_card["rows"] = [
+                {"item": "Nairobi · WGMN", "col2": "Principal and deputy active", "status_label": "Complete", "status_style": "green", "url": "/foundation/dashboard/"},
+                {"item": "Mombasa · WGMN", "col2": "Principal only", "status_label": "Deputy vacancy", "status_style": "purple", "url": "/foundation/dashboard/"},
+                {"item": "Kisumu · WGMN", "col2": "Deputy only", "status_label": "Principal vacancy", "status_style": "purple", "url": "/foundation/dashboard/"},
+            ]
     elif norm_code == "DASH-14":
         kpis = get_scoped_kpis(user_scope, "chapter_lead", active_network, active_country)
         if len(kpi_cards) >= 4:

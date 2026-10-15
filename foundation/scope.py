@@ -64,7 +64,7 @@ class UserScope:
         return code in [c.upper() for c in self.allowed_countries]
 
     def can_access_confidential(self) -> bool:
-        return self.is_management_or_admin or bool(self.roles.intersection({"management", "it_admin", "reviewer", "founder", "operations"}))
+        return self.is_management_or_admin or bool(self.roles.intersection({"management", "it_admin", "reviewer", "founder", "operations", "safeguarding"}))
 
     def can_access_role(self, role: str) -> bool:
         if not role:
@@ -83,9 +83,9 @@ class UserScope:
 
         # Role aliases mapping
         role_aliases = {
-            "country_lead": {"country_lead", "country_director", "country_representative", "field_lead"},
+            "country_lead": {"country_lead", "country_director", "country_representative", "field_lead", "state_lead", "regional_lead", "state_coordinator"},
             "chapter_lead": {"chapter_lead", "chapter_coordinator", "chapter", "cluster_lead", "cluster_coordinator", "local_operations", "lga_lead", "lga_coordinator"},
-            "operations": {"operations", "ops", "coordinator", "coordination", "regional_coordinator", "programmes", "program_director", "communications", "comms", "resources", "finance", "systems", "quality", "reviewer", "compliance", "safeguarding"},
+            "operations": {"operations", "ops", "hofco", "coordinator", "coordination", "regional_coordinator", "programmes", "program_director", "communications", "comms", "resources", "finance", "systems", "quality", "reviewer", "compliance", "safeguarding"},
             "founder": {"founder", "hq", "executive", "admin", "administration", "secretary"},
             "member": {"member", "membership"},
             "candidate": {"candidate", "applicant"},
@@ -127,21 +127,30 @@ def get_user_scope(account: Account, session=None) -> UserScope:
     roles: Set[str] = set()
     allowed_networks: Set[str] = set()
     allowed_countries: Set[str] = set()
+    grant_countries: Set[str] = set()
+    has_safeguarding_grant = False
     is_management_or_admin = False
+
+    # Inspect active AccessGrants first so explicit role grants are not shadowed by generic staff flag
+    active_grants = list(
+        AccessGrant.objects.filter(
+            account=account,
+            revoked_at__isnull=True,
+            expires_at__gt=now,
+        )
+    )
 
     # Check staff / superuser status
     if account.user.is_superuser or account.user.is_staff:
         is_management_or_admin = True
-        roles.add("it_admin")
+        if not active_grants:
+            roles.add("it_admin")
 
-    # Inspect active AccessGrants
-    active_grants = AccessGrant.objects.filter(
-        account=account,
-        revoked_at__isnull=True,
-        expires_at__gt=now,
-    )
     for grant in active_grants:
         roles.add(grant.role)
+        if getattr(grant, "function", "") == "safeguarding" or grant.role == "safeguarding":
+            has_safeguarding_grant = True
+            roles.add("safeguarding")
         if grant.role in ("it_admin", "management"):
             is_management_or_admin = True
 
@@ -160,12 +169,20 @@ def get_user_scope(account: Account, session=None) -> UserScope:
                 c_info = get_country(geo)
                 if c_info:
                     allowed_countries.add(c_info["code"])
+                    grant_countries.add(c_info["code"])
                 else:
                     chap = Chapter.objects.filter(code=grant.geography).first() or Chapter.objects.filter(name__icontains=grant.geography).first()
                     if chap:
                         allowed_countries.add(chap.country)
+                        grant_countries.add(chap.country)
                     else:
-                        allowed_countries.add(geo)
+                        c_prefix = geo.split("-")[0]
+                        if get_country(c_prefix):
+                            allowed_countries.add(c_prefix)
+                            grant_countries.add(c_prefix)
+                        else:
+                            allowed_countries.add(geo)
+                            grant_countries.add(geo)
 
     # Inspect Membership
     membership = None
@@ -174,15 +191,28 @@ def get_user_scope(account: Account, session=None) -> UserScope:
     if not membership:
         membership = Membership.objects.filter(draft__account=account).first()
     if membership:
-        if membership.network:
+        if membership.network and not allowed_networks:
             allowed_networks.add(membership.network.upper())
         home_country = (membership.home or {}).get("country")
         if home_country:
             c_info = get_country(home_country)
-            if c_info:
-                allowed_countries.add(c_info["code"])
-            else:
-                allowed_countries.add(home_country.upper())
+            norm_home_country = c_info["code"] if c_info else home_country.upper()
+            # Only add membership country if there are no explicit country grants, or if it matches
+            if not grant_countries or norm_home_country in grant_countries:
+                allowed_countries.add(norm_home_country)
+            elif len(grant_countries) == 1:
+                # Auto-heal stale membership country if an explicit single-country AccessGrant exists
+                auth_ctry = next(iter(grant_countries))
+                default_chaps = {
+                    "KE": ("KE-NBO-01", "Nairobi Central Chapter"),
+                    "GH": ("GH-ACC-02", "Accra Next-Gen Hub"),
+                    "AO": ("AO-LUA-01", "Luanda Central Chapter"),
+                    "ET": ("ET-ADD-01", "Addis Ababa Central Chapter"),
+                    "NG": ("NG-LOS-01", "Lagos Central Chapter"),
+                }
+                c_code, c_label = default_chaps.get(auth_ctry, (f"{auth_ctry}-01", f"{auth_ctry} Central Chapter"))
+                membership.home = {"code": c_code, "country": auth_ctry, "label": c_label}
+                membership.save(update_fields=["home"])
 
     # Fallback to draft data if membership record is forming
     if not allowed_networks or not allowed_countries:
@@ -214,7 +244,7 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         chapter_code = membership.home.get("code")
         chapter_name = membership.home.get("label") or membership.home.get("name")
     for grant in active_grants:
-        if grant.role in ("chapter_lead", "chapter") and grant.geography:
+        if grant.role in ("chapter_lead", "chapter", "local_operations", "cluster_lead") and grant.geography:
             chap = Chapter.objects.filter(code=grant.geography).first() or Chapter.objects.filter(name__icontains=grant.geography).first()
             if chap:
                 chapter_code = chapter_code or chap.code
@@ -227,26 +257,30 @@ def get_user_scope(account: Account, session=None) -> UserScope:
     leadership_tier = 5
     primary_role = "member"
 
-    if "founder" in roles or "hq" in roles or "hofco" in roles:
+    if "founder" in roles or "hq" in roles:
         leadership_level = "founder"
         leadership_tier = 1
         primary_role = "founder"
-    elif "admin" in roles or "administration" in roles:
-        leadership_level = "founder"
-        leadership_tier = 1
-        primary_role = "admin"
-    elif "it_admin" in roles or "systems" in roles:
-        leadership_level = "it_admin"
-        leadership_tier = 1
-        primary_role = "systems"
-    elif "management" in roles or account.user.is_superuser:
-        leadership_level = "global_executive"
-        leadership_tier = 1
-        primary_role = "founder"
+    elif has_safeguarding_grant or "safeguarding" in roles:
+        leadership_level = "operations"
+        leadership_tier = 2
+        primary_role = "safeguarding"
+    elif "operations" in roles or "hofco" in roles or "ops" in roles:
+        leadership_level = "operations"
+        leadership_tier = 2
+        primary_role = "operations"
     elif "coordination" in roles or "coordinator" in roles or "regional_coordinator" in roles:
         leadership_level = "operations"
         leadership_tier = 2
         primary_role = "coordinator"
+    elif "network_secretary" in roles:
+        leadership_level = "network_secretary"
+        leadership_tier = 2
+        primary_role = "network_secretary"
+    elif "admin" in roles or "administration" in roles or "secretary" in roles:
+        leadership_level = "founder"
+        leadership_tier = 1
+        primary_role = "admin"
     elif "programmes" in roles or "program_director" in roles:
         leadership_level = "operations"
         leadership_tier = 2
@@ -259,22 +293,22 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         leadership_level = "operations"
         leadership_tier = 2
         primary_role = "resources"
-    elif "quality" in roles or "reviewer" in roles:
+    elif "systems" in roles or "it_admin" in roles:
+        leadership_level = "it_admin"
+        leadership_tier = 1
+        primary_role = "systems"
+    elif "quality" in roles or "controls" in roles or "compliance" in roles or "reviewer" in roles:
         leadership_level = "reviewer"
         leadership_tier = 2
         primary_role = "quality"
-    elif "operations" in roles:
-        leadership_level = "operations"
-        leadership_tier = 2
-        primary_role = "operations"
-    elif "network_secretary" in roles:
-        leadership_level = "network_secretary"
-        leadership_tier = 2
-        primary_role = "network_secretary"
     elif "country_director" in roles or "country_lead" in roles or "field_lead" in roles:
         leadership_level = "country_lead"
         leadership_tier = 3
         primary_role = "country_lead"
+    elif "state_lead" in roles or "regional_lead" in roles or "state_coordinator" in roles:
+        leadership_level = "country_lead"
+        leadership_tier = 3
+        primary_role = "state_lead"
     elif "local_operations" in roles or "lga_lead" in roles or "lga_coordinator" in roles:
         leadership_level = "chapter_lead"
         leadership_tier = 4
@@ -287,10 +321,10 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         leadership_level = "chapter_lead"
         leadership_tier = 4
         primary_role = "chapter_lead"
-    elif "reviewer" in roles:
-        leadership_level = "reviewer"
-        leadership_tier = 4
-        primary_role = "operations"
+    elif "management" in roles or account.user.is_superuser:
+        leadership_level = "global_executive"
+        leadership_tier = 1
+        primary_role = "founder"
     elif "candidate" in roles:
         leadership_level = "candidate"
         leadership_tier = 6
@@ -334,6 +368,9 @@ def get_user_scope(account: Account, session=None) -> UserScope:
 
     if not active_country or ("*" not in allowed_countries and active_country not in allowed_countries):
         active_country = "NG" if "*" in allowed_countries else sorted(list(allowed_countries))[0]
+        if pref and pref.active_country != active_country:
+            pref.active_country = active_country
+            pref.save(update_fields=["active_country"])
 
     # Active role determination
     temp_scope = UserScope(

@@ -310,16 +310,23 @@
 
     {% if recent_accounts %}
     <div class="card" style="padding:0; overflow:hidden;">
-      <div style="padding:16px 20px; border-bottom:1px solid var(--border);">
-        <h2 style="font-size:16px; font-weight:700; margin:0;">Recent Accounts & Quick Actions</h2>
+      <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h2 style="font-size:16px; font-weight:700; margin:0;">All Role & Test Accounts ({{ recent_accounts|length }})</h2>
+          <p style="margin:2px 0 0 0; font-size:12px; color:#6B7280;">Includes all Stage 05 role accounts (DASH-01 through DASH-17) and registered accounts.</p>
+        </div>
+        <a href="/foundation/test-approve/?seed_all=1" class="btn-secondary btn-sm">
+          Refresh / Sync All Role Accounts
+        </a>
       </div>
       <div style="overflow-x:auto;">
         <table>
           <thead>
             <tr>
               <th>Account</th>
+              <th>Role & Scope</th>
+              <th>Target Dashboard</th>
               <th>Status</th>
-              <th>Onboarding</th>
               <th style="text-align:right;">Quick Action</th>
             </tr>
           </thead>
@@ -331,31 +338,30 @@
                 <div style="color:#6B7280; font-size:12px;">{{ acc.email }}</div>
               </td>
               <td>
-                {% if acc.status == 'active' %}
-                  <span class="pill pill-green">Active</span>
-                {% elif acc.status == 'pending' %}
-                  <span class="pill pill-amber">Pending</span>
-                {% else %}
-                  <span class="pill pill-gray">{{ acc.status|title }}</span>
-                {% endif %}
+                <div style="font-weight:600; color:#374151; font-size:12px;">{{ acc.role_label }}</div>
+                <div style="color:#6B7280; font-size:11px;">{{ acc.scope_label }}</div>
+              </td>
+              <td>
+                <span class="pill pill-gray" style="font-family:monospace;">{{ acc.dashboard_code }}</span>
+                <div style="color:#6B7280; font-size:11px; margin-top:2px;">{{ acc.dashboard_title }}</div>
               </td>
               <td>
                 {% if acc.is_approved %}
-                  <span class="pill pill-green">Accepted</span>
+                  <span class="pill pill-green">Active</span>
                 {% elif acc.draft_state == 'review_needed' %}
-                  <span class="pill pill-amber">Needs Review</span>
+                  <span class="pill pill-amber">Candidate</span>
                 {% else %}
-                  <span class="pill pill-gray">{{ acc.draft_state|default:"None"|title }}</span>
+                  <span class="pill pill-amber">Pending</span>
                 {% endif %}
               </td>
-              <td style="text-align:right;">
+              <td style="text-align:right; white-space:nowrap;">
                 {% if not acc.is_approved %}
                   <a href="/foundation/test-approve/?email={{ acc.email }}&auto_login=1" class="btn-primary btn-sm" title="Approve and open dashboard">
                     Approve & Enter
                   </a>
                 {% else %}
-                  <a href="/foundation/dev-switch/{{ acc.email }}/" class="btn-secondary btn-sm" title="Direct 1-click login">
-                    Open Dashboard
+                  <a href="/foundation/dev-switch/{{ acc.email }}/" class="btn-primary btn-sm" title="Direct 1-click login to {{ acc.dashboard_code }}">
+                    Open {{ acc.dashboard_code }}
                   </a>
                 {% endif %}
               </td>

@@ -3102,17 +3102,27 @@ def dev_switch_user(request, role_or_alias):
         "finance": "resources@example.org",
         "systems": "systems@example.org",
         "it_admin": "systems@example.org",
+        "Quality": "quality@example.org",
         "quality": "quality@example.org",
         "reviewer": "quality@example.org",
         "safeguarding": "safeguarding@example.org",
+        "state": "state.lagos@example.org",
+        "state_lagos": "state.lagos@example.org",
+        "state-lagos": "state.lagos@example.org",
+        "lina": "state.lagos@example.org",
         "ikeja": "ikeja.lead@example.org",
         "ikeja_lead": "ikeja.lead@example.org",
         "cluster": "cluster.lead@example.org",
         "cluster_lead": "cluster.lead@example.org",
-        "hofco": "founder@example.org",
+        "hofco": "ops@example.org",
     }
     email = alias_map.get(role_or_alias.lower().strip(), role_or_alias.lower().strip())
     account = Account.objects.select_related("user").filter(email__iexact=email).first()
+    if not account and email.endswith("@example.org"):
+        import io
+        from django.core.management import call_command
+        call_command("seed_test_accounts", stdout=io.StringIO())
+        account = Account.objects.select_related("user").filter(email__iexact=email).first()
     if not account:
         raise Http404(f"Test account '{role_or_alias}' ({email}) not found.")
 
@@ -3205,17 +3215,26 @@ def test_approve_account_view(request, email=None):
     """
     Unauthenticated testing endpoint to activate and approve any registered user account
     and their onboarding draft, granting immediate dashboard access without manual CLI commands.
+    Also auto-provisions the complete Stage 05 role account matrix (DASH-01 through DASH-17)
+    so every role dashboard is immediately testable.
     Strictly disabled in production.
     """
     if not settings.DEBUG and os.getenv("WDOS_ENVIRONMENT", "local") == "production":
         raise Http404("Test utility route only available in local and staging environments.")
  
+    import io
     from django.contrib.auth import get_user_model
+    from django.core.management import call_command
     from accounts.models import OnboardingConsent, OnboardingEvent
  
     User = get_user_model()
     target_email = email or request.POST.get("email") or request.GET.get("email")
     auto_login = request.POST.get("auto_login") == "1" or request.GET.get("auto_login") == "1"
+    seed_requested = request.POST.get("seed_all") == "1" or request.GET.get("seed_all") == "1"
+
+    # Auto-provision all Stage 05 role accounts if any of the newly added role accounts are missing
+    if seed_requested or not Account.objects.filter(email="state.lagos@example.org").exists() or not Account.objects.filter(email="cluster.lead@example.org").exists():
+        call_command("seed_test_accounts", stdout=io.StringIO())
  
     success_info = None
     error_message = None
@@ -3265,36 +3284,29 @@ def test_approve_account_view(request, email=None):
             draft = OnboardingDraft.objects.filter(account=account).first()
             data = (draft.data if draft else {}) or {}
 
-            # Detect country and network: prioritize explicit AccessGrant, then draft data, then email heuristics
+            # Detect country and network: prioritize explicit AccessGrant, then email heuristics, then draft data
             existing_grant = AccessGrant.objects.filter(account=account, revoked_at__isnull=True).exclude(geography="*").first()
+            lower_email = target_email.lower()
             if existing_grant and existing_grant.geography and existing_grant.geography != "*":
                 country = existing_grant.geography[:2].upper()
+            elif ".ke" in lower_email or "kenya" in lower_email or "wanjiru" in lower_email:
+                country = "KE"
+            elif ".gh" in lower_email or "ghana" in lower_email or "efua" in lower_email:
+                country = "GH"
+            elif ".ao" in lower_email or "angola" in lower_email or "mary" in lower_email:
+                country = "AO"
+            elif ".et" in lower_email or "ethiopia" in lower_email or "sarah" in lower_email or "kemi" in lower_email:
+                country = "ET"
             else:
-                country = data.get("country")
-            if not country:
-                lower_email = target_email.lower()
-                if ".ke" in lower_email or "kenya" in lower_email or "wanjiru" in lower_email:
-                    country = "KE"
-                elif ".gh" in lower_email or "ghana" in lower_email or "efua" in lower_email:
-                    country = "GH"
-                elif ".ao" in lower_email or "angola" in lower_email or "mary" in lower_email:
-                    country = "AO"
-                elif ".et" in lower_email or "ethiopia" in lower_email or "sarah" in lower_email or "kemi" in lower_email:
-                    country = "ET"
-                else:
-                    country = "NG"
+                country = data.get("country") or "NG"
 
             existing_net_grant = AccessGrant.objects.filter(account=account, revoked_at__isnull=True).exclude(network="*").first()
             if existing_net_grant and existing_net_grant.network and existing_net_grant.network != "*":
                 network = existing_net_grant.network
+            elif "wnnn" in lower_email or "efua" in lower_email:
+                network = "WNNN"
             else:
-                network = data.get("network")
-            if not network:
-                lower_email = target_email.lower()
-                if "wnnn" in lower_email or "efua" in lower_email:
-                    network = "WNNN"
-                else:
-                    network = "WGMN"
+                network = data.get("network") or "WGMN"
 
             country_default_chapters = {
                 "KE": ("KE-NBO-01", "Nairobi Central Chapter"),
@@ -3306,6 +3318,8 @@ def test_approve_account_view(request, email=None):
             default_chap_code, default_chap_name = country_default_chapters.get(country, ("NG-LOS-01", "Lagos Central Chapter"))
             if existing_grant and "-" in (existing_grant.geography or ""):
                 chapter_code = existing_grant.geography
+            elif country != "NG":
+                chapter_code = default_chap_code
             else:
                 chapter_code = data.get("district") or data.get("chapter_code") or default_chap_code
  
@@ -3313,16 +3327,19 @@ def test_approve_account_view(request, email=None):
             chapter_label = chap.name if chap else default_chap_name
             home = {"code": chapter_code, "country": country, "label": chapter_label}
  
+            is_candidate_account = "candidate" in lower_email or "john.kalu" in lower_email or AccessGrant.objects.filter(account=account, role="candidate", revoked_at__isnull=True).exists()
+            target_draft_state = "review_needed" if is_candidate_account else "accepted"
+
             if not draft:
                 draft = OnboardingDraft.objects.create(
                     account=account,
-                    state="accepted",
-                    next_step=8,
+                    state=target_draft_state,
+                    next_step=6 if is_candidate_account else 8,
                     data={"network": network, "country": country, "district": chapter_code, "language": "en"},
                 )
             else:
-                draft.state = "accepted"
-                draft.next_step = 8
+                draft.state = target_draft_state
+                draft.next_step = 6 if is_candidate_account else 8
                 draft.revision += 1
                 draft.data = {**data, "network": network, "country": country, "district": chapter_code}
                 draft.save(update_fields=["state", "next_step", "revision", "data", "updated_at"])
@@ -3341,18 +3358,20 @@ def test_approve_account_view(request, email=None):
                     channel="web",
                 )
  
-            # 6. Create / Update Membership
-            Membership.objects.update_or_create(
-                draft=draft,
-                defaults={
-                    "person": p,
-                    "network": network,
-                    "home": home,
-                    "consent": consent,
-                    "policy_digest": "policy_digest_active",
-                    "approved_by": account,
-                },
-            )
+            # 6. Create / Update Membership (for accepted non-candidate accounts)
+            if not is_candidate_account:
+                Membership.objects.filter(person=p).exclude(draft=draft).delete()
+                Membership.objects.update_or_create(
+                    draft=draft,
+                    defaults={
+                        "person": p,
+                        "network": network,
+                        "home": home,
+                        "consent": consent,
+                        "policy_digest": "policy_digest_active",
+                        "approved_by": account,
+                    },
+                )
  
             # 7. User Preferences
             opt_updates = data.get("optional_updates")
@@ -3402,17 +3421,60 @@ def test_approve_account_view(request, email=None):
                 "chapter": chapter_label,
             }
  
-    # Fetch recent accounts for 1-click table
-    recent_accounts_raw = Account.objects.select_related("user", "person").all().order_by("-created_at")[:12]
+    # Fetch all accounts (prioritizing Stage 05 role matrix in DASH-01..DASH-17 order)
+    priority_emails = [
+        "founder@example.org",
+        "ops@example.org",
+        "coordinator@example.org",
+        "admin.hq@example.org",
+        "programmes@example.org",
+        "comms@example.org",
+        "resources@example.org",
+        "systems@example.org",
+        "quality@example.org",
+        "safeguarding@example.org",
+        "country.ng@example.org",
+        "country.ke@example.org",
+        "state.lagos@example.org",
+        "ikeja.lead@example.org",
+        "cluster.lead@example.org",
+        "chapter.lagos@example.org",
+        "member.ada@example.org",
+        "wnnn.member@example.org",
+        "mary.david@example.org",
+        "sarah.andres@example.org",
+        "kemi.dare@example.org",
+        "candidate.john@example.org",
+        "community.amara@example.org",
+    ]
+    all_accounts_raw = list(Account.objects.select_related("user", "person").all().order_by("-created_at"))
+    priority_rank = {em: idx for idx, em in enumerate(priority_emails)}
+    all_accounts_raw.sort(key=lambda a: (0, priority_rank[a.email.lower()]) if a.email.lower() in priority_rank else (1, 0))
+
     recent_list = []
-    for acc in recent_accounts_raw:
+    for acc in all_accounts_raw:
         dr = OnboardingDraft.objects.filter(account=acc).first()
+        scope = get_user_scope(acc)
+        dash_code = get_default_screen_for_role(scope.primary_role)
+        dash_screen = get_dashboard_screen(dash_code) or {}
+        is_ready = (
+            acc.status == "active"
+            and (
+                (dr and dr.state == "accepted" and Membership.objects.filter(draft=dr).exists())
+                or scope.primary_role in ("candidate", "community")
+                or bool(scope.roles)
+            )
+        )
         recent_list.append({
             "email": acc.email,
             "display_name": acc.display_name or (acc.person.display_name if acc.person else acc.email.split("@")[0]),
             "status": acc.status,
             "draft_state": dr.state if dr else "No draft",
-            "is_approved": (dr and dr.state == "accepted" and Membership.objects.filter(draft=dr).exists()),
+            "is_approved": is_ready,
+            "role_label": dash_screen.get("default_role_title") or scope.primary_role.replace("_", " ").title(),
+            "scope_label": f"{scope.active_network} / {scope.active_country}",
+            "dashboard_code": dash_code,
+            "dashboard_title": dash_screen.get("title", dash_code),
         })
  
     ctx = {

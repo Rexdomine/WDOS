@@ -106,6 +106,15 @@ class Stage5DashboardsTestCase(TestCase):
         resp = self.client.get("/foundation/dashboard/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Continental priorities")
+        self.assertContains(resp, "DASH-01")
+
+        # Operations Lead must open DASH-02 (Country operations), NOT DASH-01
+        self.login_as(self.user_ops)
+        resp = self.client.get("/foundation/dashboard/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Country operations")
+        self.assertContains(resp, "DASH-02")
+        self.assertNotContains(resp, "Continental priorities")
 
         self.login_as(self.user_member_ada)
         resp = self.client.get("/foundation/dashboard/")
@@ -116,11 +125,60 @@ class Stage5DashboardsTestCase(TestCase):
         resp = self.client.get("/foundation/dashboard/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Your next step is clear")
+        self.assertContains(resp, 'href="/onboarding/1/"')
 
         self.login_as(self.user_community)
         resp = self.client.get("/foundation/dashboard/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Stay connected with WODDI")
+
+    def test_kenya_country_lead_dashboard_shows_kenya_items_not_lagos(self):
+        """Kenya Country Lead (country.ke@example.org) opens Kenya country overview with Nairobi/Mombasa items and no Lagos/Ikeja items."""
+        self.login_as(self.user_country_ke)
+        resp = self.client.get("/foundation/dashboard/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Kenya country overview")
+        self.assertContains(resp, "WGMN / KENYA")
+        self.assertContains(resp, "Nairobi")
+        self.assertContains(resp, "Mombasa")
+        self.assertNotContains(resp, "Lagos")
+        self.assertNotContains(resp, "Ikeja")
+
+    def test_all_pending_role_accounts_provisioned_in_test_approver_and_open_correct_dashboards(self):
+        """Visiting /foundation/test-approve/ auto-provisions all role accounts for DASH-01..DASH-17 and each opens its documented dashboard."""
+        resp_approver = self.client.get("/foundation/test-approve/")
+        self.assertEqual(resp_approver.status_code, 200)
+
+        expected_role_matrix = [
+            ("founder@example.org", "DASH-01", "Continental priorities"),
+            ("ops@example.org", "DASH-02", "Country operations"),
+            ("coordinator@example.org", "DASH-03", "Coordination desk"),
+            ("admin.hq@example.org", "DASH-04", "Administration overview"),
+            ("programmes@example.org", "DASH-05", "Programme portfolio"),
+            ("comms@example.org", "DASH-06", "Communications workspace"),
+            ("resources@example.org", "DASH-07", "Resource accountability"),
+            ("systems@example.org", "DASH-08", "Systems operations"),
+            ("quality@example.org", "DASH-09", "Quality and controls"),
+            ("safeguarding@example.org", "DASH-10-SAFEGUARDING", "Confidential safeguarding desk"),
+            ("country.ng@example.org", "DASH-10", "Nigeria country overview"),
+            ("country.ke@example.org", "DASH-10", "Kenya country overview"),
+            ("state.lagos@example.org", "DASH-11", "Lagos regional overview"),
+            ("ikeja.lead@example.org", "DASH-12", "Ikeja local operations"),
+            ("cluster.lead@example.org", "DASH-13", "Your Cluster at a glance"),
+            ("chapter.lagos@example.org", "DASH-14", "Lagos Central Chapter · Command desk"),
+            ("member.ada@example.org", "DASH-15", "Good morning, Ada"),
+            ("candidate.john@example.org", "DASH-16", "Your next step is clear"),
+            ("community.amara@example.org", "DASH-17", "Stay connected with WODDI"),
+        ]
+
+        for email, expected_code, expected_title in expected_role_matrix:
+            self.assertContains(resp_approver, email)
+            user = User.objects.get(email=email)
+            self.login_as(user)
+            dash_resp = self.client.get("/foundation/dashboard/")
+            self.assertEqual(dash_resp.status_code, 200, f"{email} failed on /foundation/dashboard/")
+            self.assertContains(dash_resp, expected_code)
+            self.assertContains(dash_resp, expected_title)
 
     def test_state_interaction_feedback_modes(self):
         """All 5 state feedback modes render the state card and implementation contract banner."""

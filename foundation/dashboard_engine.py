@@ -2870,7 +2870,7 @@ def build_dashboard_context(
         "state_mode": state_mode,
         "state_card": state_card,
         "is_leadership_tier": is_leadership_tier,
-        "active_role_title": screen.get("default_role_title") or user_scope.active_role.title(),
+        "active_role_title": screen.get("default_role_title") or user_scope.active_role.replace("_", " ").title(),
         "active_network": active_network,
         "active_country": active_country,
         "country_name": country_display,

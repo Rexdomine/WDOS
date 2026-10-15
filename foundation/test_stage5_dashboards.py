@@ -129,6 +129,10 @@ class Stage5DashboardsTestCase(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Your next step is clear")
         self.assertContains(resp, 'href="/onboarding/1/"')
+        onb_resp = self.client.get("/onboarding/1/", follow=True)
+        self.assertEqual(onb_resp.status_code, 200)
+        self.assertNotContains(onb_resp, "ONB-08")
+        self.assertNotContains(onb_resp, "ONB-01")
 
         self.login_as(self.user_community)
         resp = self.client.get("/foundation/dashboard/")

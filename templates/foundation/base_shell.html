@@ -23,7 +23,7 @@
     <a href="/foundation/dashboard/switch-role/" class="scope-box" aria-label="Switch active scope or network" style="text-decoration:none;">
       <div class="scope-box-text">
         <div class="scope-network">{{ user_scope.active_network }} / {{ country_name|default:user_scope.active_country }}</div>
-        <div class="scope-role">{{ active_role_title|default:user_scope.active_role|title }}</div>
+        <div class="scope-role">{{ active_role_title|default:"Member" }}</div>
       </div>
       <div class="scope-box-arrow" aria-hidden="true">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -120,7 +120,7 @@
       </div>
       <div class="user-info">
         <div class="user-name">{{ display_name|default:"Ada Okafor" }}</div>
-        <div class="user-role">{{ active_role_title|default:user_scope.active_role|title }}</div>
+        <div class="user-role">{{ active_role_title|default:"Member" }}</div>
       </div>
     </div>
   </aside>
@@ -144,7 +144,7 @@
         <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
           <div class="profile-menu-header">
             <strong class="profile-menu-name">{{ display_name|default:"Ada Okafor" }}</strong>
-            <small class="profile-menu-scope">{{ active_role_title|default:user_scope.active_role|title }} ({{ user_scope.active_network }})</small>
+            <small class="profile-menu-scope">{{ active_role_title|default:"Member" }} ({{ user_scope.active_network }})</small>
           </div>
           <div class="profile-menu-items">
             <a href="/foundation/" role="menuitem" class="profile-menu-link">Workspace Home</a>
@@ -168,7 +168,7 @@
 
   <!-- Mobile Scope Banner -->
   <div class="mobile-scope-bar">
-    <span>{{ user_scope.active_network }} / {{ country_name|default:"Nigeria" }} &nbsp;·&nbsp; {{ active_role_title|default:user_scope.active_role|title }}</span>
+    <span>{{ user_scope.active_network }} / {{ country_name|default:"Nigeria" }} &nbsp;·&nbsp; {{ active_role_title|default:"Member" }}</span>
   </div>
 
   <!-- Main Content Shell -->
@@ -220,7 +220,7 @@
           <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
             <div class="profile-menu-header">
               <strong class="profile-menu-name">{{ display_name|default:"Ada Okafor" }}</strong>
-              <small class="profile-menu-scope">{{ active_role_title|default:user_scope.active_role|title }} ({{ user_scope.active_network }})</small>
+              <small class="profile-menu-scope">{{ active_role_title|default:"Member" }} ({{ user_scope.active_network }})</small>
             </div>
             <div class="profile-menu-items">
               <a href="/foundation/profile/" role="menuitem" class="profile-menu-link">My Profile</a>

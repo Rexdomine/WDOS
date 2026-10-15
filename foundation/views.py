@@ -186,9 +186,14 @@ def _get_authenticated_context(request):
     if not session_tz:
         request.session["wdos_timezone"] = current_tz
 
+    default_dash = get_dashboard_screen(get_default_screen_for_role(user_scope.active_role or user_scope.primary_role)) or {}
+    active_role_title = default_dash.get("default_role_title") or (user_scope.active_role or "member").replace("_", " ").title()
+
     context = {
         "account": account,
         "user_scope": user_scope,
+        "active_network": user_scope.active_network or "WGMN",
+        "active_role_title": active_role_title,
         "country_name": get_country_display_name(user_scope.active_country),
         "user_pref": user_pref,
         "lang": lang,
@@ -211,8 +216,13 @@ def _get_authenticated_context(request):
 
 def _render_scope_error(request, context, exception):
     """Render the accessible, explanatory scope permission denial error page."""
+    raw_reason = getattr(exception, "reason_code", "forbidden")
+    user_scope = context.get("user_scope")
+    raw_level = getattr(user_scope, "leadership_level", "") or "member"
     context["error_message"] = getattr(exception, "message", str(exception))
-    context["reason_code"] = getattr(exception, "reason_code", "forbidden")
+    context["reason_code"] = raw_reason
+    context["reason_label"] = raw_reason.replace("_", " ").title()
+    context["leadership_level_label"] = raw_level.replace("_", " ").title()
     context["recovery_url"] = getattr(exception, "recovery_url", "/foundation/")
     context["breadcrumbs"] = [
         {"label": "WDOS", "url": "/foundation/", "is_current": False},

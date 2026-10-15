@@ -10,7 +10,7 @@
   </div>
 </div>
 
-<div class="error-state">
+<div class="error-state" data-reason-code="{{ reason_code|default:'forbidden' }}">
   <h2>{{ error_message|default:"You do not have permission to access this resource." }}</h2>
   
   <p>
@@ -21,8 +21,8 @@
   <dl class="definition" style="margin:20px 0; background:white; padding:16px; border-radius:8px; border:1px solid #F8CCD7;">
     <div><dt>Your Authorized Networks</dt><dd>{{ user_scope.allowed_networks|join:", "|default:"None" }}</dd></div>
     <div><dt>Your Authorized Geographies</dt><dd>{% if "*" in user_scope.allowed_countries %}All Countries{% else %}{{ user_scope.allowed_countries|join:", "|default:"None" }}{% endif %}</dd></div>
-    <div><dt>Your Leadership Level</dt><dd>{{ user_scope.leadership_level|title }}</dd></div>
-    <div><dt>Reason Code</dt><dd><code>{{ reason_code|default:"forbidden" }}</code></dd></div>
+    <div><dt>Your Leadership Level</dt><dd>{{ leadership_level_label|default:"Member" }}</dd></div>
+    <div><dt>Access Boundary</dt><dd>{{ reason_label|default:"Restricted Scope" }}</dd></div>
   </dl>
 
   <div class="actions" style="margin-top:24px;">

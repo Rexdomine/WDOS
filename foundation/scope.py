@@ -414,7 +414,7 @@ def assert_role_authorized(user_scope: UserScope, role: str):
     """Ensure user is authorized to view the requested role dashboard view."""
     if not user_scope.can_access_role(role):
         raise ScopePermissionDenied(
-            message=f"Access Denied: You do not have authorization to view the {role.title()} dashboard.",
+            message=f"Access Denied: You do not have authorization to view the {role.replace('_', ' ').title()} dashboard.",
             reason_code="unauthorized_role",
             attempted_scope={"role": role},
             authorized_scope={"roles": list(user_scope.roles), "primary_role": user_scope.primary_role},

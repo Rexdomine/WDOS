@@ -60,12 +60,20 @@ from .dashboard_engine import (
 )
 from .people_geo_engine import (
     STAGE6_SCREENS,
+    assert_country_network_authorized,
+    assert_person_scope_authorized,
     assert_stage6_authorized,
+    get_country_name_for_code,
+    get_stage6_audit_history,
+    is_global_stage6_scope,
+    normalize_country_code,
     seed_stage6_fixtures,
     check_for_duplicate_person,
     add_or_link_person_record,
+    update_person_profile_record,
     save_person_relationship,
     submit_reassignment_decision,
+    save_local_organisation_unit,
     verify_country_dossier_submission,
     save_geography_terminology_revision,
 )
@@ -1521,6 +1529,52 @@ def _execute_scoped_search(query: str, user_scope: UserScope, active_tab: str = 
                 "network": user_scope.active_network,
                 "country": hub.code,
                 "url": f"/foundation/network/{user_scope.active_network}/country/{hub.code}/",
+            })
+
+        # 3. Search People & Community Profiles (Stage 06) strictly within allowed scope
+        people_qs = PersonProfile.objects.filter(network__in=user_scope.allowed_networks)
+        if "*" not in user_scope.allowed_countries:
+            people_qs = people_qs.filter(country__in=user_scope.allowed_countries)
+        people_qs = people_qs.filter(
+            models_q_search(query, ["full_name", "person_code", "local_home", "primary_relationship", "email"])
+        )
+        matching_people = people_qs[:5] if limit else people_qs
+        for p in matching_people:
+            results.append({
+                "id": p.person_code,
+                "type": "person_profile",
+                "title": f"{p.full_name} ({p.person_code})",
+                "summary": f"{p.primary_relationship} · {p.local_home} ({p.network}/{p.country})",
+                "when": p.status,
+                "action_label": "View profile ›",
+                "pill_style": "magenta" if p.status == "Active" else "amber",
+                "status": p.status.lower(),
+                "network": p.network,
+                "country": p.country,
+                "url": f"/foundation/people/{p.person_code}/",
+            })
+
+        # 4. Search Local Organisation Units (Stage 06) strictly within allowed scope
+        units_qs = LocalOrganisationUnit.objects.filter(network__in=user_scope.allowed_networks)
+        if "*" not in user_scope.allowed_countries:
+            units_qs = units_qs.filter(country__in=user_scope.allowed_countries)
+        units_qs = units_qs.filter(
+            models_q_search(query, ["unit_name", "level", "responsible_leader_name", "description"])
+        )
+        matching_units = units_qs[:5] if limit else units_qs
+        for u in matching_units:
+            results.append({
+                "id": u.id,
+                "type": "local_unit",
+                "title": f"{u.unit_name} ({u.level})",
+                "summary": f"Leader: {u.responsible_leader_name} · {u.network}/{u.country}",
+                "when": u.record_state,
+                "action_label": "Open unit ›",
+                "pill_style": "magenta",
+                "status": "active",
+                "network": u.network,
+                "country": u.country,
+                "url": f"/foundation/geography/local-org/?country={u.country}&network={u.network}",
             })
 
     return results
@@ -3374,6 +3428,40 @@ def test_approve_account_view(request, email=None):
 # WDOS STAGE 06: PEOPLE, COMMUNITY, AND GEOGRAPHY SPINE VIEWS
 # =============================================================================
 
+def _get_scoped_people_queryset(user_scope: UserScope, req_country: str = "", req_network: str = ""):
+    qs = PersonProfile.objects.all()
+    if is_global_stage6_scope(user_scope):
+        if req_network and req_network.upper() in {"WGMN", "WNNN"}:
+            qs = qs.filter(network=req_network.upper())
+        elif user_scope.active_network in {"WGMN", "WNNN"} and not req_country:
+            qs = qs.filter(network__in=[user_scope.active_network, "BOTH"])
+        if req_country:
+            qs = qs.filter(country=normalize_country_code(req_country))
+        elif user_scope.active_country not in {"ALL", "BOTH", "*", ""}:
+            qs = qs.filter(country=user_scope.active_country)
+    else:
+        if user_scope.active_network not in {"ALL", "HQ / Both networks", "*"}:
+            qs = qs.filter(network__in=[user_scope.active_network, "BOTH"])
+        if user_scope.active_country not in {"ALL", "BOTH", "*"}:
+            qs = qs.filter(country=user_scope.active_country)
+    return qs
+
+
+def _get_changed_person_codes() -> set:
+    from accounts.models import AuditEvent
+
+    changed = set(
+        LocalHomeReassignment.objects.filter(status="approved").values_list("person__person_code", flat=True)
+    )
+    recent_events = AuditEvent.objects.filter(
+        event__in={"person_profile_updated", "relationship_saved", "local_home_reassigned", "person_linked"}
+    ).order_by("-created_at")[:50]
+    for ev in recent_events:
+        if ev.detail and ev.detail.get("person_code"):
+            changed.add(ev.detail["person_code"])
+    return changed
+
+
 def people_directory_view(request):
     """
     PEOPLE-01: People directory.
@@ -3391,45 +3479,80 @@ def people_directory_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["PEOPLE-01"]
+    req_country = request.GET.get("country", "").strip()
+    req_network = request.GET.get("network", "").strip()
+    if req_country or req_network:
+        try:
+            assert_country_network_authorized(user_scope, country=req_country or None, network=req_network or None)
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+
+    screen = dict(STAGE6_SCREENS["PEOPLE-01"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    # Scoped query
-    qs = PersonProfile.objects.all()
-    if user_scope.active_network not in {"ALL", "HQ / Both networks"}:
-        qs = qs.filter(network__in=[user_scope.active_network, "BOTH"])
-    if user_scope.active_country not in {"ALL", "BOTH"}:
-        qs = qs.filter(country=user_scope.active_country)
+    qs = _get_scoped_people_queryset(user_scope, req_country=req_country, req_network=req_network)
+    total_scoped_count = qs.count()
 
     query = request.GET.get("q", "").strip()
     if query:
-        qs = qs.filter(Q(full_name__icontains=query) | Q(local_home__icontains=query) | Q(person_code__icontains=query))
+        qs = qs.filter(
+            Q(full_name__icontains=query)
+            | Q(local_home__icontains=query)
+            | Q(person_code__icontains=query)
+            | Q(email__icontains=query)
+            | Q(primary_relationship__icontains=query)
+        )
 
     status_filter = request.GET.get("status", "").strip()
     if status_filter:
         qs = qs.filter(status__iexact=status_filter)
 
+    relationship_filter = request.GET.get("relationship", "").strip()
+    if relationship_filter:
+        qs = qs.filter(primary_relationship__icontains=relationship_filter)
+
+    verification_filter = request.GET.get("verification", "").strip()
+    if verification_filter:
+        qs = qs.filter(contact_verification__iexact=verification_filter)
+
     people = list(qs)
     if state_mode == "empty":
         people = []
+    elif not state_card and len(people) == 0 and (query or status_filter or relationship_filter or verification_filter):
+        state_card = screen["state_contracts"].get("no_matching")
+
+    changed_codes = _get_changed_person_codes()
+    for p in people:
+        p.is_changed_record = p.person_code in changed_codes
+
+    audit_history = get_stage6_audit_history(user_scope)
 
     ctx.update({
         "screen": screen,
         "people": people,
+        "total_scoped_count": total_scoped_count,
+        "active_count": sum(1 for p in people if p.status == "Active"),
+        "verified_count": sum(1 for p in people if p.contact_verification == "Verified"),
+        "review_due_count": sum(1 for p in people if p.status != "Active"),
+        "changed_codes": changed_codes,
+        "audit_history": audit_history,
         "active_nav": "people",
         "active_tab": request.GET.get("tab", "records"),
         "state_mode": state_mode,
         "state_card": state_card,
         "query": query,
+        "status_filter": status_filter,
+        "relationship_filter": relationship_filter,
     })
     return render(request, "foundation/stage6/people_01_directory.html", ctx)
 
 
 def person_profile_view(request, person_code="WD-00421"):
     """
-    PEOPLE-02: Ada Okafor profile.
-    Shows profile summary, verified status, and attached community relationships.
+    PEOPLE-02: Person profile (e.g. Ada Okafor).
+    Shows profile summary, local hierarchy placement, verified status, attached relationships,
+    and allows authorized users to update profile details within their permitted scope.
     """
     ctx, redirect_res = _get_authenticated_context(request)
     if redirect_res:
@@ -3437,32 +3560,115 @@ def person_profile_view(request, person_code="WD-00421"):
 
     seed_stage6_fixtures()
     user_scope = ctx["user_scope"]
+    account = ctx["account"]
 
     try:
         assert_stage6_authorized(user_scope, "PEOPLE-02")
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["PEOPLE-02"]
+    screen = dict(STAGE6_SCREENS["PEOPLE-02"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    try:
-        person = PersonProfile.objects.get(person_code=person_code)
-    except PersonProfile.DoesNotExist:
+    is_default_profile_route = request.path.rstrip("/").endswith("/people/profile")
+    req_person_param = request.GET.get("person", "").strip()
+    if req_person_param:
+        person_code = req_person_param
+        is_default_profile_route = False
+
+    person = None
+    if is_default_profile_route and not is_global_stage6_scope(user_scope):
+        scoped_qs = _get_scoped_people_queryset(user_scope)
+        person = scoped_qs.first()
+
+    if person is None:
         try:
-            person = PersonProfile.objects.get(id=person_code)
-        except Exception:
-            person = PersonProfile.objects.first()
+            person = PersonProfile.objects.get(person_code=person_code)
+        except PersonProfile.DoesNotExist:
+            try:
+                person = PersonProfile.objects.get(id=person_code)
+            except Exception:
+                raise Http404(f"Person record '{person_code}' not found.")
+
+    try:
+        assert_person_scope_authorized(user_scope, person)
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    result_message = None
+    result_success = True
+
+    if request.method == "POST":
+        action = request.POST.get("action", "update_profile")
+        if action == "update_profile":
+            full_name = request.POST.get("full_name", person.full_name)
+            email = request.POST.get("email", person.email)
+            phone = request.POST.get("phone", person.phone)
+            local_home = request.POST.get("local_home", person.local_home)
+            contact_verification = request.POST.get("contact_verification", person.contact_verification)
+            primary_relationship = request.POST.get("primary_relationship", person.primary_relationship)
+            status_val = request.POST.get("status", person.status)
+            expected_updated = request.POST.get("expected_updated_at", "").strip()
+
+            try:
+                res = update_person_profile_record(
+                    person_code=person.person_code,
+                    full_name=full_name,
+                    email=email,
+                    phone=phone,
+                    local_home=local_home,
+                    contact_verification=contact_verification,
+                    primary_relationship=primary_relationship,
+                    status=status_val,
+                    actor_account=account,
+                    user_scope=user_scope,
+                    expected_updated_at=expected_updated or None,
+                )
+                person = res["person"]
+                if res.get("conflict"):
+                    result_message = res["message"]
+                    result_success = False
+                    state_card = {
+                        "title": "Another change needs review",
+                        "message": res["message"],
+                        "action_label": "Review latest version",
+                        "action_url": f"/foundation/people/{person.person_code}/",
+                    }
+                else:
+                    result_message = f"Profile for {person.full_name} ({person.person_code}) updated and recorded in audit history."
+                    result_success = True
+            except ScopePermissionDenied as exc:
+                return _render_scope_error(request, ctx, exc)
+            except Exception as exc:
+                result_message = str(exc)
+                result_success = False
 
     people = list(PersonProfile.objects.filter(network=person.network, country=person.country))
     if state_mode == "empty":
         people = []
 
+    person_relationships = list(person.relationships.all())
+    local_hierarchy = list(
+        LocalOrganisationUnit.objects.filter(country=person.country, network=person.network).order_by("level_order")
+    )
+    audit_history = get_stage6_audit_history(user_scope, person_code=person.person_code)
+    changed_codes = _get_changed_person_codes()
+
     ctx.update({
         "screen": screen,
         "person": person,
+        "person_country_name": get_country_name_for_code(person.country),
+        "is_changed_record": person.person_code in changed_codes,
+        "expected_updated_at": person.updated_at.isoformat() if getattr(person, "updated_at", None) else "",
+        "reassignments": list(person.reassignments.all()),
         "people": people,
+        "person_relationships": person_relationships,
+        "local_hierarchy": local_hierarchy,
+        "audit_history": audit_history,
+        "result_title": "Profile updated" if result_success else "Review required",
+        "result_message": result_message,
+        "result_success": result_success,
         "active_nav": "people",
         "active_tab": request.GET.get("tab", "overview"),
         "state_mode": state_mode,
@@ -3489,48 +3695,79 @@ def add_or_link_person_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["PEOPLE-03"]
+    screen = dict(STAGE6_SCREENS["PEOPLE-03"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
+    default_country_name = get_country_name_for_code(
+        user_scope.active_country if user_scope.active_country not in {"ALL", "BOTH", "*", ""} else "NG"
+    )
+    default_net = user_scope.active_network if user_scope.active_network in {"WGMN", "WNNN"} else "WGMN"
+
     result_message = None
     result_success = True
+    duplicate_preview = None
     form_data = {
-        "full_name": "Ada Okafor",
-        "email": "ada@example.org",
-        "country": "Nigeria",
-        "relationship_to_add": "WGMN membership",
+        "full_name": "Ada Okafor" if default_country_name == "Nigeria" else "Wanjiru Kariuki",
+        "email": "ada@example.org" if default_country_name == "Nigeria" else "country.ke@example.org",
+        "country": default_country_name,
+        "relationship_to_add": f"{default_net} membership",
+        "local_home": "",
     }
 
     if request.method == "POST":
+        action = request.POST.get("action", "check_or_save")
         full_name = request.POST.get("full_name", "").strip()
         email = request.POST.get("email", "").strip()
         country = request.POST.get("country", "").strip()
         relationship = request.POST.get("relationship_to_add", "").strip()
+        local_home = request.POST.get("local_home", "").strip()
         form_data.update({
             "full_name": full_name,
             "email": email,
             "country": country,
             "relationship_to_add": relationship,
+            "local_home": local_home,
         })
 
-        if not full_name:
-            result_message = "Full name is required."
-            result_success = False
-        else:
-            res = add_or_link_person_record(
-                full_name=full_name,
-                email=email,
-                country="NG" if country.lower() in {"nigeria", "ng"} else "KE",
-                relationship_to_add=relationship,
-                network=user_scope.active_network if user_scope.active_network in {"WGMN", "WNNN"} else "WGMN",
-                actor_account=account,
-            )
-            if res["action_type"] == "linked":
-                result_message = f"Existing person record found ({res['person'].person_code} · {res['person'].full_name}). Relationship linked successfully without creating a duplicate identity."
-            else:
-                result_message = f"New authoritative person record created ({res['person'].person_code} · {res['person'].full_name}) and relationship linked."
+        if action == "save_draft":
+            state_card = screen["state_contracts"]["saved_later"]
+            result_message = "Draft saved for later. Your entered information is retained."
             result_success = True
+        elif not full_name or not email:
+            state_card = screen["state_contracts"]["check_highlighted"]
+            result_message = "Full name and contact email are required before continuing."
+            result_success = False
+        elif action == "check_only":
+            dup = check_for_duplicate_person(email=email, full_name=full_name, network=default_net)
+            duplicate_preview = dup
+            result_message = dup["message"]
+            result_success = True
+        else:
+            norm_c = normalize_country_code(country, default_code="NG")
+            try:
+                res = add_or_link_person_record(
+                    full_name=full_name,
+                    email=email,
+                    country=norm_c,
+                    relationship_to_add=relationship,
+                    network=default_net,
+                    actor_account=account,
+                    user_scope=user_scope,
+                    local_home=local_home or None,
+                )
+                if res["action_type"] == "linked":
+                    result_message = f"Existing person record found ({res['person'].person_code} · {res['person'].full_name}). Relationship linked successfully without creating a duplicate identity."
+                else:
+                    result_message = f"New authoritative person record created ({res['person'].person_code} · {res['person'].full_name}) and relationship linked."
+                result_success = True
+            except ScopePermissionDenied as exc:
+                return _render_scope_error(request, ctx, exc)
+            except Exception as exc:
+                result_message = str(exc)
+                result_success = False
+
+    audit_history = get_stage6_audit_history(user_scope)
 
     ctx.update({
         "screen": screen,
@@ -3540,7 +3777,9 @@ def add_or_link_person_view(request):
         "state_card": state_card,
         "result_message": result_message,
         "result_success": result_success,
+        "duplicate_preview": duplicate_preview,
         "form_data": form_data,
+        "audit_history": audit_history,
     })
     return render(request, "foundation/stage6/people_03_add_or_link.html", ctx)
 
@@ -3548,7 +3787,7 @@ def add_or_link_person_view(request):
 def community_relationships_view(request):
     """
     PEOPLE-04: Community relationships.
-    Displays people and connected relationships matching scope.
+    Displays people and connected relationships matching scope with search and category filters.
     """
     ctx, redirect_res = _get_authenticated_context(request)
     if redirect_res:
@@ -3562,23 +3801,56 @@ def community_relationships_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["PEOPLE-04"]
+    screen = dict(STAGE6_SCREENS["PEOPLE-04"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    qs = PersonProfile.objects.all()
-    if user_scope.active_network not in {"ALL", "HQ / Both networks"}:
-        qs = qs.filter(network__in=[user_scope.active_network, "BOTH"])
-    if user_scope.active_country not in {"ALL", "BOTH"}:
-        qs = qs.filter(country=user_scope.active_country)
+    qs = _get_scoped_people_queryset(user_scope)
+
+    query = request.GET.get("q", "").strip()
+    if query:
+        qs = qs.filter(
+            Q(full_name__icontains=query)
+            | Q(local_home__icontains=query)
+            | Q(primary_relationship__icontains=query)
+            | Q(person_code__icontains=query)
+        )
+
+    category_filter = request.GET.get("category", "").strip()
+    if category_filter:
+        qs = qs.filter(
+            Q(primary_relationship__icontains=category_filter)
+            | Q(relationships__category__icontains=category_filter)
+        ).distinct()
+
+    status_filter = request.GET.get("status", "").strip()
+    if status_filter:
+        qs = qs.filter(status__iexact=status_filter)
+
+    for_role = request.GET.get("for_role", "").strip()
+    if for_role == "1":
+        qs = qs.filter(status__in=["Active", "Review due"])
 
     people = list(qs)
     if state_mode == "empty":
         people = []
+    elif not state_card and len(people) == 0 and (query or category_filter or status_filter):
+        state_card = screen["state_contracts"].get("no_matching")
+
+    changed_codes = _get_changed_person_codes()
+    for p in people:
+        p.is_changed_record = p.person_code in changed_codes
+
+    audit_history = get_stage6_audit_history(user_scope)
 
     ctx.update({
         "screen": screen,
         "people": people,
+        "query": query,
+        "category_filter": category_filter,
+        "status_filter": status_filter,
+        "for_role": for_role,
+        "audit_history": audit_history,
         "active_nav": "people",
         "active_tab": request.GET.get("tab", "records"),
         "state_mode": state_mode,
@@ -3605,11 +3877,27 @@ def manage_relationships_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["PEOPLE-05"]
+    screen = dict(STAGE6_SCREENS["PEOPLE-05"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
+    scoped_people = list(_get_scoped_people_queryset(user_scope))
+    req_person_code = (request.GET.get("person") or request.POST.get("person_code") or "").strip()
+
+    selected_person = None
+    if req_person_code:
+        selected_person = PersonProfile.objects.filter(person_code=req_person_code).first()
+        if selected_person:
+            try:
+                assert_person_scope_authorized(user_scope, selected_person)
+            except ScopePermissionDenied as exc:
+                return _render_scope_error(request, ctx, exc)
+
+    if not selected_person:
+        selected_person = scoped_people[0] if scoped_people else PersonProfile.objects.first()
+
     result_message = None
+    result_success = True
     form_data = {
         "relationship_category": "Programme participant",
         "related_programme": "Community Skills Exchange",
@@ -3617,32 +3905,61 @@ def manage_relationships_view(request):
     }
 
     if request.method == "POST":
+        action = request.POST.get("action", "save")
         category = request.POST.get("relationship_category", "").strip()
         programme = request.POST.get("related_programme", "").strip()
         eff_date = request.POST.get("effective_date", "").strip()
-        person_code = request.POST.get("person_code", "WD-00421").strip()
+        person_code = request.POST.get("person_code", selected_person.person_code if selected_person else "WD-00421").strip()
         form_data.update({
             "relationship_category": category,
             "related_programme": programme,
             "effective_date": eff_date,
         })
 
-        res = save_person_relationship(
-            person_id_or_code=person_code,
-            relationship_category=category,
-            related_programme=programme,
-            effective_date_str=eff_date,
-            actor_account=account,
-        )
-        result_message = f"Relationship successfully saved and attached to {res['person'].full_name} ({res['person'].person_code})."
+        if action == "save_draft":
+            state_card = screen["state_contracts"]["saved_later"]
+            result_message = "Draft relationship saved for later."
+        elif not category:
+            state_card = screen["state_contracts"]["check_highlighted"]
+            result_message = "Relationship category is required."
+            result_success = False
+        else:
+            try:
+                res = save_person_relationship(
+                    person_id_or_code=person_code,
+                    relationship_category=category,
+                    related_programme=programme,
+                    effective_date_str=eff_date,
+                    actor_account=account,
+                    user_scope=user_scope,
+                )
+                selected_person = res["person"]
+                result_message = f"Relationship successfully saved and attached to {res['person'].full_name} ({res['person'].person_code})."
+                result_success = True
+            except ScopePermissionDenied as exc:
+                return _render_scope_error(request, ctx, exc)
+            except Exception as exc:
+                result_message = str(exc)
+                result_success = False
+
+    existing_relationships = list(selected_person.relationships.all()) if selected_person else []
+    audit_history = get_stage6_audit_history(
+        user_scope,
+        person_code=selected_person.person_code if selected_person else None,
+    )
 
     ctx.update({
         "screen": screen,
+        "selected_person": selected_person,
+        "scoped_people": scoped_people,
+        "existing_relationships": existing_relationships,
+        "audit_history": audit_history,
         "active_nav": "people",
         "active_tab": request.GET.get("tab", "records"),
         "state_mode": state_mode,
         "state_card": state_card,
         "result_message": result_message,
+        "result_success": result_success,
         "form_data": form_data,
     })
     return render(request, "foundation/stage6/people_05_manage_relationships.html", ctx)
@@ -3666,17 +3983,30 @@ def review_reassignment_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["PEOPLE-06"]
+    screen = dict(STAGE6_SCREENS["PEOPLE-06"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    reassignment = LocalHomeReassignment.objects.select_related("person").first()
+    scoped_people = _get_scoped_people_queryset(user_scope)
+    req_person = (request.GET.get("person") or request.POST.get("person_code") or "").strip()
+
+    reassignments_qs = LocalHomeReassignment.objects.select_related("person").filter(person__in=scoped_people)
+    if req_person:
+        target_p = PersonProfile.objects.filter(person_code=req_person).first()
+        if target_p:
+            try:
+                assert_person_scope_authorized(user_scope, target_p)
+            except ScopePermissionDenied as exc:
+                return _render_scope_error(request, ctx, exc)
+            reassignments_qs = LocalHomeReassignment.objects.select_related("person").filter(person=target_p)
+
+    reassignment = reassignments_qs.first() or LocalHomeReassignment.objects.select_related("person").first()
 
     result_message = None
     result_success = True
 
     if request.method == "POST":
-        person_code = request.POST.get("person_code", "WD-00421")
+        person_code = request.POST.get("person_code", reassignment.person.person_code if reassignment else "WD-00421")
         proposed_home = request.POST.get("proposed_local_home", "").strip()
         reason = request.POST.get("reason", "").strip()
         confirmation = request.POST.get("member_confirmation") in {"true", "True", "1", "on"}
@@ -3695,13 +4025,25 @@ def review_reassignment_view(request):
             result_success = True
         except ScopePermissionDenied as exc:
             return _render_scope_error(request, ctx, exc)
+        except ValueError as exc:
+            state_card = screen["state_contracts"]["check_highlighted"]
+            result_message = str(exc)
+            result_success = False
         except Exception as exc:
             result_message = str(exc)
             result_success = False
 
+    reassignments_history = list(
+        LocalHomeReassignment.objects.select_related("person", "reviewed_by").filter(person__in=scoped_people)
+    )
+    audit_history = get_stage6_audit_history(user_scope)
+
     ctx.update({
         "screen": screen,
         "reassignment": reassignment,
+        "scoped_people": list(scoped_people),
+        "reassignments_history": reassignments_history,
+        "audit_history": audit_history,
         "active_nav": "people",
         "active_tab": request.GET.get("tab", "records"),
         "state_mode": state_mode,
@@ -3729,17 +4071,55 @@ def africa_network_coverage_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["GEO-01"]
+    screen = dict(STAGE6_SCREENS["GEO-01"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    dossiers = list(CountryDossier.objects.all())
+    qs = CountryDossier.objects.all()
+    if not is_global_stage6_scope(user_scope):
+        if user_scope.active_country not in {"ALL", "BOTH", "*"}:
+            qs = qs.filter(country_code=user_scope.active_country)
+        if user_scope.active_network in {"WGMN", "WNNN"}:
+            qs = qs.filter(network=user_scope.active_network)
+
+    query = request.GET.get("q", "").strip()
+    if query:
+        qs = qs.filter(
+            Q(country_name__icontains=query)
+            | Q(country_code__icontains=query)
+            | Q(network__icontains=query)
+            | Q(country_lead_name__icontains=query)
+            | Q(verification_status__icontains=query)
+        )
+
+    status_filter = request.GET.get("status", "").strip()
+    if status_filter:
+        qs = qs.filter(verification_status__icontains=status_filter)
+
+    network_filter = request.GET.get("network", "").strip().upper()
+    if network_filter in {"WGMN", "WNNN"}:
+        qs = qs.filter(network=network_filter)
+
+    dossiers = list(qs)
     if state_mode == "empty":
         dossiers = []
+    elif not state_card and len(dossiers) == 0 and (query or status_filter or network_filter):
+        state_card = screen["state_contracts"].get("no_matching")
+
+    req_country = request.GET.get("country", "").strip().upper()
+    selected_dossier = None
+    if req_country:
+        selected_dossier = next((d for d in dossiers if d.country_code == req_country), None)
+    if not selected_dossier and dossiers:
+        selected_dossier = next((d for d in dossiers if d.country_code == "NG" and d.network == "WGMN"), dossiers[0])
 
     ctx.update({
         "screen": screen,
         "dossiers": dossiers,
+        "selected_dossier": selected_dossier,
+        "query": query,
+        "status_filter": status_filter,
+        "network_filter": network_filter,
         "active_nav": "reports",
         "active_tab": request.GET.get("tab", "map"),
         "state_mode": state_mode,
@@ -3750,7 +4130,7 @@ def africa_network_coverage_view(request):
 
 def country_command_profile_view(request, country_code="NG"):
     """
-    GEO-02: Nigeria · Country Command Profile.
+    GEO-02: Country Command Profile.
     Shows country leadership, timezone reference, and dossier verification status.
     """
     ctx, redirect_res = _get_authenticated_context(request)
@@ -3765,20 +4145,41 @@ def country_command_profile_view(request, country_code="NG"):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["GEO-02"]
+    norm_cc = normalize_country_code(country_code, default_code="NG")
+    req_net = request.GET.get("network", "").strip().upper()
+
+    try:
+        assert_country_network_authorized(user_scope, country=norm_cc, network=req_net or None)
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = dict(STAGE6_SCREENS["GEO-02"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    norm_cc = (country_code or "NG").strip().upper()
-    dossier = CountryDossier.objects.filter(country_code=norm_cc).first() or CountryDossier.objects.first()
-    dossiers = list(CountryDossier.objects.all())
+    dossier_qs = CountryDossier.objects.filter(country_code=norm_cc)
+    if req_net in {"WGMN", "WNNN"}:
+        dossier_qs = dossier_qs.filter(network=req_net)
+    dossier = dossier_qs.first() or CountryDossier.objects.filter(country_code=norm_cc).first() or CountryDossier.objects.first()
+
+    dossiers_qs = CountryDossier.objects.all()
+    if not is_global_stage6_scope(user_scope):
+        if user_scope.active_country not in {"ALL", "BOTH", "*"}:
+            dossiers_qs = dossiers_qs.filter(country_code=user_scope.active_country)
+        if user_scope.active_network in {"WGMN", "WNNN"}:
+            dossiers_qs = dossiers_qs.filter(network=user_scope.active_network)
+
+    dossiers = list(dossiers_qs)
     if state_mode == "empty":
         dossiers = []
+
+    audit_history = get_stage6_audit_history(user_scope, country_code=norm_cc)
 
     ctx.update({
         "screen": screen,
         "dossier": dossier,
         "dossiers": dossiers,
+        "audit_history": audit_history,
         "active_nav": "reports",
         "active_tab": request.GET.get("tab", "overview"),
         "state_mode": state_mode,
@@ -3790,7 +4191,7 @@ def country_command_profile_view(request, country_code="NG"):
 def local_organisation_view(request):
     """
     GEO-03: Local organisation.
-    Visual 5-tier organizational hierarchy and unit directory.
+    Visual 5-tier organizational hierarchy, unit directory, and unit creation/editing.
     """
     ctx, redirect_res = _get_authenticated_context(request)
     if redirect_res:
@@ -3798,23 +4199,114 @@ def local_organisation_view(request):
 
     seed_stage6_fixtures()
     user_scope = ctx["user_scope"]
+    account = ctx["account"]
 
     try:
         assert_stage6_authorized(user_scope, "GEO-03")
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["GEO-03"]
+    req_country = (request.GET.get("country") or request.POST.get("country") or "").strip()
+    req_network = (request.GET.get("network") or request.POST.get("network") or "").strip().upper()
+
+    if req_country:
+        target_country = normalize_country_code(req_country, default_code="NG")
+    elif not is_global_stage6_scope(user_scope) and user_scope.active_country not in {"ALL", "BOTH", "*", ""}:
+        target_country = user_scope.active_country
+    else:
+        target_country = "NG"
+
+    if req_network in {"WGMN", "WNNN"}:
+        target_network = req_network
+    elif not is_global_stage6_scope(user_scope) and user_scope.active_network in {"WGMN", "WNNN"}:
+        target_network = user_scope.active_network
+    else:
+        target_network = "WGMN"
+
+    try:
+        assert_country_network_authorized(user_scope, country=target_country, network=target_network)
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = dict(STAGE6_SCREENS["GEO-03"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    units = list(LocalOrganisationUnit.objects.filter(country="NG", network="WGMN").order_by("level_order"))
+    result_message = None
+    result_success = True
+
+    if request.method == "POST":
+        unit_name = request.POST.get("unit_name", "").strip()
+        level = request.POST.get("level", "Chapter").strip()
+        leader_name = request.POST.get("responsible_leader_name", "").strip()
+        description = request.POST.get("description", "").strip()
+        evidence_type = request.POST.get("evidence_type", "Unit record").strip()
+        record_state = request.POST.get("record_state", "Active unit records").strip()
+
+        if not unit_name:
+            result_message = "Unit name is required."
+            result_success = False
+        else:
+            try:
+                res = save_local_organisation_unit(
+                    network=target_network,
+                    country=target_country,
+                    level=level,
+                    unit_name=unit_name,
+                    responsible_leader_name=leader_name,
+                    description=description,
+                    evidence_type=evidence_type,
+                    record_state=record_state,
+                    actor_account=account,
+                    user_scope=user_scope,
+                )
+                verb = "created" if res["created"] else "updated"
+                result_message = f"Local organisation unit '{res['unit'].unit_name}' ({res['unit'].level}) {verb} successfully."
+                result_success = True
+            except ScopePermissionDenied as exc:
+                return _render_scope_error(request, ctx, exc)
+            except Exception as exc:
+                result_message = str(exc)
+                result_success = False
+
+    units_qs = LocalOrganisationUnit.objects.filter(country=target_country, network=target_network).order_by("level_order")
+    if not units_qs.exists():
+        units_qs = LocalOrganisationUnit.objects.filter(country=target_country).order_by("level_order")
+
+    hierarchy_units = list(units_qs[:5])
+
+    query = request.GET.get("q", "").strip()
+    if query:
+        units_qs = units_qs.filter(
+            Q(unit_name__icontains=query)
+            | Q(level__icontains=query)
+            | Q(responsible_leader_name__icontains=query)
+        )
+
+    level_filter = request.GET.get("level", "").strip()
+    if level_filter:
+        units_qs = units_qs.filter(level__icontains=level_filter)
+
+    units = list(units_qs)
     if state_mode == "empty":
         units = []
+    elif not state_card and len(units) == 0 and (query or level_filter):
+        state_card = screen["state_contracts"].get("no_matching")
+
+    audit_history = get_stage6_audit_history(user_scope, country_code=target_country)
 
     ctx.update({
         "screen": screen,
         "units": units,
+        "hierarchy_units": hierarchy_units,
+        "target_country": target_country,
+        "target_country_name": get_country_name_for_code(target_country),
+        "target_network": target_network,
+        "query": query,
+        "level_filter": level_filter,
+        "result_message": result_message,
+        "result_success": result_success,
+        "audit_history": audit_history,
         "active_nav": "reports",
         "active_tab": request.GET.get("tab", "structure"),
         "state_mode": state_mode,
@@ -3826,7 +4318,7 @@ def local_organisation_view(request):
 def verify_country_dossier_view(request):
     """
     GEO-04: Verify the country dossier.
-    Enforces HOFCO / QA authority for country dossier verification.
+    Enforces HOFCO / QA / Country authority for country dossier verification.
     """
     ctx, redirect_res = _get_authenticated_context(request)
     if redirect_res:
@@ -3841,43 +4333,76 @@ def verify_country_dossier_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["GEO-04"]
+    req_country = (request.GET.get("country") or request.POST.get("country_code") or "").strip()
+    req_network = (request.GET.get("network") or request.POST.get("network") or "").strip().upper()
+
+    if req_country:
+        target_cc = normalize_country_code(req_country, default_code="NG")
+    elif not is_global_stage6_scope(user_scope) and user_scope.active_country not in {"ALL", "BOTH", "*", ""}:
+        target_cc = user_scope.active_country
+    else:
+        target_cc = "NG"
+
+    target_net = req_network if req_network in {"WGMN", "WNNN"} else "WGMN"
+
+    try:
+        assert_country_network_authorized(user_scope, country=target_cc, network=target_net)
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = dict(STAGE6_SCREENS["GEO-04"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    dossier = CountryDossier.objects.filter(country_code="NG", network="WGMN").first() or CountryDossier.objects.first()
+    dossier = (
+        CountryDossier.objects.filter(country_code=target_cc, network=target_net).first()
+        or CountryDossier.objects.filter(country_code=target_cc).first()
+        or CountryDossier.objects.first()
+    )
     result_message = None
     result_success = True
 
     if request.method == "POST":
-        country_code = request.POST.get("country_code", "NG")
-        network = request.POST.get("network", "WGMN")
+        action = request.POST.get("action", "submit")
+        country_code = request.POST.get("country_code", target_cc)
+        network = request.POST.get("network", target_net)
         stage = request.POST.get("verification_stage", "").strip()
         ref = request.POST.get("evidence_reference", "").strip()
         notes = request.POST.get("verification_notes", "").strip()
 
-        try:
-            res = verify_country_dossier_submission(
-                country_code=country_code,
-                network=network,
-                verification_stage=stage,
-                evidence_reference=ref,
-                verification_notes=notes,
-                actor_account=account,
-                user_scope=user_scope,
-            )
-            dossier = res["dossier"]
-            result_message = f"Country dossier for {dossier.country_name} ({dossier.network}) verified successfully."
-            result_success = True
-        except ScopePermissionDenied as exc:
-            return _render_scope_error(request, ctx, exc)
-        except Exception as exc:
-            result_message = str(exc)
+        if action == "save_draft":
+            state_card = screen["state_contracts"]["saved_later"]
+            result_message = "Verification draft saved for later."
+        elif not stage or not ref or not notes:
+            state_card = screen["state_contracts"]["check_highlighted"]
+            result_message = "Verification stage, evidence reference, and notes are required."
             result_success = False
+        else:
+            try:
+                res = verify_country_dossier_submission(
+                    country_code=country_code,
+                    network=network,
+                    verification_stage=stage,
+                    evidence_reference=ref,
+                    verification_notes=notes,
+                    actor_account=account,
+                    user_scope=user_scope,
+                )
+                dossier = res["dossier"]
+                result_message = f"Country dossier for {dossier.country_name} ({dossier.network}) verified successfully."
+                result_success = True
+            except ScopePermissionDenied as exc:
+                return _render_scope_error(request, ctx, exc)
+            except Exception as exc:
+                result_message = str(exc)
+                result_success = False
+
+    audit_history = get_stage6_audit_history(user_scope, country_code=target_cc)
 
     ctx.update({
         "screen": screen,
         "dossier": dossier,
+        "audit_history": audit_history,
         "active_nav": "reports",
         "active_tab": request.GET.get("tab", "records"),
         "state_mode": state_mode,
@@ -3906,46 +4431,76 @@ def geography_terminology_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
-    screen = STAGE6_SCREENS["GEO-05"]
+    req_country = (request.GET.get("country") or request.POST.get("country_code") or request.POST.get("country") or "").strip()
+    if req_country:
+        target_cc = normalize_country_code(req_country, default_code="NG")
+    elif not is_global_stage6_scope(user_scope) and user_scope.active_country not in {"ALL", "BOTH", "*", ""}:
+        target_cc = user_scope.active_country
+    else:
+        target_cc = "NG"
+
+    try:
+        assert_country_network_authorized(user_scope, country=target_cc)
+    except ScopePermissionDenied as exc:
+        return _render_scope_error(request, ctx, exc)
+
+    screen = dict(STAGE6_SCREENS["GEO-05"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
 
-    term = GeographyTerminology.objects.filter(country="NG").first()
+    term = GeographyTerminology.objects.filter(country=target_cc).first() or GeographyTerminology.objects.filter(country="NG").first()
     result_message = None
     result_success = True
 
     if request.method == "POST":
-        country_code = request.POST.get("country_code", "NG")
+        action = request.POST.get("action", "submit")
+        country_code = request.POST.get("country_code") or request.POST.get("country") or target_cc
         first_level = request.POST.get("first_level_term", "").strip()
         second_level = request.POST.get("second_level_term", "").strip()
         eff_date_str = request.POST.get("effective_date", "").strip()
 
-        try:
-            res = save_geography_terminology_revision(
-                country_code=country_code,
-                first_level_term=first_level,
-                second_level_term=second_level,
-                effective_date_str=eff_date_str,
-                actor_account=account,
-                user_scope=user_scope,
-            )
-            term = res["terminology"]
-            result_message = f"Proposed terminology revision for {term.country_name} saved. Effective date: {eff_date_str}."
-            result_success = True
-        except ScopePermissionDenied as exc:
-            return _render_scope_error(request, ctx, exc)
-        except Exception as exc:
-            result_message = str(exc)
+        if action == "save_draft":
+            state_card = screen["state_contracts"]["saved_later"]
+            result_message = "Proposed terminology revision saved as draft."
+        elif not first_level or not second_level:
+            state_card = screen["state_contracts"]["check_highlighted"]
+            result_message = "First-level and second-level terms are required."
             result_success = False
+        else:
+            try:
+                res = save_geography_terminology_revision(
+                    country_code=country_code,
+                    first_level_term=first_level,
+                    second_level_term=second_level,
+                    effective_date_str=eff_date_str,
+                    actor_account=account,
+                    user_scope=user_scope,
+                )
+                term = res["terminology"]
+                result_message = f"Proposed terminology revision for {term.country_name} saved. Effective date: {eff_date_str}."
+                result_success = True
+            except ScopePermissionDenied as exc:
+                return _render_scope_error(request, ctx, exc)
+            except Exception as exc:
+                result_message = str(exc)
+                result_success = False
 
     effective_date_display = "01 October 2026"
     if term and term.effective_date:
         effective_date_display = term.effective_date.strftime("%d %B %Y")
 
+    all_terms = GeographyTerminology.objects.all()
+    if not is_global_stage6_scope(user_scope) and user_scope.active_country not in {"ALL", "BOTH", "*"}:
+        all_terms = all_terms.filter(country=user_scope.active_country)
+
+    audit_history = get_stage6_audit_history(user_scope, country_code=target_cc)
+
     ctx.update({
         "screen": screen,
         "terminology": term,
+        "all_terminologies": list(all_terms),
         "effective_date_display": effective_date_display,
+        "audit_history": audit_history,
         "active_nav": "reports",
         "active_tab": request.GET.get("tab", "records"),
         "state_mode": state_mode,
@@ -3980,6 +4535,7 @@ def stage6_screen_router(request, screen_code):
     if not view_fn:
         raise Http404(f"Stage 06 screen code '{screen_code}' not found.")
     return view_fn(request)
+
 
 
 

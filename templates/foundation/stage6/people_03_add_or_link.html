@@ -85,9 +85,12 @@
 
         <p style="font-size:12.5px; color:#6B7280; margin-bottom:24px;">Your information stays within your authorized scope.</p>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; pt-4;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <a href="/foundation/people/" class="dash-btn-secondary">Back</a>
-          <button type="submit" class="dash-btn-primary" name="action" value="check_or_save">Check for existing person</button>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button type="submit" class="dash-btn-secondary" name="action" value="save_draft">Save for later</button>
+            <button type="submit" class="dash-btn-primary" name="action" value="check_or_save">Check for existing person</button>
+          </div>
         </div>
       </form>
     </div>
@@ -112,6 +115,34 @@
       </div>
     </div>
   </div>
+
+  {% if active_tab == 'history' and audit_history %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Recent add / link activity history</h2>
+    </div>
+    <table class="dash-table" aria-label="Add or Link Audit History">
+      <thead>
+        <tr>
+          <th scope="col">EVENT</th>
+          <th scope="col">SUMMARY</th>
+          <th scope="col">ACTOR</th>
+          <th scope="col">TIMESTAMP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in audit_history %}
+        <tr>
+          <td><span class="dash-pill dash-pill-green">{{ ev.action }}</span></td>
+          <td>{{ ev.summary }}</td>
+          <td>{{ ev.actor }}</td>
+          <td>{{ ev.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <!-- Footer Banner -->
   <div class="dash-footer">

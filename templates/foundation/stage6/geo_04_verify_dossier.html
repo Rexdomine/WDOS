@@ -78,7 +78,7 @@
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <a href="/foundation/geography/country/NG/command/" class="dash-btn-secondary">Back</a>
+          <a href="/foundation/geography/country/{{ dossier.country_code|default:'NG' }}/command/" class="dash-btn-secondary">Back</a>
           <button type="submit" class="dash-btn-primary">Submit verification</button>
         </div>
       </form>
@@ -104,6 +104,34 @@
       </div>
     </div>
   </div>
+
+  {% if active_tab == 'history' and audit_history %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Dossier verification history</h2>
+    </div>
+    <table class="dash-table" aria-label="Dossier Verification History">
+      <thead>
+        <tr>
+          <th scope="col">EVENT</th>
+          <th scope="col">SUMMARY</th>
+          <th scope="col">ACTOR</th>
+          <th scope="col">TIMESTAMP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in audit_history %}
+        <tr>
+          <td><span class="dash-pill dash-pill-green">{{ ev.action }}</span></td>
+          <td>{{ ev.summary }}</td>
+          <td>{{ ev.actor }}</td>
+          <td>{{ ev.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <!-- Footer Banner -->
   <div class="dash-footer">

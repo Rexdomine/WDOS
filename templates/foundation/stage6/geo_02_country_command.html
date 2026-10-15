@@ -1,7 +1,7 @@
 {% extends "foundation/base_shell.html" %}
 {% load static %}
 
-{% block title %}Nigeria · Country Command Profile · WDOS{% endblock %}
+{% block title %}{{ dossier.country_name|default:"Nigeria" }} · Country Command Profile · WDOS{% endblock %}
 
 {% block content %}
 <div class="dash-container">
@@ -9,12 +9,12 @@
   <div class="dash-pagehead">
     <div>
       <div class="dash-eyebrow">{{ screen.eyebrow|default:"H Q / B OT H N E T W O R K S" }}</div>
-      <h1 class="dash-title">Nigeria &middot; Country Command Profile</h1>
+      <h1 class="dash-title">{{ dossier.country_name|default:"Nigeria" }} &middot; Country Command Profile</h1>
       <p class="dash-subtitle">See the relevant country and local coverage records, linked evidence and next actions for your scope.</p>
     </div>
     <div class="dash-actions">
       <a href="{{ screen.secondary_action.url|default:'/foundation/geography/coverage/' }}" class="dash-btn-secondary">Back</a>
-      <a href="{{ screen.primary_action.url|default:'/foundation/geography/dossier/verify/' }}" class="dash-btn-primary">Request verification</a>
+      <a href="/foundation/geography/dossier/verify/?country={{ dossier.country_code|default:'NG' }}" class="dash-btn-primary">Request verification</a>
     </div>
   </div>
 
@@ -39,8 +39,8 @@
 
   <!-- Command Profile Summary Box -->
   <div class="stage6-profile-box" role="region" aria-label="Country Command Summary">
-    <h2 class="stage6-profile-title">Nigeria &middot; Country Command Profile</h2>
-    <div class="stage6-profile-subtitle">HQ / Both networks</div>
+    <h2 class="stage6-profile-title">{{ dossier.country_name|default:"Nigeria" }} &middot; Country Command Profile</h2>
+    <div class="stage6-profile-subtitle">HQ / Both networks {% if dossier.country_lead_name %}&middot; Country Lead: {{ dossier.country_lead_name }}{% endif %}</div>
     <div class="stage6-profile-grid">
       <div>
         <div class="stage6-profile-field-label">Network</div>
@@ -60,6 +60,13 @@
           <span style="color:#10B981;">&#10003;</span> {{ dossier.verification_status|default:"Country verified" }} &middot; HQ review due
         </div>
       </div>
+    </div>
+    <div style="margin-top:14px; padding-top:12px; border-top:1px solid #E5E7EB; display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:#4B5563;">
+      <span><strong>Authorized people in country:</strong> {{ country_people_count|default:0 }}</span>
+      <span><strong>Active local units:</strong> {{ country_units|length }}</span>
+      {% if terminology %}
+      <span><strong>Local terms:</strong> {{ terminology.first_level_term }} / {{ terminology.second_level_term }}</span>
+      {% endif %}
     </div>
   </div>
 
@@ -129,6 +136,34 @@
     </div>
   </div>
 
+  {% if active_tab == 'history' and audit_history %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Country dossier activity history</h2>
+    </div>
+    <table class="dash-table" aria-label="Country Command History">
+      <thead>
+        <tr>
+          <th scope="col">EVENT</th>
+          <th scope="col">SUMMARY</th>
+          <th scope="col">ACTOR</th>
+          <th scope="col">TIMESTAMP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in audit_history %}
+        <tr>
+          <td><span class="dash-pill dash-pill-green">{{ ev.action }}</span></td>
+          <td>{{ ev.summary }}</td>
+          <td>{{ ev.actor }}</td>
+          <td>{{ ev.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
   <!-- Scoped Notice -->
   <div class="stage6-shield-notice">
     <div class="stage6-shield-icon" aria-hidden="true">
@@ -144,14 +179,14 @@
         <h3 class="stage6-info-card-title">Country context</h3>
         <p class="stage6-info-card-text">Geography, timezones and local language readiness stay attached to the country dossier.</p>
       </div>
-      <span class="stage6-info-card-link" style="color:#6B7280;">Verified sources</span>
+      <a href="/foundation/geography/terminology/?country={{ dossier.country_code|default:'NG' }}" class="stage6-info-card-link">Verified sources &amp; local terminology &rarr;</a>
     </div>
     <div class="stage6-info-card">
       <div>
         <h3 class="stage6-info-card-title">Follow the structure</h3>
         <p class="stage6-info-card-text">Explore Country, Region, District, Community Cluster and Chapter.</p>
       </div>
-      <a href="/foundation/geography/local-org/" class="stage6-info-card-link">Local terms preserved &rarr;</a>
+      <a href="/foundation/geography/local-org/?country={{ dossier.country_code|default:'NG' }}" class="stage6-info-card-link">Local terms preserved &rarr;</a>
     </div>
   </div>
 

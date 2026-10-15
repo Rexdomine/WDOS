@@ -47,7 +47,18 @@
         {% csrf_token %}
         <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">Review local-home reassignment</h2>
 
+        {% if scoped_people %}
+        <div class="stage6-field-group">
+          <label class="stage6-label" for="person_code">Person</label>
+          <select id="person_code" name="person_code" class="stage6-input">
+            {% for p in scoped_people %}
+            <option value="{{ p.person_code }}" {% if selected_person and p.person_code == selected_person.person_code %}selected{% endif %}>{{ p.full_name }} ({{ p.person_code }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% else %}
         <input type="hidden" name="person_code" value="{{ reassignment.person.person_code|default:'WD-00421' }}">
+        {% endif %}
 
         <div class="stage6-field-group">
           <label class="stage6-label">Current local home</label>
@@ -80,7 +91,7 @@
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <a href="/foundation/people/WD-00421/" class="dash-btn-secondary">Back</a>
+          <a href="/foundation/people/{{ selected_person.person_code|default:'WD-00421' }}/" class="dash-btn-secondary">Back</a>
           <button type="submit" class="dash-btn-primary">Submit reassignment</button>
         </div>
       </form>
@@ -106,6 +117,34 @@
       </div>
     </div>
   </div>
+
+  {% if reassignments_history %}
+  <div class="dash-card" style="margin-top:24px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Local-home reassignment history</h2>
+    </div>
+    <table class="dash-table" aria-label="Local-home Reassignment History">
+      <thead>
+        <tr>
+          <th scope="col">PERSON</th>
+          <th scope="col">PREVIOUS HOME &rarr; NEW HOME</th>
+          <th scope="col">REASON</th>
+          <th scope="col">STATUS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in reassignments_history %}
+        <tr>
+          <td><a href="/foundation/people/{{ item.person.person_code }}/" style="color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">{{ item.person.full_name }}</a></td>
+          <td>{{ item.current_local_home }} &rarr; <strong>{{ item.proposed_local_home }}</strong></td>
+          <td>{{ item.reason }}</td>
+          <td><span class="dash-pill {% if item.status == 'approved' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">{{ item.status|title }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <!-- Footer Banner -->
   <div class="dash-footer">

@@ -421,3 +421,193 @@ class Stage06PeopleGeoTestCase(TestCase):
         for screen in screens:
             res = self.client.get(f"/foundation/screens/{screen}/")
             self.assertEqual(res.status_code, 200, f"Screen {screen} failed with status {res.status_code}")
+
+    # -------------------------------------------------------------------------
+    # END-TO-END FUNCTIONAL & SCOPE ISOLATION TESTS
+    # -------------------------------------------------------------------------
+
+    def _create_kenya_lead_user(self):
+        ke_user = User.objects.create_user(
+            username="wanjiru_ke_lead",
+            email="wanjiru.ke@example.org",
+            password="test-password-123",
+        )
+        ke_person = Person.objects.create(display_name="Wanjiru Kariuki")
+        ke_account = Account.objects.create(
+            user=ke_user,
+            email="wanjiru.ke@example.org",
+            display_name="Wanjiru Kariuki",
+            person=ke_person,
+            status="active",
+            security_version=1,
+        )
+        ke_draft = OnboardingDraft.objects.create(
+            account=ke_account,
+            state="accepted",
+            data={"language": "en", "timezone": "Africa/Nairobi"},
+        )
+        ke_consent = OnboardingConsent.objects.create(
+            draft=ke_draft,
+            revision=1,
+            version="1.0",
+            notice="Consent",
+            digest="abc",
+            approval_reference="ref-ke",
+            privacy_ack=True,
+            channel="web",
+        )
+        Membership.objects.create(
+            draft=ke_draft,
+            person=ke_person,
+            network="WGMN",
+            home={"country": "KE", "region": "Nairobi", "chapter": "Westlands Chapter"},
+            consent=ke_consent,
+            policy_digest="digest-ke",
+            approved_by=ke_account,
+        )
+        AccessGrant.objects.create(
+            account=ke_account,
+            role="country_lead",
+            network="WGMN",
+            geography="KE",
+            function="leadership",
+            expires_at=timezone.now() + timezone.timedelta(days=365),
+        )
+        return ke_user
+
+    def test_multi_country_scope_isolation_and_restricted_states(self):
+        """Kenya Country Lead sees only Kenya records and is blocked from Nigeria records/mutations."""
+        ke_user = self._create_kenya_lead_user()
+        self._login(ke_user)
+
+        # PEOPLE-01 shows Kenya records (Wanjiru Kariuki, Amina Ochieng) and hides Nigeria records (Ada Okafor)
+        res_dir = self.client.get("/foundation/people/")
+        self.assertEqual(res_dir.status_code, 200)
+        self.assertContains(res_dir, "Wanjiru Kariuki")
+        self.assertContains(res_dir, "Amina Ochieng")
+        self.assertNotContains(res_dir, "Ada Okafor")
+
+        # PEOPLE-02: Opening Kenya person WD-00424 succeeds and shows belonging spine
+        res_ke_prof = self.client.get("/foundation/people/WD-00424/")
+        self.assertEqual(res_ke_prof.status_code, 200)
+        self.assertContains(res_ke_prof, "Wanjiru Kariuki")
+        self.assertContains(res_ke_prof, "Nairobi Central Chapter")
+        self.assertContains(res_ke_prof, "Nairobi County")
+
+        # PEOPLE-02: Opening Nigeria person WD-00421 returns 403 Restricted State
+        res_ng_prof = self.client.get("/foundation/people/WD-00421/")
+        self.assertEqual(res_ng_prof.status_code, 403)
+
+        # GEO-02: Opening Kenya command profile succeeds; opening Nigeria command profile returns 403
+        res_ke_cmd = self.client.get("/foundation/geography/country/KE/command/")
+        self.assertEqual(res_ke_cmd.status_code, 200)
+        self.assertContains(res_ke_cmd, "Kenya &middot; Country Command Profile")
+
+        res_ng_cmd = self.client.get("/foundation/geography/country/NG/command/")
+        self.assertEqual(res_ng_cmd.status_code, 403)
+
+    def test_profile_update_changed_record_and_concurrency_protection(self):
+        """PEOPLE-02: Authorized user updates profile, marks record as changed, and detects concurrent edits."""
+        self._login(self.secretary_user)
+
+        ada = PersonProfile.objects.get(person_code="WD-00421")
+        initial_ts = ada.updated_at.isoformat()
+
+        # Valid update
+        res = self.client.post("/foundation/people/WD-00421/", {
+            "action": "update_profile",
+            "expected_updated_at": initial_ts,
+            "full_name": "Ada Okafor",
+            "email": "ada@example.org",
+            "local_home": "Victoria Island Chapter",
+            "primary_relationship": "WGMN Chapter Lead",
+            "status": "Active",
+            "contact_verification": "Verified",
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Profile updated")
+        self.assertContains(res, "Changed record")
+
+        ada.refresh_from_db()
+        self.assertEqual(ada.local_home, "Victoria Island Chapter")
+        self.assertEqual(ada.primary_relationship, "WGMN Chapter Lead")
+
+        # Concurrent stale update with old timestamp triggers 'Another change needs review'
+        res_stale = self.client.post("/foundation/people/WD-00421/", {
+            "action": "update_profile",
+            "expected_updated_at": "2020-01-01T00:00:00+00:00",
+            "full_name": "Ada Okafor",
+            "email": "ada@example.org",
+            "local_home": "Stale Overwrite Chapter",
+            "primary_relationship": "Member",
+            "status": "Active",
+            "contact_verification": "Verified",
+        })
+        self.assertEqual(res_stale.status_code, 200)
+        self.assertContains(res_stale, "Another change needs review")
+        ada.refresh_from_db()
+        self.assertEqual(ada.local_home, "Victoria Island Chapter")
+
+    def test_search_and_lists_automatic_no_matching_empty_states(self):
+        """Search queries with 0 matches automatically display the 'Nothing to show in this scope' empty state card."""
+        self._login(self.hofco_user)
+
+        for url in [
+            "/foundation/people/?q=NonExistentRecordXYZ",
+            "/foundation/community/relationships/?q=NonExistentRecordXYZ",
+            "/foundation/geography/coverage/?q=NonExistentRecordXYZ",
+            "/foundation/geography/local-org/?q=NonExistentRecordXYZ",
+        ]:
+            res = self.client.get(url)
+            self.assertEqual(res.status_code, 200, f"Failed for {url}")
+            self.assertContains(res, "Nothing to show in this scope")
+            self.assertContains(res, "no matching records")
+            self.assertContains(res, "Reset view")
+
+    def test_local_organisation_unit_editing_and_scope_enforcement(self):
+        """GEO-03: Authorized user creates/updates a local organisation unit within permitted country scope."""
+        self._login(self.secretary_user)
+
+        res = self.client.post("/foundation/geography/local-org/?country=NG", {
+            "action": "save_unit",
+            "country_code": "NG",
+            "network": "WGMN",
+            "unit_name": "Surulere Chapter",
+            "level": "Chapter",
+            "responsible_leader_name": "Chioma Nwosu",
+            "evidence_type": "Charter record",
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Surulere Chapter")
+        self.assertTrue(
+            LocalOrganisationUnit.objects.filter(
+                country="NG", network="WGMN", unit_name="Surulere Chapter"
+            ).exists()
+        )
+
+        # Attempting to create a unit in Kenya (outside Nigeria secretary's scope) returns 403
+        res_denied = self.client.post("/foundation/geography/local-org/?country=KE", {
+            "action": "save_unit",
+            "country_code": "KE",
+            "network": "WGMN",
+            "unit_name": "Unauthorized Kenya Unit",
+            "level": "Chapter",
+            "responsible_leader_name": "Someone",
+            "evidence_type": "Charter record",
+        })
+        self.assertEqual(res_denied.status_code, 403)
+
+    def test_global_scoped_search_finds_people_and_units_in_scope(self):
+        """Global search (/foundation/search/) returns authorized people and local units and hides out-of-scope records."""
+        self._login(self.secretary_user)
+
+        # Nigeria secretary finds Ada Okafor
+        res_ada = self.client.get("/foundation/search/?q=Ada")
+        self.assertEqual(res_ada.status_code, 200)
+        self.assertContains(res_ada, "Ada Okafor")
+
+        # Nigeria secretary cannot find Kenya's Wanjiru Kariuki via global search
+        res_ke = self.client.get("/foundation/search/?q=Wanjiru")
+        self.assertEqual(res_ke.status_code, 200)
+        self.assertNotContains(res_ke, "Wanjiru Kariuki")
+

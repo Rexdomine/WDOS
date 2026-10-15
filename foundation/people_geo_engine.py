@@ -90,6 +90,120 @@ def seed_stage6_fixtures():
         },
     )
 
+    # Additional multi-country & multi-network people (Kenya, Ghana, Angola, Ethiopia)
+    wanjiru, _ = PersonProfile.objects.get_or_create(
+        person_code="WD-00424",
+        defaults={
+            "full_name": "Wanjiru Kariuki",
+            "email": "country.ke@example.org",
+            "phone": "+254 711 234 567",
+            "network": "WGMN",
+            "country": "KE",
+            "local_home": "Nairobi Central Chapter",
+            "contact_verification": "Verified",
+            "primary_relationship": "Country Lead / Member",
+            "status": "Active",
+        },
+    )
+    amina_ke, _ = PersonProfile.objects.get_or_create(
+        person_code="WD-00425",
+        defaults={
+            "full_name": "Amina Ochieng",
+            "email": "amina.ke@example.org",
+            "phone": "+254 722 345 678",
+            "network": "WGMN",
+            "country": "KE",
+            "local_home": "Mombasa Coastal Chapter",
+            "contact_verification": "Verified",
+            "primary_relationship": "Programme participant",
+            "status": "Active",
+        },
+    )
+    zawadi_ke, _ = PersonProfile.objects.get_or_create(
+        person_code="WD-00426",
+        defaults={
+            "full_name": "Zawadi Mwangi",
+            "email": "zawadi.ke@example.org",
+            "phone": "+254 733 456 789",
+            "network": "WGMN",
+            "country": "KE",
+            "local_home": "Westlands Sub-County Hub",
+            "contact_verification": "Pending",
+            "primary_relationship": "Member / Mentor",
+            "status": "Review due",
+        },
+    )
+    efua_gh, _ = PersonProfile.objects.get_or_create(
+        person_code="WD-00427",
+        defaults={
+            "full_name": "Efua Mensah",
+            "email": "wnnn.member@example.org",
+            "phone": "+233 24 123 4567",
+            "network": "WNNN",
+            "country": "GH",
+            "local_home": "Accra Youth Chapter",
+            "contact_verification": "Verified",
+            "primary_relationship": "Member",
+            "status": "Active",
+        },
+    )
+    abena_gh, _ = PersonProfile.objects.get_or_create(
+        person_code="WD-00428",
+        defaults={
+            "full_name": "Abena Owusu",
+            "email": "abena.gh@example.org",
+            "phone": "+233 20 234 5678",
+            "network": "WGMN",
+            "country": "GH",
+            "local_home": "Greater Accra Chapter",
+            "contact_verification": "Verified",
+            "primary_relationship": "Chapter Lead / Mentor",
+            "status": "Active",
+        },
+    )
+    mary_ao, _ = PersonProfile.objects.get_or_create(
+        person_code="WD-00429",
+        defaults={
+            "full_name": "Mary David",
+            "email": "mary.david@example.org",
+            "phone": "+244 923 123 456",
+            "network": "WGMN",
+            "country": "AO",
+            "local_home": "Luanda Central Chapter",
+            "contact_verification": "Verified",
+            "primary_relationship": "Member",
+            "status": "Active",
+        },
+    )
+    sarah_et, _ = PersonProfile.objects.get_or_create(
+        person_code="WD-00430",
+        defaults={
+            "full_name": "Sarah Andres",
+            "email": "sarah.andres@example.org",
+            "phone": "+251 911 234 567",
+            "network": "WGMN",
+            "country": "ET",
+            "local_home": "Addis Ababa Bole Chapter",
+            "contact_verification": "Verified",
+            "primary_relationship": "Member",
+            "status": "Active",
+        },
+    )
+    kemi_et, _ = PersonProfile.objects.get_or_create(
+        person_code="WD-00431",
+        defaults={
+            "full_name": "Kemi Dare",
+            "email": "kemi.dare@example.org",
+            "phone": "+251 912 345 678",
+            "network": "WGMN",
+            "country": "ET",
+            "local_home": "Addis Ababa Kirkos Chapter",
+            "contact_verification": "Pending",
+            "primary_relationship": "Programme participant",
+            "status": "Review due",
+        },
+    )
+
     # 2. Person Relationships
     PersonRelationship.objects.get_or_create(
         person=ada,
@@ -132,8 +246,38 @@ def seed_stage6_fixtures():
             "status": "Review due",
         },
     )
+    PersonRelationship.objects.get_or_create(
+        person=wanjiru,
+        category="leadership",
+        relationship_label="Country Lead / Member",
+        related_programme="Kenya Maternal Health Initiative",
+        defaults={
+            "effective_date": date(2025, 2, 1),
+            "status": "Active",
+        },
+    )
+    PersonRelationship.objects.get_or_create(
+        person=amina_ke,
+        category="programme_participant",
+        relationship_label="Programme participant",
+        related_programme="East Africa Skills Exchange",
+        defaults={
+            "effective_date": date(2026, 4, 12),
+            "status": "Active",
+        },
+    )
+    PersonRelationship.objects.get_or_create(
+        person=efua_gh,
+        category="membership",
+        relationship_label="Member",
+        related_programme="WNNN Next-Gen Fellowship",
+        defaults={
+            "effective_date": date(2025, 8, 20),
+            "status": "Active",
+        },
+    )
 
-    # 3. Local-Home Reassignment Record
+    # 3. Local-Home Reassignment Records
     LocalHomeReassignment.objects.get_or_create(
         person=ada,
         current_local_home="Abuja virtual home",
@@ -142,6 +286,17 @@ def seed_stage6_fixtures():
             "reason": "Member has confirmed a move to Lagos.",
             "member_confirmation": True,
             "evidence_reference": "Confirmation received and linked to the request.",
+            "status": "in_progress",
+        },
+    )
+    LocalHomeReassignment.objects.get_or_create(
+        person=amina_ke,
+        current_local_home="Mombasa Coastal Chapter",
+        proposed_local_home="Nairobi Central Chapter",
+        defaults={
+            "reason": "Member relocated to Nairobi County and confirmed transfer.",
+            "member_confirmation": True,
+            "evidence_reference": "Nairobi chapter intake confirmation.",
             "status": "in_progress",
         },
     )
@@ -176,6 +331,20 @@ def seed_stage6_fixtures():
         },
     )
     CountryDossier.objects.get_or_create(
+        country_code="KE",
+        network="WGMN",
+        defaults={
+            "country_name": "Kenya",
+            "country_lead_name": "Wanjiru Kariuki",
+            "timezone_reference": "Africa/Nairobi · EAT",
+            "verification_status": "Country verified",
+            "verification_stage": "Country custodian review",
+            "next_review_date": "28 Sep",
+            "evidence_reference": "Kenya register revision 02",
+            "verification_notes": "Nairobi, Mombasa and Westlands local units verified.",
+        },
+    )
+    CountryDossier.objects.get_or_create(
         country_code="GH",
         network="WGMN",
         defaults={
@@ -190,7 +359,7 @@ def seed_stage6_fixtures():
         },
     )
 
-    # 5. Local Organisation Hierarchy (GEO-03)
+    # 5. Local Organisation Hierarchy (GEO-03) - Nigeria (WGMN)
     c_unit, _ = LocalOrganisationUnit.objects.get_or_create(
         network="WGMN",
         country="NG",
@@ -261,6 +430,148 @@ def seed_stage6_fixtures():
         },
     )
 
+    # Local Organisation Hierarchy (GEO-03) - Kenya (WGMN)
+    ke_c, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="KE",
+        level="Country",
+        unit_name="Kenya",
+        defaults={
+            "level_order": 1,
+            "description": "Assigned network and organisational scope",
+            "responsible_leader_name": "Wanjiru Kariuki",
+            "evidence_type": "Country dossier",
+            "record_state": "Active unit records",
+        },
+    )
+    ke_r, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="KE",
+        level="Region / State",
+        unit_name="Nairobi County",
+        defaults={
+            "level_order": 2,
+            "parent": ke_c,
+            "description": "Regional coordination for the selected network.",
+            "responsible_leader_name": "Amina Ochieng",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+    ke_d, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="KE",
+        level="District / LGA",
+        unit_name="Westlands Sub-County",
+        defaults={
+            "level_order": 3,
+            "parent": ke_r,
+            "description": "Local operational coordination and linked units.",
+            "responsible_leader_name": "Zawadi Mwangi",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+    ke_cc, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="KE",
+        level="Community Cluster",
+        unit_name="Westlands Cluster",
+        defaults={
+            "level_order": 4,
+            "parent": ke_d,
+            "description": "Community Cluster linking neighbouring Chapters.",
+            "responsible_leader_name": "Njeri Kamau",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+    LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="KE",
+        level="Chapter",
+        unit_name="Nairobi Central Chapter",
+        defaults={
+            "level_order": 5,
+            "parent": ke_cc,
+            "description": "Chapter membership and local activity records.",
+            "responsible_leader_name": "Halima Hassan",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+
+    # Local Organisation Hierarchy (GEO-03) - Ghana (WGMN)
+    gh_c, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="GH",
+        level="Country",
+        unit_name="Ghana",
+        defaults={
+            "level_order": 1,
+            "description": "Assigned network and organisational scope",
+            "responsible_leader_name": "Kemi Bello",
+            "evidence_type": "Country dossier",
+            "record_state": "Active unit records",
+        },
+    )
+    gh_r, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="GH",
+        level="Region / State",
+        unit_name="Greater Accra Region",
+        defaults={
+            "level_order": 2,
+            "parent": gh_c,
+            "description": "Regional coordination for the selected network.",
+            "responsible_leader_name": "Abena Owusu",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+    gh_d, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="GH",
+        level="District / LGA",
+        unit_name="Accra Metropolitan",
+        defaults={
+            "level_order": 3,
+            "parent": gh_r,
+            "description": "Local operational coordination and linked units.",
+            "responsible_leader_name": "Efua Mensah",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+    gh_cc, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="GH",
+        level="Community Cluster",
+        unit_name="Osu-Labone Cluster",
+        defaults={
+            "level_order": 4,
+            "parent": gh_d,
+            "description": "Community Cluster linking neighbouring Chapters.",
+            "responsible_leader_name": "Akosua Boateng",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+    LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="GH",
+        level="Chapter",
+        unit_name="Accra Central Chapter",
+        defaults={
+            "level_order": 5,
+            "parent": gh_cc,
+            "description": "Chapter membership and local activity records.",
+            "responsible_leader_name": "Ama Serwaa",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+
     # 6. Geography Terminology (GEO-05)
     GeographyTerminology.objects.get_or_create(
         country="NG",
@@ -268,6 +579,46 @@ def seed_stage6_fixtures():
         defaults={
             "first_level_term": "State / FCT",
             "second_level_term": "LGA",
+            "effective_date": date(2026, 10, 1),
+            "status": "effective",
+        },
+    )
+    GeographyTerminology.objects.get_or_create(
+        country="KE",
+        country_name="Kenya",
+        defaults={
+            "first_level_term": "County",
+            "second_level_term": "Sub-County",
+            "effective_date": date(2026, 10, 1),
+            "status": "effective",
+        },
+    )
+    GeographyTerminology.objects.get_or_create(
+        country="GH",
+        country_name="Ghana",
+        defaults={
+            "first_level_term": "Region",
+            "second_level_term": "Metropolitan / District",
+            "effective_date": date(2026, 10, 1),
+            "status": "effective",
+        },
+    )
+    GeographyTerminology.objects.get_or_create(
+        country="AO",
+        country_name="Angola",
+        defaults={
+            "first_level_term": "Province",
+            "second_level_term": "Municipality",
+            "effective_date": date(2026, 10, 1),
+            "status": "effective",
+        },
+    )
+    GeographyTerminology.objects.get_or_create(
+        country="ET",
+        country_name="Ethiopia",
+        defaults={
+            "first_level_term": "Region / Chartered City",
+            "second_level_term": "Sub-City / Woreda",
             "effective_date": date(2026, 10, 1),
             "status": "effective",
         },
@@ -890,14 +1241,48 @@ STAGE6_SCREENS: Dict[str, Dict[str, Any]] = {
 # BUSINESS LOGIC & PERMISSION SERVICES
 # -----------------------------------------------------------------------------
 
-def assert_stage6_authorized(user_scope: UserScope, screen_id: str):
-    """
-    Enforces role and boundary authorization for Stage 06 workflows.
-    Founder/HOFCO/Admin have cross-cutting continental access.
-    Network Secretary has operational authority in Nigeria / WGMN.
-    Country leads have access in their country.
-    Other roles receive ScopePermissionDenied.
-    """
+COUNTRY_CODE_MAP = {
+    "NG": "Nigeria",
+    "NIGERIA": "NG",
+    "KE": "Kenya",
+    "KENYA": "KE",
+    "GH": "Ghana",
+    "GHANA": "GH",
+    "AO": "Angola",
+    "ANGOLA": "AO",
+    "ET": "Ethiopia",
+    "ETHIOPIA": "ET",
+    "ZA": "South Africa",
+    "SOUTH AFRICA": "ZA",
+    "RW": "Rwanda",
+    "RWANDA": "RW",
+}
+
+COUNTRY_DEFAULT_HOME = {
+    "NG": "Ikeja Chapter",
+    "KE": "Nairobi Central Chapter",
+    "GH": "Accra Central Chapter",
+    "AO": "Luanda Central Chapter",
+    "ET": "Addis Ababa Bole Chapter",
+    "ZA": "Johannesburg Chapter",
+    "RW": "Kigali Central Chapter",
+}
+
+
+def normalize_country_code(country_input: str, default_code: str = "NG") -> str:
+    if not country_input:
+        return default_code
+    cleaned = country_input.strip().upper()
+    if cleaned in {"NG", "KE", "GH", "AO", "ET", "ZA", "RW"}:
+        return cleaned
+    return COUNTRY_CODE_MAP.get(cleaned, default_code)
+
+
+def get_country_name_for_code(code: str) -> str:
+    return COUNTRY_CODE_MAP.get((code or "NG").strip().upper(), code or "Nigeria")
+
+
+def _collect_user_roles(user_scope: UserScope) -> set:
     user_roles = {r.lower() for r in user_scope.roles}
     if user_scope.primary_role:
         user_roles.add(user_scope.primary_role.lower())
@@ -907,17 +1292,102 @@ def assert_stage6_authorized(user_scope: UserScope, screen_id: str):
         user_roles.add(user_scope.leadership_level.lower())
     if user_scope.is_management_or_admin:
         user_roles.update(["admin", "founder", "hofco", "operations"])
+    return user_roles
 
-    admin_roles = {"founder", "hofco", "executive", "admin", "operations", "qa_controls", "quality_lead", "it_admin", "management"}
-    network_roles = {"network_secretary", "country_lead", "chapter_lead", "regional_coordinator"}
 
-    # Geography oversight screens require continental or country authority
+def is_global_stage6_scope(user_scope: UserScope) -> bool:
+    user_roles = _collect_user_roles(user_scope)
+    global_roles = {
+        "founder", "hofco", "executive", "global_executive", "admin",
+        "operations", "coordinator", "programmes", "comms", "resources",
+        "systems", "quality", "qa_controls", "quality_lead", "it_admin",
+        "management", "safeguarding",
+    }
+    if user_roles.intersection(global_roles):
+        return True
+    if "*" in user_scope.allowed_countries or "ALL" in user_scope.allowed_countries:
+        return True
+    return False
+
+
+def assert_country_network_authorized(
+    user_scope: UserScope,
+    country: Optional[str] = None,
+    network: Optional[str] = None,
+):
+    """
+    Fail-closed scope boundary verification for Stage 06 records.
+    Ensures a user can only view or mutate records within their permitted
+    network and geographic area.
+    """
+    if is_global_stage6_scope(user_scope):
+        return
+
+    if network and network not in {"ALL", "BOTH", "*", "HQ / Both networks"}:
+        allowed_nets = {n.upper() for n in user_scope.allowed_networks}
+        if (
+            "*" not in allowed_nets
+            and "ALL" not in allowed_nets
+            and "HQ / BOTH NETWORKS" not in allowed_nets
+            and user_scope.active_network not in {"ALL", "HQ / Both networks", "*"}
+        ):
+            if network.upper() not in allowed_nets and network.upper() != user_scope.active_network.upper():
+                raise ScopePermissionDenied(
+                    f"Access restricted: Record belongs to network '{network}', outside your permitted network scope ({user_scope.active_network}).",
+                    reason_code="network_mismatch",
+                )
+
+    if country and country not in {"ALL", "BOTH", "*"}:
+        norm_c = normalize_country_code(country, country.upper())
+        allowed_ctries = {c.upper() for c in user_scope.allowed_countries}
+        if (
+            "*" not in allowed_ctries
+            and "ALL" not in allowed_ctries
+            and user_scope.active_country not in {"ALL", "BOTH", "*"}
+        ):
+            if norm_c not in allowed_ctries and norm_c != user_scope.active_country.upper():
+                raise ScopePermissionDenied(
+                    f"Access restricted: Record belongs to country '{get_country_name_for_code(norm_c)}', outside your permitted geographic area ({get_country_name_for_code(user_scope.active_country)}).",
+                    reason_code="country_mismatch",
+                )
+
+
+def assert_person_scope_authorized(user_scope: UserScope, person: PersonProfile):
+    """Verifies that the given PersonProfile is inside the user's permitted network and country."""
+    if not person:
+        return
+    assert_country_network_authorized(user_scope, country=person.country, network=person.network)
+
+
+def assert_stage6_authorized(user_scope: UserScope, screen_id: str):
+    """
+    Enforces role and boundary authorization for Stage 06 workflows.
+    Founder/HOFCO/Admin/Operations have cross-cutting continental access.
+    Network Secretary, Country Leads, Cluster Leads, Chapter Leads, and Local Coordinators
+    have operational authority within their permitted network and country.
+    Unauthorized roles receive ScopePermissionDenied.
+    """
+    user_roles = _collect_user_roles(user_scope)
+
+    admin_roles = {
+        "founder", "hofco", "executive", "global_executive", "admin",
+        "operations", "coordinator", "programmes", "comms", "resources",
+        "systems", "quality", "qa_controls", "quality_lead", "it_admin",
+        "management", "safeguarding",
+    }
+    network_roles = {
+        "network_secretary", "country_lead", "country_director",
+        "chapter_lead", "cluster_lead", "local_operations",
+        "regional_coordinator", "reviewer",
+    }
+
+    # Geography oversight screens require continental, country, or network leadership authority
     if screen_id in {"GEO-01", "GEO-02", "GEO-04", "GEO-05"}:
-        if not user_roles.intersection(admin_roles | {"country_lead", "network_secretary"}):
+        if not user_roles.intersection(admin_roles | {"country_lead", "country_director", "network_secretary", "regional_coordinator"}):
             raise ScopePermissionDenied(f"Role '{user_scope.primary_role}' is not authorized for {screen_id}.")
 
-    # People screens require at least network leadership or admin
-    if screen_id in {"PEOPLE-01", "PEOPLE-02", "PEOPLE-03", "PEOPLE-04", "PEOPLE-05", "PEOPLE-06"}:
+    # Local organisation structure (GEO-03) and People screens (PEOPLE-01..06) require leadership or admin
+    if screen_id in {"GEO-03", "PEOPLE-01", "PEOPLE-02", "PEOPLE-03", "PEOPLE-04", "PEOPLE-05", "PEOPLE-06"}:
         if not user_roles.intersection(admin_roles | network_roles):
             raise ScopePermissionDenied(f"Role '{user_scope.primary_role}' cannot manage people and community records.")
 
@@ -958,20 +1428,30 @@ def add_or_link_person_record(
     relationship_to_add: str,
     network: str,
     actor_account: Account,
+    user_scope: Optional[UserScope] = None,
+    local_home: Optional[str] = None,
+    phone: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Atomically creates or links a person record and relationship,
-    preventing duplicate identity registration.
+    preventing duplicate identity registration and enforcing scope boundaries.
     """
+    norm_country = normalize_country_code(country, default_code="NG")
+    norm_network = network if network in {"WGMN", "WNNN"} else "WGMN"
+
+    if user_scope is not None:
+        assert_country_network_authorized(user_scope, country=norm_country, network=norm_network)
+
     with transaction.atomic():
-        dup_check = check_for_duplicate_person(email, full_name, network)
+        dup_check = check_for_duplicate_person(email, full_name, norm_network)
         if dup_check["duplicate_found"]:
             person = dup_check["person"]
+            if user_scope is not None:
+                assert_person_scope_authorized(user_scope, person)
             action_type = "linked"
         else:
-            # Generate next non-colliding person code
             existing_codes = PersonProfile.objects.values_list("person_code", flat=True)
-            max_num = 420
+            max_num = 431
             for c in existing_codes:
                 if c.startswith("WD-"):
                     try:
@@ -981,20 +1461,21 @@ def add_or_link_person_record(
                     except (IndexError, ValueError):
                         pass
             code = f"WD-{max_num + 1:05d}"
+            resolved_home = (local_home or "").strip() or COUNTRY_DEFAULT_HOME.get(norm_country, f"{norm_country} Hub")
             person = PersonProfile.objects.create(
                 person_code=code,
                 full_name=full_name.strip(),
                 email=email.strip().lower(),
-                network=network,
-                country=country or "NG",
-                local_home="Ikeja Chapter" if country == "NG" else f"{country} Hub",
+                phone=(phone or "").strip(),
+                network=norm_network,
+                country=norm_country,
+                local_home=resolved_home,
                 contact_verification="Verified" if email else "Pending",
                 primary_relationship=relationship_to_add or "Member",
                 status="Active",
             )
             action_type = "created"
 
-        # Create relationship attached to person identity
         rel, _ = PersonRelationship.objects.get_or_create(
             person=person,
             relationship_label=relationship_to_add or "Member",
@@ -1005,7 +1486,6 @@ def add_or_link_person_record(
             },
         )
 
-        # Audit trail
         AuditEvent.objects.create(
             account=actor_account,
             event=f"person_{action_type}",
@@ -1013,7 +1493,8 @@ def add_or_link_person_record(
                 "person_code": person.person_code,
                 "person_name": person.full_name,
                 "relationship": relationship_to_add,
-                "network": network,
+                "network": person.network,
+                "country": person.country,
             },
         )
 
@@ -1025,21 +1506,100 @@ def add_or_link_person_record(
         }
 
 
+def update_person_profile_record(
+    person_code: str,
+    full_name: str,
+    email: str,
+    phone: str,
+    local_home: str,
+    contact_verification: str,
+    primary_relationship: str,
+    status: str,
+    actor_account: Account,
+    user_scope: UserScope,
+    expected_updated_at: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Updates a PersonProfile within the user's permitted network and geographic scope.
+    Performs optimistic concurrency check if expected_updated_at is provided,
+    and writes a durable AuditEvent.
+    """
+    assert_stage6_authorized(user_scope, "PEOPLE-02")
+
+    with transaction.atomic():
+        person = PersonProfile.objects.select_for_update().get(person_code=person_code)
+        assert_person_scope_authorized(user_scope, person)
+
+        if expected_updated_at and person.updated_at:
+            current_stamp = person.updated_at.strftime("%Y-%m-%dT%H:%M:%S")
+            if expected_updated_at.strip() not in {current_stamp, person.updated_at.isoformat()}:
+                return {
+                    "success": False,
+                    "conflict": True,
+                    "person": person,
+                    "message": "This record changed since you opened it. Review the latest version before submitting.",
+                }
+
+        changes = {}
+        if full_name and full_name.strip() != person.full_name:
+            changes["full_name"] = {"from": person.full_name, "to": full_name.strip()}
+            person.full_name = full_name.strip()
+        if email is not None and email.strip().lower() != person.email:
+            changes["email"] = {"from": person.email, "to": email.strip().lower()}
+            person.email = email.strip().lower()
+        if phone is not None and phone.strip() != person.phone:
+            changes["phone"] = {"from": person.phone, "to": phone.strip()}
+            person.phone = phone.strip()
+        if local_home and local_home.strip() != person.local_home:
+            changes["local_home"] = {"from": person.local_home, "to": local_home.strip()}
+            person.local_home = local_home.strip()
+        if contact_verification and contact_verification.strip() != person.contact_verification:
+            changes["contact_verification"] = {"from": person.contact_verification, "to": contact_verification.strip()}
+            person.contact_verification = contact_verification.strip()
+        if primary_relationship and primary_relationship.strip() != person.primary_relationship:
+            changes["primary_relationship"] = {"from": person.primary_relationship, "to": primary_relationship.strip()}
+            person.primary_relationship = primary_relationship.strip()
+        if status and status.strip() != person.status:
+            changes["status"] = {"from": person.status, "to": status.strip()}
+            person.status = status.strip()
+
+        person.save()
+
+        AuditEvent.objects.create(
+            account=actor_account,
+            event="person_profile_updated",
+            detail={
+                "person_code": person.person_code,
+                "person_name": person.full_name,
+                "network": person.network,
+                "country": person.country,
+                "changes": changes,
+            },
+        )
+
+        return {"success": True, "conflict": False, "person": person, "changes": changes}
+
+
 def save_person_relationship(
     person_id_or_code: str,
     relationship_category: str,
     related_programme: str,
     effective_date_str: str,
     actor_account: Account,
+    user_scope: Optional[UserScope] = None,
 ) -> Dict[str, Any]:
     """
-    Attaches a new relationship to an existing person identity with duplicate prevention.
+    Attaches a new relationship to an existing person identity with duplicate prevention
+    and scope boundary verification.
     """
     with transaction.atomic():
         try:
             person = PersonProfile.objects.get(person_code=person_id_or_code)
         except PersonProfile.DoesNotExist:
             person = PersonProfile.objects.get(id=person_id_or_code)
+
+        if user_scope is not None:
+            assert_person_scope_authorized(user_scope, person)
 
         eff_date = None
         if effective_date_str:
@@ -1053,12 +1613,23 @@ def save_person_relationship(
         else:
             eff_date = date.today()
 
+        cat_slug = "programme_participant"
+        low_cat = (relationship_category or "").lower()
+        if "member" in low_cat and "mentor" not in low_cat:
+            cat_slug = "membership"
+        elif "mentor" in low_cat:
+            cat_slug = "mentor"
+        elif "lead" in low_cat:
+            cat_slug = "leadership"
+        elif "community" in low_cat:
+            cat_slug = "community_supporter"
+
         rel, created = PersonRelationship.objects.update_or_create(
             person=person,
             relationship_label=relationship_category or "Programme participant",
             related_programme=related_programme or "",
             defaults={
-                "category": relationship_category or "programme_participant",
+                "category": cat_slug,
                 "effective_date": eff_date,
                 "status": "Active",
             },
@@ -1069,9 +1640,12 @@ def save_person_relationship(
             event="relationship_saved",
             detail={
                 "person_code": person.person_code,
+                "person_name": person.full_name,
                 "category": relationship_category,
                 "programme": related_programme,
                 "effective_date": str(eff_date),
+                "network": person.network,
+                "country": person.country,
             },
         )
 
@@ -1088,19 +1662,16 @@ def submit_reassignment_decision(
 ) -> Dict[str, Any]:
     """
     Submits and approves local-home reassignment with evidence check.
-    Enforces role authority (Network Secretary, Country Lead, Founder, HOFCO).
+    Enforces role authority and network/country scope boundaries.
     """
-    user_roles = {r.lower() for r in user_scope.roles}
-    if user_scope.primary_role:
-        user_roles.add(user_scope.primary_role.lower())
-    if user_scope.active_role:
-        user_roles.add(user_scope.active_role.lower())
-    if user_scope.leadership_level:
-        user_roles.add(user_scope.leadership_level.lower())
-    if user_scope.is_management_or_admin:
-        user_roles.update(["admin", "founder", "hofco", "operations"])
+    user_roles = _collect_user_roles(user_scope)
 
-    authorized_roles = {"network_secretary", "country_lead", "founder", "hofco", "admin", "operations"}
+    authorized_roles = {
+        "network_secretary", "country_lead", "country_director",
+        "chapter_lead", "cluster_lead", "local_operations", "regional_coordinator",
+        "founder", "hofco", "executive", "global_executive", "admin",
+        "operations", "coordinator", "programmes", "quality", "qa_controls",
+    }
     if not user_roles.intersection(authorized_roles):
         raise ScopePermissionDenied("A decision requires the appropriate authority.")
 
@@ -1109,6 +1680,7 @@ def submit_reassignment_decision(
 
     with transaction.atomic():
         person = PersonProfile.objects.get(person_code=person_code)
+        assert_person_scope_authorized(user_scope, person)
         current_home = person.local_home
 
         reassignment, _ = LocalHomeReassignment.objects.get_or_create(
@@ -1124,13 +1696,13 @@ def submit_reassignment_decision(
                 "reviewed_at": timezone.now(),
             },
         )
+        reassignment.reason = reason
         reassignment.status = "approved"
         reassignment.member_confirmation = True
         reassignment.reviewed_by = actor_account
         reassignment.reviewed_at = timezone.now()
         reassignment.save()
 
-        # Update person profile
         person.local_home = proposed_local_home
         person.save()
 
@@ -1139,13 +1711,86 @@ def submit_reassignment_decision(
             event="local_home_reassigned",
             detail={
                 "person_code": person.person_code,
+                "person_name": person.full_name,
                 "previous_home": current_home,
                 "new_home": proposed_local_home,
                 "reason": reason,
+                "network": person.network,
+                "country": person.country,
             },
         )
 
         return {"success": True, "reassignment": reassignment, "person": person}
+
+
+def save_local_organisation_unit(
+    network: str,
+    country: str,
+    level: str,
+    unit_name: str,
+    responsible_leader_name: str,
+    description: str,
+    evidence_type: str,
+    record_state: str,
+    actor_account: Account,
+    user_scope: UserScope,
+) -> Dict[str, Any]:
+    """
+    Creates or updates a LocalOrganisationUnit in the 5-tier hierarchy within
+    the user's permitted network and country scope, and records an AuditEvent.
+    """
+    assert_stage6_authorized(user_scope, "GEO-03")
+    norm_country = normalize_country_code(country, default_code=user_scope.active_country or "NG")
+    norm_network = network if network in {"WGMN", "WNNN"} else (user_scope.active_network if user_scope.active_network in {"WGMN", "WNNN"} else "WGMN")
+    assert_country_network_authorized(user_scope, country=norm_country, network=norm_network)
+
+    level_order_map = {
+        "Country": 1,
+        "Region / State": 2,
+        "District / LGA": 3,
+        "Community Cluster": 4,
+        "Chapter": 5,
+    }
+    l_order = level_order_map.get(level, 5)
+
+    with transaction.atomic():
+        parent_unit = None
+        if l_order > 1:
+            parent_unit = LocalOrganisationUnit.objects.filter(
+                network=norm_network,
+                country=norm_country,
+                level_order=l_order - 1,
+            ).first()
+
+        unit, created = LocalOrganisationUnit.objects.update_or_create(
+            network=norm_network,
+            country=norm_country,
+            level=level,
+            unit_name=unit_name.strip(),
+            defaults={
+                "level_order": l_order,
+                "parent": parent_unit,
+                "description": (description or "").strip() or f"{level} operational coordination and records.",
+                "responsible_leader_name": (responsible_leader_name or "").strip() or "Assigned Coordinator",
+                "evidence_type": (evidence_type or "").strip() or "Unit record",
+                "record_state": (record_state or "").strip() or "Active unit records",
+            },
+        )
+
+        AuditEvent.objects.create(
+            account=actor_account,
+            event="local_unit_saved",
+            detail={
+                "unit_name": unit.unit_name,
+                "level": unit.level,
+                "leader": unit.responsible_leader_name,
+                "network": norm_network,
+                "country": norm_country,
+                "created": created,
+            },
+        )
+
+        return {"success": True, "created": created, "unit": unit}
 
 
 def verify_country_dossier_submission(
@@ -1159,27 +1804,27 @@ def verify_country_dossier_submission(
 ) -> Dict[str, Any]:
     """
     Submits country dossier verification sign-off.
-    Enforces HOFCO / QA Controls authority.
+    Enforces HOFCO / QA Controls / Country / Executive authority.
     """
-    user_roles = {r.lower() for r in user_scope.roles}
-    if user_scope.primary_role:
-        user_roles.add(user_scope.primary_role.lower())
-    if user_scope.active_role:
-        user_roles.add(user_scope.active_role.lower())
-    if user_scope.leadership_level:
-        user_roles.add(user_scope.leadership_level.lower())
-    if user_scope.is_management_or_admin:
-        user_roles.update(["admin", "founder", "hofco", "operations"])
+    user_roles = _collect_user_roles(user_scope)
 
-    authorized_roles = {"hofco", "founder", "qa_controls", "admin", "operations"}
+    authorized_roles = {
+        "hofco", "founder", "executive", "global_executive",
+        "qa_controls", "quality", "quality_lead", "admin",
+        "operations", "coordinator", "country_lead", "country_director",
+    }
     if not user_roles.intersection(authorized_roles):
         raise ScopePermissionDenied("A decision requires the appropriate authority.")
 
+    norm_country = normalize_country_code(country_code, default_code="NG")
+    assert_country_network_authorized(user_scope, country=norm_country, network=network)
+
     with transaction.atomic():
         dossier, _ = CountryDossier.objects.get_or_create(
-            country_code=country_code,
+            country_code=norm_country,
             network=network,
             defaults={
+                "country_name": get_country_name_for_code(norm_country),
                 "verification_status": "Country verified",
                 "verification_stage": verification_stage,
                 "evidence_reference": evidence_reference,
@@ -1200,8 +1845,10 @@ def verify_country_dossier_submission(
             account=actor_account,
             event="country_dossier_verified",
             detail={
-                "country_code": country_code,
+                "country_code": norm_country,
+                "country_name": dossier.country_name,
                 "network": network,
+                "verification_stage": verification_stage,
                 "evidence_reference": evidence_reference,
             },
         )
@@ -1221,19 +1868,18 @@ def save_geography_terminology_revision(
     Saves a proposed revision to geography and local terminology.
     Enforces authority and records in audit history.
     """
-    user_roles = {r.lower() for r in user_scope.roles}
-    if user_scope.primary_role:
-        user_roles.add(user_scope.primary_role.lower())
-    if user_scope.active_role:
-        user_roles.add(user_scope.active_role.lower())
-    if user_scope.leadership_level:
-        user_roles.add(user_scope.leadership_level.lower())
-    if user_scope.is_management_or_admin:
-        user_roles.update(["admin", "founder", "hofco", "operations"])
+    user_roles = _collect_user_roles(user_scope)
 
-    authorized_roles = {"hofco", "founder", "admin", "operations", "network_secretary"}
+    authorized_roles = {
+        "hofco", "founder", "executive", "global_executive",
+        "admin", "operations", "coordinator", "network_secretary",
+        "country_lead", "country_director", "quality", "qa_controls",
+    }
     if not user_roles.intersection(authorized_roles):
         raise ScopePermissionDenied("A decision requires the appropriate authority.")
+
+    norm_country = normalize_country_code(country_code, default_code="NG")
+    assert_country_network_authorized(user_scope, country=norm_country)
 
     eff_date = None
     if effective_date_str:
@@ -1249,8 +1895,9 @@ def save_geography_terminology_revision(
 
     with transaction.atomic():
         term, _ = GeographyTerminology.objects.update_or_create(
-            country=country_code,
+            country=norm_country,
             defaults={
+                "country_name": get_country_name_for_code(norm_country),
                 "first_level_term": first_level_term,
                 "second_level_term": second_level_term,
                 "effective_date": eff_date,
@@ -1264,7 +1911,8 @@ def save_geography_terminology_revision(
             account=actor_account,
             event="geography_terminology_revised",
             detail={
-                "country": country_code,
+                "country": norm_country,
+                "country_name": term.country_name,
                 "first_level_term": first_level_term,
                 "second_level_term": second_level_term,
                 "effective_date": str(eff_date),
@@ -1272,3 +1920,69 @@ def save_geography_terminology_revision(
         )
 
         return {"success": True, "terminology": term}
+
+
+def get_stage6_audit_history(
+    user_scope: UserScope,
+    person_code: Optional[str] = None,
+    country_code: Optional[str] = None,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """
+    Returns scoped audit history events for Stage 06 People, Community, and Geography actions.
+    """
+    stage6_events = {
+        "person_created",
+        "person_linked",
+        "person_profile_updated",
+        "relationship_saved",
+        "local_home_reassigned",
+        "local_unit_saved",
+        "country_dossier_verified",
+        "geography_terminology_revised",
+    }
+    qs = AuditEvent.objects.filter(event__in=stage6_events).select_related("account").order_by("-created_at")
+
+    records = []
+    is_global = is_global_stage6_scope(user_scope)
+    active_c = (country_code or user_scope.active_country or "NG").upper()
+    active_n = (user_scope.active_network or "WGMN").upper()
+
+    for ev in qs[:100]:
+        det = ev.detail or {}
+        ev_country = (det.get("country") or det.get("country_code") or "").upper()
+        ev_net = (det.get("network") or "").upper()
+        ev_pcode = det.get("person_code") or ""
+
+        if person_code and ev_pcode != person_code:
+            continue
+        if country_code and ev_country and ev_country != active_c:
+            continue
+        if not is_global:
+            if ev_country and ev_country != active_c:
+                continue
+            if ev_net and active_n not in {"ALL", "HQ / BOTH NETWORKS", "*"} and ev_net != active_n:
+                continue
+
+        label_map = {
+            "person_created": f"New person created: {det.get('person_name', '')} ({ev_pcode})",
+            "person_linked": f"Existing identity linked: {det.get('person_name', '')} ({ev_pcode})",
+            "person_profile_updated": f"Profile updated: {det.get('person_name', '')} ({ev_pcode})",
+            "relationship_saved": f"Relationship saved: {det.get('category', '')} · {det.get('programme', '')} ({ev_pcode})",
+            "local_home_reassigned": f"Local home reassigned: {det.get('previous_home', '')} → {det.get('new_home', '')} ({ev_pcode})",
+            "local_unit_saved": f"Local unit updated: {det.get('unit_name', '')} ({det.get('level', '')})",
+            "country_dossier_verified": f"Country dossier verified: {det.get('country_name', ev_country)} · {ev_net} ({det.get('evidence_reference', '')})",
+            "geography_terminology_revised": f"Terminology revised ({ev_country}): {det.get('first_level_term', '')} / {det.get('second_level_term', '')}",
+        }
+        records.append({
+            "event": ev.event,
+            "summary": label_map.get(ev.event, ev.event),
+            "actor": ev.account.display_name if ev.account else "System",
+            "when": ev.created_at.strftime("%d %b %Y · %H:%M") if ev.created_at else "Recently",
+            "detail": det,
+        })
+        if len(records) >= limit:
+            break
+
+    return records
+

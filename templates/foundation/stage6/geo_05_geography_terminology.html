@@ -65,14 +65,17 @@
 
         <div class="stage6-field-group">
           <label class="stage6-label" for="effective_date">Effective date</label>
-          <input type="text" id="effective_date" name="effective_date" class="stage6-input" value="{{ terminology.effective_date_display|default:'01 October 2026' }}" required>
+          <input type="text" id="effective_date" name="effective_date" class="stage6-input" value="{{ effective_date_display|default:'01 October 2026' }}" required>
         </div>
 
         <p style="font-size:12.5px; color:#6B7280; margin-bottom:24px;">Changes are recorded in the activity history.</p>
 
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <a href="/foundation/geography/country/NG/command/" class="dash-btn-secondary">Back</a>
-          <button type="submit" class="dash-btn-primary">Save proposed revision</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <a href="/foundation/geography/country/{{ terminology.country|default:'NG' }}/command/" class="dash-btn-secondary">Back</a>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button type="submit" class="dash-btn-secondary" name="action" value="save_draft">Save for later</button>
+            <button type="submit" class="dash-btn-primary">Save proposed revision</button>
+          </div>
         </div>
       </form>
     </div>
@@ -81,7 +84,7 @@
     <div class="stage6-form-sidebar">
       <div class="stage6-sidebar-box">
         <h3 class="stage6-sidebar-box-title">At a glance</h3>
-        <p class="stage6-sidebar-box-text">In progress</p>
+        <p class="stage6-sidebar-box-text">{{ terminology.status|default:"In progress"|title }}</p>
       </div>
 
       <div class="stage6-sidebar-box">
@@ -97,6 +100,34 @@
       </div>
     </div>
   </div>
+
+  {% if active_tab == 'history' and audit_history %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Terminology revision history</h2>
+    </div>
+    <table class="dash-table" aria-label="Terminology History">
+      <thead>
+        <tr>
+          <th scope="col">EVENT</th>
+          <th scope="col">SUMMARY</th>
+          <th scope="col">ACTOR</th>
+          <th scope="col">TIMESTAMP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in audit_history %}
+        <tr>
+          <td><span class="dash-pill dash-pill-green">{{ ev.action }}</span></td>
+          <td>{{ ev.summary }}</td>
+          <td>{{ ev.actor }}</td>
+          <td>{{ ev.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <!-- Footer Banner -->
   <div class="dash-footer">

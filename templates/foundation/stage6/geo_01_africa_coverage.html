@@ -79,12 +79,12 @@
 
       <!-- Selected Country Info Box -->
       <div class="stage6-map-selection-box">
-        <h3 class="stage6-map-selection-title">Nigeria &middot; WGMN</h3>
-        <span class="stage6-map-selection-pill">Country verified</span>
+        <h3 class="stage6-map-selection-title">{{ selected_dossier.country_name|default:"Nigeria" }} &middot; {{ selected_dossier.network|default:"WGMN" }}</h3>
+        <span class="stage6-map-selection-pill">{{ selected_dossier.verification_status|default:"Country verified" }}</span>
         <p class="stage6-map-selection-text">Open the country dossier to review leadership coverage, certification evidence and unresolved differences.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <a href="/foundation/dashboards/dash-01/" class="dash-btn-secondary" style="background:#FFFFFF;">Back</a>
-          <a href="/foundation/geography/country/NG/command/" class="dash-btn-primary">Open country dossier</a>
+          <a href="/foundation/geography/country/{{ selected_dossier.country_code|default:'NG' }}/command/" class="dash-btn-primary">Open country dossier</a>
         </div>
       </div>
     </div>
@@ -104,26 +104,30 @@
         <h3 class="stage6-info-card-title">Follow the structure</h3>
         <p class="stage6-info-card-text">Explore Country, Region, District, Community Cluster and Chapter.</p>
       </div>
-      <a href="/foundation/geography/local-org/" class="stage6-info-card-link">Local terms preserved &rarr;</a>
+      <a href="/foundation/geography/local-org/?country={{ selected_dossier.country_code|default:'NG' }}" class="stage6-info-card-link">Local terms preserved &rarr;</a>
     </div>
   </div>
 
   <!-- Country Records Table -->
   <div class="dash-card">
-    <div class="dash-card-header">
+    <div class="dash-card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <h2 class="dash-card-title">Country records</h2>
+      {% if query or status_filter or network_filter %}
+      <a href="/foundation/geography/coverage/" style="font-size:12.5px; color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">Clear active filters &times;</a>
+      {% endif %}
     </div>
 
     <!-- Toolbar Filters -->
     <div class="dash-toolbar" style="margin-bottom:16px;">
-      <div class="dash-search-box" style="flex:1;">
+      <form method="get" action="/foundation/geography/coverage/" class="dash-search-box" style="flex:1; display:flex; align-items:center; gap:8px;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" placeholder="Search these records" aria-label="Search country records">
-      </div>
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search these records" aria-label="Search country records" style="flex:1;">
+        <button type="submit" style="background:none; border:none; color:var(--wdos-magenta, #D4006A); font-size:12px; font-weight:600; cursor:pointer;">Search</button>
+      </form>
       <div class="dash-filter-actions">
-        <span class="dash-filter-pill-active">Current view</span>
-        <button type="button" class="dash-filter-pill">Status &darr;</button>
-        <button type="button" class="dash-filter-pill">More filters</button>
+        <a href="/foundation/geography/coverage/" class="{% if not status_filter and not network_filter and not query %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">Current view</a>
+        <a href="?status={% if status_filter == 'Country verified' %}HQ review due{% else %}Country verified{% endif %}{% if query %}&q={{ query }}{% endif %}" class="{% if status_filter %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">Status &darr;{% if status_filter %}: {{ status_filter }}{% endif %}</a>
+        <a href="?network={% if network_filter == 'WGMN' %}WNNN{% else %}WGMN{% endif %}{% if query %}&q={{ query }}{% endif %}" class="{% if network_filter %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">More filters{% if network_filter %}: {{ network_filter }}{% endif %}</a>
       </div>
     </div>
 
@@ -150,6 +154,12 @@
             </span>
           </td>
           <td>{{ dossier.next_review_date }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center; padding:32px; color:#6B7280;">
+            No country records match your current search or scope filter.
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -178,6 +188,8 @@
           <span class="dash-mobile-val">{{ dossier.next_review_date }}</span>
         </div>
       </div>
+      {% empty %}
+      <div style="padding:24px; text-align:center; color:#6B7280;">No country records in this view.</div>
       {% endfor %}
     </div>
 

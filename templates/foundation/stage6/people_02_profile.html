@@ -14,7 +14,7 @@
     </div>
     <div class="dash-actions">
       <a href="{{ screen.secondary_action.url|default:'/foundation/people/' }}" class="dash-btn-secondary">Back</a>
-      <a href="{{ screen.primary_action.url|default:'/foundation/community/reassignment/review/' }}" class="dash-btn-primary">Review profile</a>
+      <a href="/foundation/community/reassignment/review/?person={{ person.person_code|default:'WD-00421' }}" class="dash-btn-primary">Review profile</a>
     </div>
   </div>
 
@@ -30,6 +30,12 @@
   </div>
   {% endif %}
 
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEF3C7; color: #92400E; border: 1px solid #FCD34D;{% endif %}">
+    <strong>{{ result_title|default:"Notice" }}:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
   <!-- Sub Navigation Tabs -->
   <div class="stage6-subnav" role="tablist">
     <a href="?tab=overview{% if state_mode %}&state={{ state_mode }}{% endif %}" class="stage6-subnav-item {% if active_tab == 'overview' or not active_tab %}active{% endif %}" role="tab">Overview</a>
@@ -39,8 +45,15 @@
 
   <!-- Profile Summary Box -->
   <div class="stage6-profile-box" role="region" aria-label="Person Identity Summary">
-    <h2 class="stage6-profile-title">{{ person.full_name|default:"Ada Okafor" }}</h2>
-    <div class="stage6-profile-subtitle">{{ person.network|default:"WGMN" }} / {{ country_name|default:"Nigeria" }}</div>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+      <div>
+        <h2 class="stage6-profile-title">{{ person.full_name|default:"Ada Okafor" }}</h2>
+        <div class="stage6-profile-subtitle">{{ person.network|default:"WGMN" }} / {{ person_country_name|default:country_name|default:"Nigeria" }} {% if person.region %}&middot; {{ person.region }}{% endif %}</div>
+      </div>
+      {% if is_changed_record %}
+      <span class="dash-pill dash-pill-amber">Changed record</span>
+      {% endif %}
+    </div>
     <div class="stage6-profile-grid">
       <div>
         <div class="stage6-profile-field-label">Person ID</div>
@@ -61,6 +74,73 @@
         </div>
       </div>
     </div>
+
+    {% if local_hierarchy %}
+    <div style="margin-top:16px; padding-top:14px; border-top:1px solid #E5E7EB;">
+      <div class="stage6-profile-field-label" style="margin-bottom:6px;">Where this person belongs (Geographic &amp; Organizational Spine)</div>
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:12.5px; color:#374151;">
+        {% for unit in local_hierarchy %}
+          <span style="background:#F3F4F6; padding:3px 8px; border-radius:4px; font-weight:600;">{{ unit.unit_name }} <small style="font-weight:400; color:#6B7280;">({{ unit.level }})</small></span>
+          {% if not forloop.last %}<span style="color:#9CA3AF;">&rarr;</span>{% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if person_relationships %}
+    <div style="margin-top:12px; padding-top:12px; border-top:1px solid #E5E7EB;">
+      <div class="stage6-profile-field-label" style="margin-bottom:6px;">Attached community &amp; network relationships</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        {% for rel in person_relationships %}
+          <span class="dash-pill dash-pill-green">{{ rel.relationship_category }}{% if rel.related_programme %}: {{ rel.related_programme }}{% endif %}</span>
+        {% endfor %}
+        <a href="/foundation/community/relationships/manage/?person={{ person.person_code }}" style="font-size:12px; color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none; align-self:center;">+ Manage relationships</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Inline Authorized Profile Update Form -->
+  <div class="dash-card" style="margin-bottom:20px; padding:20px;">
+    <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 12px 0;">Update authorized profile information</h3>
+    <form method="post" action="/foundation/people/{{ person.person_code }}/" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; align-items:end;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_profile">
+      <input type="hidden" name="expected_updated_at" value="{{ expected_updated_at }}">
+      <div>
+        <label class="stage6-label" for="id_full_name" style="font-size:12px;">Full name</label>
+        <input type="text" id="id_full_name" name="full_name" class="stage6-input" value="{{ person.full_name }}" required>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_email" style="font-size:12px;">Contact email</label>
+        <input type="email" id="id_email" name="email" class="stage6-input" value="{{ person.email }}" required>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_local_home" style="font-size:12px;">Local home</label>
+        <input type="text" id="id_local_home" name="local_home" class="stage6-input" value="{{ person.local_home }}" required>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_primary_relationship" style="font-size:12px;">Primary relationship</label>
+        <input type="text" id="id_primary_relationship" name="primary_relationship" class="stage6-input" value="{{ person.primary_relationship }}" required>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_status" style="font-size:12px;">Status</label>
+        <select id="id_status" name="status" class="stage6-input">
+          <option value="Active" {% if person.status == 'Active' %}selected{% endif %}>Active</option>
+          <option value="Review due" {% if person.status == 'Review due' %}selected{% endif %}>Review due</option>
+        </select>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_contact_verification" style="font-size:12px;">Contact verification</label>
+        <select id="id_contact_verification" name="contact_verification" class="stage6-input">
+          <option value="Verified" {% if person.contact_verification == 'Verified' %}selected{% endif %}>Verified</option>
+          <option value="Pending review" {% if person.contact_verification == 'Pending review' %}selected{% endif %}>Pending review</option>
+        </select>
+      </div>
+      <div>
+        <button type="submit" class="dash-btn-primary" style="width:100%;">Save profile updates</button>
+      </div>
+    </form>
   </div>
 
   <!-- Records Table Card -->
@@ -128,6 +208,39 @@
       </div>
     </div>
   </div>
+
+  {% if active_tab == 'history' %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Reassignment &amp; record history</h2>
+    </div>
+    <table class="dash-table" aria-label="Person Record History">
+      <thead>
+        <tr>
+          <th scope="col">EVENT / REASSIGNMENT</th>
+          <th scope="col">DETAILS</th>
+          <th scope="col">STATUS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reassignments %}
+        <tr>
+          <td>Local-home reassignment</td>
+          <td>{{ r.current_local_home }} &rarr; {{ r.proposed_local_home }} ({{ r.reason }})</td>
+          <td><span class="dash-pill dash-pill-green">{{ r.status|title }}</span></td>
+        </tr>
+        {% endfor %}
+        {% for ev in audit_history %}
+        <tr>
+          <td>{{ ev.action }}</td>
+          <td>{{ ev.summary }}</td>
+          <td><span class="dash-pill dash-pill-green">{{ ev.timestamp }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <!-- Scoped Notice -->
   <div class="stage6-shield-notice">

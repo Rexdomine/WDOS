@@ -39,22 +39,47 @@
 
   <!-- Toolbar with Search and Filters -->
   <div class="dash-toolbar">
-    <form method="get" action="/foundation/people/" class="dash-search-box" style="flex:1;">
+    <form method="get" action="/foundation/people/" class="dash-search-box" style="flex:1; display:flex; align-items:center; gap:8px;">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search these records" aria-label="Search these records">
+      <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search these records" aria-label="Search these records" style="flex:1;">
       {% if state_mode %}<input type="hidden" name="state" value="{{ state_mode }}">{% endif %}
+      {% if active_tab %}<input type="hidden" name="tab" value="{{ active_tab }}">{% endif %}
+      <button type="submit" style="background:none; border:none; color:var(--wdos-magenta, #D4006A); font-size:12px; font-weight:600; cursor:pointer;">Search</button>
     </form>
     <div class="dash-filter-actions">
-      <span class="dash-filter-pill-active">Current view</span>
-      <a href="?status=active" class="dash-filter-pill" style="text-decoration:none;">Status ↓</a>
-      <a href="?tab=records" class="dash-filter-pill" style="text-decoration:none;">More filters</a>
+      <a href="/foundation/people/" class="{% if not status_filter and not verification_filter and not query %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">Current view</a>
+      <a href="?status={% if status_filter == 'Active' %}Review due{% else %}Active{% endif %}{% if query %}&q={{ query }}{% endif %}" class="{% if status_filter %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">Status ↓{% if status_filter %}: {{ status_filter }}{% endif %}</a>
+      <a href="?verification={% if verification_filter == 'Verified' %}Pending review{% else %}Verified{% endif %}{% if query %}&q={{ query }}{% endif %}" class="{% if verification_filter %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">More filters{% if verification_filter %}: {{ verification_filter }}{% endif %}</a>
     </div>
   </div>
 
+  {% if active_tab == 'overview' %}
+  <!-- Overview Summary Strip -->
+  <div class="stage6-cards-grid" style="margin-bottom:20px;">
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Authorized scope summary</h3>
+        <p class="stage6-info-card-text">{{ total_people_count|default:people|length }} people in scope &middot; {{ active_people_count|default:0 }} Active &middot; {{ review_due_count|default:0 }} Review due &middot; {{ verified_count|default:0 }} Contact verified.</p>
+      </div>
+      <a href="?tab=records" class="stage6-info-card-link">View all records &rarr;</a>
+    </div>
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Geography &amp; network spine</h3>
+        <p class="stage6-info-card-text">Active scope: {{ user_scope.active_network }} / {{ country_name }}. Records outside your authorized scope are automatically filtered.</p>
+      </div>
+      <a href="/foundation/geography/local-org/" class="stage6-info-card-link">Explore local hierarchy &rarr;</a>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Records Table Card -->
   <div class="dash-card">
-    <div class="dash-card-header">
+    <div class="dash-card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <h2 class="dash-card-title">People directory</h2>
+      {% if query or status_filter or verification_filter %}
+      <a href="/foundation/people/" style="font-size:12.5px; color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">Clear active filters &times;</a>
+      {% endif %}
     </div>
 
     <!-- Desktop Table -->
@@ -72,8 +97,15 @@
         <tr>
           <td>
             <a href="/foundation/people/{{ person.person_code }}/" style="color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">{{ person.full_name }}</a>
+            <span style="display:block; font-size:11.5px; color:#6B7280;">{{ person.person_code }} &middot; {{ person.network }}</span>
+            {% if person.is_changed_record %}
+            <span class="dash-pill dash-pill-amber" style="display:inline-block; margin-top:4px; font-size:10.5px;">Changed record</span>
+            {% endif %}
           </td>
-          <td>{{ person.local_home }}</td>
+          <td>
+            {{ person.local_home }}
+            <span style="display:block; font-size:11.5px; color:#6B7280;">{{ person.region|default:person.country }}</span>
+          </td>
           <td>{{ person.primary_relationship }}</td>
           <td>
             <span class="dash-pill {% if person.status == 'Active' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">
@@ -97,11 +129,16 @@
       <div class="dash-mobile-item">
         <div class="dash-mobile-row">
           <span class="dash-mobile-label">Person</span>
-          <a href="/foundation/people/{{ person.person_code }}/" class="dash-mobile-val" style="color:var(--wdos-magenta, #D4006A); font-weight:700; text-decoration:none;">{{ person.full_name }}</a>
+          <span>
+            <a href="/foundation/people/{{ person.person_code }}/" class="dash-mobile-val" style="color:var(--wdos-magenta, #D4006A); font-weight:700; text-decoration:none;">{{ person.full_name }}</a>
+            {% if person.is_changed_record %}
+            <span class="dash-pill dash-pill-amber" style="margin-left:6px; font-size:10.5px;">Changed record</span>
+            {% endif %}
+          </span>
         </div>
         <div class="dash-mobile-row">
           <span class="dash-mobile-label">Local home</span>
-          <span class="dash-mobile-val">{{ person.local_home }}</span>
+          <span class="dash-mobile-val">{{ person.local_home }} ({{ person.region|default:person.country }})</span>
         </div>
         <div class="dash-mobile-row">
           <span class="dash-mobile-label">Relationship</span>
@@ -129,6 +166,34 @@
       </div>
     </div>
   </div>
+
+  {% if active_tab == 'history' and audit_history %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Recent people &amp; geography activity history</h2>
+    </div>
+    <table class="dash-table" aria-label="Audit History">
+      <thead>
+        <tr>
+          <th scope="col">EVENT</th>
+          <th scope="col">SUMMARY</th>
+          <th scope="col">ACTOR</th>
+          <th scope="col">TIMESTAMP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in audit_history %}
+        <tr>
+          <td><span class="dash-pill dash-pill-green">{{ ev.action }}</span></td>
+          <td>{{ ev.summary }}</td>
+          <td>{{ ev.actor }}</td>
+          <td>{{ ev.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <!-- Scoped Notice -->
   <div class="stage6-shield-notice">

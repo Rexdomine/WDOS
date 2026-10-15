@@ -43,7 +43,7 @@
   </div>
   {% endif %}
 
-  <!-- Hero Next Step Banner (DASH-14, 15, 16, 17) -->
+  <!-- Hero Next Step Banner -->
   {% if screen.hero_banner %}
   <div class="dash-hero-banner" role="region" aria-label="Next Step Priority">
     <div class="dash-hero-waves" aria-hidden="true">
@@ -80,7 +80,7 @@
   </div>
   {% endif %}
 
-  <!-- Search and Filter Bar (Subviews like DASH-10-*) -->
+  <!-- Search and Filter Bar -->
   {% if screen.has_search_filter %}
   <div class="dash-toolbar">
     <div class="dash-search-box">
@@ -189,7 +189,7 @@
       </div>
       {% endif %}
 
-      <!-- Chart Card (e.g. DASH-01, DASH-10) -->
+      <!-- Chart Card -->
       {% if screen.chart_card %}
       <div class="dash-chart-card">
         <div class="dash-card-header">
@@ -246,23 +246,14 @@
   </div>
   {% endif %}
 
-  <!-- State Contract Dark Banner (only in state artboard mode) -->
-  {% if state_mode %}
-  <div class="dash-contract-banner">
-    <div class="dash-contract-tag">FUTURE FULL-STACK IMPLEMENTATION CONTRACT</div>
-    <p class="dash-contract-body">Future implementation contract: enforce server-owned permissions, scope, expiry, audit, and idempotent transitions before rendering this surface.</p>
-  </div>
-  <p class="dash-contract-note">States are component artboards, not additional routes. Buttons and examples in this PDF are visual proposals, not live system actions. Final policy values remain subject to approval.</p>
-  {% endif %}
-
-  <!-- Related Screens Accordion -->
-  {% if related_screens %}
+  <!-- Related Operational Views Accordion -->
+  {% if related_views %}
   <details class="dash-accordion" style="margin-bottom: 20px;">
-    <summary class="dash-accordion-btn">＋ Related screens · design preview</summary>
+    <summary class="dash-accordion-btn">＋ Related operational views</summary>
     <div class="dash-related-grid">
-      {% for rel in related_screens %}
-      <a href="/foundation/dashboards/{{ rel|lower }}/" class="dash-related-link">
-        <span>→</span> {{ rel }}
+      {% for item in related_views %}
+      <a href="{{ item.url }}" class="dash-related-link">
+        <span>→</span> {{ item.label }}
       </a>
       {% endfor %}
     </div>
@@ -275,10 +266,10 @@
     <span>{{ screen.support_note|default:"Need help? Ask your support team. Never share your password or verification codes." }}</span>
   </div>
 
-  <!-- Page Artboard Footer -->
+  <!-- Page Footer -->
   <footer class="dash-footer">
     <span>WODDI · No Woman Is Left Out</span>
-    <span>{{ screen.screen_id }} · UI review v2 · Sample data</span>
+    <span>{{ active_network|default:"WODDI" }} · {{ country_name|default:"Operational Workspace" }}</span>
   </footer>
 </div>
 {% endblock %}

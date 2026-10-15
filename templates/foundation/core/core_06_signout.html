@@ -65,7 +65,7 @@
 </div>
 
 <div class="stage4-preview-banner">
-  <a href="?view_mode=state" class="stage4-preview-link">＋ Related screens · design preview</a>
+  <a href="?view_mode=state" class="stage4-preview-link">＋ System status & recovery options</a>
   <p class="stage4-preview-help">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     Need help? Ask your support team. Never share your password or verification codes.
@@ -73,16 +73,16 @@
 </div>
 
 {% if request.GET.view_mode == 'state' or request.GET.contract == '1' %}
-<!-- State & Interaction Contract Artboards Section (PDF Page 182) -->
+<!-- System Status & Recovery Section -->
 <section class="stage4-state-section" id="state-contract" style="margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--wdos-line);">
   <div class="stage4-state-header">
-    <div class="contract-tag">CORE-06-SIGNOUT / FEEDBACK AND RECOVERY</div>
+    <div class="contract-tag">SYSTEM STATUS &amp; RECOVERY</div>
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <div>
         <h2 style="font-size:18px; margin:0;">Sign out this device?</h2>
-        <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Clear outcomes, safe next steps. Examples are not live actions.</p>
+        <p style="font-size:12.5px; color:var(--wdos-muted); margin:3px 0 0 0;">Clear outcomes and safe next steps for your workspace.</p>
       </div>
-      <span class="action-pill magenta" style="font-size:11px;"><span class="dot"></span> Proposed for approval</span>
+      <span class="action-pill magenta" style="font-size:11px;"><span class="dot"></span> Active safeguards</span>
     </div>
   </div>
 

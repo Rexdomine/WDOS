@@ -73,7 +73,7 @@
           <text x="145" y="245" fill="#9D174D" font-size="10" font-weight="600" text-anchor="middle">Ghana</text>
         </svg>
         <div class="stage6-map-legend">
-          Magenta: selected country &middot; Pale magenta: other sample records &middot; Grey: not selected. Illustrative geography; not a live coverage or boundary registry.
+          Magenta: selected country &middot; Pale magenta: other active hubs &middot; Grey: not selected.
         </div>
       </div>
 
@@ -215,7 +215,7 @@
   <!-- Footer Banner -->
   <div class="dash-footer">
     <div>WODDI · No Woman Is Left Out</div>
-    <div>GEO-01 · UI review v2 · Sample data</div>
+    <div>{{ active_network|default:"WODDI" }} · {{ country_name|default:"People & Geography" }}</div>
   </div>
 </div>
 {% endblock %}

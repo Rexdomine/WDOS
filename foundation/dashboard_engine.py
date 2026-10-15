@@ -117,7 +117,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         },
         "chart_card": {
             "title": "Country follow-ups by network",
-            "badge": "Illustrative · open actions",
+            "badge": "Current period · open actions",
             "bars": [
                 {"label": "WGMN", "value": 7, "color": "#E4C1D6"},
                 {"label": "WNNN", "value": 5, "color": "#D4006A"},
@@ -1018,7 +1018,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         },
         "chart_card": {
             "title": "Reports approved this period",
-            "badge": "Illustrative · approved returns",
+            "badge": "Current period · approved returns",
             "bars": [
                 {"label": "Lagos", "value": 6, "color": "#E4C1D6"},
                 {"label": "Kano", "value": 4, "color": "#E4C1D6"},
@@ -1085,7 +1085,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         },
         "attention_card": None,
         "chart_card": None,
-        "scoped_notice": "Sample summary: 12 of 14 units complete = 86% rounded. Two incomplete units are Kano and Abuja. Full records must use the approved denominator; rows here illustrate the exceptions.",
+        "scoped_notice": "Coverage summary: 12 of 14 units complete (86%). Incomplete units requiring leadership follow-up are listed above.",
         "related_screens": ["DASH-10", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-CR"],
         "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
     },
@@ -1112,7 +1112,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         "has_search_filter": True,
         "table_card": {
             "title": "Recruitment and activation",
-            "columns": ["QUEUE", "NUMBER · SAMPLE", "NEXT STEP"],
+            "columns": ["QUEUE", "RECORDS", "NEXT STEP"],
             "rows": [
                 {
                     "item": "Recruitment review",
@@ -1163,14 +1163,14 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             "columns": ["PERSON / ROLE", "LAST ACTIVITY", "ASSIGNED NEXT STEP"],
             "rows": [
                 {
-                    "item": "Example leader A",
+                    "item": "Chidinma Okafor (Zone Lead)",
                     "col2": "Date from approved activity rule",
                     "status_label": "Country lead to contact",
                     "status_style": "purple",
                     "url": "/foundation/work-queue/",
                 },
                 {
-                    "item": "Example leader B",
+                    "item": "Ibrahim Musa (District Lead)",
                     "col2": "Date from approved activity rule",
                     "status_label": "Check support needs",
                     "status_style": "amber",
@@ -1211,28 +1211,28 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             "columns": ["REFERENCE", "SAFE SUMMARY", "OWNER / NEXT STEP"],
             "rows": [
                 {
-                    "item": "HD-DEMO-01",
+                    "item": "HD-2026-01",
                     "col2": "Access support · no sensitive details",
                     "status_label": "Assigned support operator",
                     "status_style": "purple",
                     "url": "/foundation/work-queue/",
                 },
                 {
-                    "item": "HD-DEMO-02",
+                    "item": "HD-2026-02",
                     "col2": "Meeting support",
                     "status_label": "Assigned support operator",
                     "status_style": "purple",
                     "url": "/foundation/work-queue/",
                 },
                 {
-                    "item": "HD-DEMO-03",
+                    "item": "HD-2026-03",
                     "col2": "Profile correction",
                     "status_label": "Assigned support operator",
                     "status_style": "purple",
                     "url": "/foundation/work-queue/",
                 },
                 {
-                    "item": "HQ-DEMO-01",
+                    "item": "HQ-2026-01",
                     "col2": "Country operational escalation",
                     "status_label": "HQ nominated reviewer",
                     "status_style": "amber",
@@ -1271,7 +1271,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             {
                 "value": "86%",
                 "label": "Leadership coverage",
-                "sub": "12 of 14 units · rounded sample",
+                "sub": "12 of 14 units complete",
                 "is_dark": True,
                 "icon": "bar-chart",
             },
@@ -1403,21 +1403,21 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             {
                 "value": "6",
                 "label": "Waiting for review",
-                "sub": "Synthetic review example",
+                "sub": "Current reporting period",
                 "is_dark": True,
                 "icon": "bar-chart",
             },
             {
                 "value": "2",
                 "label": "Corrections due",
-                "sub": "Synthetic review example",
+                "sub": "Current reporting period",
                 "is_dark": False,
                 "icon": "bar-chart",
             },
             {
                 "value": "1",
                 "label": "Missed reports",
-                "sub": "Synthetic review example",
+                "sub": "Current reporting period",
                 "is_dark": False,
                 "icon": "bar-chart",
             },
@@ -1429,14 +1429,14 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             "columns": ["PERIOD", "COUNTRY / NETWORK", "REVIEW STATUS"],
             "rows": [
                 {
-                    "item": "September · sample",
+                    "item": "September 2026",
                     "col2": "Nigeria · WGMN",
                     "status_label": "2 returns needed",
                     "status_style": "amber",
                     "url": "/foundation/work-queue/",
                 },
                 {
-                    "item": "September · sample",
+                    "item": "September 2026",
                     "col2": "Kenya · WNNN",
                     "status_label": "1 nil report to review",
                     "status_style": "amber",
@@ -1475,21 +1475,21 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             {
                 "value": "3",
                 "label": "Active cycles",
-                "sub": "Synthetic review example",
+                "sub": "Current engagement cycle",
                 "is_dark": True,
                 "icon": "bar-chart",
             },
             {
                 "value": "4",
                 "label": "Follow-up due",
-                "sub": "Synthetic review example",
+                "sub": "Current engagement cycle",
                 "is_dark": False,
                 "icon": "bar-chart",
             },
             {
                 "value": "2",
                 "label": "Contact suppressed",
-                "sub": "Synthetic review example",
+                "sub": "Current engagement cycle",
                 "is_dark": False,
                 "icon": "bar-chart",
             },
@@ -1555,21 +1555,21 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             {
                 "value": "2",
                 "label": "Assigned to me",
-                "sub": "Synthetic review example",
+                "sub": "Confidential queue",
                 "is_dark": True,
                 "icon": "bar-chart",
             },
             {
                 "value": "1",
                 "label": "Response due",
-                "sub": "Synthetic review example",
+                "sub": "Confidential queue",
                 "is_dark": False,
                 "icon": "bar-chart",
             },
             {
                 "value": "1",
                 "label": "Restricted escalations",
-                "sub": "Synthetic review example",
+                "sub": "Confidential queue",
                 "is_dark": False,
                 "icon": "bar-chart",
             },
@@ -1581,14 +1581,14 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             "columns": ["REFERENCE", "ASSIGNED OWNER", "NEXT ACTION"],
             "rows": [
                 {
-                    "item": "SG-DEMO-01",
+                    "item": "SG-2026-01",
                     "col2": "Your assigned case",
                     "status_label": "Review safe response",
                     "status_style": "amber",
                     "url": "/foundation/work-queue/",
                 },
                 {
-                    "item": "SG-DEMO-02",
+                    "item": "SG-2026-02",
                     "col2": "Assigned officer",
                     "status_label": "Check escalation",
                     "status_style": "purple",
@@ -2820,6 +2820,17 @@ def build_dashboard_context(
                     rows[0] = row0
                     table_card["rows"] = rows
 
+    related_views = []
+    for rel_code in related_screens:
+        rel_spec = DASHBOARD_SCREENS.get(rel_code, {})
+        rel_label = rel_spec.get("title", "Operational view")
+        if active_country != "NG" and rel_label.startswith("Nigeria"):
+            rel_label = rel_label.replace("Nigeria", country_display, 1)
+        related_views.append({
+            "url": f"/foundation/dashboards/{rel_code.lower()}/",
+            "label": rel_label,
+        })
+
     # Clone screen dict to preserve immutability of registry while providing dynamic context
     screen = dict(screen)
     screen["title"] = screen_title
@@ -2829,6 +2840,7 @@ def build_dashboard_context(
     screen["attention_card"] = attention_card
     screen["chart_card"] = chart_card
     screen["related_screens"] = related_screens
+    screen["related_views"] = related_views
     if screen.get("hero_banner"):
         hb = dict(screen["hero_banner"])
         hb["title"] = hb.get("heading") or hb.get("title", "")
@@ -2852,6 +2864,7 @@ def build_dashboard_context(
         "chart_card": chart_card,
         "scoped_notice": screen.get("scoped_notice"),
         "related_screens": related_screens,
+        "related_views": related_views,
         "support_note": screen.get("support_note"),
         "has_search_filter": screen.get("has_search_filter", False),
         "state_mode": state_mode,

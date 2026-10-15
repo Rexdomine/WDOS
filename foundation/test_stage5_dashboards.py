@@ -74,10 +74,11 @@ class Stage5DashboardsTestCase(TestCase):
                 200,
                 f"Screen {code} failed with status {resp.status_code}",
             )
-            # Verify exact screen title and eyebrow from definition
+            # Verify exact screen title and eyebrow from definition, and no internal DASH-XX code in HTML
             self.assertContains(resp, defn["title"])
             self.assertContains(resp, defn["eyebrow"])
-            self.assertContains(resp, code)
+            self.assertEqual(resp.context["screen_code"], code)
+            self.assertNotContains(resp, code)
 
     def test_safeguarding_desk_forbidden_for_standard_members(self):
         """Confidential safeguarding desk strictly requires confidential safeguarding clearance."""
@@ -105,16 +106,18 @@ class Stage5DashboardsTestCase(TestCase):
         self.login_as(self.user_founder)
         resp = self.client.get("/foundation/dashboard/")
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Continental priorities")
-        self.assertContains(resp, "DASH-01")
+        self.assertEqual(resp.context["screen_code"], "DASH-01")
+        self.assertContains(resp, '<h1 class="dash-title">Continental priorities</h1>')
+        self.assertNotContains(resp, "UI review v2")
+        self.assertNotContains(resp, "Sample data")
 
         # Operations Lead must open DASH-02 (Country operations), NOT DASH-01
         self.login_as(self.user_ops)
         resp = self.client.get("/foundation/dashboard/")
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Country operations")
-        self.assertContains(resp, "DASH-02")
-        self.assertNotContains(resp, "Continental priorities")
+        self.assertEqual(resp.context["screen_code"], "DASH-02")
+        self.assertContains(resp, '<h1 class="dash-title">Country operations</h1>')
+        self.assertNotContains(resp, '<h1 class="dash-title">Continental priorities</h1>')
 
         self.login_as(self.user_member_ada)
         resp = self.client.get("/foundation/dashboard/")
@@ -177,18 +180,22 @@ class Stage5DashboardsTestCase(TestCase):
             self.login_as(user)
             dash_resp = self.client.get("/foundation/dashboard/")
             self.assertEqual(dash_resp.status_code, 200, f"{email} failed on /foundation/dashboard/")
-            self.assertContains(dash_resp, expected_code)
+            self.assertEqual(dash_resp.context["screen_code"], expected_code)
             self.assertContains(dash_resp, expected_title)
+            self.assertNotContains(dash_resp, "UI review v2")
+            self.assertNotContains(dash_resp, "Sample data")
+            self.assertNotContains(dash_resp, "Synthetic review example")
+            self.assertNotContains(dash_resp, "Role-specific dashboard reference screens")
 
     def test_state_interaction_feedback_modes(self):
-        """All 5 state feedback modes render the state card and implementation contract banner."""
+        """All 5 state feedback modes render the clean user-facing state card without internal implementation contract labels."""
         self.login_as(self.user_founder)
         states = ["empty", "stale", "role_changed", "loading", "filtered_empty"]
         for st in states:
             resp = self.client.get(f"/foundation/dashboards/dash-01/?state={st}")
             self.assertEqual(resp.status_code, 200)
             self.assertContains(resp, "dash-state-card")
-            self.assertContains(resp, "FUTURE FULL-STACK IMPLEMENTATION CONTRACT")
+            self.assertNotContains(resp, "FUTURE FULL-STACK IMPLEMENTATION CONTRACT")
 
     def test_tab_navigation_parameters(self):
         """Tabs overview, my_work, and history maintain active state."""

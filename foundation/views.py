@@ -2561,7 +2561,7 @@ def privacy_request_review_view(request):
         "active_nav": "workspace",
         "is_privacy_reviewer": True,
         "active_role_title": "Authorised privacy reviewer",
-        "privacy_req": pr or type("Obj", (), {"reference": "PR-2610-DEMO", "request_type_label": "Correct my information"}),
+        "privacy_req": pr or type("Obj", (), {"reference": "PR-2026-081", "request_type_label": "Correct my information"}),
         "decision_recorded": saved,
         **_get_stage4_state_context(request, "Review a privacy request"),
     })
@@ -3201,7 +3201,7 @@ def dashboard_screen_view(request, screen_code=None):
     ctx["active_nav"] = "workspace"
     ctx["breadcrumbs"] = [
         {"label": "Workspace", "url": "/foundation/", "is_current": False},
-        {"label": "Role-specific dashboard reference screens", "url": None, "is_current": True},
+        {"label": dash_ctx.get("screen_title", "Dashboard"), "url": None, "is_current": True},
     ]
 
     return render(request, "foundation/dashboards/dash_screen.html", ctx)

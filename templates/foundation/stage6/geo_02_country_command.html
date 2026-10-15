@@ -193,7 +193,7 @@
   <!-- Related Screens & Support Notes -->
   <div class="dash-related-screens">
     <div style="font-weight: 700; font-size: 13px; color: #374151; display:flex; align-items:center; gap:6px;">
-      <span style="font-size:16px;">&#xFF0B;</span> Related screens &middot; design preview
+      <span style="font-size:16px;">&#xFF0B;</span> Related operational views
     </div>
   </div>
 
@@ -204,7 +204,7 @@
   <!-- Footer Banner -->
   <div class="dash-footer">
     <div>WODDI · No Woman Is Left Out</div>
-    <div>GEO-02 · UI review v2 · Sample data</div>
+    <div>{{ active_network|default:"WODDI" }} · {{ country_name|default:"People & Geography" }}</div>
   </div>
 </div>
 {% endblock %}

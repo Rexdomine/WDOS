@@ -194,13 +194,13 @@
       <div class="dash-chart-card">
         <div class="dash-card-header">
           <h2 class="dash-card-title">{{ screen.chart_card.title }}</h2>
-          <span class="dash-chart-sub">{{ screen.chart_card.sub }}</span>
+          <span class="dash-chart-sub">{% if screen.chart_card.badge %}{{ screen.chart_card.badge }}{% elif screen.chart_card.sub %}{{ screen.chart_card.sub }}{% endif %}</span>
         </div>
         <div class="dash-chart-bars" role="img" aria-label="{{ screen.chart_card.title }} chart">
           {% for bar in screen.chart_card.bars %}
           <div class="dash-bar-col">
             <div class="dash-bar-val">{{ bar.value }}</div>
-            <div class="dash-bar {{ bar.color }}" style="height: calc({{ bar.value }} * 18px); min-height: 24px;"></div>
+            <div class="dash-bar" style="height: calc({{ bar.value }} * 18px); min-height: 24px; background-color: {{ bar.color|default:'#D4006A' }};"></div>
             <div class="dash-bar-lbl">{{ bar.label }}</div>
           </div>
           {% endfor %}

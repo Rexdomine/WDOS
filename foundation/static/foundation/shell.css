@@ -2570,14 +2570,15 @@ table.records-table tr:last-child td,
 }
 .dash-bar {
   width: 44px;
-  border-radius: 4px 4px 0 0;
+  border-radius: 6px 6px 0 0;
+  background-color: var(--wdos-magenta, #D4006A);
   transition: height 0.3s ease;
 }
 .dash-bar.lavender {
-  background: #D8B4E2;
+  background-color: #E4C1D6;
 }
 .dash-bar.magenta {
-  background: var(--wdos-magenta, #D4006A);
+  background-color: var(--wdos-magenta, #D4006A);
 }
 .dash-bar-lbl {
   font-size: 12px;

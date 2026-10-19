@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60" fill="none">
+  <!-- WODDI Emblem: Leaf / Shoot Growth Motif in Forest Green -->
+  <g transform="translate(6, 6)">
+    <circle cx="24" cy="24" r="22" fill="#F0FDF4" stroke="#2E7D32" stroke-width="2.5"/>
+    <!-- Stylized Sprouting Leaf / Youth Motif -->
+    <path d="M24 33 C24 24, 15 20, 15 15 C21 15, 24 22, 24 22 C24 22, 27 15, 33 15 C33 20, 24 24, 24 33 Z" fill="#2E7D32"/>
+    <path d="M24 20 L24 32" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <!-- Text: WNN -->
+  <text x="64" y="28" font-family="'Manrope', -apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="800" fill="#2E7D32" letter-spacing="1">WNN</text>
+  <!-- Text: WODDI NEXT-GEN NURTURERS -->
+  <text x="64" y="44" font-family="'Inter', -apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="700" fill="#15803D" letter-spacing="0.5">WODDI NEXT-GEN NURTURERS</text>
+</svg>

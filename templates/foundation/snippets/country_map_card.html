@@ -1,0 +1,207 @@
+<!-- Approved Country Geographic Visualisation & Full Hierarchy Path (Acceptance Criteria #2, #3, #4, #5) -->
+<section class="country-map-card {% if active_network == 'WNNN' or active_network == 'WNN' %}theme-wnn{% else %}theme-wgmn{% endif %}" aria-label="{{ country_name|default:'Country' }} Geographic Coverage and Organisational Scope" style="margin-bottom:24px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <h2 style="font-size:16px; font-weight:700; color:#111827; margin:0;">
+        {{ country_name|default:'Nigeria' }} &middot; Country Geographic Visualisation
+      </h2>
+      <span class="dash-pill {% if active_network == 'WNNN' or active_network == 'WNN' %}dash-pill-green{% else %}dash-pill-magenta{% endif %}">
+        {% if active_network == 'WNNN' or active_network == 'WNN' %}WNN &middot; Next-Gen Nurturers{% else %}WGMN &middot; Good Mother Network{% endif %}
+      </span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="/foundation/geography/country/{{ active_country|default:'NG' }}/command/" style="font-size:13px; font-weight:600; color:{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}var(--wdos-magenta, #D4006A){% endif %}; text-decoration:none;">Country command profile &rarr;</a>
+    </div>
+  </div>
+
+  <div class="country-map-grid">
+    <!-- SVG Country Map Graphic with Public Admin vs WDOS Units -->
+    <div class="country-map-svg-wrap">
+      {% if active_country == 'KE' %}
+      <!-- Kenya Geographic Visualisation -->
+      <svg viewBox="0 0 500 340" class="country-map-svg" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Geographic Visualisation of Kenya Hub with Counties and Chapters">
+        <defs>
+          <linearGradient id="leadKeGradSnippet" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#F9FAFB"/>
+            <stop offset="100%" stop-color="#F0FDF4"/>
+          </linearGradient>
+        </defs>
+        <path d="M 170,50 C 230,40 310,60 360,110 C 390,160 380,240 340,300 C 310,320 250,310 200,280 C 170,250 140,210 130,160 C 120,110 140,70 170,50 Z" fill="url(#leadKeGradSnippet)" stroke="#CBD5E1" stroke-width="2"/>
+        <circle cx="230" cy="220" r="28" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}" stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="2"/>
+        <text x="230" y="260" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">Nairobi County</text>
+        <text x="230" y="272" font-size="8.5" fill="#64748B" text-anchor="middle">(Public County &middot; Level 1)</text>
+
+        <circle cx="310" cy="280" r="16" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+        <text x="310" y="283" font-size="9.5" font-weight="600" fill="#475569" text-anchor="middle">Mombasa</text>
+        <circle cx="160" cy="195" r="16" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+        <text x="160" y="198" font-size="9.5" font-weight="600" fill="#475569" text-anchor="middle">Kisumu</text>
+
+        <rect x="218" y="214" width="8" height="8" fill="#64748B" rx="1"/>
+        <path d="M 230,212 L 235,217 L 230,222 L 225,217 Z" fill="#7C3AED"/>
+        <polygon points="240,209 242,213 246,213 243,216 244,220 240,218 236,220 237,216 234,213 238,213" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}"/>
+
+        <line x1="240" y1="209" x2="280" y2="170" stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <rect x="280" y="152" width="165" height="40" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="288" y="167" font-size="9.5" font-weight="700" fill="#111827">★ {{ identity_context.chapter_name|default:"Nairobi Central Chapter" }}</text>
+        <text x="288" y="180" font-size="8.5" fill="#7C3AED">❖ {{ identity_context.cluster_name|default:"Westlands Cluster" }}</text>
+      </svg>
+      {% elif active_country == 'GH' %}
+      <!-- Ghana Geographic Visualisation -->
+      <svg viewBox="0 0 500 340" class="country-map-svg" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Geographic Visualisation of Ghana Hub with Regions and Chapters">
+        <defs>
+          <linearGradient id="leadGhGradSnippet" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#F9FAFB"/>
+            <stop offset="100%" stop-color="#F0FDF4"/>
+          </linearGradient>
+        </defs>
+        <path d="M 210,60 C 260,50 300,80 300,140 C 310,210 290,280 270,320 C 240,325 180,310 170,260 C 160,200 170,120 210,60 Z" fill="url(#leadGhGradSnippet)" stroke="#CBD5E1" stroke-width="2"/>
+        <circle cx="260" cy="290" r="24" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}" stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="2"/>
+        <text x="260" y="325" font-size="9.5" font-weight="700" fill="#334155" text-anchor="middle">Greater Accra Region</text>
+        <text x="260" y="337" font-size="8" fill="#64748B" text-anchor="middle">(Public Region &middot; Level 1)</text>
+
+        <circle cx="230" cy="220" r="18" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+        <text x="230" y="223" font-size="9.5" font-weight="600" fill="#475569" text-anchor="middle">Ashanti</text>
+
+        <rect x="252" y="286" width="8" height="8" fill="#64748B" rx="1"/>
+        <path d="M 264,284 L 269,289 L 264,294 L 259,289 Z" fill="#7C3AED"/>
+        <polygon points="274,281 276,285 280,285 277,288 278,292 274,290 270,292 271,288 268,285 272,285" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}"/>
+
+        <line x1="274" y1="281" x2="320" y2="235" stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <rect x="320" y="217" width="160" height="40" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="328" y="232" font-size="9.5" font-weight="700" fill="#111827">★ {{ identity_context.chapter_name|default:"Accra Central Chapter" }}</text>
+        <text x="328" y="246" font-size="8.5" fill="#7C3AED">❖ {{ identity_context.cluster_name|default:"Osu-Labone Cluster" }}</text>
+      </svg>
+      {% else %}
+      <!-- Nigeria & Default Master Map -->
+      <svg viewBox="0 0 500 340" class="country-map-svg" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Geographic Visualisation of {{ country_name|default:'Nigeria' }} Hub with States and Chapters">
+        <defs>
+          <linearGradient id="leadNgGradSnippet" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#F9FAFB"/>
+            <stop offset="100%" stop-color="#F0FDF4"/>
+          </linearGradient>
+        </defs>
+        <path d="M 90,140 C 130,90 200,80 270,70 C 340,60 410,100 440,160 C 470,220 440,290 380,310 C 320,330 250,300 200,310 C 150,320 100,280 80,240 C 60,200 70,160 90,140 Z" fill="url(#leadNgGradSnippet)" stroke="#CBD5E1" stroke-width="2"/>
+        
+        <path d="M 95,250 C 110,245 135,248 140,265 C 130,275 105,275 95,265 Z" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}" stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="2"/>
+        <text x="115" y="290" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">{{ identity_context.first_level_name|default:"Lagos State" }}</text>
+        <text x="115" y="302" font-size="8.5" fill="#64748B" text-anchor="middle">(Public {{ identity_context.first_level_term|default:"State" }} &middot; Level 1)</text>
+
+        <circle cx="250" cy="180" r="15" fill="#F1F5F9" stroke="#94A3B8" stroke-dasharray="2 2" stroke-width="1.5"/>
+        <text x="250" y="165" font-size="9.5" font-weight="600" fill="#475569" text-anchor="middle">{% if active_country == 'AO' %}Luanda{% elif active_country == 'ET' %}Addis Ababa{% else %}FCT Abuja{% endif %}</text>
+
+        <circle cx="280" cy="115" r="18" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+        <text x="280" y="118" font-size="9.5" font-weight="600" fill="#475569" text-anchor="middle">Northern Zone</text>
+
+        <rect x="110" y="250" width="8" height="8" fill="#64748B" rx="1"/>
+        <path d="M 125,248 L 130,253 L 125,258 L 120,253 Z" fill="#7C3AED"/>
+        <polygon points="135,242 137,246 141,246 138,249 139,253 135,251 131,253 132,249 129,246 133,246" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}"/>
+
+        <line x1="135" y1="242" x2="180" y2="205" stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <rect x="180" y="188" width="165" height="42" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="188" y="204" font-size="9.5" font-weight="700" fill="#111827">★ {{ identity_context.chapter_name|default:"Allen Chapter" }}</text>
+        <text x="188" y="217" font-size="8.5" fill="#7C3AED">❖ {{ identity_context.cluster_name|default:"Ikeja Central Cluster" }}</text>
+      </svg>
+      {% endif %}
+
+      <!-- Legend -->
+      <div style="margin-top:10px; font-size:11px; color:#4B5563; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+        <span style="display:inline-flex; align-items:center; gap:4px;">
+          <span style="display:inline-block; width:9px; height:9px; background:#64748B; border-radius:2px;"></span>
+          <strong>Public Geography</strong>
+        </span>
+        <span style="display:inline-flex; align-items:center; gap:4px;">
+          <span style="color:#7C3AED; font-size:11px;">❖</span>
+          <strong>WDOS Cluster</strong>
+        </span>
+        <span style="display:inline-flex; align-items:center; gap:4px;">
+          <span style="color:{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}; font-size:11px;">★</span>
+          <strong>WDOS Chapter</strong>
+        </span>
+      </div>
+    </div>
+
+    <!-- Right: Country Territory Panel -->
+    <div class="country-map-meta-panel">
+      <div>
+        <span style="font-size:10.5px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px;">Permitted Hub Territory</span>
+        <h3 style="font-size:16px; font-weight:700; color:#111827; margin:2px 0 4px 0;">{{ country_name|default:'Nigeria' }}</h3>
+        <span class="dash-pill {% if active_network == 'WNNN' or active_network == 'WNN' %}dash-pill-green{% else %}dash-pill-magenta{% endif %}" style="font-size:11px;">
+          {{ active_network|default:'WGMN' }} Network
+        </span>
+      </div>
+
+      <div style="border-top:1px solid #E5E7EB; padding-top:10px;">
+        <div style="font-size:11.5px; color:#6B7280;">Authoritative Local Operations:</div>
+        <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">
+          ★ {{ identity_context.chapter_name|default:"Local Chapter" }}
+        </div>
+        <div style="font-size:11.5px; color:#7C3AED; margin-top:2px;">
+          ❖ {{ identity_context.cluster_name|default:"Community Cluster" }}
+        </div>
+        <div style="font-size:11px; color:#6B7280; margin-top:2px;">
+          Under {{ identity_context.second_level_name|default:"District" }}, {{ identity_context.first_level_name|default:"Region" }}
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #E5E7EB; padding-top:12px; margin-top:auto;">
+        <a href="/foundation/network/{{ active_network|default:'WGMN' }}/country/{{ active_country|default:'NG' }}/" class="btn primary" style="width:100%; text-align:center; box-sizing:border-box;">
+          Explore Country Hierarchy
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Equivalent Section for Map -->
+  <div class="stage6-map-text-equivalent" role="region" aria-label="Accessible Map Text Equivalent and Full Hierarchy Path">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <div>
+        <h3 style="font-size:14px; font-weight:700; color:#111827; margin:0 0 4px 0;">Accessible Map Text Equivalent &middot; Full Hierarchy Path</h3>
+        <p style="font-size:12px; color:#4B5563; margin:0;">
+          Territory oversight showing active <strong>{{ active_network|default:'WGMN' }}</strong> operating units across {{ country_name|default:'Nigeria' }}.
+        </p>
+      </div>
+      <span class="dash-pill {% if active_network == 'WNNN' or active_network == 'WNN' %}dash-pill-green{% else %}dash-pill-magenta{% endif %}">
+        {{ country_name|default:'Nigeria' }} &middot; {{ active_network|default:'WGMN' }}
+      </span>
+    </div>
+
+    <!-- Current Hierarchy Trail Breadcrumb -->
+    <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:12px 14px; margin-bottom:14px;">
+      <div style="font-size:10.5px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Authoritative Hierarchy Trail</div>
+      <div style="font-size:13px; font-weight:600; color:#111827;">
+        {{ identity_context.context_breadcrumb_text|default:"WGMN → Nigeria → Lagos State → Ikeja LGA → Ikeja Central Cluster → Allen Chapter" }}
+      </div>
+      <div style="font-size:11px; color:#6B7280; margin-top:6px;">
+        <em>Rule: Public areas (such as {{ identity_context.first_level_name|default:"Region" }} or {{ identity_context.second_level_name|default:"District" }}) are public administrative geography and not chapters. Community Clusters and Chapters are distinct WDOS operating units.</em>
+      </div>
+    </div>
+
+    <!-- 6-Level Hierarchy Breakdown Cards -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(135px, 1fr)); gap:10px;">
+      <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+        <span style="font-size:10px; font-weight:700; color:{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}; text-transform:uppercase;">Network</span>
+        <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ active_network|default:'WGMN' }}</div>
+      </div>
+      <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+        <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">Country &middot; Public Geo</span>
+        <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ country_name|default:'Nigeria' }}</div>
+      </div>
+      <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+        <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">{{ identity_context.first_level_term|default:"State" }} &middot; Public Geo</span>
+        <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ identity_context.first_level_name|default:"Lagos State" }}</div>
+      </div>
+      <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+        <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">{{ identity_context.second_level_term|default:"LGA" }} &middot; Public Geo</span>
+        <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ identity_context.second_level_name|default:"Ikeja LGA" }}</div>
+      </div>
+      <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+        <span style="font-size:10px; font-weight:700; color:#7C3AED; text-transform:uppercase;">Community Cluster</span>
+        <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ identity_context.cluster_name|default:"Ikeja Central Cluster" }}</div>
+      </div>
+      <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+        <span style="font-size:10px; font-weight:700; color:#D97706; text-transform:uppercase;">Chapter &middot; Operating</span>
+        <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ identity_context.chapter_name|default:"Allen Chapter" }}</div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -319,6 +319,14 @@ class Chapter(models.Model):
     country = models.CharField(max_length=8)  # ISO code like 'NG', 'KE', 'GH'
     region = models.CharField(max_length=100)
     district = models.CharField(max_length=100, blank=True)
+    community_cluster = models.CharField(max_length=150, blank=True)
+    cluster_unit = models.ForeignKey(
+        "LocalOrganisationUnit",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="chapters",
+    )
     status = models.CharField(
         max_length=16,
         default="active",
@@ -511,6 +519,16 @@ class PersonProfile(models.Model):
     phone = models.CharField(max_length=32, blank=True)
     network = models.CharField(max_length=8, choices=[("WGMN", "WGMN"), ("WNNN", "WNNN"), ("BOTH", "Both Networks")], default="WGMN")
     country = models.CharField(max_length=8, default="NG")
+    state_or_region = models.CharField(max_length=100, blank=True)
+    lga_or_district = models.CharField(max_length=100, blank=True)
+    community_cluster = models.CharField(max_length=150, blank=True)
+    cluster_unit = models.ForeignKey(
+        "LocalOrganisationUnit",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="person_cluster_members",
+    )
     local_home = models.CharField(max_length=150, default="Ikeja Chapter")
     chapter = models.ForeignKey(Chapter, null=True, blank=True, on_delete=models.SET_NULL, related_name="members")
     account = models.ForeignKey("accounts.Account", null=True, blank=True, on_delete=models.SET_NULL, related_name="person_profiles")
@@ -519,6 +537,149 @@ class PersonProfile(models.Model):
     status = models.CharField(max_length=32, default="Active", choices=[("Active", "Active"), ("Review due", "Review due"), ("Inactive", "Inactive")])
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def chapter_name(self):
+        if self.chapter:
+            return self.chapter.name
+        return self.local_home or ""
+
+    @property
+    def region(self):
+        return self.state_or_region or ""
+
+    @property
+    def district(self):
+        return self.lga_or_district or ""
+
+    @property
+    def hierarchy_path(self):
+        return getattr(self, "_hierarchy_path", None) or self.get_hierarchy_path()
+
+    @hierarchy_path.setter
+    def hierarchy_path(self, val):
+        self._hierarchy_path = val
+
+    def get_hierarchy_path(self):
+        """
+        Returns the authoritative 6-tier hierarchy path:
+        Country → State/first-level area equivalent → Local government/LGA/district equivalent → Community Cluster → Chapter → Person
+        using country-specific terminology.
+        """
+        from .context_block import get_country_flag_emoji
+        from accounts.african_geography import get_country
+
+        c_code = (self.country or "NG").upper()
+        term = GeographyTerminology.objects.filter(country=c_code, status="effective").first()
+        c_info = get_country(c_code) or {}
+        c_name = c_info.get("name") or (term.country_name if term else "Nigeria")
+        c_flag = get_country_flag_emoji(c_code)
+
+        first_term = term.first_level_term if term else (c_info.get("admin1_label") or "State / FCT")
+        second_term = term.second_level_term if term else (c_info.get("admin2_label") or "LGA")
+
+        # Resolve state/first-level
+        first_name = self.state_or_region
+        if not first_name:
+            if self.chapter and self.chapter.region:
+                first_name = self.chapter.region
+            elif c_code == "NG":
+                first_name = "Lagos State"
+            else:
+                first_name = f"{c_name} Region"
+
+        # Resolve LGA/second-level
+        second_name = self.lga_or_district
+        if not second_name:
+            if self.chapter and self.chapter.district:
+                second_name = self.chapter.district
+            elif c_code == "NG":
+                second_name = "Ikeja LGA"
+            else:
+                second_name = f"{c_name} District"
+
+        # Resolve Community Cluster (WODDI organisational unit)
+        cluster_name = self.community_cluster
+        if not cluster_name and self.cluster_unit:
+            cluster_name = self.cluster_unit.unit_name
+        if not cluster_name and self.chapter and self.chapter.community_cluster:
+            cluster_name = self.chapter.community_cluster
+        if not cluster_name:
+            c_unit = LocalOrganisationUnit.objects.filter(country=c_code, level="Community Cluster").first()
+            if c_unit:
+                cluster_name = c_unit.unit_name
+            else:
+                cluster_name = "Ikeja Central Cluster" if c_code == "NG" else "Central Community Cluster"
+
+        if cluster_name and not cluster_name.lower().endswith("cluster"):
+            cluster_name = f"{cluster_name} Cluster"
+
+        # Resolve Chapter (WODDI operating unit)
+        chap_name = self.chapter.name if self.chapter else ""
+        if not chap_name:
+            raw_home = (self.local_home or "").strip()
+            # Prevent bare broad place names like "Lagos" or "Ikeja" from being treated as chapter
+            if raw_home and raw_home.lower() not in {"lagos", "ikeja", "abuja", "kano", "nairobi", "accra"}:
+                chap_name = raw_home
+            else:
+                ch_unit = LocalOrganisationUnit.objects.filter(country=c_code, level="Chapter").first()
+                if ch_unit:
+                    chap_name = ch_unit.unit_name
+                else:
+                    chap_name = "Allen Chapter" if c_code == "NG" else f"{c_name} Central Chapter"
+
+        path_steps = [
+            {"level": "country", "term": "Country", "name": c_name, "flag": c_flag, "code": c_code, "type": "public_geo"},
+            {"level": "first_level", "term": first_term, "name": first_name, "type": "public_geo"},
+            {"level": "second_level", "term": second_term, "name": second_name, "type": "public_geo"},
+            {"level": "cluster", "term": "Community Cluster", "name": cluster_name, "type": "woddi_cluster"},
+            {"level": "chapter", "term": "Chapter", "name": chap_name, "type": "woddi_chapter"},
+            {"level": "person", "term": "Person", "name": self.full_name, "code": self.person_code, "type": "person"},
+        ]
+
+        breadcrumb = f"{c_name} → {first_name} → {second_name} → {cluster_name} → {chap_name} → {self.full_name}"
+
+        path_nodes = [
+            {"tier": s["level"], "term": s["term"], "name": s["name"], "badge_type": s["type"]}
+            for s in path_steps
+        ]
+
+        return {
+            "country_code": c_code,
+            "country_name": c_name,
+            "country_flag": c_flag,
+            "first_level_term": first_term,
+            "first_level_name": first_name,
+            "second_level_term": second_term,
+            "second_level_name": second_name,
+            "cluster_term": "Community Cluster",
+            "cluster_name": cluster_name,
+            "cluster_code": getattr(self.cluster_unit, "code", "") if self.cluster_unit else "",
+            "chapter_term": "Chapter",
+            "chapter_name": chap_name,
+            "chapter_code": getattr(self.chapter, "code", "") if self.chapter else "",
+            "person_code": self.person_code,
+            "person_name": self.full_name,
+            "path_steps": path_steps,
+            "path_nodes": path_nodes,
+            "path_display": breadcrumb,
+            "breadcrumb": breadcrumb,
+        }
+
+    @property
+    def chapter_name(self) -> str:
+        if self.chapter and self.chapter.name:
+            return self.chapter.name
+        return self.get_hierarchy_path()["chapter_name"]
+
+    @chapter_name.setter
+    def chapter_name(self, value: str):
+        if not value:
+            return
+        chap = Chapter.objects.filter(name__iexact=value).first()
+        if chap:
+            self.chapter = chap
+        self.local_home = value
 
     class Meta:
         ordering = ["full_name"]

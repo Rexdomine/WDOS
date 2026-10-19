@@ -64,8 +64,16 @@
         <div class="stage6-profile-field-value">{{ person.network|default:"WGMN" }}</div>
       </div>
       <div>
-        <div class="stage6-profile-field-label">Local home</div>
-        <div class="stage6-profile-field-value">{{ person.local_home|default:"Ikeja Chapter" }}</div>
+        <div class="stage6-profile-field-label">{{ hierarchy_path.first_level_term|default:"State" }} &amp; {{ hierarchy_path.second_level_term|default:"LGA" }}</div>
+        <div class="stage6-profile-field-value">{{ hierarchy_path.first_level_name|default:"Not specified" }} &middot; {{ hierarchy_path.second_level_name|default:"Not specified" }}</div>
+      </div>
+      <div>
+        <div class="stage6-profile-field-label">Community Cluster</div>
+        <div class="stage6-profile-field-value" style="color:#5B21B6; font-weight:600;">{{ hierarchy_path.cluster_name|default:"Not assigned" }}</div>
+      </div>
+      <div>
+        <div class="stage6-profile-field-label">Chapter</div>
+        <div class="stage6-profile-field-value" style="color:#9D174D; font-weight:600;">{{ hierarchy_path.chapter_name|default:person.local_home|default:"Not assigned" }}</div>
       </div>
       <div>
         <div class="stage6-profile-field-label">Contact verification</div>
@@ -75,17 +83,34 @@
       </div>
     </div>
 
-    {% if local_hierarchy %}
     <div style="margin-top:16px; padding-top:14px; border-top:1px solid #E5E7EB;">
-      <div class="stage6-profile-field-label" style="margin-bottom:6px;">Where this person belongs (Geographic &amp; Organizational Spine)</div>
-      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:12.5px; color:#374151;">
-        {% for unit in local_hierarchy %}
-          <span style="background:#F3F4F6; padding:3px 8px; border-radius:4px; font-weight:600;">{{ unit.unit_name }} <small style="font-weight:400; color:#6B7280;">({{ unit.level }})</small></span>
-          {% if not forloop.last %}<span style="color:#9CA3AF;">&rarr;</span>{% endif %}
-        {% endfor %}
+      <div class="stage6-profile-field-label" style="margin-bottom:8px;">Where this person belongs (Geographic &amp; Organizational Spine)</div>
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12.5px;">
+        {% if hierarchy_path.path_nodes %}
+          {% for node in hierarchy_path.path_nodes %}
+            <span style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:6px; font-weight:600;
+              {% if node.badge_type == 'public_geo' %}
+                background:#EFF6FF; color:#1E40AF; border:1px solid #BFDBFE;
+              {% elif node.badge_type == 'woddi_cluster' %}
+                background:#F5F3FF; color:#5B21B6; border:1px solid #DDD6FE;
+              {% elif node.badge_type == 'woddi_chapter' %}
+                background:#FDF2F8; color:#9D174D; border:1px solid #FBCFE8;
+              {% else %}
+                background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0;
+              {% endif %}">
+              <span>{{ node.name }}</span>
+              <small style="font-weight:500; opacity:0.8;">({{ node.term }})</small>
+            </span>
+            {% if not forloop.last %}<span style="color:#9CA3AF; font-weight:bold;">&rarr;</span>{% endif %}
+          {% endfor %}
+        {% elif local_hierarchy %}
+          {% for unit in local_hierarchy %}
+            <span style="background:#F3F4F6; padding:3px 8px; border-radius:4px; font-weight:600; color:#374151;">{{ unit.unit_name }} <small style="font-weight:400; color:#6B7280;">({{ unit.level }})</small></span>
+            {% if not forloop.last %}<span style="color:#9CA3AF;">&rarr;</span>{% endif %}
+          {% endfor %}
+        {% endif %}
       </div>
     </div>
-    {% endif %}
 
     {% if person_relationships %}
     <div style="margin-top:12px; padding-top:12px; border-top:1px solid #E5E7EB;">
@@ -114,6 +139,22 @@
       <div>
         <label class="stage6-label" for="id_email" style="font-size:12px;">Contact email</label>
         <input type="email" id="id_email" name="email" class="stage6-input" value="{{ person.email }}" required>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_state_or_region" style="font-size:12px;">{{ hierarchy_path.first_level_term|default:"State / Region" }}</label>
+        <input type="text" id="id_state_or_region" name="state_or_region" class="stage6-input" value="{{ person.state_or_region|default:person.region }}">
+      </div>
+      <div>
+        <label class="stage6-label" for="id_lga_or_district" style="font-size:12px;">{{ hierarchy_path.second_level_term|default:"LGA / District" }}</label>
+        <input type="text" id="id_lga_or_district" name="lga_or_district" class="stage6-input" value="{{ person.lga_or_district }}">
+      </div>
+      <div>
+        <label class="stage6-label" for="id_community_cluster" style="font-size:12px;">Community Cluster</label>
+        <input type="text" id="id_community_cluster" name="community_cluster" class="stage6-input" value="{{ person.community_cluster }}">
+      </div>
+      <div>
+        <label class="stage6-label" for="id_chapter_name" style="font-size:12px;">Chapter</label>
+        <input type="text" id="id_chapter_name" name="chapter_name" class="stage6-input" value="{{ person.chapter_name }}">
       </div>
       <div>
         <label class="stage6-label" for="id_local_home" style="font-size:12px;">Local home</label>

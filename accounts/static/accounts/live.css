@@ -77,3 +77,36 @@ input::-ms-reveal,input::-ms-clear{display:none !important}
   .state-card{padding:20px}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* WGMN & WNN Visual Distinction on Welcome Screen */
+.welcome-network-selection{margin:18px 0 24px}
+.welcome-network-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.welcome-network-card{border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;transition:transform .15s ease,box-shadow .15s ease;position:relative}
+.welcome-network-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+.card-wgmn{background:#FFF5F8;border:1.5px solid #F472B6;box-shadow:0 2px 8px rgba(212,0,106,0.06)}
+.card-wnn{background:#F0FDF4;border:1.5px solid #86EFAC;box-shadow:0 2px 8px rgba(46,125,50,0.06)}
+.network-card-header{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.network-badge{font-family:Manrope,sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;padding:3px 8px;border-radius:6px;width:fit-content;display:inline-block}
+.badge-wgmn{background:#D4006A;color:#FFFFFF}
+.badge-wnn{background:#2E7D32;color:#FFFFFF}
+.network-age-band{font-size:11px;font-weight:600;color:#6B7280}
+.card-wgmn .network-age-band{color:#9D174D}
+.card-wnn .network-age-band{color:#15803D}
+.network-card-title{font-size:14px;font-weight:750;margin:0 0 6px 0;line-height:1.35}
+.card-wgmn .network-card-title{color:#831843}
+.card-wnn .network-card-title{color:#14532D}
+.network-card-desc{font-size:11.5px;line-height:1.45;color:#4B5563;margin:0 0 14px 0;flex:1}
+.network-card-action .btn{width:100%;font-size:12.5px;padding:9px 12px;min-height:38px;justify-content:center}
+.btn-wgmn{background:#D4006A !important;color:#FFFFFF !important;border:none !important}
+.btn-wgmn:hover{background:#B8005A !important}
+.btn-wnn{background:#2E7D32 !important;color:#FFFFFF !important;border:none !important}
+.btn-wnn:hover{background:#226326 !important}
+@media(max-width:600px){
+  .welcome-network-grid{grid-template-columns:1fr}
+}
+
+.network-line:first-child strong{color:#D4006A}
+.network-line:last-child strong{color:#2E7D32}
+.network-line:first-child{border-left-color:#D4006A}
+.network-line:last-child{border-left-color:#2E7D32}
+

@@ -32,6 +32,123 @@ class ScopePermissionDenied(PermissionDenied):
         self.recovery_url = recovery_url
 
 
+def normalize_network_code(network: Optional[str]) -> str:
+    """Normalize network code (WNN and WNNN are treated synonymously)."""
+    if not network:
+        return ""
+    code = network.strip().upper()
+    if code in ("WNN", "WNNN"):
+        return "WNNN"
+    return code
+
+
+KNOWN_BROAD_PLACES = {
+    # Nigeria States & LGAs
+    "lagos", "ikeja", "surulere", "alimosho", "kano", "rivers", "port harcourt", "fct", "abuja",
+    "kaduna", "oyo", "ibadan", "enugu", "delta", "warri", "benin", "edo",
+    # Kenya Counties & Sub-Counties
+    "nairobi", "westlands", "kilimani", "mombasa", "kisumu", "nakuru", "eldoret",
+    # Ghana Regions & Districts
+    "greater accra", "accra", "accra metro", "tema", "ashanti", "kumasi",
+    # Angola Provinces & Municipalities
+    "luanda", "ingombota", "benguela", "huambo",
+    # Ethiopia Regions & Sub-Cities
+    "addis ababa", "bole", "kirkos", "oromia", "amhara",
+    # South Africa & Rwanda
+    "gauteng", "johannesburg", "kigali", "gasabo",
+}
+
+
+def is_broad_geographic_place(name: Optional[str], country_code: Optional[str] = None) -> bool:
+    """
+    Check if a string represents a broad administrative geography (Country, State/Region, LGA/District)
+    rather than an authoritative WDOS organizational Chapter.
+    """
+    if not name:
+        return False
+    norm = name.strip().lower()
+    administrative_suffixes = (
+        "state", "lga", "region", "province", "county", "district",
+        "sub-county", "municipality", "sub-city", "woreda", "fct", "metropolitan"
+    )
+    for suffix in administrative_suffixes:
+        if norm.endswith(suffix):
+            return True
+
+    if norm in KNOWN_BROAD_PLACES:
+        return True
+
+    # Check if a synthesized "... chapter" phrase was passed (e.g. "Lagos Chapter", "Ikeja Chapter")
+    if norm.endswith(" chapter"):
+        base_core = norm[:-8].strip()
+        if base_core in KNOWN_BROAD_PLACES or any(base_core.endswith(s) for s in administrative_suffixes):
+            return True
+
+    try:
+        from accounts.african_geography import get_country, get_regions_for_country
+        if country_code:
+            regions = get_regions_for_country(country_code)
+            for r_code, r_name in regions:
+                r_norm = r_name.strip().lower()
+                if norm == r_norm or norm.startswith(r_norm):
+                    return True
+        c_info = get_country(country_code or "NG")
+        if c_info and norm == (c_info.get("name") or "").strip().lower():
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def is_authoritative_chapter(name: Optional[str]) -> bool:
+    """
+    Check if a name is explicitly defined as an authoritative Chapter in WDOS data.
+    """
+    if not name:
+        return False
+    from .models import Chapter, LocalOrganisationUnit
+    c_name = name.strip()
+    if Chapter.objects.filter(name__iexact=c_name).exists():
+        return True
+    if LocalOrganisationUnit.objects.filter(level="Chapter", unit_name__iexact=c_name).exists():
+        return True
+    return False
+
+
+def sanitize_chapter_display(raw_name: Optional[str], fallback_country: str = "NG") -> str:
+    """
+    Prevent broad places such as Lagos or Ikeja from being displayed as a Chapter
+    unless the authoritative WDOS data explicitly defines them that way.
+    """
+    if not raw_name:
+        return "Allen Chapter" if fallback_country == "NG" else f"{fallback_country} Central Chapter"
+    cleaned = raw_name.strip()
+
+    # If the raw name is already an authoritative chapter in DB, allow it
+    if is_authoritative_chapter(cleaned):
+        return cleaned
+
+    base_name = cleaned
+    if cleaned.lower().endswith("chapter"):
+        base_name = cleaned[:-7].strip()
+
+    # If it's a broad place (e.g. Lagos, Ikeja, Surulere, Nairobi)
+    if is_broad_geographic_place(cleaned, fallback_country) or is_broad_geographic_place(base_name, fallback_country):
+        from .models import Chapter, LocalOrganisationUnit
+        chap = Chapter.objects.filter(district__iexact=base_name).first() or Chapter.objects.filter(region__iexact=base_name).first()
+        if chap:
+            return chap.name
+        unit = LocalOrganisationUnit.objects.filter(level="Chapter", parent__unit_name__icontains=base_name).first()
+        if unit:
+            return unit.unit_name
+        return f"{base_name} Chapter (Pending Allocation)" if fallback_country == "NG" else f"{fallback_country} Central Chapter"
+
+    if not cleaned.lower().endswith("chapter") and not cleaned.lower().endswith("hub"):
+        cleaned = f"{cleaned} Chapter"
+    return cleaned
+
+
 @dataclass
 class UserScope:
     account: Account
@@ -45,26 +162,114 @@ class UserScope:
     active_country: str = "NG"
     primary_role: str = "member"
     active_role: str = "member"
+    first_level_area: Optional[str] = None
+    second_level_area: Optional[str] = None
+    community_cluster: Optional[str] = None
+    cluster_name: Optional[str] = None
+    cluster_code: Optional[str] = None
     chapter_code: Optional[str] = None
     chapter_name: Optional[str] = None
 
+    @property
+    def can_cross_network(self) -> bool:
+        return (
+            self.is_management_or_admin
+            or bool(self.roles.intersection({"founder", "hq", "it_admin"}))
+            or "*" in self.allowed_networks
+            or "ALL" in self.allowed_networks
+            or len(set(self.allowed_networks).intersection({"WGMN", "WNNN", "BOTH"})) > 1
+        )
+
     def can_access_network(self, network: str) -> bool:
-        if not network or network.upper() in ("*", "ALL"):
+        if not network:
             return True
-        if self.is_management_or_admin or "*" in self.allowed_networks:
+        norm_req = normalize_network_code(network)
+        if norm_req in ("*", "ALL", "HQ / BOTH NETWORKS", "BOTH"):
+            return (
+                self.is_management_or_admin
+                or bool(self.roles.intersection({"founder", "hofco", "operations", "executive", "hq", "it_admin"}))
+                or bool({"*", "ALL", "BOTH", "HQ / BOTH NETWORKS"}.intersection({normalize_network_code(n) for n in self.allowed_networks}))
+            )
+        if (
+            self.is_management_or_admin
+            or bool(self.roles.intersection({"founder", "hofco", "operations", "executive", "hq", "it_admin"}))
+            or bool({"*", "ALL", "BOTH", "HQ / BOTH NETWORKS"}.intersection({normalize_network_code(n) for n in self.allowed_networks}))
+        ):
             return True
-        return network.upper() in [n.upper() for n in self.allowed_networks]
+        allowed = [normalize_network_code(n) for n in self.allowed_networks]
+        return norm_req in allowed
 
     def can_access_country(self, country_code: str) -> bool:
-        if not country_code or country_code.upper() in ("*", "ALL"):
+        if not country_code:
             return True
+        code = country_code.strip().upper()
+        if code in ("*", "ALL", "HQ / ALL"):
+            return self.is_management_or_admin or bool(self.roles.intersection({"founder", "hq", "it_admin", "operations"})) or "*" in self.allowed_countries
         if self.is_management_or_admin or "*" in self.allowed_countries:
             return True
-        code = country_code.upper()
         return code in [c.upper() for c in self.allowed_countries]
 
     def can_access_confidential(self) -> bool:
         return self.is_management_or_admin or bool(self.roles.intersection({"management", "it_admin", "reviewer", "founder", "operations", "safeguarding"}))
+
+    def can_access_first_level(self, first_level: str) -> bool:
+        if not first_level or self.is_management_or_admin or "*" in self.allowed_countries:
+            return True
+        if self.leadership_tier <= 3 and not self.first_level_area:
+            return True
+        if self.first_level_area:
+            f_norm = first_level.strip().lower()
+            m_norm = self.first_level_area.strip().lower()
+            return f_norm in m_norm or m_norm in f_norm
+        return True
+
+    def can_access_second_level(self, second_level: str) -> bool:
+        if not second_level or self.is_management_or_admin or "*" in self.allowed_countries:
+            return True
+        if self.leadership_tier <= 3 and not self.second_level_area:
+            return True
+        if self.second_level_area:
+            s_norm = second_level.strip().lower()
+            m_norm = self.second_level_area.strip().lower()
+            return s_norm in m_norm or m_norm in s_norm
+        return True
+
+    def can_access_cluster(self, cluster: str) -> bool:
+        if not cluster or self.is_management_or_admin or "*" in self.allowed_countries:
+            return True
+        if self.leadership_tier <= 4 and not self.community_cluster:
+            return True
+        if self.community_cluster:
+            c_clean = cluster.strip().lower().replace(" cluster", "")
+            my_c_clean = self.community_cluster.strip().lower().replace(" cluster", "")
+            return c_clean in my_c_clean or my_c_clean in c_clean
+        if self.chapter_code or self.chapter_name:
+            from .models import Chapter
+            chap = Chapter.objects.filter(code=self.chapter_code).first() if self.chapter_code else Chapter.objects.filter(name__icontains=self.chapter_name).first()
+            if chap and chap.community_cluster:
+                return chap.community_cluster.strip().lower() in cluster.strip().lower() or cluster.strip().lower() in chap.community_cluster.strip().lower()
+        return True
+
+    def can_access_chapter(self, chapter: str) -> bool:
+        if not chapter or self.is_management_or_admin or "*" in self.allowed_countries:
+            return True
+        if self.leadership_tier < 4:
+            return True
+        if self.community_cluster:
+            from .models import Chapter, LocalOrganisationUnit
+            chap = Chapter.objects.filter(code=chapter).first() or Chapter.objects.filter(name__icontains=chapter).first()
+            if chap and chap.community_cluster:
+                my_c = self.community_cluster.strip().lower().replace(" cluster", "")
+                return my_c in chap.community_cluster.strip().lower()
+            unit = LocalOrganisationUnit.objects.filter(level="Chapter", unit_name__icontains=chapter).first()
+            if unit and unit.parent:
+                my_c = self.community_cluster.strip().lower().replace(" cluster", "")
+                return my_c in unit.parent.unit_name.strip().lower()
+        if self.chapter_code and (chapter.strip().upper() == self.chapter_code.upper()):
+            return True
+        if self.chapter_name and (self.chapter_name.strip().lower() in chapter.strip().lower() or chapter.strip().lower() in self.chapter_name.strip().lower()):
+            return True
+        return False
 
     def can_access_role(self, role: str) -> bool:
         if not role:
@@ -75,6 +280,18 @@ class UserScope:
         if self.is_management_or_admin or bool(self.roles.intersection({"founder", "hq", "it_admin"})):
             return True
 
+        # Ordinary members, candidates, and community users cannot access leadership-only roles
+        if self.leadership_tier > 4 and role not in ("member", "membership", "candidate", "applicant", "community", "supporter"):
+            return False
+
+        # Candidate can only access candidate or community
+        if self.leadership_tier == 6 and role not in ("candidate", "applicant", "community", "supporter"):
+            return False
+
+        # Community can only access community
+        if self.leadership_tier == 7 and role not in ("community", "supporter"):
+            return False
+
         # Check explicit roles assigned via AccessGrant or primary role
         normalized_roles = {r.lower().strip().replace("-", "_") for r in self.roles}
         normalized_primary = (self.primary_role or "").lower().strip().replace("-", "_")
@@ -83,21 +300,44 @@ class UserScope:
 
         # Role aliases mapping
         role_aliases = {
-            "country_lead": {"country_lead", "country_director", "country_representative", "field_lead", "state_lead", "regional_lead", "state_coordinator"},
-            "chapter_lead": {"chapter_lead", "chapter_coordinator", "chapter", "cluster_lead", "cluster_coordinator", "local_operations", "lga_lead", "lga_coordinator"},
+            "country_lead": {"country_lead", "country_director", "country_representative", "field_lead", "deputy_country_lead"},
+            "state_lead": {"state_lead", "regional_lead", "state_coordinator"},
+            "lga_lead": {"local_operations", "lga_lead", "lga_coordinator", "district_lead"},
+            "cluster_lead": {"cluster_lead", "cluster_coordinator", "cluster"},
+            "chapter_lead": {"chapter_lead", "chapter_coordinator", "chapter"},
             "operations": {"operations", "ops", "hofco", "coordinator", "coordination", "regional_coordinator", "programmes", "program_director", "communications", "comms", "resources", "finance", "systems", "quality", "reviewer", "compliance", "safeguarding"},
-            "founder": {"founder", "hq", "executive", "admin", "administration", "secretary"},
+            "founder": {"founder", "hq", "executive"},
+            "admin": {"admin", "administration", "admin_hq"},
             "member": {"member", "membership"},
             "candidate": {"candidate", "applicant"},
             "community": {"community", "supporter"},
             "network_secretary": {"network_secretary", "secretary"},
         }
+
+        # Check exact alias match
         for canon, aliases in role_aliases.items():
             if role in aliases:
                 if canon in normalized_roles or canon == normalized_primary:
                     return True
                 if normalized_roles.intersection(aliases):
                     return True
+
+        # Hierarchical role inheritance: Higher-tier leaders can access subordinate local roles
+        tier_subordinates = {
+            "country_lead": {"state_lead", "lga_lead", "cluster_lead", "chapter_lead", "member", "community"},
+            "state_lead": {"lga_lead", "cluster_lead", "chapter_lead", "member", "community"},
+            "lga_lead": {"cluster_lead", "chapter_lead", "member", "community"},
+            "cluster_lead": {"chapter_lead", "member", "community"},
+            "chapter_lead": {"member", "community"},
+            "operations": {"country_lead", "state_lead", "lga_lead", "cluster_lead", "chapter_lead", "member", "community"},
+        }
+        for parent_role, subs in tier_subordinates.items():
+            parent_aliases = role_aliases.get(parent_role, {parent_role})
+            if normalized_roles.intersection(parent_aliases) or normalized_primary in parent_aliases:
+                for sub in subs:
+                    sub_aliases = role_aliases.get(sub, {sub})
+                    if role in sub_aliases:
+                        return True
 
         # Member role accessibility: authorized if account has a membership or is leadership tier <= 5
         if role in ("member", "membership"):
@@ -176,13 +416,20 @@ def get_user_scope(account: Account, session=None) -> UserScope:
                         allowed_countries.add(chap.country)
                         grant_countries.add(chap.country)
                     else:
-                        c_prefix = geo.split("-")[0]
-                        if get_country(c_prefix):
-                            allowed_countries.add(c_prefix)
-                            grant_countries.add(c_prefix)
+                        from .models import LocalOrganisationUnit
+                        geo_clean = grant.geography.strip().replace(" Cluster", "").replace(" Chapter", "")
+                        l_unit = LocalOrganisationUnit.objects.filter(unit_name__icontains=geo_clean).first()
+                        if l_unit:
+                            allowed_countries.add(l_unit.country)
+                            grant_countries.add(l_unit.country)
                         else:
-                            allowed_countries.add(geo)
-                            grant_countries.add(geo)
+                            c_prefix = geo.split("-")[0]
+                            if get_country(c_prefix):
+                                allowed_countries.add(c_prefix)
+                                grant_countries.add(c_prefix)
+                            else:
+                                allowed_countries.add(geo)
+                                grant_countries.add(geo)
 
     # Inspect Membership
     membership = None
@@ -237,20 +484,102 @@ def get_user_scope(account: Account, session=None) -> UserScope:
     if not allowed_countries:
         allowed_countries.add("NG")
 
-    # Determine chapter affiliation
+    # Determine geographic hierarchy and organizational unit affiliation
+    first_level_area = None
+    second_level_area = None
+    community_cluster = None
+    cluster_name = None
+    cluster_code = None
     chapter_code = None
     chapter_name = None
+
+    # 1. Inspect PersonProfile if present
+    from foundation.models import PersonProfile
+    profile = PersonProfile.objects.filter(account=account).first()
+    if profile:
+        first_level_area = getattr(profile, "state_or_region", None) or None
+        second_level_area = getattr(profile, "lga_or_district", None) or None
+        community_cluster = getattr(profile, "community_cluster", None) or None
+        if profile.cluster_unit:
+            cluster_name = profile.cluster_unit.unit_name
+            cluster_code = getattr(profile.cluster_unit, "unit_code", profile.cluster_unit.unit_name)
+            community_cluster = community_cluster or profile.cluster_unit.unit_name
+        if profile.chapter:
+            chapter_code = profile.chapter.code
+            chapter_name = profile.chapter.name
+            community_cluster = community_cluster or getattr(profile.chapter, "community_cluster", None)
+            if not cluster_name and profile.chapter.cluster_unit:
+                cluster_name = profile.chapter.cluster_unit.unit_name
+                cluster_code = getattr(profile.chapter.cluster_unit, "unit_code", profile.chapter.cluster_unit.unit_name)
+                community_cluster = community_cluster or profile.chapter.cluster_unit.unit_name
+            first_level_area = first_level_area or profile.chapter.region
+            second_level_area = second_level_area or profile.chapter.district
+
+    # 2. Inspect Membership home
     if membership and membership.home:
-        chapter_code = membership.home.get("code")
-        chapter_name = membership.home.get("label") or membership.home.get("name")
-    for grant in active_grants:
-        if grant.role in ("chapter_lead", "chapter", "local_operations", "cluster_lead") and grant.geography:
-            chap = Chapter.objects.filter(code=grant.geography).first() or Chapter.objects.filter(name__icontains=grant.geography).first()
+        h_code = membership.home.get("code")
+        h_label = membership.home.get("label") or membership.home.get("name")
+        if h_code:
+            chap = Chapter.objects.filter(code=h_code).first()
             if chap:
                 chapter_code = chapter_code or chap.code
                 chapter_name = chapter_name or chap.name
+                community_cluster = community_cluster or chap.community_cluster
+                if not cluster_name and chap.cluster_unit:
+                    cluster_name = chap.cluster_unit.unit_name
+                    cluster_code = getattr(chap.cluster_unit, "unit_code", chap.cluster_unit.unit_name)
+                    community_cluster = community_cluster or chap.cluster_unit.unit_name
+                first_level_area = first_level_area or chap.region
+                second_level_area = second_level_area or chap.district
             else:
-                chapter_name = chapter_name or grant.geography
+                chapter_code = chapter_code or h_code
+
+        if h_label and not chapter_name:
+            if not is_broad_geographic_place(h_label, next(iter(allowed_countries)) if allowed_countries else "NG"):
+                chapter_name = h_label
+            else:
+                # Broad place (e.g. Lagos, Ikeja) must NOT be chapter_name
+                if not first_level_area:
+                    first_level_area = h_label
+                elif not second_level_area and h_label != first_level_area:
+                    second_level_area = h_label
+
+    # 3. Inspect AccessGrants
+    for grant in active_grants:
+        if grant.geography:
+            geo = grant.geography.strip()
+            if grant.role in ("state_lead", "regional_lead"):
+                first_level_area = first_level_area or geo
+            elif grant.role in ("lga_lead", "local_operations"):
+                second_level_area = second_level_area or geo
+            elif grant.role in ("cluster_lead", "cluster_coordinator"):
+                community_cluster = community_cluster or geo
+                cluster_name = cluster_name or geo
+            elif grant.role in ("chapter_lead", "chapter"):
+                chap = Chapter.objects.filter(code=geo).first() or Chapter.objects.filter(name__icontains=geo).first()
+                if chap:
+                    chapter_code = chapter_code or chap.code
+                    chapter_name = chapter_name or chap.name
+                    community_cluster = community_cluster or chap.community_cluster
+                    first_level_area = first_level_area or chap.region
+                    second_level_area = second_level_area or chap.district
+                else:
+                    if is_broad_geographic_place(geo, next(iter(allowed_countries)) if allowed_countries else "NG"):
+                        if not first_level_area:
+                            first_level_area = geo
+                        elif not second_level_area and geo != first_level_area:
+                            second_level_area = geo
+                    else:
+                        chapter_name = chapter_name or geo
+
+    # Prevent broad place names from persisting as chapter_name
+    if chapter_name and is_broad_geographic_place(chapter_name, next(iter(allowed_countries)) if allowed_countries else "NG"):
+        chapter_name = None
+
+    if cluster_name and not community_cluster:
+        community_cluster = cluster_name
+    if community_cluster and not cluster_name:
+        cluster_name = community_cluster
 
     # Determine leadership tier & level & primary role
     leadership_level = "member"
@@ -382,6 +711,13 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         roles=roles,
         is_management_or_admin=is_management_or_admin,
         primary_role=primary_role,
+        first_level_area=first_level_area,
+        second_level_area=second_level_area,
+        community_cluster=community_cluster,
+        cluster_name=cluster_name,
+        cluster_code=cluster_code,
+        chapter_code=chapter_code,
+        chapter_name=chapter_name,
     )
     active_role = None
     if session:
@@ -405,6 +741,11 @@ def get_user_scope(account: Account, session=None) -> UserScope:
         active_country=active_country,
         primary_role=primary_role,
         active_role=active_role,
+        first_level_area=first_level_area,
+        second_level_area=second_level_area,
+        community_cluster=community_cluster,
+        cluster_name=cluster_name,
+        cluster_code=cluster_code,
         chapter_code=chapter_code,
         chapter_name=chapter_name,
     )
@@ -430,6 +771,22 @@ def get_scoped_kpis(user_scope: UserScope, role: str, network: str, country: str
 
     now = timezone.now()
 
+    # Enforce user_scope boundaries if user is not cross-network / global
+    is_cross_net = user_scope.is_management_or_admin or bool(user_scope.roles.intersection({"founder", "hq"})) or "*" in user_scope.allowed_networks
+    is_cross_geo = user_scope.is_management_or_admin or bool(user_scope.roles.intersection({"founder", "hq"})) or "*" in user_scope.allowed_countries
+
+    if not is_cross_net:
+        if not network or network in ("ALL", "*"):
+            network = user_scope.active_network
+        elif not user_scope.can_access_network(network):
+            network = user_scope.active_network
+
+    if not is_cross_geo:
+        if not country or country in ("ALL", "*"):
+            country = user_scope.active_country
+        elif not user_scope.can_access_country(country):
+            country = user_scope.active_country
+
     # Base queries
     mem_qs = Membership.objects.all()
     chap_qs = Chapter.objects.filter(status="active")
@@ -453,7 +810,6 @@ def get_scoped_kpis(user_scope: UserScope, role: str, network: str, country: str
 
     # Country scoping (unless 'ALL' / '*')
     if country and country not in ("ALL", "*"):
-        c_name = get_country_display_name(country)
         chap_qs = chap_qs.filter(country=country)
         alert_qs = alert_qs.filter(country__in=[country, "ALL"])
         meet_qs = meet_qs.filter(country__in=[country, "ALL"])
@@ -466,17 +822,22 @@ def get_scoped_kpis(user_scope: UserScope, role: str, network: str, country: str
         total_mems = mem_qs.count()
         chapter_member_sum = chap_qs.aggregate(total=Sum("member_count"))["total"] or 0
         total_members = max(total_mems, chapter_member_sum)
-        return {
+        res = {
             "total_members": total_members,
             "active_chapters": total_chaps,
             "active_alerts": alert_qs.count(),
             "scheduled_meetings": meet_qs.count(),
             "published_reports": rep_qs.count(),
-            "wgmn_members": Membership.objects.filter(network="WGMN").count(),
-            "wnnn_members": Membership.objects.filter(network="WNNN").count(),
-            "wgmn_chapters": Chapter.objects.filter(network="WGMN", status="active").count(),
-            "wnnn_chapters": Chapter.objects.filter(network="WNNN", status="active").count(),
         }
+        # Multi-network comparison only for founder / authorized management
+        if is_cross_net:
+            res.update({
+                "wgmn_members": Membership.objects.filter(network="WGMN").count(),
+                "wnnn_members": Membership.objects.filter(network="WNNN").count(),
+                "wgmn_chapters": Chapter.objects.filter(network="WGMN", status="active").count(),
+                "wnnn_chapters": Chapter.objects.filter(network="WNNN", status="active").count(),
+            })
+        return res
     elif role == "operations":
         return {
             "pending_verifications": draft_qs.count(),
@@ -548,9 +909,15 @@ def assert_scope_authorized(
     country: Optional[str] = None,
     level: Optional[str] = None,
     confidential: bool = False,
+    first_level: Optional[str] = None,
+    second_level: Optional[str] = None,
+    cluster: Optional[str] = None,
+    chapter: Optional[str] = None,
 ):
     """
     Raise ScopePermissionDenied if the requested scope is outside the user's authorization.
+    Supports network, country, leadership level, confidentiality,
+    first-level area, second-level area, community cluster, and chapter.
     """
     if network and not user_scope.can_access_network(network):
         recovery_net = user_scope.allowed_networks[0] if user_scope.allowed_networks else "WGMN"
@@ -573,6 +940,65 @@ def assert_scope_authorized(
             authorized_scope={"allowed_countries": user_scope.allowed_countries},
             recovery_url=f"/foundation/network/{current_net}/country/{recovery_country}/",
         )
+
+    if first_level and not user_scope.can_access_first_level(first_level):
+        raise ScopePermissionDenied(
+            message=f"Access Denied: You do not have authorization to view records for {first_level}.",
+            reason_code="wrong_first_level",
+            attempted_scope={"first_level": first_level},
+            authorized_scope={"first_level_area": user_scope.first_level_area},
+            recovery_url="/foundation/dashboard/",
+        )
+
+    if second_level and not user_scope.can_access_second_level(second_level):
+        raise ScopePermissionDenied(
+            message=f"Access Denied: You do not have authorization to view records for {second_level}.",
+            reason_code="wrong_second_level",
+            attempted_scope={"second_level": second_level},
+            authorized_scope={"second_level_area": user_scope.second_level_area},
+            recovery_url="/foundation/dashboard/",
+        )
+
+    if cluster and not user_scope.can_access_cluster(cluster):
+        raise ScopePermissionDenied(
+            message=f"Access Denied: You do not have authorization to view records for Community Cluster '{cluster}'.",
+            reason_code="wrong_cluster",
+            attempted_scope={"cluster": cluster},
+            authorized_scope={"community_cluster": user_scope.community_cluster},
+            recovery_url="/foundation/dashboard/",
+        )
+
+    if chapter and not user_scope.can_access_chapter(chapter):
+        raise ScopePermissionDenied(
+            message=f"Access Denied: You do not have authorization to view records for Chapter '{chapter}'.",
+            reason_code="wrong_chapter",
+            attempted_scope={"chapter": chapter},
+            authorized_scope={"chapter_code": user_scope.chapter_code, "chapter_name": user_scope.chapter_name},
+            recovery_url="/foundation/dashboard/",
+        )
+
+    if level:
+        level_clean = level.lower().strip().replace("-", "_")
+        target_lvl = LeadershipLevel.objects.filter(code=level_clean).first()
+        target_tier = target_lvl.tier if target_lvl else 5
+        # Ordinary members, candidates, community cannot access leadership levels (tier 1..4)
+        if target_tier <= 4 and user_scope.leadership_tier > 4:
+            raise ScopePermissionDenied(
+                f"Access Denied: Leadership level '{level}' is restricted to authorized leadership appointments.",
+                reason_code="leadership_restricted",
+                attempted_scope={"level": level},
+                authorized_scope={"leadership_tier": user_scope.leadership_tier, "roles": list(user_scope.roles)},
+                recovery_url="/foundation/dashboard/",
+            )
+        # Leadership hierarchy: lower-tier leader cannot access higher tier levels
+        if not user_scope.is_management_or_admin and user_scope.leadership_tier > target_tier and not user_scope.can_access_role(level_clean):
+            raise ScopePermissionDenied(
+                f"Access Denied: You do not have authorization to view leadership tier {target_tier}.",
+                reason_code="leadership_restricted",
+                attempted_scope={"level": level},
+                authorized_scope={"leadership_tier": user_scope.leadership_tier, "roles": list(user_scope.roles)},
+                recovery_url="/foundation/dashboard/",
+            )
 
     if confidential and not user_scope.can_access_confidential():
         raise ScopePermissionDenied(

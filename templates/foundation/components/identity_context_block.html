@@ -1,0 +1,137 @@
+{% load static %}
+<!-- Persistent Identity and Scope Context Block (16 October Review / Rebuild Master Specification v1.2) -->
+<section class="identity-context-block {{ identity_context.network_brand_class }}" role="region" aria-label="Active Identity and Operational Scope">
+  
+  <!-- Identity & Role Ribbon -->
+  <div class="context-identity-row">
+    <div class="context-user-profile">
+      <!-- Profile Photo / Fallback Initials Avatar -->
+      <div class="context-avatar-frame">
+        {% if identity_context.has_profile_photo and identity_context.profile_photo_url %}
+          <img src="{{ identity_context.profile_photo_url }}" alt="{{ identity_context.display_name }}" class="context-photo-img" loading="lazy">
+        {% else %}
+          <div class="context-initials-avatar" style="background: {{ identity_context.network_brand_color }};" aria-hidden="true">
+            {{ identity_context.initials }}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Identity & Role Details -->
+      <div class="context-meta">
+        <div class="context-name-line">
+          <strong class="context-display-name">{{ identity_context.display_name }}</strong>
+          <span class="context-role-badge" style="background: {{ identity_context.network_badge_bg }}; color: {{ identity_context.network_badge_text }}; border-color: {{ identity_context.network_badge_border }};">
+            {{ identity_context.active_role_title }}
+          </span>
+          {% if identity_context.scope_badge %}
+            <span class="context-scope-pill">{{ identity_context.scope_badge }}</span>
+          {% endif %}
+        </div>
+
+        <!-- Network Name and Logo Indicator -->
+        <div class="context-network-line">
+          <span class="context-network-icon" aria-hidden="true">
+            {{ identity_context.network_logo_svg|safe }}
+          </span>
+          <span class="context-network-title">
+            <strong class="network-brand-accent" style="color: {{ identity_context.network_brand_color }};">{{ identity_context.network_short_name }}</strong>
+            <span class="network-full-name">· {{ identity_context.network_name }}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Role & Scope Controls -->
+    <div class="context-actions">
+      <a href="/foundation/dashboard/switch-role/" class="context-switch-btn" title="Switch active network, role, or country scope" aria-label="Switch active network, role, or country scope">
+        <span class="switch-icon" aria-hidden="true">⇋</span>
+        <span class="switch-label">Switch Scope / Role</span>
+      </a>
+    </div>
+  </div>
+
+  {# Operational Hierarchy Pipeline Trail #}
+  {# Pipeline pattern: Network -> Country -> Level 1 -> Level 2 -> Cluster -> Chapter #}
+  <div class="context-hierarchy-row" aria-label="Organizational and Geographic Assignment Hierarchy">
+    <div class="hierarchy-label">
+      <span class="hierarchy-badge">ASSIGNED SCOPE</span>
+    </div>
+
+    <div class="hierarchy-pipeline" role="list">
+      <!-- 1. Network Node -->
+      <div class="pipeline-node node-network" role="listitem" title="Active Network: {{ identity_context.network_name }}">
+        <span class="node-pill pill-network" style="background: {{ identity_context.network_brand_color }};">
+          {{ identity_context.network_short_name }}
+        </span>
+      </div>
+
+      <span class="pipeline-arrow" aria-hidden="true">→</span>
+
+      <!-- 2. Public Administrative Geography: Country -->
+      <div class="pipeline-node node-country" role="listitem" title="Public Country: {{ identity_context.country_name }} ({{ identity_context.country_code }})">
+        <span class="node-pill pill-country">
+          <span class="flag-icon" aria-hidden="true">{{ identity_context.country_flag_emoji }}</span>
+          <span class="node-text">{{ identity_context.country_name }}</span>
+          <span class="geo-badge-tag tag-country">Country</span>
+        </span>
+      </div>
+
+      <span class="pipeline-arrow" aria-hidden="true">→</span>
+
+      <!-- 3. Public Administrative Geography: First-Level Area (State / Province / County) -->
+      <div class="pipeline-node node-first-level" role="listitem" title="Public First-Level Area ({{ identity_context.first_level_term }}): {{ identity_context.first_level_name }}">
+        <span class="node-pill pill-first-level">
+          <span class="geo-icon" aria-hidden="true">📍</span>
+          <span class="node-text">{{ identity_context.first_level_name }}</span>
+          <span class="geo-badge-tag tag-admin">{{ identity_context.first_level_term }}</span>
+        </span>
+      </div>
+
+      <span class="pipeline-arrow" aria-hidden="true">→</span>
+
+      <!-- 4. Public Administrative Geography: Second-Level Area (LGA / District / Sub-County) -->
+      <div class="pipeline-node node-second-level" role="listitem" title="Public Local Government / District ({{ identity_context.second_level_term }}): {{ identity_context.second_level_name }}">
+        <span class="node-pill pill-second-level">
+          <span class="geo-icon" aria-hidden="true">🏛️</span>
+          <span class="node-text">{{ identity_context.second_level_name }}</span>
+          <span class="geo-badge-tag tag-admin">{{ identity_context.second_level_term }}</span>
+        </span>
+      </div>
+
+      <span class="pipeline-arrow" aria-hidden="true">→</span>
+
+      <!-- 5. WODDI Organisational Unit: Community Cluster (DISTINGUISHED from Public Geography) -->
+      <div class="pipeline-node node-cluster" role="listitem" title="WODDI Community Cluster: {{ identity_context.cluster_name }}">
+        <span class="node-pill pill-cluster">
+          <span class="cluster-icon" aria-hidden="true">❖</span>
+          <span class="node-text"><strong>{{ identity_context.cluster_name }}</strong></span>
+          <span class="org-badge-tag tag-cluster">Community Cluster</span>
+        </span>
+      </div>
+
+      <span class="pipeline-arrow" aria-hidden="true">→</span>
+
+      <!-- 6. WODDI Operating Unit: Actual Chapter (DISTINGUISHED from Community Cluster & Public Geography) -->
+      <div class="pipeline-node node-chapter" role="listitem" title="WODDI Operating Unit: {{ identity_context.chapter_name }}">
+        <span class="node-pill pill-chapter">
+          <span class="chapter-icon" aria-hidden="true">★</span>
+          <span class="node-text"><strong>{{ identity_context.chapter_name }}</strong></span>
+          <span class="org-badge-tag tag-chapter">Chapter</span>
+        </span>
+      </div>
+
+      {% if identity_context.person_name %}
+      <span class="pipeline-arrow" aria-hidden="true">→</span>
+
+      <!-- 7. Person (Terminal Individual in Hierarchy) -->
+      <div class="pipeline-node node-person" role="listitem" title="Person: {{ identity_context.person_name }}">
+        <span class="node-pill pill-person">
+          <span class="person-icon" aria-hidden="true">👤</span>
+          <span class="node-text"><strong>{{ identity_context.person_name }}</strong></span>
+          <span class="org-badge-tag tag-person">Person</span>
+        </span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>

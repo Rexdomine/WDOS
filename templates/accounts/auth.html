@@ -225,6 +225,42 @@
       {% endif %}
 
       {% if screen == 'AUTH-01' %}
+        <div class="welcome-network-selection" role="region" aria-label="Select your network">
+          <div class="welcome-network-grid">
+            <!-- WGMN Visual Identity Card -->
+            <div class="welcome-network-card network-choice-card card-wgmn">
+              <div class="network-card-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <img src="{% static 'accounts/assets/wgmn-logo.svg' %}" alt="WGMN Logo" class="network-card-logo" width="28" height="28">
+                  <span class="network-badge badge-wgmn">WGMN &middot; 30+</span>
+                </div>
+                <span class="network-age-band">Mothers &amp; Adult Women (30+)</span>
+              </div>
+              <h2 class="network-card-title">WODDI Good Mother Network</h2>
+              <p class="network-card-desc">Family development, maternal health leadership, country chapters, and community empowerment.</p>
+              <div class="network-card-action">
+                <a class="btn primary btn-wgmn" href="{% url 'accounts:register' %}?network=WGMN">{% include 'accounts/arrow.html' %}Enter Good Mother Network</a>
+              </div>
+            </div>
+
+            <!-- WNN Visual Identity Card -->
+            <div class="welcome-network-card network-choice-card card-wnn">
+              <div class="network-card-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <img src="{% static 'accounts/assets/wnn-logo.svg' %}" alt="WNN Logo" class="network-card-logo" width="28" height="28">
+                  <span class="network-badge badge-wnn">WNN &middot; 18–29</span>
+                </div>
+                <span class="network-age-band">Young Women &amp; Youth (18–29)</span>
+              </div>
+              <h2 class="network-card-title">WODDI Next-Gen Nurturers Network</h2>
+              <p class="network-card-desc">Leadership acceleration, peer mentorship circles, digital skills, and next-gen community clusters.</p>
+              <div class="network-card-action">
+                <a class="btn primary btn-wnn" href="{% url 'accounts:register' %}?network=WNNN">{% include 'accounts/arrow.html' %}Enter Next-Gen Nurturers</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="welcome-actions">
           <a class="btn primary" href="{% url 'accounts:register' %}">{% include 'accounts/arrow.html' %}{{ translations.join }}</a>
         </div>

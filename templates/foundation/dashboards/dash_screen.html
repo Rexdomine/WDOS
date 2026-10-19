@@ -80,6 +80,11 @@
   </div>
   {% endif %}
 
+  <!-- Approved Country Geographic Visualisation on Country Overview (Acceptance Criteria #2, #3, #4, #5) -->
+  {% if screen.screen_id == 'DASH-10' or screen.screen_id == 'DASH-10-COVERAGE' or screen_code == 'DASH-10' or norm_code == 'DASH-10' %}
+  {% include "foundation/snippets/country_map_card.html" %}
+  {% endif %}
+
   <!-- Search and Filter Bar -->
   {% if screen.has_search_filter %}
   <div class="dash-toolbar">

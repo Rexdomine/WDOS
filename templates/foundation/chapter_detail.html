@@ -137,12 +137,16 @@
         <dd>{{ chapter.country }}</dd>
       </div>
       <div>
-        <dt>Region / State</dt>
+        <dt>{{ first_level_term|default:"Region / State" }}</dt>
         <dd>{{ chapter.region|default:"Not specified" }}</dd>
       </div>
       <div>
-        <dt>District / LGA</dt>
+        <dt>{{ second_level_term|default:"District / LGA" }}</dt>
         <dd>{{ chapter.district|default:"Not specified" }}</dd>
+      </div>
+      <div>
+        <dt>Community Cluster</dt>
+        <dd><strong>{{ community_cluster_name|default:chapter.community_cluster|default:"Assigned Cluster" }}</strong></dd>
       </div>
       <div>
         <dt>Lead Coordinator</dt>

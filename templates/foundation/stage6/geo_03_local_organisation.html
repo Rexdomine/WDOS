@@ -47,18 +47,41 @@
   <div class="stage6-hierarchy-container">
     <!-- Structure Tree -->
     <div class="stage6-hierarchy-tree" role="region" aria-label="Organizational Hierarchy Tree">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
         <h2 style="font-size:16px; font-weight:700; color:#111827; margin:0;">Local organisation</h2>
         <a href="?tab=unit_directory{% if target_country %}&country={{ target_country }}{% endif %}" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">List view &rarr;</a>
+      </div>
+
+      <!-- Authoritative Hierarchy Trail Breadcrumb Box -->
+      <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:12px 14px; margin-bottom:18px;">
+        <div style="font-size:10.5px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Authoritative Hierarchy Trail</div>
+        <div style="font-size:13px; font-weight:600; color:#111827;">
+          {{ country_hierarchy.path_text|default:"WGMN → Nigeria → Lagos State → Ikeja LGA → Ikeja Central Cluster → Allen Chapter" }}
+        </div>
+        <div style="font-size:11px; color:#6B7280; margin-top:6px;">
+          <em>Rule: Public areas (such as {{ country_hierarchy.first_level_name|default:"Region" }} or {{ country_hierarchy.second_level_name|default:"District" }}) are public administrative geography and not chapters. Community Clusters and Chapters are distinct WDOS operating units.</em>
+        </div>
       </div>
 
       {% for h_unit in hierarchy_units %}
       <div class="stage6-hierarchy-item">
         <div class="stage6-hierarchy-bullet"></div>
         <div class="stage6-hierarchy-item-card">
-          <div class="stage6-hierarchy-unit-name">{% if h_unit.level == 'Country' %}{{ h_unit.network|default:target_network|default:"WGMN" }} / {{ h_unit.unit_name }}{% else %}{{ h_unit.unit_name }}{% endif %}</div>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+            <div class="stage6-hierarchy-unit-name">{% if h_unit.level == 'Country' %}{{ h_unit.network|default:target_network|default:"WGMN" }} / {{ h_unit.unit_name }}{% else %}{{ h_unit.unit_name }}{% endif %}</div>
+            {% if h_unit.level == 'Country' or h_unit.level == 'Region / State' or h_unit.level == 'District / LGA' %}
+            <span class="badge-public-geo">Public Administrative Geography</span>
+            {% elif h_unit.level == 'Community Cluster' %}
+            <span class="badge-wdos-org">WDOS Organisational Unit</span>
+            {% elif h_unit.level == 'Chapter' %}
+            <span class="badge-wdos-operating">WDOS Operating Unit</span>
+            {% endif %}
+          </div>
           <div class="stage6-hierarchy-unit-desc">{{ h_unit.description }}</div>
-          <span class="stage6-hierarchy-unit-level">{{ h_unit.level }}</span>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+            <span class="stage6-hierarchy-unit-level">{{ h_unit.level }}</span>
+            <span style="font-size:11px; color:#6B7280;">Leader: {{ h_unit.responsible_leader_name }}</span>
+          </div>
         </div>
       </div>
       {% if not forloop.last %}
@@ -70,6 +93,7 @@
         <div class="stage6-hierarchy-item-card">
           <div class="stage6-hierarchy-unit-name">{{ target_network|default:"WGMN" }} / {{ target_country_name|default:"Nigeria" }}</div>
           <div class="stage6-hierarchy-unit-desc">Assigned network and organisational scope</div>
+          <span class="badge-public-geo">Public Administrative Geography</span>
           <span class="stage6-hierarchy-unit-level">Country</span>
         </div>
       </div>
@@ -117,9 +141,18 @@
         <select id="id_level" name="level" class="stage6-input">
           <option value="Chapter">Chapter</option>
           <option value="Community Cluster">Community Cluster</option>
-          <option value="District / LGA">District / LGA</option>
-          <option value="Region / State">Region / State</option>
+          <option value="District / LGA">{{ second_level_term|default:"District / LGA" }}</option>
+          <option value="Region / State">{{ first_level_term|default:"Region / State" }}</option>
           <option value="Country">Country</option>
+        </select>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_parent_id" style="font-size:12px;">Parent unit (Cluster / District)</label>
+        <select id="id_parent_id" name="parent_id" class="stage6-input">
+          <option value="">-- No parent / Root unit --</option>
+          {% for p_unit in available_parents %}
+          <option value="{{ p_unit.id }}">{{ p_unit.unit_name }} ({{ p_unit.level }})</option>
+          {% endfor %}
         </select>
       </div>
       <div>
@@ -160,7 +193,12 @@
       <tbody>
         {% for unit in units %}
         <tr>
-          <td style="font-weight:600; color:#111827;">{{ unit.unit_name }}</td>
+          <td style="font-weight:600; color:#111827;">
+            {{ unit.unit_name }}
+            {% if unit.parent %}
+            <span style="display:block; font-size:11.5px; color:#6B7280; font-weight:normal;">Parent: {{ unit.parent.unit_name }} ({{ unit.parent.level }})</span>
+            {% endif %}
+          </td>
           <td>{{ unit.level }}</td>
           <td>{{ unit.responsible_leader_name }}</td>
           <td>

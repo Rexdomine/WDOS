@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60" fill="none">
+  <!-- WODDI Emblem: Floral / Motherhood Circle in Magenta -->
+  <g transform="translate(6, 6)">
+    <circle cx="24" cy="24" r="22" fill="#FDF2F8" stroke="#D4006A" stroke-width="2.5"/>
+    <!-- Stylized Heart/Nurturing Petals -->
+    <path d="M24 14 C20 10, 14 12, 14 17 C14 23, 24 30, 24 33 C24 30, 34 23, 34 17 C34 12, 28 10, 24 14 Z" fill="#D4006A"/>
+    <circle cx="24" cy="18" r="2.5" fill="#FFFFFF"/>
+  </g>
+  <!-- Text: WGMN -->
+  <text x="64" y="28" font-family="'Manrope', -apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="800" fill="#D4006A" letter-spacing="1">WGMN</text>
+  <!-- Text: WODDI GOOD MOTHER NETWORK -->
+  <text x="64" y="44" font-family="'Inter', -apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="700" fill="#9D174D" letter-spacing="0.5">WODDI GOOD MOTHER NETWORK</text>
+</svg>

@@ -13,11 +13,13 @@ from .models import (
     DashboardAlert,
     DashboardActivity,
     DashboardReport,
+    LocalOrganisationUnit,
     ScheduledMeeting,
     WorkItem,
 )
 from accounts.models import Account, Membership, OnboardingDraft
-from .scope import ScopePermissionDenied
+from .context_block import get_identity_context
+from .scope import ScopePermissionDenied, is_broad_geographic_place, sanitize_chapter_display
 
 
 DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
@@ -1615,7 +1617,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         "state_pnum": 131,
         "eyebrow": "WGMN / NIGERIA / LAGOS",
         "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "country_lead",
+        "default_role_code": "state_lead",
         "default_role_title": "State Coordinator",
         "default_network": "WGMN",
         "default_country": "NG",
@@ -1714,7 +1716,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         "state_pnum": 134,
         "eyebrow": "WGMN / NIGERIA / IKEJA",
         "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "chapter_lead",
+        "default_role_code": "lga_lead",
         "default_role_title": "LGA Coordinator",
         "default_network": "WGMN",
         "default_country": "NG",
@@ -1813,7 +1815,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         "state_pnum": 137,
         "eyebrow": "WGMN / NIGERIA / IKEJA",
         "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "chapter_lead",
+        "default_role_code": "cluster_lead",
         "default_role_title": "Cluster Coordinator",
         "default_network": "WGMN",
         "default_country": "NG",
@@ -2458,16 +2460,16 @@ def get_dashboard_screen(screen_code: str) -> Optional[Dict[str, Any]]:
 
 def get_default_screen_for_role(role: str) -> str:
     """Map user role to its canonical default dashboard screen."""
-    r = (role or "").strip().lower()
+    r = (role or "").strip().lower().replace("-", "_")
     if r in ("founder", "hq", "executive", "management"):
         return "DASH-01"
     elif r in ("operations", "hofco", "ops"):
         return "DASH-02"
-    elif r in ("coordination", "coordinator", "regional_coordinator", "network_secretary"):
+    elif r in ("coordination", "coordinator", "regional_coordinator", "network_secretary", "secretary"):
         return "DASH-03"
-    elif r in ("admin", "administration", "secretary"):
+    elif r in ("admin", "administration", "admin_hq", "admin_lead"):
         return "DASH-04"
-    elif r in ("programmes", "program_director", "programme_portfolio"):
+    elif r in ("programmes", "program_director", "programme_portfolio", "program_lead"):
         return "DASH-05"
     elif r in ("communications", "comms", "media"):
         return "DASH-06"
@@ -2475,23 +2477,23 @@ def get_default_screen_for_role(role: str) -> str:
         return "DASH-07"
     elif r in ("systems", "it_admin", "tech_ops"):
         return "DASH-08"
-    elif r in ("quality", "controls", "compliance", "reviewer"):
+    elif r in ("quality", "controls", "compliance", "reviewer", "qa_controls", "quality_lead"):
         return "DASH-09"
     elif r in ("safeguarding", "safeguarding_officer"):
         return "DASH-10-SAFEGUARDING"
-    elif r in ("country_lead", "country_representative", "country_director"):
+    elif r in ("country_lead", "country_representative", "country_director", "field_lead", "deputy_country_lead"):
         return "DASH-10"
     elif r in ("state_lead", "regional_lead", "state_coordinator"):
         return "DASH-11"
-    elif r in ("lga_lead", "local_operations", "lga_coordinator"):
+    elif r in ("lga_lead", "local_operations", "lga_coordinator", "local_lead"):
         return "DASH-12"
-    elif r in ("cluster_lead", "cluster_coordinator"):
+    elif r in ("cluster_lead", "cluster_coordinator", "cluster"):
         return "DASH-13"
     elif r in ("chapter_lead", "chapter", "chapter_coordinator"):
         return "DASH-14"
-    elif r in ("member",):
+    elif r in ("member", "membership"):
         return "DASH-15"
-    elif r in ("candidate",):
+    elif r in ("candidate", "applicant"):
         return "DASH-16"
     elif r in ("community", "supporter"):
         return "DASH-17"
@@ -2501,64 +2503,106 @@ def get_default_screen_for_role(role: str) -> str:
 def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool = False):
     """
     Enforces server-authoritative boundary checks:
-    - Safeguarding: DASH-10-SAFEGUARDING is strictly restricted.
-    - Role level & geographic isolation.
-    - Network separation.
+    - Safeguarding: DASH-10-SAFEGUARDING is strictly restricted to confidential safeguarding officers.
+    - Tier boundaries: Ordinary members (T5), candidates (T6), community (T7) cannot access leadership screens.
+    - Leadership hierarchy: Lower-tier leaders cannot access higher-tier dashboards.
+    - Geographic boundaries: Single-country clearance cannot access non-permitted country hubs.
+    - Network separation: WGMN users cannot access WNN dashboards; WNN users cannot access WGMN dashboards.
     """
     screen = get_dashboard_screen(screen_code)
     if not screen:
         raise ScopePermissionDenied(f"Unknown dashboard screen: {screen_code}", reason_code="not_found")
 
+    norm_code = screen_code.strip().upper()
+
     # Confidential Safeguarding desk check
-    if screen.get("requires_safeguarding"):
-        if not user_scope.can_access_confidential():
+    if screen.get("requires_safeguarding") or norm_code == "DASH-10-SAFEGUARDING":
+        if not user_scope.can_access_confidential() and not user_scope.can_access_role("safeguarding"):
             raise ScopePermissionDenied(
                 "Access to confidential safeguarding records is restricted to authorized safeguarding officers.",
                 reason_code="safeguarding_restricted",
                 recovery_url="/foundation/dashboard/",
             )
 
-    norm_code = screen_code.strip().upper()
-
-    # Universal role dashboards adapt dynamically to the user's authorized country and network.
-    UNIVERSAL_ROLE_SCREENS = {
+    # Leadership boundaries: Ordinary members, candidates, and community users cannot access leadership screens (tier 1..4)
+    LEADERSHIP_SCREENS = {
         "DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05",
         "DASH-06", "DASH-07", "DASH-08", "DASH-09",
-        "DASH-10", "DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION", "DASH-10-CR",
-        "DASH-13", "DASH-14",
-        "DASH-15", "DASH-16", "DASH-17"
+        "DASH-10", "DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE",
+        "DASH-10-ATTENTION", "DASH-10-CR", "DASH-10-REPORTING", "DASH-10-ENGAGEMENT",
+        "DASH-10-SAFEGUARDING", "DASH-11", "DASH-12", "DASH-13", "DASH-14"
     }
 
-    # Role authorization check for the dashboard
-    screen_role = screen.get("default_role_code")
-    if screen_role:
-        if not user_scope.can_access_role(screen_role):
-            # Check hierarchy permissions
-            tier_allows = False
-            if screen_role in ("candidate", "community"):
-                tier_allows = True
-            elif screen_role == "member" and user_scope.can_access_role("member"):
-                tier_allows = True
-            elif screen_role == "chapter_lead" and (user_scope.can_access_role("chapter_lead") or user_scope.leadership_tier <= 4):
-                tier_allows = True
-            elif screen_role == "country_lead" and (user_scope.can_access_role("country_lead") or user_scope.leadership_tier <= 3):
-                tier_allows = True
-            elif screen_role in ("operations", "founder") and (user_scope.is_management_or_admin or user_scope.leadership_tier <= 2):
-                tier_allows = True
+    if user_scope.leadership_tier > 4 and norm_code in LEADERSHIP_SCREENS:
+        raise ScopePermissionDenied(
+            "Access Denied: Leadership dashboards are restricted to authorized leadership appointments.",
+            reason_code="leadership_restricted",
+            attempted_scope={"screen": norm_code},
+            authorized_scope={"leadership_tier": user_scope.leadership_tier, "roles": list(user_scope.roles)},
+            recovery_url="/foundation/dashboard/",
+        )
 
-            if not tier_allows:
+    # Candidate restricted from member dashboard
+    if user_scope.leadership_tier == 6 and norm_code not in ("DASH-16", "DASH-17"):
+        raise ScopePermissionDenied(
+            "Access Denied: Candidate accounts cannot access member or leadership dashboards.",
+            reason_code="unauthorized_role",
+            attempted_scope={"screen": norm_code},
+            authorized_scope={"primary_role": user_scope.primary_role},
+            recovery_url="/foundation/dashboard/",
+        )
+
+    # Community restricted from candidate/member dashboards
+    if user_scope.leadership_tier == 7 and norm_code != "DASH-17":
+        raise ScopePermissionDenied(
+            "Access Denied: Community accounts cannot access candidate, member, or leadership dashboards.",
+            reason_code="unauthorized_role",
+            attempted_scope={"screen": norm_code},
+            authorized_scope={"primary_role": user_scope.primary_role},
+            recovery_url="/foundation/dashboard/",
+        )
+
+    # Tier 4 operational leaders cannot access screens above their role authority
+    if user_scope.leadership_tier == 4 and not user_scope.is_management_or_admin:
+        if norm_code in ("DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05", "DASH-06", "DASH-07", "DASH-08", "DASH-09", "DASH-10", "DASH-11", "DASH-12", "DASH-13"):
+            screen_role = screen.get("default_role_code", "")
+            if not user_scope.can_access_role(screen_role):
                 raise ScopePermissionDenied(
-                    f"Access Denied: You do not have authorization to view the {screen.get('default_role_title', screen_role)} dashboard.",
+                    f"Access Denied: You do not have authorization to view the {screen.get('default_role_title', norm_code)} dashboard.",
                     reason_code="unauthorized_role",
-                    attempted_scope={"screen": norm_code, "role": screen_role},
-                    authorized_scope={"roles": list(user_scope.roles), "primary_role": user_scope.primary_role},
+                    attempted_scope={"screen": norm_code},
+                    authorized_scope={"roles": list(user_scope.roles)},
                     recovery_url="/foundation/dashboard/",
                 )
 
-    # Country isolation check: DASH-11 (Lagos) and DASH-12 (Ikeja) and explicit DASH-10 (Nigeria overview)
+    # Country Lead (tier 3) cannot access continental operations (T2) or founder (T1)
+    if user_scope.leadership_tier == 3 and not user_scope.is_management_or_admin:
+        if norm_code in ("DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05", "DASH-06", "DASH-07", "DASH-08", "DASH-09"):
+            screen_role = screen.get("default_role_code", "")
+            if not user_scope.can_access_role(screen_role):
+                raise ScopePermissionDenied(
+                    f"Access Denied: You do not have authorization to view the {screen.get('default_role_title', norm_code)} dashboard.",
+                    reason_code="unauthorized_role",
+                    attempted_scope={"screen": norm_code},
+                    authorized_scope={"roles": list(user_scope.roles)},
+                    recovery_url="/foundation/dashboard/",
+                )
+
+    # Founder overview (DASH-01) is strictly restricted to founder/management
+    if norm_code == "DASH-01":
+        if not user_scope.is_management_or_admin and not user_scope.can_access_role("founder"):
+            raise ScopePermissionDenied(
+                "Access Denied: The executive overview dashboard is restricted to the Founder and authorized executive leadership.",
+                reason_code="unauthorized_role",
+                attempted_scope={"screen": norm_code},
+                authorized_scope={"roles": list(user_scope.roles)},
+                recovery_url="/foundation/dashboard/",
+            )
+
+    # Country isolation check
     screen_country = screen.get("default_country")
     if screen_country and screen_country != "ALL":
-        if (is_explicit and norm_code in ("DASH-10", "DASH-11", "DASH-12")) or norm_code not in UNIVERSAL_ROLE_SCREENS:
+        if is_explicit:
             if not user_scope.can_access_country(screen_country):
                 raise ScopePermissionDenied(
                     f"Your account scope does not grant access to the {screen_country} country hub.",
@@ -2566,16 +2610,17 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
                     recovery_url="/foundation/dashboard/",
                 )
 
-    # Network-scoped screens verification
+    # Network separation check
     screen_network = screen.get("default_network")
     if screen_network and screen_network not in ("HQ / Both networks", "ALL", "*", "WODDI", "PUBLIC", "My application"):
-        if norm_code not in UNIVERSAL_ROLE_SCREENS:
-            if not user_scope.can_access_network(screen_network):
-                raise ScopePermissionDenied(
-                    f"Your account scope does not grant access to the {screen_network} network workspace.",
-                    reason_code="network_mismatch",
-                    recovery_url="/foundation/dashboard/",
-                )
+        from .scope import normalize_network_code
+        norm_screen_net = normalize_network_code(screen_network)
+        if not user_scope.can_access_network(norm_screen_net):
+            raise ScopePermissionDenied(
+                f"Your account scope does not grant access to the {screen_network} network workspace.",
+                reason_code="network_mismatch",
+                recovery_url="/foundation/dashboard/",
+            )
 
 
 def build_dashboard_context(
@@ -2663,7 +2708,8 @@ def build_dashboard_context(
             screen_title = f"{country_display} · what needs attention"
             eyebrow = f"{active_network} / {country_display.upper()}"
         elif norm_code == "DASH-14" and not is_explicit:
-            chap_name = user_scope.chapter_name or "Chapter"
+            raw_chap = user_scope.chapter_name or "Chapter"
+            chap_name = sanitize_chapter_display(raw_chap, fallback_country=active_country)
             screen_title = f"{chap_name} · Command desk"
             eyebrow = f"{active_network} / {country_display.upper()}"
         elif norm_code == "DASH-15" and not is_explicit:
@@ -2783,11 +2829,73 @@ def build_dashboard_context(
                 {"item": "Mombasa · WGMN", "col2": "Principal only", "status_label": "Deputy vacancy", "status_style": "purple", "url": "/foundation/dashboard/"},
                 {"item": "Kisumu · WGMN", "col2": "Deputy only", "status_label": "Principal vacancy", "status_style": "purple", "url": "/foundation/dashboard/"},
             ]
+    elif norm_code == "DASH-13":
+        c_name = user_scope.community_cluster or user_scope.cluster_name
+        c_unit = None
+        if c_name:
+            c_clean = c_name.replace(" Cluster", "").strip()
+            c_unit = LocalOrganisationUnit.objects.filter(
+                country=active_country,
+                network=active_network,
+                level="Community Cluster",
+                unit_name__icontains=c_clean,
+            ).first()
+        if not c_unit:
+            c_unit = LocalOrganisationUnit.objects.filter(
+                country=active_country,
+                network=active_network,
+                level="Community Cluster",
+            ).first()
+
+        connected_chapters_count = 0
+        connected_chapter_names = []
+        if c_unit:
+            ch_units = c_unit.children.filter(level="Chapter")
+            connected_chapters_count = ch_units.count()
+            connected_chapter_names = [u.unit_name for u in ch_units]
+        if connected_chapters_count == 0:
+            chaps = Chapter.objects.filter(
+                country=active_country,
+                network=active_network,
+                status="active",
+            )
+            if c_name:
+                chaps = chaps.filter(community_cluster__icontains=c_name.replace(" Cluster", "").strip())
+            connected_chapters_count = chaps.count()
+            connected_chapter_names = [c.name for c in chaps]
+
+        disp_cluster = c_name or (c_unit.unit_name if c_unit else "Community Cluster")
+        if not disp_cluster.lower().endswith("cluster"):
+            disp_cluster = f"{disp_cluster} Cluster"
+
+        if len(kpi_cards) >= 1:
+            kpi_cards[0]["value"] = str(connected_chapters_count or 6)
+            kpi_cards[0]["sub"] = f"Within {disp_cluster}"
+
+        if table_card and connected_chapter_names:
+            table_card["rows"] = [
+                {
+                    "item": f"{name} membership & returns",
+                    "col2": "Chapter Lead",
+                    "col3": "25 Sep",
+                    "status_label": "Active",
+                    "status_style": "green",
+                    "url": "/foundation/work-queue/",
+                }
+                for name in connected_chapter_names[:4]
+            ]
+            table_card["record_count_text"] = f"Showing {len(connected_chapter_names)} connected Chapters"
     elif norm_code == "DASH-14":
         kpis = get_scoped_kpis(user_scope, "chapter_lead", active_network, active_country)
+        raw_chap = user_scope.chapter_name or kpis.get("chapter_name", "Local Chapter")
+        chap_name = sanitize_chapter_display(raw_chap, fallback_country=active_country)
+        parent_cluster = user_scope.community_cluster or "Community Cluster"
+        if not parent_cluster.lower().endswith("cluster"):
+            parent_cluster = f"{parent_cluster} Cluster"
+
         if len(kpi_cards) >= 4:
-            kpi_cards[0]["value"] = kpis.get("chapter_name", user_scope.chapter_name or "Local Chapter")
-            kpi_cards[0]["sub"] = country_display
+            kpi_cards[0]["value"] = chap_name
+            kpi_cards[0]["sub"] = f"{parent_cluster} · {country_display}"
             kpi_cards[1]["value"] = str(kpis.get("chapter_members", 0))
             kpi_cards[2]["value"] = str(kpis.get("chapter_meetings", 0))
             kpi_cards[3]["value"] = str(kpis.get("chapter_notices", 0))
@@ -2817,8 +2925,59 @@ def build_dashboard_context(
                     row0["col2"] = next_meet.scheduled_at.strftime("%d %b · %H:%M")
                     row0["status_label"] = "View invitation"
                     row0["url"] = f"/foundation/dashboard/meetings/{next_meet.id}/"
-                    rows[0] = row0
-                    table_card["rows"] = rows
+    # Enforce network and geography data boundaries in table_card and attention_card
+    # Founder / Management can have an authorized cross-network overview.
+    # Non-founder/lower-level users must remain strictly scoped to their permitted network and geography.
+    if not user_scope.can_cross_network:
+        # 1. Adapt eyebrow if it says HQ / BOTH NETWORKS
+        if eyebrow == "HQ / BOTH NETWORKS":
+            if active_country and active_country != "ALL":
+                eyebrow = f"{active_network} / {country_display.upper()}"
+            else:
+                eyebrow = f"{active_network} / CONTINENTAL OPERATIONS"
+
+        # 2. Filter table_card rows
+        if table_card and "rows" in table_card:
+            raw_rows = table_card["rows"]
+            filtered_rows = []
+            for row in raw_rows:
+                row_text = " ".join([str(v) for v in row.values() if v])
+                # Check forbidden network
+                if active_network in ("WGMN",) and ("WNNN" in row_text or "WNN" in row_text):
+                    continue
+                if active_network in ("WNN", "WNNN") and ("WGMN" in row_text):
+                    continue
+                # Check geography boundary for single-country users
+                if user_scope.allowed_countries != ["*"] and active_country != "ALL":
+                    if active_country == "NG" and any(k in row_text for k in ("Kenya", "Nairobi", "Mombasa", "Ghana", "Accra")):
+                        continue
+                    elif active_country == "KE" and any(k in row_text for k in ("Nigeria", "Lagos", "Ikeja", "Kano", "Abuja", "Ghana")):
+                        continue
+                    elif active_country == "GH" and any(k in row_text for k in ("Nigeria", "Lagos", "Kenya", "Nairobi")):
+                        continue
+                filtered_rows.append(row)
+            table_card["rows"] = filtered_rows
+            table_card["record_count_text"] = f"Showing {len(filtered_rows)} records in this view"
+
+        # 3. Filter attention_card items
+        if attention_card and "items" in attention_card:
+            raw_items = attention_card["items"]
+            filtered_items = []
+            for item in raw_items:
+                item_text = " ".join([str(v) for v in item.values() if v])
+                if active_network in ("WGMN",) and ("WNNN" in item_text or "WNN" in item_text):
+                    continue
+                if active_network in ("WNN", "WNNN") and ("WGMN" in item_text):
+                    continue
+                if user_scope.allowed_countries != ["*"] and active_country != "ALL":
+                    if active_country == "NG" and any(k in item_text for k in ("Kenya", "Nairobi", "Mombasa", "Ghana", "Accra")):
+                        continue
+                    elif active_country == "KE" and any(k in item_text for k in ("Nigeria", "Lagos", "Ikeja", "Kano", "Abuja", "Ghana")):
+                        continue
+                    elif active_country == "GH" and any(k in item_text for k in ("Nigeria", "Lagos", "Kenya", "Nairobi")):
+                        continue
+                filtered_items.append(item)
+            attention_card["items"] = filtered_items
 
     related_views = []
     for rel_code in related_screens:
@@ -2874,4 +3033,12 @@ def build_dashboard_context(
         "active_network": active_network,
         "active_country": active_country,
         "country_name": country_display,
+        "identity_context": get_identity_context(
+            account,
+            user_scope,
+            active_network=active_network,
+            active_role=user_scope.active_role,
+            active_country=active_country,
+            request=request,
+        ),
     }

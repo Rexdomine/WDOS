@@ -37,54 +37,231 @@
     <a href="/foundation/geography/dossier/verify/{% if state_mode %}?state={{ state_mode }}{% endif %}" class="stage6-subnav-item" role="tab">Verification</a>
   </div>
 
-  <!-- Continental View Card with Stylized Vector Map -->
-  <div class="stage6-continental-card" role="region" aria-label="Continental Coverage Map">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <h2 style="font-size:16px; font-weight:700; color:#111827; margin:0;">Continental view</h2>
-      <a href="?tab=country_table" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Country table &rarr;</a>
+  <!-- Continental View Card with Stylized Vector Map & Network Identity -->
+  <div class="stage6-continental-card {% if active_network == 'WNNN' or active_network == 'WNN' %}theme-wnn{% else %}theme-wgmn{% endif %}" role="region" aria-label="Continental Coverage Map">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <h2 style="font-size:16px; font-weight:700; color:#111827; margin:0;">Continental view &middot; {{ active_network }} Network</h2>
+        <span class="dash-pill {% if active_network == 'WNNN' or active_network == 'WNN' %}dash-pill-green{% else %}dash-pill-magenta{% endif %}">
+          {% if active_network == 'WNNN' or active_network == 'WNN' %}WNN &middot; Next-Gen Nurturers{% else %}WGMN &middot; Good Mother Network{% endif %}
+        </span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        {% if is_global_user %}
+        <span style="font-size:12px; color:#6B7280;">Switch network:</span>
+        <a href="?network=WGMN{% if state_mode %}&state={{ state_mode }}{% endif %}" class="dash-pill {% if active_network == 'WGMN' %}dash-pill-magenta{% endif %}" style="text-decoration:none; font-weight:700;">WGMN</a>
+        <a href="?network=WNNN{% if state_mode %}&state={{ state_mode }}{% endif %}" class="dash-pill {% if active_network == 'WNNN' or active_network == 'WNN' %}dash-pill-green{% endif %}" style="text-decoration:none; font-weight:700;">WNN</a>
+        {% endif %}
+        <a href="?tab=country_table" style="font-size:13px; font-weight:600; color:{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}var(--wdos-magenta, #D4006A){% endif %}; text-decoration:none;">Country table &rarr;</a>
+      </div>
     </div>
 
     <div class="stage6-map-wrapper">
-      <!-- Scalable Vector Map of Africa with Highlights -->
+      <!-- Scalable Vector Map of Africa with Dynamic 5-Country Network Highlights -->
       <div style="text-align:center;">
-        <svg viewBox="0 0 500 500" class="stage6-map-graphic" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Stylized Map of Africa">
+        <svg viewBox="0 0 500 500" class="stage6-map-graphic" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Interactive Map of Africa with {{ active_network }} Hubs">
+          <defs>
+            <linearGradient id="africaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F9FAFB" />
+              <stop offset="100%" stop-color="#F3F4F6" />
+            </linearGradient>
+            <filter id="mapGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" flood-opacity="0.35"/>
+            </filter>
+          </defs>
+
           <!-- Stylized Africa Continental Outlines -->
-          <!-- Background Silhouette -->
-          <path d="M 170,80 C 230,65 310,75 350,90 C 370,100 420,160 380,200 C 350,230 330,260 320,310 C 310,360 280,410 250,440 C 240,430 220,380 220,340 C 210,310 180,270 160,250 C 130,230 110,210 100,180 C 90,140 120,95 170,80 Z" fill="#E5E7EB" stroke="#D1D5DB" stroke-width="2" />
-          
-          <!-- West Africa Region & Ghana (Pale Magenta) -->
-          <path d="M 130,195 C 145,190 160,195 165,215 C 160,225 140,230 130,215 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5" />
-          
-          <!-- Nigeria (Selected: Full WDOS Magenta #D4006A) -->
-          <path d="M 180,185 C 215,180 235,195 230,230 C 210,240 185,230 175,215 C 170,195 175,188 180,185 Z" fill="#D4006A" stroke="#9D174D" stroke-width="2">
-            <animate attributeName="opacity" values="0.9;1;0.9" dur="3s" repeatCount="indefinite" />
-          </path>
+          <path d="M 170,80 C 230,65 310,75 350,90 C 370,100 420,160 380,200 C 350,230 330,260 320,310 C 310,360 280,410 250,440 C 240,430 220,380 220,340 C 210,310 180,270 160,250 C 130,230 110,210 100,180 C 90,140 120,95 170,80 Z" fill="url(#africaGrad)" stroke="#D1D5DB" stroke-width="2" />
 
-          <!-- East Africa Region & Kenya (Pale Magenta) -->
-          <path d="M 315,220 C 345,215 365,235 355,265 C 335,270 320,250 315,220 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5" />
+          <!-- 1. Ghana (GH) -->
+          <path d="M 130,195 C 145,190 160,195 165,215 C 160,225 140,230 130,215 Z"
+                fill="{% if selected_dossier.country_code == 'GH' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% elif 'GH' in allowed_country_codes %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}{% else %}#E5E7EB{% endif %}"
+                stroke="{% if selected_dossier.country_code == 'GH' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#15803D{% else %}#9D174D{% endif %}{% else %}#D1D5DB{% endif %}"
+                stroke-width="{% if selected_dossier.country_code == 'GH' %}2.5{% else %}1.5{% endif %}" />
 
-          <!-- Interactive / Visual Map Marker for Nigeria -->
-          <circle cx="205" cy="208" r="8" fill="#FFFFFF" stroke="#D4006A" stroke-width="3" />
-          <circle cx="205" cy="208" r="3" fill="#D4006A" />
+          <!-- 2. Nigeria (NG) -->
+          <path d="M 180,185 C 215,180 235,195 230,230 C 210,240 185,230 175,215 C 170,195 175,188 180,185 Z"
+                fill="{% if selected_dossier.country_code == 'NG' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% elif 'NG' in allowed_country_codes %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}{% else %}#E5E7EB{% endif %}"
+                stroke="{% if selected_dossier.country_code == 'NG' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#15803D{% else %}#9D174D{% endif %}{% else %}#D1D5DB{% endif %}"
+                stroke-width="{% if selected_dossier.country_code == 'NG' %}2.5{% else %}1.5{% endif %}" />
 
-          <!-- Map Labels -->
-          <text x="205" y="175" fill="#831843" font-size="12" font-weight="700" text-anchor="middle">Nigeria</text>
-          <text x="345" y="210" fill="#9D174D" font-size="10" font-weight="600" text-anchor="middle">Kenya</text>
-          <text x="145" y="245" fill="#9D174D" font-size="10" font-weight="600" text-anchor="middle">Ghana</text>
+          <!-- 3. Ethiopia (ET) -->
+          <path d="M 340,160 C 375,150 400,175 385,205 C 360,210 340,190 340,160 Z"
+                fill="{% if selected_dossier.country_code == 'ET' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% elif 'ET' in allowed_country_codes %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}{% else %}#E5E7EB{% endif %}"
+                stroke="{% if selected_dossier.country_code == 'ET' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#15803D{% else %}#9D174D{% endif %}{% else %}#D1D5DB{% endif %}"
+                stroke-width="{% if selected_dossier.country_code == 'ET' %}2.5{% else %}1.5{% endif %}" />
+
+          <!-- 4. Kenya (KE) -->
+          <path d="M 315,220 C 345,215 365,235 355,265 C 335,270 320,250 315,220 Z"
+                fill="{% if selected_dossier.country_code == 'KE' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% elif 'KE' in allowed_country_codes %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}{% else %}#E5E7EB{% endif %}"
+                stroke="{% if selected_dossier.country_code == 'KE' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#15803D{% else %}#9D174D{% endif %}{% else %}#D1D5DB{% endif %}"
+                stroke-width="{% if selected_dossier.country_code == 'KE' %}2.5{% else %}1.5{% endif %}" />
+
+          <!-- 5. Angola (AO) -->
+          <path d="M 210,285 C 245,280 255,305 245,340 C 220,345 205,320 210,285 Z"
+                fill="{% if selected_dossier.country_code == 'AO' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% elif 'AO' in allowed_country_codes %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}{% else %}#E5E7EB{% endif %}"
+                stroke="{% if selected_dossier.country_code == 'AO' %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#15803D{% else %}#9D174D{% endif %}{% else %}#D1D5DB{% endif %}"
+                stroke-width="{% if selected_dossier.country_code == 'AO' %}2.5{% else %}1.5{% endif %}" />
+
+          <!-- Dynamic Interactive Markers with Text Labels -->
+          <!-- Nigeria Marker -->
+          <g class="stage6-map-marker" data-country="NG">
+            {% if is_global_user or 'NG' in allowed_country_codes %}
+            <a href="?country=NG{% if network_filter %}&network={{ network_filter }}{% endif %}" aria-label="Select Nigeria Hub">
+            {% endif %}
+              <circle cx="205" cy="208" r="{% if selected_dossier.country_code == 'NG' %}9{% else %}6{% endif %}"
+                      fill="{% if selected_dossier.country_code == 'NG' %}#FFFFFF{% else %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% endif %}"
+                      stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="3" />
+              {% if selected_dossier.country_code == 'NG' %}
+              <circle cx="205" cy="208" r="4" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" />
+              {% endif %}
+              <text x="205" y="176" fill="{% if selected_dossier.country_code == 'NG' %}#111827{% else %}#4B5563{% endif %}" font-size="11" font-weight="{% if selected_dossier.country_code == 'NG' %}700{% else %}600{% endif %}" text-anchor="middle">Nigeria</text>
+            {% if is_global_user or 'NG' in allowed_country_codes %}</a>{% endif %}
+          </g>
+
+          <!-- Kenya Marker -->
+          <g class="stage6-map-marker" data-country="KE">
+            {% if is_global_user or 'KE' in allowed_country_codes %}
+            <a href="?country=KE{% if network_filter %}&network={{ network_filter }}{% endif %}" aria-label="Select Kenya Hub">
+            {% endif %}
+              <circle cx="335" cy="245" r="{% if selected_dossier.country_code == 'KE' %}9{% else %}6{% endif %}"
+                      fill="{% if selected_dossier.country_code == 'KE' %}#FFFFFF{% else %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% endif %}"
+                      stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="3" />
+              {% if selected_dossier.country_code == 'KE' %}
+              <circle cx="335" cy="245" r="4" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" />
+              {% endif %}
+              <text x="335" y="214" fill="{% if selected_dossier.country_code == 'KE' %}#111827{% else %}#4B5563{% endif %}" font-size="11" font-weight="{% if selected_dossier.country_code == 'KE' %}700{% else %}600{% endif %}" text-anchor="middle">Kenya</text>
+            {% if is_global_user or 'KE' in allowed_country_codes %}</a>{% endif %}
+          </g>
+
+          <!-- Ghana Marker -->
+          <g class="stage6-map-marker" data-country="GH">
+            {% if is_global_user or 'GH' in allowed_country_codes %}
+            <a href="?country=GH{% if network_filter %}&network={{ network_filter }}{% endif %}" aria-label="Select Ghana Hub">
+            {% endif %}
+              <circle cx="145" cy="205" r="{% if selected_dossier.country_code == 'GH' %}9{% else %}6{% endif %}"
+                      fill="{% if selected_dossier.country_code == 'GH' %}#FFFFFF{% else %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% endif %}"
+                      stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="3" />
+              {% if selected_dossier.country_code == 'GH' %}
+              <circle cx="145" cy="205" r="4" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" />
+              {% endif %}
+              <text x="145" y="235" fill="{% if selected_dossier.country_code == 'GH' %}#111827{% else %}#4B5563{% endif %}" font-size="11" font-weight="{% if selected_dossier.country_code == 'GH' %}700{% else %}600{% endif %}" text-anchor="middle">Ghana</text>
+            {% if is_global_user or 'GH' in allowed_country_codes %}</a>{% endif %}
+          </g>
+
+          <!-- Angola Marker -->
+          <g class="stage6-map-marker" data-country="AO">
+            {% if is_global_user or 'AO' in allowed_country_codes %}
+            <a href="?country=AO{% if network_filter %}&network={{ network_filter }}{% endif %}" aria-label="Select Angola Hub">
+            {% endif %}
+              <circle cx="230" cy="310" r="{% if selected_dossier.country_code == 'AO' %}9{% else %}6{% endif %}"
+                      fill="{% if selected_dossier.country_code == 'AO' %}#FFFFFF{% else %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% endif %}"
+                      stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="3" />
+              {% if selected_dossier.country_code == 'AO' %}
+              <circle cx="230" cy="310" r="4" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" />
+              {% endif %}
+              <text x="230" y="338" fill="{% if selected_dossier.country_code == 'AO' %}#111827{% else %}#4B5563{% endif %}" font-size="11" font-weight="{% if selected_dossier.country_code == 'AO' %}700{% else %}600{% endif %}" text-anchor="middle">Angola</text>
+            {% if is_global_user or 'AO' in allowed_country_codes %}</a>{% endif %}
+          </g>
+
+          <!-- Ethiopia Marker -->
+          <g class="stage6-map-marker" data-country="ET">
+            {% if is_global_user or 'ET' in allowed_country_codes %}
+            <a href="?country=ET{% if network_filter %}&network={{ network_filter }}{% endif %}" aria-label="Select Ethiopia Hub">
+            {% endif %}
+              <circle cx="360" cy="185" r="{% if selected_dossier.country_code == 'ET' %}9{% else %}6{% endif %}"
+                      fill="{% if selected_dossier.country_code == 'ET' %}#FFFFFF{% else %}{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}{% endif %}"
+                      stroke="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="3" />
+              {% if selected_dossier.country_code == 'ET' %}
+              <circle cx="360" cy="185" r="4" fill="{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" />
+              {% endif %}
+              <text x="360" y="156" fill="{% if selected_dossier.country_code == 'ET' %}#111827{% else %}#4B5563{% endif %}" font-size="11" font-weight="{% if selected_dossier.country_code == 'ET' %}700{% else %}600{% endif %}" text-anchor="middle">Ethiopia</text>
+            {% if is_global_user or 'ET' in allowed_country_codes %}</a>{% endif %}
+          </g>
         </svg>
+
         <div class="stage6-map-legend">
-          Magenta: selected country &middot; Pale magenta: other active hubs &middot; Grey: not selected.
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %};"></span>
+            Selected country ({{ selected_dossier.country_name|default:"Nigeria" }})
+          </span>
+          &middot;
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:{% if active_network == 'WNNN' or active_network == 'WNN' %}#DCFCE7; border:1px solid #2E7D32;{% else %}#FCE7F3; border:1px solid #D4006A;{% endif %}"></span>
+            Permitted national hubs
+          </span>
+          &middot;
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#E5E7EB; border:1px solid #D1D5DB;"></span>
+            Outside active scope
+          </span>
         </div>
       </div>
 
       <!-- Selected Country Info Box -->
       <div class="stage6-map-selection-box">
-        <h3 class="stage6-map-selection-title">{{ selected_dossier.country_name|default:"Nigeria" }} &middot; {{ selected_dossier.network|default:"WGMN" }}</h3>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <h3 class="stage6-map-selection-title" style="margin:0;">{{ selected_dossier.country_name|default:"Nigeria" }} &middot; {{ selected_dossier.network|default:active_network }}</h3>
+        </div>
         <span class="stage6-map-selection-pill">{{ selected_dossier.verification_status|default:"Country verified" }}</span>
-        <p class="stage6-map-selection-text">Open the country dossier to review leadership coverage, certification evidence and unresolved differences.</p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <a href="/foundation/dashboards/dash-01/" class="dash-btn-secondary" style="background:#FFFFFF;">Back</a>
+        <p class="stage6-map-selection-text">Open the country dossier to review leadership coverage, certification evidence, and local organizational structure.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
           <a href="/foundation/geography/country/{{ selected_dossier.country_code|default:'NG' }}/command/" class="dash-btn-primary">Open country dossier</a>
+          <a href="/foundation/geography/local-org/?country={{ selected_dossier.country_code|default:'NG' }}&network={{ active_network }}" class="dash-btn-secondary" style="background:#FFFFFF;">Explore local organisation</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text Equivalent for Africa Coverage Map (Acceptance Criteria #4 & #5) -->
+    <div class="stage6-map-text-equivalent" role="region" aria-label="Accessible Map Text Equivalent and Hierarchy Path" style="margin-top:20px; padding-top:18px; border-top:1px solid #E5E7EB;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+        <div>
+          <h3 style="font-size:14px; font-weight:700; color:#111827; margin:0 0 4px 0;">Accessible Map Text Equivalent &middot; Full Hierarchy Path</h3>
+          <p style="font-size:12px; color:#4B5563; margin:0;">
+            Continental representation showing active <strong>{{ active_network }}</strong> hubs across Africa. User's permitted scope is restricted to authorized territories.
+          </p>
+        </div>
+        <span class="dash-pill {% if active_network == 'WNNN' or active_network == 'WNN' %}dash-pill-green{% else %}dash-pill-magenta{% endif %}">
+          {{ selected_dossier.country_name }} &middot; {{ active_network }}
+        </span>
+      </div>
+
+      <!-- Current Hierarchy Trail Breadcrumb -->
+      <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:12px 14px; margin-bottom:14px;">
+        <div style="font-size:10.5px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Authoritative Hierarchy Trail</div>
+        <div style="font-size:13px; font-weight:600; color:#111827;">
+          {{ selected_hierarchy.path_text|default:"WGMN → Nigeria → Lagos State → Ikeja LGA → Ikeja Central Cluster → Allen Chapter" }}
+        </div>
+        <div style="font-size:11px; color:#6B7280; margin-top:6px;">
+          <em>Rule: Public areas (such as {{ selected_hierarchy.first_level_name }} or {{ selected_hierarchy.second_level_name }}) are public administrative geography and not chapters. Community Clusters and Chapters are distinct WDOS operating units.</em>
+        </div>
+      </div>
+
+      <!-- 6-Level Hierarchy Breakdown Cards -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:{% if active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}; text-transform:uppercase;">Network</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ active_network }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">Country &middot; Public Geo</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ selected_dossier.country_name }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">{{ selected_hierarchy.first_level_term }} &middot; Public Geo</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ selected_hierarchy.first_level_name }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">{{ selected_hierarchy.second_level_term }} &middot; Public Geo</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ selected_hierarchy.second_level_name }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#7C3AED; text-transform:uppercase;">Community Cluster</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ selected_hierarchy.cluster_name }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#D97706; text-transform:uppercase;">Chapter &middot; Operating</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ selected_hierarchy.chapter_name }}</div>
         </div>
       </div>
     </div>

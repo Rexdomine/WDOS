@@ -53,12 +53,25 @@ def seed_stage6_fixtures():
             "phone": "+234 801 234 5678",
             "network": "WGMN",
             "country": "NG",
+            "state_or_region": "Lagos State",
+            "lga_or_district": "Ikeja LGA",
+            "community_cluster": "Ikeja Central Cluster",
             "local_home": "Ikeja Chapter",
             "contact_verification": "Verified",
             "primary_relationship": "Member",
             "status": "Active",
         },
     )
+    if not ada.state_or_region:
+        ada.state_or_region = "Lagos State"
+        ada.lga_or_district = "Ikeja LGA"
+        ada.community_cluster = "Ikeja Central Cluster"
+        ada.save(update_fields=["state_or_region", "lga_or_district", "community_cluster"])
+
+    ada_acc = Account.objects.filter(email__in=["ada@example.org", "member.ada@example.org"]).first()
+    if ada_acc and not ada.account:
+        ada.account = ada_acc
+        ada.save(update_fields=["account"])
 
     lina, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00422",
@@ -68,12 +81,20 @@ def seed_stage6_fixtures():
             "phone": "+234 802 345 6789",
             "network": "WGMN",
             "country": "NG",
+            "state_or_region": "FCT Abuja",
+            "lga_or_district": "Abuja Municipal",
+            "community_cluster": "Abuja Central Cluster",
             "local_home": "Abuja virtual home",
             "contact_verification": "Verified",
             "primary_relationship": "Programme participant",
             "status": "Active",
         },
     )
+    if not lina.state_or_region:
+        lina.state_or_region = "FCT Abuja"
+        lina.lga_or_district = "Abuja Municipal"
+        lina.community_cluster = "Abuja Central Cluster"
+        lina.save(update_fields=["state_or_region", "lga_or_district", "community_cluster"])
 
     kemi, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00423",
@@ -83,12 +104,21 @@ def seed_stage6_fixtures():
             "phone": "+234 803 456 7890",
             "network": "WGMN",
             "country": "NG",
-            "local_home": "Kano Central",
+            "state_or_region": "Kano State",
+            "lga_or_district": "Kano Municipal",
+            "community_cluster": "Kano Central Cluster",
+            "local_home": "Kano Central Chapter",
             "contact_verification": "Pending",
             "primary_relationship": "Member / Mentor",
             "status": "Review due",
         },
     )
+    if not kemi.state_or_region:
+        kemi.state_or_region = "Kano State"
+        kemi.lga_or_district = "Kano Municipal"
+        kemi.community_cluster = "Kano Central Cluster"
+        kemi.local_home = "Kano Central Chapter"
+        kemi.save(update_fields=["state_or_region", "lga_or_district", "community_cluster", "local_home"])
 
     # Additional multi-country & multi-network people (Kenya, Ghana, Angola, Ethiopia)
     wanjiru, _ = PersonProfile.objects.get_or_create(
@@ -99,12 +129,22 @@ def seed_stage6_fixtures():
             "phone": "+254 711 234 567",
             "network": "WGMN",
             "country": "KE",
+            "state_or_region": "Nairobi County",
+            "lga_or_district": "Westlands Sub-County",
+            "community_cluster": "Westlands Cluster",
             "local_home": "Nairobi Central Chapter",
             "contact_verification": "Verified",
             "primary_relationship": "Country Lead / Member",
             "status": "Active",
         },
     )
+    if not wanjiru.state_or_region:
+        wanjiru.state_or_region = "Nairobi County"
+        wanjiru.lga_or_district = "Westlands Sub-County"
+        wanjiru.community_cluster = "Westlands Cluster"
+        wanjiru.local_home = "Nairobi Central Chapter"
+        wanjiru.save(update_fields=["state_or_region", "lga_or_district", "community_cluster", "local_home"])
+
     amina_ke, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00425",
         defaults={
@@ -113,12 +153,21 @@ def seed_stage6_fixtures():
             "phone": "+254 722 345 678",
             "network": "WGMN",
             "country": "KE",
+            "state_or_region": "Mombasa County",
+            "lga_or_district": "Mvita Sub-County",
+            "community_cluster": "Coastal Cluster",
             "local_home": "Mombasa Coastal Chapter",
             "contact_verification": "Verified",
             "primary_relationship": "Programme participant",
             "status": "Active",
         },
     )
+    if not amina_ke.state_or_region:
+        amina_ke.state_or_region = "Mombasa County"
+        amina_ke.lga_or_district = "Mvita Sub-County"
+        amina_ke.community_cluster = "Coastal Cluster"
+        amina_ke.save(update_fields=["state_or_region", "lga_or_district", "community_cluster"])
+
     zawadi_ke, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00426",
         defaults={
@@ -127,12 +176,22 @@ def seed_stage6_fixtures():
             "phone": "+254 733 456 789",
             "network": "WGMN",
             "country": "KE",
-            "local_home": "Westlands Sub-County Hub",
+            "state_or_region": "Nairobi County",
+            "lga_or_district": "Westlands Sub-County",
+            "community_cluster": "Westlands Cluster",
+            "local_home": "Parklands Chapter",
             "contact_verification": "Pending",
             "primary_relationship": "Member / Mentor",
             "status": "Review due",
         },
     )
+    if not zawadi_ke.state_or_region:
+        zawadi_ke.state_or_region = "Nairobi County"
+        zawadi_ke.lga_or_district = "Westlands Sub-County"
+        zawadi_ke.community_cluster = "Westlands Cluster"
+        zawadi_ke.local_home = "Parklands Chapter"
+        zawadi_ke.save(update_fields=["state_or_region", "lga_or_district", "community_cluster", "local_home"])
+
     efua_gh, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00427",
         defaults={
@@ -141,12 +200,21 @@ def seed_stage6_fixtures():
             "phone": "+233 24 123 4567",
             "network": "WNNN",
             "country": "GH",
+            "state_or_region": "Greater Accra Region",
+            "lga_or_district": "Accra Metropolitan",
+            "community_cluster": "Osu-Labone Cluster",
             "local_home": "Accra Youth Chapter",
             "contact_verification": "Verified",
             "primary_relationship": "Member",
             "status": "Active",
         },
     )
+    if not efua_gh.state_or_region:
+        efua_gh.state_or_region = "Greater Accra Region"
+        efua_gh.lga_or_district = "Accra Metropolitan"
+        efua_gh.community_cluster = "Osu-Labone Cluster"
+        efua_gh.save(update_fields=["state_or_region", "lga_or_district", "community_cluster"])
+
     abena_gh, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00428",
         defaults={
@@ -155,12 +223,21 @@ def seed_stage6_fixtures():
             "phone": "+233 20 234 5678",
             "network": "WGMN",
             "country": "GH",
-            "local_home": "Greater Accra Chapter",
+            "state_or_region": "Greater Accra Region",
+            "lga_or_district": "Accra Metropolitan",
+            "community_cluster": "Osu-Labone Cluster",
+            "local_home": "Accra Central Chapter",
             "contact_verification": "Verified",
             "primary_relationship": "Chapter Lead / Mentor",
             "status": "Active",
         },
     )
+    if not abena_gh.state_or_region:
+        abena_gh.state_or_region = "Greater Accra Region"
+        abena_gh.lga_or_district = "Accra Metropolitan"
+        abena_gh.community_cluster = "Osu-Labone Cluster"
+        abena_gh.save(update_fields=["state_or_region", "lga_or_district", "community_cluster"])
+
     mary_ao, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00429",
         defaults={
@@ -169,12 +246,21 @@ def seed_stage6_fixtures():
             "phone": "+244 923 123 456",
             "network": "WGMN",
             "country": "AO",
+            "state_or_region": "Luanda Province",
+            "lga_or_district": "Luanda Municipality",
+            "community_cluster": "Luanda Central Cluster",
             "local_home": "Luanda Central Chapter",
             "contact_verification": "Verified",
             "primary_relationship": "Member",
             "status": "Active",
         },
     )
+    if not mary_ao.state_or_region:
+        mary_ao.state_or_region = "Luanda Province"
+        mary_ao.lga_or_district = "Luanda Municipality"
+        mary_ao.community_cluster = "Luanda Central Cluster"
+        mary_ao.save(update_fields=["state_or_region", "lga_or_district", "community_cluster"])
+
     sarah_et, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00430",
         defaults={
@@ -183,12 +269,21 @@ def seed_stage6_fixtures():
             "phone": "+251 911 234 567",
             "network": "WGMN",
             "country": "ET",
+            "state_or_region": "Addis Ababa",
+            "lga_or_district": "Bole Sub-City",
+            "community_cluster": "Addis Bole Cluster",
             "local_home": "Addis Ababa Bole Chapter",
             "contact_verification": "Verified",
             "primary_relationship": "Member",
             "status": "Active",
         },
     )
+    if not sarah_et.state_or_region:
+        sarah_et.state_or_region = "Addis Ababa"
+        sarah_et.lga_or_district = "Bole Sub-City"
+        sarah_et.community_cluster = "Addis Bole Cluster"
+        sarah_et.save(update_fields=["state_or_region", "lga_or_district", "community_cluster"])
+
     kemi_et, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00431",
         defaults={
@@ -197,12 +292,20 @@ def seed_stage6_fixtures():
             "phone": "+251 912 345 678",
             "network": "WGMN",
             "country": "ET",
+            "state_or_region": "Addis Ababa",
+            "lga_or_district": "Kirkos Sub-City",
+            "community_cluster": "Kirkos Cluster",
             "local_home": "Addis Ababa Kirkos Chapter",
             "contact_verification": "Pending",
             "primary_relationship": "Programme participant",
             "status": "Review due",
         },
     )
+    if not kemi_et.state_or_region:
+        kemi_et.state_or_region = "Addis Ababa"
+        kemi_et.lga_or_district = "Kirkos Sub-City"
+        kemi_et.community_cluster = "Kirkos Cluster"
+        kemi_et.save(update_fields=["state_or_region", "lga_or_district", "community_cluster"])
 
     # 2. Person Relationships
     PersonRelationship.objects.get_or_create(
@@ -415,7 +518,7 @@ def seed_stage6_fixtures():
             "record_state": "Active unit records",
         },
     )
-    LocalOrganisationUnit.objects.get_or_create(
+    allen_chap_unit, _ = LocalOrganisationUnit.objects.get_or_create(
         network="WGMN",
         country="NG",
         level="Chapter",
@@ -429,6 +532,27 @@ def seed_stage6_fixtures():
             "record_state": "Active unit records",
         },
     )
+    allen_chap, _ = Chapter.objects.get_or_create(
+        code="NG-LOS-01",
+        defaults={
+            "name": "Allen Chapter",
+            "country": "NG",
+            "network": "WGMN",
+            "region": "Lagos State",
+            "district": "Ikeja LGA",
+            "community_cluster": "Ikeja Central Cluster",
+            "cluster_unit": cc_unit,
+            "status": "active",
+        },
+    )
+    if not allen_chap.cluster_unit or not allen_chap.community_cluster:
+        allen_chap.cluster_unit = cc_unit
+        allen_chap.community_cluster = "Ikeja Central Cluster"
+        allen_chap.save(update_fields=["cluster_unit", "community_cluster"])
+
+    ada.cluster_unit = cc_unit
+    ada.chapter = allen_chap
+    ada.save(update_fields=["cluster_unit", "chapter"])
 
     # Local Organisation Hierarchy (GEO-03) - Kenya (WGMN)
     ke_c, _ = LocalOrganisationUnit.objects.get_or_create(
@@ -486,7 +610,7 @@ def seed_stage6_fixtures():
             "record_state": "Active unit records",
         },
     )
-    LocalOrganisationUnit.objects.get_or_create(
+    ke_nbo_unit, _ = LocalOrganisationUnit.objects.get_or_create(
         network="WGMN",
         country="KE",
         level="Chapter",
@@ -500,6 +624,63 @@ def seed_stage6_fixtures():
             "record_state": "Active unit records",
         },
     )
+    ke_pkl_unit, _ = LocalOrganisationUnit.objects.get_or_create(
+        network="WGMN",
+        country="KE",
+        level="Chapter",
+        unit_name="Parklands Chapter",
+        defaults={
+            "level_order": 5,
+            "parent": ke_cc,
+            "description": "Chapter membership and local activity records.",
+            "responsible_leader_name": "Fatuma Ali",
+            "evidence_type": "Unit record",
+            "record_state": "Active unit records",
+        },
+    )
+    nbo_chap, _ = Chapter.objects.get_or_create(
+        code="KE-NBO-01",
+        defaults={
+            "name": "Nairobi Central Chapter",
+            "country": "KE",
+            "network": "WGMN",
+            "region": "Nairobi County",
+            "district": "Westlands Sub-County",
+            "community_cluster": "Westlands Cluster",
+            "cluster_unit": ke_cc,
+            "status": "active",
+        },
+    )
+    if not nbo_chap.cluster_unit or not nbo_chap.community_cluster:
+        nbo_chap.cluster_unit = ke_cc
+        nbo_chap.community_cluster = "Westlands Cluster"
+        nbo_chap.save(update_fields=["cluster_unit", "community_cluster"])
+
+    pkl_chap, _ = Chapter.objects.get_or_create(
+        code="KE-PKL-02",
+        defaults={
+            "name": "Parklands Chapter",
+            "country": "KE",
+            "network": "WGMN",
+            "region": "Nairobi County",
+            "district": "Westlands Sub-County",
+            "community_cluster": "Westlands Cluster",
+            "cluster_unit": ke_cc,
+            "status": "active",
+        },
+    )
+    if not pkl_chap.cluster_unit or not pkl_chap.community_cluster:
+        pkl_chap.cluster_unit = ke_cc
+        pkl_chap.community_cluster = "Westlands Cluster"
+        pkl_chap.save(update_fields=["cluster_unit", "community_cluster"])
+
+    wanjiru.cluster_unit = ke_cc
+    wanjiru.chapter = nbo_chap
+    wanjiru.save(update_fields=["cluster_unit", "chapter"])
+
+    zawadi_ke.cluster_unit = ke_cc
+    zawadi_ke.chapter = pkl_chap
+    zawadi_ke.save(update_fields=["cluster_unit", "chapter"])
 
     # Local Organisation Hierarchy (GEO-03) - Ghana (WGMN)
     gh_c, _ = LocalOrganisationUnit.objects.get_or_create(
@@ -557,7 +738,7 @@ def seed_stage6_fixtures():
             "record_state": "Active unit records",
         },
     )
-    LocalOrganisationUnit.objects.get_or_create(
+    gh_chap_unit, _ = LocalOrganisationUnit.objects.get_or_create(
         network="WGMN",
         country="GH",
         level="Chapter",
@@ -571,6 +752,75 @@ def seed_stage6_fixtures():
             "record_state": "Active unit records",
         },
     )
+    gh_chap, _ = Chapter.objects.get_or_create(
+        code="GH-ACC-01",
+        defaults={
+            "name": "Accra Central Chapter",
+            "country": "GH",
+            "network": "WGMN",
+            "region": "Greater Accra Region",
+            "district": "Accra Metropolitan",
+            "community_cluster": "Osu-Labone Cluster",
+            "cluster_unit": gh_cc,
+            "status": "active",
+        },
+    )
+    if not gh_chap.cluster_unit or not gh_chap.community_cluster:
+        gh_chap.cluster_unit = gh_cc
+        gh_chap.community_cluster = "Osu-Labone Cluster"
+        gh_chap.save(update_fields=["cluster_unit", "community_cluster"])
+
+    gh_youth_chap, _ = Chapter.objects.get_or_create(
+        code="GH-ACC-02",
+        defaults={
+            "name": "Accra Youth Chapter",
+            "country": "GH",
+            "network": "WNNN",
+            "region": "Greater Accra Region",
+            "district": "Accra Metropolitan",
+            "community_cluster": "Osu-Labone Cluster",
+            "cluster_unit": gh_cc,
+            "status": "active",
+        },
+    )
+    efua_gh.cluster_unit = gh_cc
+    efua_gh.chapter = gh_youth_chap
+    efua_gh.save(update_fields=["cluster_unit", "chapter"])
+
+    abena_gh.cluster_unit = gh_cc
+    abena_gh.chapter = gh_chap
+    abena_gh.save(update_fields=["cluster_unit", "chapter"])
+
+    # Local Chapters - Angola & Ethiopia
+    ao_chap, _ = Chapter.objects.get_or_create(
+        code="AO-LUA-01",
+        defaults={
+            "name": "Luanda Central Chapter",
+            "country": "AO",
+            "network": "WGMN",
+            "region": "Luanda Province",
+            "district": "Luanda Municipality",
+            "community_cluster": "Luanda Central Cluster",
+            "status": "active",
+        },
+    )
+    mary_ao.chapter = ao_chap
+    mary_ao.save(update_fields=["chapter"])
+
+    et_chap, _ = Chapter.objects.get_or_create(
+        code="ET-ADD-01",
+        defaults={
+            "name": "Addis Ababa Bole Chapter",
+            "country": "ET",
+            "network": "WGMN",
+            "region": "Addis Ababa",
+            "district": "Bole Sub-City",
+            "community_cluster": "Addis Bole Cluster",
+            "status": "active",
+        },
+    )
+    sarah_et.chapter = et_chap
+    sarah_et.save(update_fields=["chapter"])
 
     # 6. Geography Terminology (GEO-05)
     GeographyTerminology.objects.get_or_create(
@@ -1320,32 +1570,21 @@ def assert_country_network_authorized(
     Ensures a user can only view or mutate records within their permitted
     network and geographic area.
     """
-    if is_global_stage6_scope(user_scope):
-        return
-
+    # Network boundary check: only authorized founder/executive roles can cross networks.
     if network and network not in {"ALL", "BOTH", "*", "HQ / Both networks"}:
-        allowed_nets = {n.upper() for n in user_scope.allowed_networks}
-        if (
-            "*" not in allowed_nets
-            and "ALL" not in allowed_nets
-            and "HQ / BOTH NETWORKS" not in allowed_nets
-            and user_scope.active_network not in {"ALL", "HQ / Both networks", "*"}
-        ):
-            if network.upper() not in allowed_nets and network.upper() != user_scope.active_network.upper():
-                raise ScopePermissionDenied(
-                    f"Access restricted: Record belongs to network '{network}', outside your permitted network scope ({user_scope.active_network}).",
-                    reason_code="network_mismatch",
-                )
+        from .scope import normalize_network_code
+        norm_net = normalize_network_code(network)
+        if not user_scope.can_access_network(norm_net):
+            raise ScopePermissionDenied(
+                f"Access restricted: Record belongs to network '{network}', outside your permitted network scope ({user_scope.active_network}).",
+                reason_code="network_mismatch",
+            )
 
+    # Geographic boundary check: continental roles can access any country; regional/local strictly scoped.
     if country and country not in {"ALL", "BOTH", "*"}:
-        norm_c = normalize_country_code(country, country.upper())
-        allowed_ctries = {c.upper() for c in user_scope.allowed_countries}
-        if (
-            "*" not in allowed_ctries
-            and "ALL" not in allowed_ctries
-            and user_scope.active_country not in {"ALL", "BOTH", "*"}
-        ):
-            if norm_c not in allowed_ctries and norm_c != user_scope.active_country.upper():
+        if not is_global_stage6_scope(user_scope):
+            norm_c = normalize_country_code(country, country.upper())
+            if not user_scope.can_access_country(norm_c):
                 raise ScopePermissionDenied(
                     f"Access restricted: Record belongs to country '{get_country_name_for_code(norm_c)}', outside your permitted geographic area ({get_country_name_for_code(user_scope.active_country)}).",
                     reason_code="country_mismatch",
@@ -1431,9 +1670,15 @@ def add_or_link_person_record(
     user_scope: Optional[UserScope] = None,
     local_home: Optional[str] = None,
     phone: Optional[str] = None,
+    state_or_region: Optional[str] = None,
+    lga_or_district: Optional[str] = None,
+    community_cluster: Optional[str] = None,
+    chapter_id: Optional[str] = None,
+    cluster_unit_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Atomically creates or links a person record and relationship,
+    distinguishing public geography from Community Cluster and actual Chapter,
     preventing duplicate identity registration and enforcing scope boundaries.
     """
     norm_country = normalize_country_code(country, default_code="NG")
@@ -1443,11 +1688,52 @@ def add_or_link_person_record(
         assert_country_network_authorized(user_scope, country=norm_country, network=norm_network)
 
     with transaction.atomic():
+        # Resolve chapter & cluster entities if available
+        chap_obj = None
+        if chapter_id:
+            chap_obj = Chapter.objects.filter(id=chapter_id).first()
+        elif local_home:
+            chap_obj = Chapter.objects.filter(name__iexact=local_home.strip()).first()
+
+        cluster_obj = None
+        if cluster_unit_id:
+            cluster_obj = LocalOrganisationUnit.objects.filter(id=cluster_unit_id, level="Community Cluster").first()
+        elif chap_obj and chap_obj.cluster_unit:
+            cluster_obj = chap_obj.cluster_unit
+        elif community_cluster:
+            cluster_obj = LocalOrganisationUnit.objects.filter(
+                unit_name__icontains=community_cluster.replace(" Cluster", "").strip(),
+                level="Community Cluster",
+            ).first()
+
+        resolved_cluster = community_cluster or (cluster_obj.unit_name if cluster_obj else (chap_obj.community_cluster if chap_obj else ""))
+        resolved_state = state_or_region or (chap_obj.region if chap_obj else "")
+        resolved_lga = lga_or_district or (chap_obj.district if chap_obj else "")
+        resolved_home = (local_home or "").strip() or (chap_obj.name if chap_obj else "") or COUNTRY_DEFAULT_HOME.get(norm_country, f"{norm_country} Hub")
+
         dup_check = check_for_duplicate_person(email, full_name, norm_network)
         if dup_check["duplicate_found"]:
             person = dup_check["person"]
             if user_scope is not None:
                 assert_person_scope_authorized(user_scope, person)
+            updated = False
+            if resolved_state and not person.state_or_region:
+                person.state_or_region = resolved_state
+                updated = True
+            if resolved_lga and not person.lga_or_district:
+                person.lga_or_district = resolved_lga
+                updated = True
+            if resolved_cluster and not person.community_cluster:
+                person.community_cluster = resolved_cluster
+                updated = True
+            if cluster_obj and not person.cluster_unit:
+                person.cluster_unit = cluster_obj
+                updated = True
+            if chap_obj and not person.chapter:
+                person.chapter = chap_obj
+                updated = True
+            if updated:
+                person.save()
             action_type = "linked"
         else:
             existing_codes = PersonProfile.objects.values_list("person_code", flat=True)
@@ -1461,7 +1747,6 @@ def add_or_link_person_record(
                     except (IndexError, ValueError):
                         pass
             code = f"WD-{max_num + 1:05d}"
-            resolved_home = (local_home or "").strip() or COUNTRY_DEFAULT_HOME.get(norm_country, f"{norm_country} Hub")
             person = PersonProfile.objects.create(
                 person_code=code,
                 full_name=full_name.strip(),
@@ -1469,6 +1754,11 @@ def add_or_link_person_record(
                 phone=(phone or "").strip(),
                 network=norm_network,
                 country=norm_country,
+                state_or_region=resolved_state,
+                lga_or_district=resolved_lga,
+                community_cluster=resolved_cluster,
+                cluster_unit=cluster_obj,
+                chapter=chap_obj,
                 local_home=resolved_home,
                 contact_verification="Verified" if email else "Pending",
                 primary_relationship=relationship_to_add or "Member",
@@ -1495,6 +1785,8 @@ def add_or_link_person_record(
                 "relationship": relationship_to_add,
                 "network": person.network,
                 "country": person.country,
+                "community_cluster": person.community_cluster,
+                "chapter": person.local_home,
             },
         )
 
@@ -1518,6 +1810,11 @@ def update_person_profile_record(
     actor_account: Account,
     user_scope: UserScope,
     expected_updated_at: Optional[str] = None,
+    state_or_region: Optional[str] = None,
+    lga_or_district: Optional[str] = None,
+    community_cluster: Optional[str] = None,
+    chapter_name: Optional[str] = None,
+    cluster_unit_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Updates a PersonProfile within the user's permitted network and geographic scope.
@@ -1562,6 +1859,31 @@ def update_person_profile_record(
         if status and status.strip() != person.status:
             changes["status"] = {"from": person.status, "to": status.strip()}
             person.status = status.strip()
+
+        if state_or_region is not None and state_or_region.strip() != person.state_or_region:
+            changes["state_or_region"] = {"from": person.state_or_region, "to": state_or_region.strip()}
+            person.state_or_region = state_or_region.strip()
+
+        if lga_or_district is not None and lga_or_district.strip() != person.lga_or_district:
+            changes["lga_or_district"] = {"from": person.lga_or_district, "to": lga_or_district.strip()}
+            person.lga_or_district = lga_or_district.strip()
+
+        if community_cluster is not None and community_cluster.strip() != person.community_cluster:
+            changes["community_cluster"] = {"from": person.community_cluster, "to": community_cluster.strip()}
+            person.community_cluster = community_cluster.strip()
+
+        if cluster_unit_id:
+            c_unit = LocalOrganisationUnit.objects.filter(id=cluster_unit_id, level="Community Cluster").first()
+            if c_unit and person.cluster_unit != c_unit:
+                changes["cluster_unit"] = {"from": str(person.cluster_unit), "to": str(c_unit)}
+                person.cluster_unit = c_unit
+
+        target_chapter_name = chapter_name or local_home
+        if target_chapter_name:
+            chap = Chapter.objects.filter(name__iexact=target_chapter_name.strip()).first()
+            if chap and person.chapter != chap:
+                changes["chapter"] = {"from": str(person.chapter), "to": str(chap)}
+                person.chapter = chap
 
         person.save()
 
@@ -1659,10 +1981,14 @@ def submit_reassignment_decision(
     member_confirmation: bool,
     actor_account: Account,
     user_scope: UserScope,
+    proposed_cluster: Optional[str] = None,
+    proposed_state: Optional[str] = None,
+    proposed_lga: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Submits and approves local-home reassignment with evidence check.
-    Enforces role authority and network/country scope boundaries.
+    Enforces role authority and network/country scope boundaries,
+    updating both the actual chapter and the community cluster.
     """
     user_roles = _collect_user_roles(user_scope)
 
@@ -1704,6 +2030,32 @@ def submit_reassignment_decision(
         reassignment.save()
 
         person.local_home = proposed_local_home
+
+        if proposed_cluster:
+            person.community_cluster = proposed_cluster.strip()
+            c_unit = LocalOrganisationUnit.objects.filter(
+                unit_name__icontains=proposed_cluster.replace(" Cluster", "").strip(),
+                level="Community Cluster",
+            ).first()
+            if c_unit:
+                person.cluster_unit = c_unit
+        if proposed_state:
+            person.state_or_region = proposed_state.strip()
+        if proposed_lga:
+            person.lga_or_district = proposed_lga.strip()
+
+        target_chap = Chapter.objects.filter(name__iexact=proposed_local_home.strip()).first()
+        if target_chap:
+            person.chapter = target_chap
+            if not proposed_cluster and target_chap.community_cluster:
+                person.community_cluster = target_chap.community_cluster
+            if not person.cluster_unit and target_chap.cluster_unit:
+                person.cluster_unit = target_chap.cluster_unit
+            if not proposed_state and target_chap.region:
+                person.state_or_region = target_chap.region
+            if not proposed_lga and target_chap.district:
+                person.lga_or_district = target_chap.district
+
         person.save()
 
         AuditEvent.objects.create(
@@ -1714,6 +2066,7 @@ def submit_reassignment_decision(
                 "person_name": person.full_name,
                 "previous_home": current_home,
                 "new_home": proposed_local_home,
+                "community_cluster": person.community_cluster,
                 "reason": reason,
                 "network": person.network,
                 "country": person.country,
@@ -1729,15 +2082,17 @@ def save_local_organisation_unit(
     level: str,
     unit_name: str,
     responsible_leader_name: str,
-    description: str,
-    evidence_type: str,
-    record_state: str,
-    actor_account: Account,
-    user_scope: UserScope,
+    description: str = "",
+    evidence_type: str = "Charter record",
+    record_state: str = "Active unit records",
+    actor_account: Optional[Account] = None,
+    user_scope: Optional[UserScope] = None,
+    parent_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Creates or updates a LocalOrganisationUnit in the 5-tier hierarchy within
-    the user's permitted network and country scope, and records an AuditEvent.
+    Creates or updates a LocalOrganisationUnit in the hierarchy within
+    the user's permitted network and country scope, supporting explicit parent_id,
+    and records an AuditEvent.
     """
     assert_stage6_authorized(user_scope, "GEO-03")
     norm_country = normalize_country_code(country, default_code=user_scope.active_country or "NG")
@@ -1755,7 +2110,13 @@ def save_local_organisation_unit(
 
     with transaction.atomic():
         parent_unit = None
-        if l_order > 1:
+        if parent_id:
+            try:
+                parent_unit = LocalOrganisationUnit.objects.get(id=parent_id)
+            except (LocalOrganisationUnit.DoesNotExist, ValueError):
+                pass
+
+        if not parent_unit and l_order > 1:
             parent_unit = LocalOrganisationUnit.objects.filter(
                 network=norm_network,
                 country=norm_country,
@@ -1776,6 +2137,33 @@ def save_local_organisation_unit(
                 "record_state": (record_state or "").strip() or "Active unit records",
             },
         )
+
+        if level == "Chapter":
+            c_cluster = parent_unit.unit_name if parent_unit and parent_unit.level == "Community Cluster" else ""
+            c_dist = ""
+            c_reg = ""
+            if parent_unit and parent_unit.parent and parent_unit.parent.level == "District / LGA":
+                c_dist = parent_unit.parent.unit_name
+                if parent_unit.parent.parent and parent_unit.parent.parent.level == "Region / State":
+                    c_reg = parent_unit.parent.parent.unit_name
+
+            chap, _ = Chapter.objects.get_or_create(
+                network=norm_network,
+                country=norm_country,
+                name=unit_name.strip(),
+                defaults={
+                    "code": f"{norm_country}-{unit_name[:3].upper()}-01",
+                    "status": "active",
+                    "community_cluster": c_cluster,
+                    "cluster_unit": parent_unit if parent_unit and parent_unit.level == "Community Cluster" else None,
+                    "region": c_reg,
+                    "district": c_dist,
+                },
+            )
+            if c_cluster and not chap.community_cluster:
+                chap.community_cluster = c_cluster
+                chap.cluster_unit = parent_unit if parent_unit and parent_unit.level == "Community Cluster" else None
+                chap.save(update_fields=["community_cluster", "cluster_unit"])
 
         AuditEvent.objects.create(
             account=actor_account,

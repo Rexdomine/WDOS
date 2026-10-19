@@ -50,6 +50,8 @@ from .scope import (
     get_scoped_kpis,
     get_user_preferences,
     get_user_scope,
+    is_broad_geographic_place,
+    sanitize_chapter_display,
 )
 from .dashboard_engine import (
     build_dashboard_context,
@@ -189,12 +191,23 @@ def _get_authenticated_context(request):
     default_dash = get_dashboard_screen(get_default_screen_for_role(user_scope.active_role or user_scope.primary_role)) or {}
     active_role_title = default_dash.get("default_role_title") or (user_scope.active_role or "member").replace("_", " ").title()
 
+    from .context_block import get_identity_context
+    identity_context = get_identity_context(
+        account,
+        user_scope,
+        active_network=user_scope.active_network,
+        active_role=user_scope.active_role,
+        active_country=user_scope.active_country,
+        request=request,
+    )
+
     context = {
         "account": account,
         "user_scope": user_scope,
         "active_network": user_scope.active_network or "WGMN",
         "active_role_title": active_role_title,
         "country_name": get_country_display_name(user_scope.active_country),
+        "identity_context": identity_context,
         "user_pref": user_pref,
         "lang": lang,
         "direction": direction,
@@ -544,6 +557,16 @@ def app_shell(request):
         **extra_context,
     })
 
+    from .context_block import get_identity_context
+    ctx["identity_context"] = get_identity_context(
+        ctx["account"],
+        user_scope,
+        active_network=active_net,
+        active_role=role,
+        active_country=active_country,
+        request=request,
+    )
+
     if not request.GET.get("role") and request.GET.get("view") != "dashboard" and request.GET.get("legacy") != "1":
         account = ctx["account"]
         _ensure_default_work_items_for_scope(account, user_scope)
@@ -827,9 +850,65 @@ def individual_profile_view(request, network, country, level, profile_id):
     # viewing other members requires matching network & country scope
     if target_account != ctx["account"]:
         try:
-            assert_scope_authorized(user_scope, network=network, country=country)
+            assert_scope_authorized(user_scope, network=network, country=country, level=level)
         except ScopePermissionDenied as exc:
             return _render_scope_error(request, ctx, exc)
+
+        # Restrict ordinary members, candidates, and community from viewing leadership profiles
+        target_grants = AccessGrant.objects.filter(
+            account=target_account,
+            revoked_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        )
+        is_target_leader = target_grants.exclude(role__in=["member", "candidate", "community"]).exists() or level not in ("member", "candidate", "community")
+        if user_scope.leadership_tier > 4 and is_target_leader:
+            return _render_scope_error(
+                request, ctx,
+                ScopePermissionDenied(
+                    "Access Denied: Leadership profile records are restricted to authorized leadership appointments.",
+                    reason_code="leadership_restricted",
+                    recovery_url="/foundation/profile/",
+                )
+            )
+
+        # Target account network verification: non-founder users cannot view records from another network
+        if not user_scope.can_cross_network:
+            from .scope import normalize_network_code
+            target_nets = set()
+            for g in target_grants:
+                if g.network and g.network != "*":
+                    target_nets.add(normalize_network_code(g.network))
+            target_mem = Membership.objects.filter(person=target_account.person).first() if target_account.person else None
+            if target_mem and target_mem.network:
+                target_nets.add(normalize_network_code(target_mem.network))
+            if target_nets and not any(user_scope.can_access_network(tn) for tn in target_nets):
+                return _render_scope_error(
+                    request, ctx,
+                    ScopePermissionDenied(
+                        f"Access Denied: Member belongs to network outside your authorized scope ({user_scope.active_network}).",
+                        reason_code="network_mismatch",
+                        recovery_url="/foundation/profile/",
+                    )
+                )
+
+        # Target account country verification for single-country users
+        if user_scope.allowed_countries != ["*"] and user_scope.active_country != "ALL":
+            target_countries = set()
+            for g in target_grants:
+                if g.geography and g.geography != "*":
+                    target_countries.add(g.geography[:2].upper())
+            target_mem = Membership.objects.filter(person=target_account.person).first() if target_account.person else None
+            if target_mem and isinstance(target_mem.home, dict) and target_mem.home.get("country"):
+                target_countries.add(target_mem.home["country"].upper())
+            if target_countries and not any(user_scope.can_access_country(tc) for tc in target_countries):
+                return _render_scope_error(
+                    request, ctx,
+                    ScopePermissionDenied(
+                        f"Access Denied: Member belongs to geographic hub outside your permitted area ({user_scope.active_country}).",
+                        reason_code="wrong_country",
+                        recovery_url="/foundation/profile/",
+                    )
+                )
 
     membership = Membership.objects.filter(person=target_account.person).first() if target_account.person else None
     active_grants = AccessGrant.objects.filter(
@@ -1272,11 +1351,29 @@ def work_item_detail_view(request, item_id):
     user_scope = ctx["user_scope"]
     item = get_object_or_404(WorkItem, id=item_id)
 
+    # Restrict leadership work items from ordinary members, candidates, and community users
+    LEADERSHIP_CATEGORIES = {
+        "verification", "governance", "operations", "quality", "safeguarding",
+        "finance", "compliance", "pipeline", "roster",
+    }
+    is_leadership_item = item.leadership_level is not None or item.category in LEADERSHIP_CATEGORIES
+    if user_scope.leadership_tier > 4 and is_leadership_item:
+        if item.assigned_to != ctx["account"] and item.created_by != ctx["account"]:
+            return _render_scope_error(
+                request, ctx,
+                ScopePermissionDenied(
+                    "Access Denied: Leadership work items are restricted to authorized leadership appointments.",
+                    reason_code="leadership_restricted",
+                    recovery_url="/foundation/work-queue/",
+                )
+            )
+
     try:
         assert_scope_authorized(
             user_scope,
             network=item.network,
             country=item.country,
+            level=item.leadership_level.code if item.leadership_level else None,
             confidential=item.confidential,
         )
     except ScopePermissionDenied as exc:
@@ -1305,11 +1402,29 @@ def work_item_action_view(request, item_id):
     user_scope = ctx["user_scope"]
     item = get_object_or_404(WorkItem, id=item_id)
 
+    # Restrict leadership work item actions from ordinary members, candidates, and community users
+    LEADERSHIP_CATEGORIES = {
+        "verification", "governance", "operations", "quality", "safeguarding",
+        "finance", "compliance", "pipeline", "roster",
+    }
+    is_leadership_item = item.leadership_level is not None or item.category in LEADERSHIP_CATEGORIES
+    if user_scope.leadership_tier > 4 and is_leadership_item:
+        if item.assigned_to != ctx["account"] and item.created_by != ctx["account"]:
+            return _render_scope_error(
+                request, ctx,
+                ScopePermissionDenied(
+                    "Access Denied: Leadership work item actions are restricted to authorized leadership appointments.",
+                    reason_code="leadership_restricted",
+                    recovery_url="/foundation/work-queue/",
+                )
+            )
+
     try:
         assert_scope_authorized(
             user_scope,
             network=item.network,
             country=item.country,
+            level=item.leadership_level.code if item.leadership_level else None,
             confidential=item.confidential,
         )
     except ScopePermissionDenied as exc:
@@ -1482,6 +1597,17 @@ def _execute_scoped_search(query: str, user_scope: UserScope, active_tab: str = 
     if not user_scope.can_access_confidential():
         items_qs = items_qs.filter(confidential=False)
 
+    if user_scope.leadership_tier > 4 and not user_scope.is_management_or_admin:
+        from django.db.models import Q
+        LEADERSHIP_CATEGORIES = [
+            "verification", "governance", "operations", "quality", "safeguarding",
+            "finance", "compliance", "pipeline", "roster",
+        ]
+        items_qs = items_qs.filter(
+            Q(assigned_to=user_scope.account) | Q(created_by=user_scope.account) |
+            (Q(leadership_level__isnull=True) & ~Q(category__in=LEADERSHIP_CATEGORIES))
+        )
+
     if active_tab == "records":
         items_qs = items_qs.filter(status__in=["pending", "in_progress"])
     elif active_tab == "history":
@@ -1550,11 +1676,14 @@ def _execute_scoped_search(query: str, user_scope: UserScope, active_tab: str = 
         )
         matching_people = people_qs[:5] if limit else people_qs
         for p in matching_people:
+            cluster_display = p.community_cluster or (p.cluster_unit.unit_name if p.cluster_unit else "")
+            chap_display = sanitize_chapter_display(p.chapter.name if p.chapter else p.local_home, fallback_country=p.country)
+            cluster_text = f" · Cluster: {cluster_display}" if cluster_display else ""
             results.append({
                 "id": p.person_code,
                 "type": "person_profile",
                 "title": f"{p.full_name} ({p.person_code})",
-                "summary": f"{p.primary_relationship} · {p.local_home} ({p.network}/{p.country})",
+                "summary": f"{p.primary_relationship} · Chapter: {chap_display}{cluster_text} ({p.network}/{p.country})",
                 "when": p.status,
                 "action_label": "View profile ›",
                 "pill_style": "magenta" if p.status == "Active" else "amber",
@@ -1573,18 +1702,61 @@ def _execute_scoped_search(query: str, user_scope: UserScope, active_tab: str = 
         )
         matching_units = units_qs[:5] if limit else units_qs
         for u in matching_units:
+            if u.level == "Community Cluster":
+                tag_label = "Community Cluster"
+                pill_style = "purple"
+                u_type = "community_cluster"
+            elif u.level == "Chapter":
+                tag_label = "Chapter"
+                pill_style = "green"
+                u_type = "chapter"
+            elif u.level == "District / LGA":
+                tag_label = "District / LGA"
+                pill_style = "blue"
+                u_type = "local_unit"
+            else:
+                tag_label = u.level
+                pill_style = "magenta"
+                u_type = "local_unit"
+
+            parent_info = f" · Parent: {u.parent.unit_name}" if u.parent else ""
             results.append({
                 "id": u.id,
-                "type": "local_unit",
-                "title": f"{u.unit_name} ({u.level})",
-                "summary": f"Leader: {u.responsible_leader_name} · {u.network}/{u.country}",
+                "type": u_type,
+                "title": f"{u.unit_name} ({tag_label})",
+                "summary": f"Leader: {u.responsible_leader_name}{parent_info} · {u.network}/{u.country}",
                 "when": u.record_state,
                 "action_label": "Open unit ›",
-                "pill_style": "magenta",
+                "pill_style": pill_style,
                 "status": "active",
                 "network": u.network,
                 "country": u.country,
                 "url": f"/foundation/geography/local-org/?country={u.country}&network={u.network}",
+            })
+
+        # 5. Search Chapters specifically (and avoid showing broad places like Lagos or Ikeja as Chapters)
+        chap_qs = Chapter.objects.filter(network__in=user_scope.allowed_networks)
+        if "*" not in user_scope.allowed_countries:
+            chap_qs = chap_qs.filter(country__in=user_scope.allowed_countries)
+        chap_qs = chap_qs.filter(
+            models_q_search(query, ["name", "code", "community_cluster", "region", "district"])
+        )
+        matching_chaps = chap_qs[:5] if limit else chap_qs
+        for ch in matching_chaps:
+            sanitized_name = sanitize_chapter_display(ch.name, fallback_country=ch.country)
+            cluster_info = f" · Cluster: {ch.community_cluster}" if ch.community_cluster else ""
+            results.append({
+                "id": ch.id,
+                "type": "chapter",
+                "title": f"{sanitized_name} (Chapter)",
+                "summary": f"{ch.code}{cluster_info} · {ch.network}/{ch.country}",
+                "when": ch.status.title(),
+                "action_label": "Open chapter ›",
+                "pill_style": "green",
+                "status": ch.status.lower(),
+                "network": ch.network,
+                "country": ch.country,
+                "url": f"/foundation/chapters/{ch.id}/",
             })
 
     return results
@@ -2756,8 +2928,18 @@ def dashboard_drilldown(request, category):
             if country not in ("ALL", "*"):
                 chap_qs = chap_qs.filter(country=country)
             items = list(chap_qs)
-            columns = ["Code", "Name", "Network", "Country", "Region", "Status", "Members", "Lead Name", "Action"]
+            columns = ["Code", "Name", "Network", "Country", "Region", "Community Cluster", "Status", "Members", "Lead Name", "Action"]
+        elif category in ("clusters", "community-clusters"):
+            c_qs = LocalOrganisationUnit.objects.filter(level="Community Cluster")
+            if net not in ("ALL", "*"):
+                c_qs = c_qs.filter(network=net)
+            if country not in ("ALL", "*"):
+                c_qs = c_qs.filter(country=country)
+            items = list(c_qs)
+            columns = ["Cluster Name", "Network", "Country", "Parent LGA / District", "Leader", "Status", "Action"]
         elif category == "alerts":
+            if user_scope.leadership_tier > 4 and not user_scope.is_management_or_admin:
+                raise ScopePermissionDenied("Access Denied: Operational alerts drilldown is restricted to leadership roles.", reason_code="leadership_restricted")
             alert_qs = DashboardAlert.objects.filter(is_active=True)
             if net not in ("ALL", "*"):
                 alert_qs = alert_qs.filter(network__in=[net, "ALL"])
@@ -2774,6 +2956,8 @@ def dashboard_drilldown(request, category):
             items = list(meet_qs.order_by("scheduled_at"))
             columns = ["Title", "Type", "Network", "Country", "Date / Time", "Location", "Attendees", "Action"]
         elif category == "reports":
+            if user_scope.leadership_tier > 4 and not user_scope.is_management_or_admin:
+                raise ScopePermissionDenied("Access Denied: Reports drilldown is restricted to leadership roles.", reason_code="leadership_restricted")
             rep_qs = DashboardReport.objects.filter(status="published")
             if net not in ("ALL", "*"):
                 rep_qs = rep_qs.filter(network__in=[net, "ALL"])
@@ -2878,6 +3062,16 @@ def report_detail_view(request, report_id):
         return redirect_response
 
     user_scope = ctx["user_scope"]
+    if user_scope.leadership_tier > 4 and not user_scope.is_management_or_admin:
+        return _render_scope_error(
+            request, ctx,
+            ScopePermissionDenied(
+                "Access Denied: Reports are restricted to authorized leadership appointments.",
+                reason_code="leadership_restricted",
+                recovery_url="/foundation/dashboard/",
+            )
+        )
+
     report = get_object_or_404(DashboardReport, id=report_id)
 
     try:
@@ -2957,16 +3151,37 @@ def chapter_detail_view(request, chapter_id):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
+    sanitized_name = sanitize_chapter_display(chapter.name, fallback_country=chapter.country)
+    term = GeographyTerminology.objects.filter(country=chapter.country).first() or GeographyTerminology.objects.filter(country="NG").first()
+    first_level_term = term.first_level_term if term else "State / FCT"
+    second_level_term = term.second_level_term if term else "LGA"
+
+    cluster_name = chapter.community_cluster or (chapter.cluster_unit.unit_name if chapter.cluster_unit else "")
+    if not cluster_name:
+        c_unit = LocalOrganisationUnit.objects.filter(country=chapter.country, level="Community Cluster").first()
+        if c_unit:
+            cluster_name = c_unit.unit_name
+        else:
+            cluster_name = "Central Community Cluster"
+
+    if cluster_name and not cluster_name.lower().endswith("cluster"):
+        cluster_name = f"{cluster_name} Cluster"
+
     chapter_meetings = list(ScheduledMeeting.objects.filter(
         geography__icontains=chapter.name,
         scheduled_at__gte=timezone.now(),
     )[:5])
     chapter_members = list(Membership.objects.filter(home__code=chapter.code)[:15])
 
-    breadcrumbs = get_breadcrumbs(user_scope, network=chapter.network, country=chapter.country, page_name=f"Chapter: {chapter.name}")
+    breadcrumbs = get_breadcrumbs(user_scope, network=chapter.network, country=chapter.country, page_name=f"Chapter: {sanitized_name}")
 
     ctx.update({
         "chapter": chapter,
+        "sanitized_chapter_name": sanitized_name,
+        "community_cluster_name": cluster_name,
+        "first_level_term": first_level_term,
+        "second_level_term": second_level_term,
+        "terminology": term,
         "chapter_meetings": chapter_meetings,
         "chapter_members": chapter_members,
         "breadcrumbs": breadcrumbs,
@@ -2984,6 +3199,15 @@ def dashboard_export(request):
     export_type = request.GET.get("type", "summary").lower()
     net = request.GET.get("network", user_scope.active_network).upper()
     country = request.GET.get("country", user_scope.active_country).upper()
+
+    if export_type in ("reports", "chapters", "alerts", "members") and user_scope.leadership_tier > 4 and not user_scope.is_management_or_admin:
+        return _render_scope_error(
+            request, ctx,
+            ScopePermissionDenied(
+                f"Access Denied: Exporting {export_type} is restricted to authorized leadership appointments.",
+                reason_code="leadership_restricted",
+            )
+        )
 
     try:
         assert_scope_authorized(user_scope, network=net, country=country)
@@ -3183,6 +3407,28 @@ def dashboard_screen_view(request, screen_code=None):
             user_scope.active_role = user_scope.primary_role
             request.session["wdos_active_role"] = user_scope.primary_role
 
+    # Network resolution & authorization
+    req_net = request.GET.get("network")
+    if req_net:
+        req_net = req_net.upper()
+        try:
+            assert_scope_authorized(user_scope, network=req_net)
+            user_scope.active_network = req_net
+            request.session["wdos_active_network"] = req_net
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+
+    # Country resolution & authorization
+    req_country = request.GET.get("country")
+    if req_country:
+        req_country = req_country.upper()
+        try:
+            assert_scope_authorized(user_scope, country=req_country)
+            user_scope.active_country = req_country
+            request.session["wdos_active_country"] = req_country
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+
     # Resolve screen code: from URL param, GET param, or user's active role default
     explicit_screen = screen_code or request.GET.get("screen")
     is_explicit = bool(explicit_screen)
@@ -3208,6 +3454,15 @@ def dashboard_screen_view(request, screen_code=None):
     )
 
     ctx.update(dash_ctx)
+    from .context_block import get_identity_context
+    ctx["identity_context"] = get_identity_context(
+        account,
+        user_scope,
+        active_network=user_scope.active_network,
+        active_role=user_scope.active_role,
+        active_country=user_scope.active_country,
+        request=request,
+    )
     ctx["active_nav"] = "workspace"
     ctx["breadcrumbs"] = [
         {"label": "Workspace", "url": "/foundation/", "is_current": False},
@@ -3597,6 +3852,7 @@ def people_directory_view(request):
     changed_codes = _get_changed_person_codes()
     for p in people:
         p.is_changed_record = p.person_code in changed_codes
+        p.hierarchy_path = p.get_hierarchy_path()
 
     audit_history = get_stage6_audit_history(user_scope)
 
@@ -3682,6 +3938,10 @@ def person_profile_view(request, person_code="WD-00421"):
             primary_relationship = request.POST.get("primary_relationship", person.primary_relationship)
             status_val = request.POST.get("status", person.status)
             expected_updated = request.POST.get("expected_updated_at", "").strip()
+            state_or_region = request.POST.get("state_or_region", person.state_or_region)
+            lga_or_district = request.POST.get("lga_or_district", person.lga_or_district)
+            community_cluster = request.POST.get("community_cluster", person.community_cluster)
+            chapter_name = request.POST.get("chapter_name", person.chapter_name)
 
             try:
                 res = update_person_profile_record(
@@ -3693,6 +3953,10 @@ def person_profile_view(request, person_code="WD-00421"):
                     contact_verification=contact_verification,
                     primary_relationship=primary_relationship,
                     status=status_val,
+                    state_or_region=state_or_region,
+                    lga_or_district=lga_or_district,
+                    community_cluster=community_cluster,
+                    chapter_name=chapter_name,
                     actor_account=account,
                     user_scope=user_scope,
                     expected_updated_at=expected_updated or None,
@@ -3726,6 +3990,18 @@ def person_profile_view(request, person_code="WD-00421"):
     )
     audit_history = get_stage6_audit_history(user_scope, person_code=person.person_code)
     changed_codes = _get_changed_person_codes()
+    hierarchy_path = person.get_hierarchy_path()
+
+    from .context_block import get_identity_context
+    ctx["identity_context"] = get_identity_context(
+        ctx["account"],
+        user_scope,
+        active_network=person.network,
+        active_role=user_scope.active_role,
+        active_country=person.country,
+        target_person=person,
+        request=request,
+    )
 
     ctx.update({
         "screen": screen,
@@ -3737,6 +4013,7 @@ def person_profile_view(request, person_code="WD-00421"):
         "people": people,
         "person_relationships": person_relationships,
         "local_hierarchy": local_hierarchy,
+        "hierarchy_path": hierarchy_path,
         "audit_history": audit_history,
         "result_title": "Profile updated" if result_success else "Review required",
         "result_message": result_message,
@@ -4143,9 +4420,22 @@ def africa_network_coverage_view(request):
     except ScopePermissionDenied as exc:
         return _render_scope_error(request, ctx, exc)
 
+    req_country = request.GET.get("country", "").strip().upper()
+    network_filter = request.GET.get("network", "").strip().upper()
+
+    if req_country or network_filter:
+        try:
+            assert_country_network_authorized(user_scope, country=req_country or None, network=network_filter or None)
+        except ScopePermissionDenied as exc:
+            return _render_scope_error(request, ctx, exc)
+
     screen = dict(STAGE6_SCREENS["GEO-01"])
     state_mode = request.GET.get("state")
     state_card = screen["state_contracts"].get(state_mode) if state_mode else None
+
+    active_network = network_filter or user_scope.active_network or "WGMN"
+    if active_network not in {"WGMN", "WNNN"}:
+        active_network = "WGMN"
 
     qs = CountryDossier.objects.all()
     if not is_global_stage6_scope(user_scope):
@@ -4153,6 +4443,9 @@ def africa_network_coverage_view(request):
             qs = qs.filter(country_code=user_scope.active_country)
         if user_scope.active_network in {"WGMN", "WNNN"}:
             qs = qs.filter(network=user_scope.active_network)
+    else:
+        if network_filter in {"WGMN", "WNNN"}:
+            qs = qs.filter(network=network_filter)
 
     query = request.GET.get("q", "").strip()
     if query:
@@ -4168,30 +4461,70 @@ def africa_network_coverage_view(request):
     if status_filter:
         qs = qs.filter(verification_status__icontains=status_filter)
 
-    network_filter = request.GET.get("network", "").strip().upper()
-    if network_filter in {"WGMN", "WNNN"}:
-        qs = qs.filter(network=network_filter)
-
     dossiers = list(qs)
     if state_mode == "empty":
         dossiers = []
     elif not state_card and len(dossiers) == 0 and (query or status_filter or network_filter):
         state_card = screen["state_contracts"].get("no_matching")
 
-    req_country = request.GET.get("country", "").strip().upper()
+    # Determine default selected dossier based on user's authorized scope
     selected_dossier = None
     if req_country:
         selected_dossier = next((d for d in dossiers if d.country_code == req_country), None)
+    if not selected_dossier and not is_global_stage6_scope(user_scope) and user_scope.active_country not in {"ALL", "BOTH", "*"}:
+        selected_dossier = next((d for d in dossiers if d.country_code == user_scope.active_country), None)
     if not selected_dossier and dossiers:
-        selected_dossier = next((d for d in dossiers if d.country_code == "NG" and d.network == "WGMN"), dossiers[0])
+        selected_dossier = next((d for d in dossiers if d.country_code == "NG" and d.network == active_network), dossiers[0])
+
+    from accounts.african_geography import get_country as get_geo_country
+    country_hierarchy_map = {}
+    for d in dossiers:
+        cc = d.country_code
+        term = GeographyTerminology.objects.filter(country=cc, status="effective").first()
+        c_info = get_geo_country(cc) or {}
+        l1_term = term.first_level_term if term else c_info.get("admin1_label", "State / Region")
+        l2_term = term.second_level_term if term else c_info.get("admin2_label", "LGA / District")
+
+        l1_unit = LocalOrganisationUnit.objects.filter(country=cc, level="Region / State").first()
+        l2_unit = LocalOrganisationUnit.objects.filter(country=cc, level="District / LGA").first()
+        cluster_unit = LocalOrganisationUnit.objects.filter(country=cc, level="Community Cluster").first()
+        chapter_unit = LocalOrganisationUnit.objects.filter(country=cc, level="Chapter").first()
+
+        l1_name = l1_unit.unit_name if l1_unit else ("Lagos State" if cc == "NG" else f"{d.country_name} Region")
+        l2_name = l2_unit.unit_name if l2_unit else ("Ikeja LGA" if cc == "NG" else f"{d.country_name} District")
+        cluster_name = cluster_unit.unit_name if cluster_unit else ("Ikeja Central Cluster" if cc == "NG" else "Central Community Cluster")
+        chapter_name = chapter_unit.unit_name if chapter_unit else ("Allen Chapter" if cc == "NG" else f"{d.country_name} Central Chapter")
+
+        country_hierarchy_map[cc] = {
+            "country_name": d.country_name,
+            "country_code": cc,
+            "first_level_term": l1_term,
+            "first_level_name": l1_name,
+            "second_level_term": l2_term,
+            "second_level_name": l2_name,
+            "cluster_name": cluster_name,
+            "chapter_name": chapter_name,
+            "path_text": f"{d.network} → {d.country_name} → {l1_name} ({l1_term}) → {l2_name} ({l2_term}) → {cluster_name} (Cluster) → {chapter_name} (Chapter)",
+        }
+
+    selected_cc = selected_dossier.country_code if selected_dossier else "NG"
+    selected_hierarchy = country_hierarchy_map.get(selected_cc)
+
+    is_global_user = is_global_stage6_scope(user_scope)
+    allowed_country_codes = ["NG", "KE", "GH", "AO", "ET"] if is_global_user else ([user_scope.active_country] if user_scope.active_country in ["NG", "KE", "GH", "AO", "ET"] else ["NG"])
 
     ctx.update({
         "screen": screen,
         "dossiers": dossiers,
         "selected_dossier": selected_dossier,
+        "country_hierarchy_map": country_hierarchy_map,
+        "selected_hierarchy": selected_hierarchy,
+        "allowed_country_codes": allowed_country_codes,
+        "is_global_user": is_global_user,
         "query": query,
         "status_filter": status_filter,
         "network_filter": network_filter,
+        "active_network": active_network,
         "active_nav": "reports",
         "active_tab": request.GET.get("tab", "map"),
         "state_mode": state_mode,
@@ -4247,11 +4580,50 @@ def country_command_profile_view(request, country_code="NG"):
 
     audit_history = get_stage6_audit_history(user_scope, country_code=norm_cc)
 
+    from accounts.african_geography import get_country as get_geo_country
+    c_info = get_geo_country(norm_cc) or {}
+    term = GeographyTerminology.objects.filter(country=norm_cc, status="effective").first()
+    l1_term = term.first_level_term if term else c_info.get("admin1_label", "State / Region")
+    l2_term = term.second_level_term if term else c_info.get("admin2_label", "LGA / District")
+    l1_unit = LocalOrganisationUnit.objects.filter(country=norm_cc, level="Region / State").first()
+    l2_unit = LocalOrganisationUnit.objects.filter(country=norm_cc, level="District / LGA").first()
+    cluster_unit = LocalOrganisationUnit.objects.filter(country=norm_cc, level="Community Cluster").first()
+    chapter_unit = LocalOrganisationUnit.objects.filter(country=norm_cc, level="Chapter").first()
+
+    l1_name = l1_unit.unit_name if l1_unit else ("Lagos State" if norm_cc == "NG" else f"{dossier.country_name} Region")
+    l2_name = l2_unit.unit_name if l2_unit else ("Ikeja LGA" if norm_cc == "NG" else f"{dossier.country_name} District")
+    cluster_name = cluster_unit.unit_name if cluster_unit else ("Ikeja Central Cluster" if norm_cc == "NG" else "Central Community Cluster")
+    if cluster_name and not cluster_name.lower().endswith("cluster"):
+        cluster_name = f"{cluster_name} Cluster"
+    chapter_name = chapter_unit.unit_name if chapter_unit else ("Allen Chapter" if norm_cc == "NG" else f"{dossier.country_name} Central Chapter")
+    chapter_name = sanitize_chapter_display(chapter_name, fallback_country=norm_cc)
+
+    country_hierarchy = {
+        "country_name": dossier.country_name,
+        "country_code": norm_cc,
+        "first_level_term": l1_term,
+        "first_level_name": l1_name,
+        "second_level_term": l2_term,
+        "second_level_name": l2_name,
+        "cluster_name": cluster_name,
+        "chapter_name": chapter_name,
+        "path_text": f"{dossier.network} → {dossier.country_name} → {l1_name} → {l2_name} → {cluster_name} → {chapter_name}",
+    }
+
+    local_hierarchy = list(LocalOrganisationUnit.objects.filter(country=norm_cc).order_by("level_order"))
+    country_units = list(LocalOrganisationUnit.objects.filter(country=norm_cc))
+    country_people_count = PersonProfile.objects.filter(country=norm_cc).count()
+
     ctx.update({
         "screen": screen,
         "dossier": dossier,
         "dossiers": dossiers,
         "audit_history": audit_history,
+        "terminology": term,
+        "country_hierarchy": country_hierarchy,
+        "local_hierarchy": local_hierarchy,
+        "country_units": country_units,
+        "country_people_count": country_people_count,
         "active_nav": "reports",
         "active_tab": request.GET.get("tab", "overview"),
         "state_mode": state_mode,
@@ -4314,6 +4686,7 @@ def local_organisation_view(request):
         description = request.POST.get("description", "").strip()
         evidence_type = request.POST.get("evidence_type", "Unit record").strip()
         record_state = request.POST.get("record_state", "Active unit records").strip()
+        parent_id = request.POST.get("parent_id", "").strip() or None
 
         if not unit_name:
             result_message = "Unit name is required."
@@ -4329,6 +4702,7 @@ def local_organisation_view(request):
                     description=description,
                     evidence_type=evidence_type,
                     record_state=record_state,
+                    parent_id=parent_id,
                     actor_account=account,
                     user_scope=user_scope,
                 )
@@ -4346,6 +4720,7 @@ def local_organisation_view(request):
         units_qs = LocalOrganisationUnit.objects.filter(country=target_country).order_by("level_order")
 
     hierarchy_units = list(units_qs[:5])
+    available_parents = list(units_qs)
 
     query = request.GET.get("q", "").strip()
     if query:
@@ -4366,14 +4741,48 @@ def local_organisation_view(request):
         state_card = screen["state_contracts"].get("no_matching")
 
     audit_history = get_stage6_audit_history(user_scope, country_code=target_country)
+    term = GeographyTerminology.objects.filter(country=target_country).first() or GeographyTerminology.objects.filter(country="NG").first()
+
+    l1_term = term.first_level_term if term else "Region / State"
+    l2_term = term.second_level_term if term else "District / LGA"
+    l1_unit = LocalOrganisationUnit.objects.filter(country=target_country, level="Region / State").first()
+    l2_unit = LocalOrganisationUnit.objects.filter(country=target_country, level="District / LGA").first()
+    cluster_unit = LocalOrganisationUnit.objects.filter(country=target_country, level="Community Cluster").first()
+    chapter_unit = LocalOrganisationUnit.objects.filter(country=target_country, level="Chapter").first()
+
+    c_name = get_country_name_for_code(target_country)
+    l1_name = l1_unit.unit_name if l1_unit else ("Lagos State" if target_country == "NG" else f"{c_name} Region")
+    l2_name = l2_unit.unit_name if l2_unit else ("Ikeja LGA" if target_country == "NG" else f"{c_name} District")
+    cluster_name = cluster_unit.unit_name if cluster_unit else ("Ikeja Central Cluster" if target_country == "NG" else "Central Community Cluster")
+    if cluster_name and not cluster_name.lower().endswith("cluster"):
+        cluster_name = f"{cluster_name} Cluster"
+    chapter_name = chapter_unit.unit_name if chapter_unit else ("Allen Chapter" if target_country == "NG" else f"{c_name} Central Chapter")
+    chapter_name = sanitize_chapter_display(chapter_name, fallback_country=target_country)
+
+    country_hierarchy = {
+        "country_name": c_name,
+        "country_code": target_country,
+        "first_level_term": l1_term,
+        "first_level_name": l1_name,
+        "second_level_term": l2_term,
+        "second_level_name": l2_name,
+        "cluster_name": cluster_name,
+        "chapter_name": chapter_name,
+        "path_text": f"{target_network} → {c_name} → {l1_name} → {l2_name} → {cluster_name} → {chapter_name}",
+    }
 
     ctx.update({
         "screen": screen,
         "units": units,
         "hierarchy_units": hierarchy_units,
+        "available_parents": available_parents,
         "target_country": target_country,
-        "target_country_name": get_country_name_for_code(target_country),
+        "target_country_name": c_name,
         "target_network": target_network,
+        "terminology": term,
+        "country_hierarchy": country_hierarchy,
+        "first_level_term": l1_term,
+        "second_level_term": l2_term,
         "query": query,
         "level_filter": level_filter,
         "result_message": result_message,

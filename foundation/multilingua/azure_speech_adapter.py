@@ -1,5 +1,6 @@
 import concurrent.futures
 import hashlib
+import re
 import sys
 import requests
 from django.conf import settings
@@ -158,13 +159,15 @@ class AzureSpeechAdapter:
             cls._HTTP_SESSION = session
         return cls._HTTP_SESSION
 
+    _LIVE_FOCUS_SHORT_LANGS = ("en", "fr", "pt", "ar", "sw")
+
     @classmethod
     def _live_translate_single(cls, text: str, source_short: str, target_short: str, fallback_name: str) -> tuple[str, str]:
         preset = cls.DEFAULT_TRANSLATION_PHRASES.get((text or "").strip(), {})
         if target_short in preset:
             return preset[target_short], source_short
 
-        cache_key = ("auto", target_short, text)
+        cache_key = (source_short or "auto", target_short, text)
         cached = cls._TRANSLATION_CACHE.get(cache_key)
         if cached:
             if isinstance(cached, tuple):
@@ -172,46 +175,78 @@ class AzureSpeechAdapter:
             return str(cached), source_short
 
         session = cls._get_http_session()
-        for _attempt in range(2):
-            try:
-                resp = session.get(
-                    "https://translate.googleapis.com/translate_a/single",
-                    params={
-                        "client": "gtx",
-                        "sl": "auto",
-                        "tl": target_short,
-                        "dt": "t",
-                        "q": text,
-                    },
-                    timeout=4.2,
-                )
-                if resp.status_code == 200:
-                    payload = resp.json()
-                    detected_lang = payload[2] if isinstance(payload, list) and len(payload) > 2 and isinstance(payload[2], str) else source_short
-                    if isinstance(payload, list) and payload and isinstance(payload[0], list):
-                        translated_parts = [part[0] for part in payload[0] if isinstance(part, list) and part and part[0]]
-                        if translated_parts:
-                            result = "".join(translated_parts)
-                            if len(cls._TRANSLATION_CACHE) < 2000:
-                                cls._TRANSLATION_CACHE[cache_key] = (result, detected_lang)
-                            return result, detected_lang
-            except Exception:
-                continue
-        return (text if target_short == source_short else f"[{fallback_name}] {text}"), source_short
+        sl_candidates = [source_short, "auto"] if (source_short and source_short != "auto") else ["auto"]
+        for sl_val in sl_candidates:
+            for _attempt in range(2):
+                try:
+                    resp = session.get(
+                        "https://translate.googleapis.com/translate_a/single",
+                        params={
+                            "client": "gtx",
+                            "sl": sl_val,
+                            "tl": target_short,
+                            "dt": "t",
+                            "q": text,
+                        },
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        timeout=4.5,
+                    )
+                    if resp.status_code == 200:
+                        payload = resp.json()
+                        detected_lang = payload[2] if isinstance(payload, list) and len(payload) > 2 and isinstance(payload[2], str) else source_short
+                        if isinstance(payload, list) and payload and isinstance(payload[0], list):
+                            translated_parts = [part[0] for part in payload[0] if isinstance(part, list) and part and part[0]]
+                            if translated_parts:
+                                result = "".join(translated_parts).strip()
+                                if (
+                                    sl_val != "auto"
+                                    and target_short != source_short
+                                    and len(text.strip()) > 4
+                                    and result.lower() == text.strip().lower()
+                                ):
+                                    break
+                                if len(cls._TRANSLATION_CACHE) < 2000:
+                                    cls._TRANSLATION_CACHE[cache_key] = (result, detected_lang)
+                                return result, detected_lang
+                except Exception:
+                    continue
+        return text, source_short
+
+    @classmethod
+    def _split_tts_chunks(cls, text: str, max_chars: int = 140) -> list[str]:
+        words = (text or "").split()
+        if not words:
+            return []
+        chunks: list[str] = []
+        current = ""
+        for w in words:
+            candidate = f"{current} {w}".strip() if current else w
+            if len(candidate) <= max_chars and len(candidate.encode("utf-8")) <= 185:
+                current = candidate
+            else:
+                if current:
+                    chunks.append(current)
+                current = w[:max_chars]
+            if len(chunks) >= 4:
+                break
+        if current and len(chunks) < 4:
+            chunks.append(current)
+        return chunks
 
     @classmethod
     def synthesize_speech_mp3(cls, text: str, target_language: str = "fr-FR") -> bytes | None:
         """
         Generates natural-sounding neural speech audio (MP3 bytes) for the given text and target language.
-        Uses in-memory caching for sub-millisecond repeat playback.
+        Splits multi-sentence or multi-byte UTF-8 statements into safe <=185-byte chunks and concatenates
+        MP3 frames so long statements in English, French, Portuguese, Arabic, and Swahili never truncate or 204.
         """
-        clean_text = (text or "").strip()
+        clean_text = re.sub(r"^\[[^\]]+\]\s*", "", (text or "").strip()).strip()
         if not clean_text or cls.is_system_echo_phrase(clean_text):
             return None
         short_lang = (target_language or "fr-FR").split("-")[0].lower()
         if short_lang not in cls._SHORT_TO_BCP47:
             short_lang = "fr"
-        trimmed = clean_text[:200]
+        trimmed = clean_text[:450]
         cache_key = (short_lang, trimmed.lower())
         if cache_key in cls._TTS_AUDIO_CACHE:
             return cls._TTS_AUDIO_CACHE[cache_key]
@@ -221,37 +256,51 @@ class AzureSpeechAdapter:
             cls._TTS_AUDIO_CACHE[cache_key] = stub
             return stub
 
-        # West African phonetic voice fallback for Yoruba/Igbo when upstream TTS lacks direct yo/ig voice models
         candidate_tls = [short_lang]
         if short_lang in ("yo", "ig"):
             candidate_tls.extend(["ha", "sw"])
 
+        max_chunk_chars = 85 if short_lang == "ar" else 145
+        chunks = cls._split_tts_chunks(trimmed, max_chars=max_chunk_chars)
+        if not chunks:
+            return None
+
         session = cls._get_http_session()
         for tl_code in candidate_tls:
-            try:
-                resp = session.get(
-                    "https://translate.googleapis.com/translate_tts",
-                    params={
-                        "ie": "UTF-8",
-                        "client": "tw-ob",
-                        "tl": tl_code,
-                        "q": trimmed,
-                    },
-                    headers={"User-Agent": "Mozilla/5.0"},
-                    timeout=3.5,
-                )
-                if resp.status_code == 200 and resp.content and len(resp.content) > 256:
-                    if len(cls._TTS_AUDIO_CACHE) < 500:
-                        cls._TTS_AUDIO_CACHE[cache_key] = resp.content
-                    return resp.content
-            except Exception:
-                continue
+            combined_mp3 = bytearray()
+            for chunk_str in chunks:
+                chunk_bytes = None
+                for _attempt in range(2):
+                    try:
+                        resp = session.get(
+                            "https://translate.googleapis.com/translate_tts",
+                            params={
+                                "ie": "UTF-8",
+                                "client": "tw-ob",
+                                "tl": tl_code,
+                                "q": chunk_str,
+                            },
+                            headers={"User-Agent": "Mozilla/5.0"},
+                            timeout=4.0,
+                        )
+                        if resp.status_code == 200 and resp.content and len(resp.content) > 128:
+                            chunk_bytes = resp.content
+                            break
+                    except Exception:
+                        continue
+                if chunk_bytes:
+                    combined_mp3.extend(chunk_bytes)
+            if len(combined_mp3) > 128:
+                final_bytes = bytes(combined_mp3)
+                if len(cls._TTS_AUDIO_CACHE) < 500:
+                    cls._TTS_AUDIO_CACHE[cache_key] = final_bytes
+                return final_bytes
         return None
 
     @classmethod
     def translate_segment(cls, original_text: str, original_language: str = "en-US", existing_translations: dict | None = None) -> dict:
         """
-        Ensures a transcript segment has translations mapped by short target code (fr, pt, en, etc.).
+        Ensures a transcript segment has translations mapped by short target code (en, fr, pt, ar, sw).
         Preserves valid translations provided by the client SDK and translates missing languages live.
         """
         raw_existing = dict(existing_translations or {})
@@ -280,8 +329,11 @@ class AzureSpeechAdapter:
                 merged[short] = preset[short]
             elif is_test_run:
                 merged[short] = clean_text if (lang_code == original_language or short == source_short) else f"[{meta['name']}] {clean_text}"
-            else:
-                pending_targets.append((short, meta["name"]))
+            elif short in cls._LIVE_FOCUS_SHORT_LANGS or short == source_short:
+                if short == source_short:
+                    merged[short] = clean_text
+                else:
+                    pending_targets.append((short, meta["name"]))
 
         detected_source_short = source_short
         if pending_targets:
@@ -297,7 +349,15 @@ class AzureSpeechAdapter:
                         if det_lang and det_lang in cls._SHORT_TO_BCP47:
                             detected_source_short = det_lang
                     except Exception:
-                        merged[short] = clean_text if short == source_short else f"[{name}] {clean_text}"
+                        merged[short] = clean_text
+            if detected_source_short != source_short and source_short in cls._LIVE_FOCUS_SHORT_LANGS:
+                # If auto-detection found the speaker actually spoke another language, translate into source_short too
+                try:
+                    src_name = cls.SUPPORTED_LANGUAGES.get(cls._SHORT_TO_BCP47.get(source_short, "en-US"), {}).get("name", "English")
+                    res_src, _ = cls._live_translate_single(clean_text, detected_source_short, source_short, src_name)
+                    merged[source_short] = res_src
+                except Exception:
+                    pass
 
         merged["_detected_source"] = cls._SHORT_TO_BCP47.get(detected_source_short, original_language or "en-US")
         return merged

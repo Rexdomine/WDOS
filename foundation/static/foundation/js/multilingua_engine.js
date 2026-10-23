@@ -42,28 +42,27 @@ class WDOSMultilinguaMeeting {
         this.isVideoOff = true;
         this.isAudioDegraded = false;
         this.isSpeakerAudioMuted = false;
+        this.isTranslationEnabled = true;
+        this.isSyncingMedia = false;
         this.lastSeenSequence = config.initialSequence || 0;
+        this.lastSeenAudioSeq = -1;
+        this.lastReceivedRawAudioAt = 0;
         this.pollTimer = null;
         this.lastTranslatedText = "";
+        this.lastOriginalText = "";
+        this.lastOriginalLang = "en-US";
         this.participantCount = 1;
-        this.ttsAudioQueue = [];
+        this.audioPlaybackQueue = [];
+        this.isPlayingQueueItem = false;
         this.currentAudioEl = null;
-
-        // Cross-tab acoustic echo lock so two tabs on the same laptop never transcribe each other's TTS output
-        this.ttsChannel = null;
-        try {
-            if ("BroadcastChannel" in window) {
-                this.ttsChannel = new BroadcastChannel("wdos_multilingua_tts");
-                this.ttsChannel.onmessage = (ev) => {
-                    if (!ev.data) return;
-                    if (ev.data.type === "tts_start") {
-                        this.ttsSuppressionUntil = Math.max(this.ttsSuppressionUntil || 0, Date.now() + (ev.data.durationMs || 2800));
-                    } else if (ev.data.type === "tts_end") {
-                        this.ttsSuppressionUntil = Date.now() + 650;
-                    }
-                };
-            }
-        } catch (_) {}
+        this.ttsAudioPlayer = null;
+        this.isAudioUnlocked = false;
+        this.speechWatchdogTimer = null;
+        this.interimFlushTimer = null;
+        this.pendingInterimText = "";
+        this.liveMediaRecorder = null;
+        this.liveRecorderInterval = null;
+        this.hadVoiceInCurrentChunk = false;
 
         this.langNames = {
             "en-US": "English",
@@ -112,10 +111,30 @@ class WDOSMultilinguaMeeting {
         return (bcp47 || "en-US").split("-")[0].toLowerCase();
     }
 
+    unlockAudioPlayback() {
+        if (this.isAudioUnlocked) return;
+        try {
+            if (!this.ttsAudioPlayer) {
+                this.ttsAudioPlayer = new Audio();
+                this.ttsAudioPlayer.preload = "auto";
+                this.ttsAudioPlayer.playsInline = true;
+            }
+            if ("speechSynthesis" in window) {
+                try { window.speechSynthesis.resume(); } catch (_) {}
+            }
+            this.isAudioUnlocked = true;
+        } catch (_) {}
+    }
+
     async boot() {
         if (document.getElementById("waiting-lobby-screen") || document.getElementById("meeting-ended-screen")) {
             return;
         }
+        const unlockHandler = () => this.unlockAudioPlayback();
+        document.addEventListener("click", unlockHandler, { passive: true });
+        document.addEventListener("touchstart", unlockHandler, { passive: true });
+        document.addEventListener("keydown", unlockHandler, { passive: true });
+
         this.switchListeningLanguage(this.listeningLang);
         this.bindUIControls();
         if (document.getElementById("prejoin-screen")) {
@@ -130,6 +149,7 @@ class WDOSMultilinguaMeeting {
         micBtns.forEach((btn) => {
             btn.addEventListener("click", async (e) => {
                 e.preventDefault();
+                this.unlockAudioPlayback();
                 await this.toggleMicrophone();
             });
         });
@@ -150,20 +170,46 @@ class WDOSMultilinguaMeeting {
             });
         }
 
+        const transModeBtn = document.getElementById("btn-toggle-translation-mode");
+        if (transModeBtn) {
+            transModeBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.unlockAudioPlayback();
+                this.isTranslationEnabled = !this.isTranslationEnabled;
+                this.clearAudioQueue();
+                const modeLabelEl = document.getElementById("btn-toggle-translation-mode-label");
+                const headerLabelEl = document.getElementById("caption-header-label");
+                const replayLabelEl = document.getElementById("btn-play-translation-label");
+                const langName = this.langNames[this.listeningLang] || this.listeningLang;
+                if (this.isTranslationEnabled) {
+                    transModeBtn.style.background = "rgba(212,0,106,0.25)";
+                    transModeBtn.style.color = "#F4C2DA";
+                    transModeBtn.style.borderColor = "rgba(244,194,218,0.45)";
+                    if (modeLabelEl) modeLabelEl.textContent = "Real-Time Translation: ON";
+                    if (headerLabelEl) headerLabelEl.textContent = `LIVE TRANSLATION (${langName.toUpperCase()})`;
+                    if (replayLabelEl) replayLabelEl.textContent = `Replay Voice (${langName})`;
+                    this.setMicStatus(`Real-Time Voice Translation ON — Hearing translated voice in ${langName}.`);
+                } else {
+                    transModeBtn.style.background = "rgba(56,189,248,0.22)";
+                    transModeBtn.style.color = "#7DD3FC";
+                    transModeBtn.style.borderColor = "rgba(125,211,252,0.45)";
+                    if (modeLabelEl) modeLabelEl.textContent = "Real-Time Translation: OFF (Original Audio)";
+                    if (headerLabelEl) headerLabelEl.textContent = "ORIGINAL AUDIO MODE (TRANSLATION OFF)";
+                    if (replayLabelEl) replayLabelEl.textContent = "Replay Original Audio";
+                    this.setMicStatus("Real-Time Voice Translation OFF — Hearing speaker's original audio normally.");
+                }
+            });
+        }
+
         const ttsToggleBtn = document.getElementById("btn-toggle-tts-audio");
         if (ttsToggleBtn) {
             ttsToggleBtn.addEventListener("click", (e) => {
                 e.preventDefault();
+                this.unlockAudioPlayback();
                 this.isSpeakerAudioMuted = !this.isSpeakerAudioMuted;
                 const labelEl = document.getElementById("btn-toggle-tts-label");
                 if (this.isSpeakerAudioMuted) {
-                    if (this.currentAudioEl) {
-                        try { this.currentAudioEl.pause(); } catch (_) {}
-                        this.currentAudioEl = null;
-                    }
-                    if ("speechSynthesis" in window) {
-                        try { window.speechSynthesis.cancel(); } catch (_) {}
-                    }
+                    this.clearAudioQueue();
                     ttsToggleBtn.style.background = "rgba(239,68,68,0.22)";
                     ttsToggleBtn.style.color = "#FCA5A5";
                     ttsToggleBtn.style.borderColor = "rgba(248,113,113,0.4)";
@@ -173,8 +219,10 @@ class WDOSMultilinguaMeeting {
                     ttsToggleBtn.style.color = "#86EFAC";
                     ttsToggleBtn.style.borderColor = "rgba(134,239,172,0.35)";
                     if (labelEl) labelEl.textContent = "Voice Output: ON";
-                    if (this.lastTranslatedText) {
+                    if (this.isTranslationEnabled && this.lastTranslatedText) {
                         this.speakTranslation(this.lastTranslatedText, this.azureData, true);
+                    } else if (!this.isTranslationEnabled && this.lastOriginalText) {
+                        this.speakTranslation(this.lastOriginalText, this.azureData, true, this.lastOriginalLang || "en-US");
                     }
                 }
             });
@@ -184,9 +232,23 @@ class WDOSMultilinguaMeeting {
         if (playBtn) {
             playBtn.addEventListener("click", (e) => {
                 e.preventDefault();
+                this.unlockAudioPlayback();
                 this.isSpeakerAudioMuted = false;
                 const labelEl = document.getElementById("btn-toggle-tts-label");
                 if (labelEl) labelEl.textContent = "Voice Output: ON";
+                const ttsBtn = document.getElementById("btn-toggle-tts-audio");
+                if (ttsBtn) {
+                    ttsBtn.style.background = "rgba(34,197,94,0.18)";
+                    ttsBtn.style.color = "#86EFAC";
+                    ttsBtn.style.borderColor = "rgba(134,239,172,0.35)";
+                }
+                if (!this.isTranslationEnabled) {
+                    const origText = this.lastOriginalText || document.getElementById("caption-text")?.textContent;
+                    if (origText) {
+                        this.speakTranslation(origText.trim(), this.azureData, true, this.lastOriginalLang || "en-US");
+                    }
+                    return;
+                }
                 const textToSpeak = this.lastTranslatedText || document.getElementById("caption-translated-text")?.textContent || document.getElementById("caption-text")?.textContent;
                 if (textToSpeak) {
                     this.speakTranslation(textToSpeak.trim(), this.azureData, true);
@@ -395,7 +457,9 @@ class WDOSMultilinguaMeeting {
     }
 
     isSuppressedByTTS() {
-        return Boolean(this.isPlayingTTS || (this.ttsSuppressionUntil && Date.now() < this.ttsSuppressionUntil));
+        // Never suppress speech recognition on the active speaker's unmuted microphone
+        if (!this.isAudioMuted) return false;
+        return Boolean(this.ttsSuppressionUntil && Date.now() < this.ttsSuppressionUntil);
     }
 
     async initAzureTranslation(azureData) {
@@ -474,6 +538,7 @@ class WDOSMultilinguaMeeting {
 
             this.speechRecognizer.canceled = () => {
                 if (!this.isAudioMuted) {
+                    this.speechRecognizer = null;
                     this.startWebSpeechFallback();
                 }
             };
@@ -544,11 +609,97 @@ class WDOSMultilinguaMeeting {
         }
     }
 
+    startLiveVoiceRecorder(stream) {
+        this.stopLiveVoiceRecorder();
+        if (!stream || typeof window.MediaRecorder === "undefined") return;
+        try {
+            let mimeType = "";
+            const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+            for (const c of candidates) {
+                if (window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(c)) {
+                    mimeType = c;
+                    break;
+                }
+            }
+            const startCycle = () => {
+                if (this.isAudioMuted || !this.localAudioStream) return;
+                try {
+                    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+                    this.liveMediaRecorder = recorder;
+                    const chunks = [];
+                    this.hadVoiceInCurrentChunk = false;
+
+                    recorder.ondataavailable = (ev) => {
+                        if (ev.data && ev.data.size > 0) {
+                            chunks.push(ev.data);
+                        }
+                    };
+                    recorder.onstop = () => {
+                        const hadVoice = this.hadVoiceInCurrentChunk;
+                        if (hadVoice && chunks.length > 0 && this.transcriptUrl) {
+                            const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
+                            if (blob.size > 400 && blob.size < 200000) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                    const dataUrl = reader.result;
+                                    if (typeof dataUrl === "string" && dataUrl.startsWith("data:audio/")) {
+                                        fetch(this.transcriptUrl, {
+                                            method: "POST",
+                                            headers: {
+                                                "Content-Type": "application/json",
+                                                "X-CSRFToken": this.getCsrfToken()
+                                            },
+                                            body: JSON.stringify({
+                                                action: "audio_chunk",
+                                                speaker_name: this.userDisplayName,
+                                                audio_data_url: dataUrl
+                                            })
+                                        }).catch(() => {});
+                                    }
+                                };
+                                reader.readAsDataURL(blob);
+                            }
+                        }
+                    };
+                    recorder.start();
+                } catch (_) {}
+            };
+
+            startCycle();
+            this.liveRecorderInterval = setInterval(() => {
+                if (this.isAudioMuted || !this.localAudioStream) {
+                    this.stopLiveVoiceRecorder();
+                    return;
+                }
+                if (this.liveMediaRecorder && this.liveMediaRecorder.state === "recording") {
+                    try { this.liveMediaRecorder.stop(); } catch (_) {}
+                }
+                startCycle();
+            }, 1800);
+        } catch (_) {}
+    }
+
+    stopLiveVoiceRecorder() {
+        if (this.liveRecorderInterval) {
+            clearInterval(this.liveRecorderInterval);
+            this.liveRecorderInterval = null;
+        }
+        if (this.liveMediaRecorder) {
+            try {
+                if (this.liveMediaRecorder.state === "recording") {
+                    this.liveMediaRecorder.stop();
+                }
+            } catch (_) {}
+            this.liveMediaRecorder = null;
+        }
+    }
+
     async startMicAudioVisualizer() {
         this.resetSpeakingIndicatorState();
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
             this.localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            this.startLiveVoiceRecorder(this.localAudioStream);
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (!AudioCtx) return;
             this.audioContext = new AudioCtx();
@@ -584,10 +735,11 @@ class WDOSMultilinguaMeeting {
                 const rms = Math.sqrt(sumSquares / timeData.length);
                 const voiceBinsAvg = (freqData[1] + freqData[2] + freqData[3] + freqData[4] + freqData[5]) / (5 * 255);
                 const energy = Math.max(rms * 4.2, voiceBinsAvg * 1.45);
-                const isVoiceDetected = energy > 0.065;
+                const isVoiceDetected = energy > 0.055;
                 const isPulseActive = Date.now() < (this.speechPulseUntil || 0);
 
                 if (isVoiceDetected) {
+                    this.hadVoiceInCurrentChunk = true;
                     this.speechPulseUntil = Math.max(this.speechPulseUntil || 0, Date.now() + 380);
                     this.activeSpeakingPerson = this.userDisplayName;
                 }
@@ -640,6 +792,7 @@ class WDOSMultilinguaMeeting {
     }
 
     stopMicAudioVisualizer() {
+        this.stopLiveVoiceRecorder();
         if (this.visualizerFrame) {
             cancelAnimationFrame(this.visualizerFrame);
             this.visualizerFrame = null;
@@ -656,6 +809,37 @@ class WDOSMultilinguaMeeting {
         this.resetSpeakingIndicatorState();
     }
 
+    async flushPendingInterimSpeech() {
+        if (this.interimFlushTimer) {
+            clearTimeout(this.interimFlushTimer);
+            this.interimFlushTimer = null;
+        }
+        const pending = (this.pendingInterimText || "").trim();
+        this.pendingInterimText = "";
+        if (!pending || this.isSystemEchoPhrase(pending)) return;
+        this.triggerSpeakingPulse(this.userDisplayName, 2000);
+        this.renderLiveCaption(this.userDisplayName, pending, null, false);
+        await this.postTranscriptSegment(pending, null, null);
+        await this.fetchLatestTranscript(false);
+    }
+
+    startSpeechWatchdog() {
+        this.stopSpeechWatchdog();
+        this.speechWatchdogTimer = setInterval(() => {
+            if (this.isAudioMuted || this.speechRecognizer) return;
+            if (!this.webSpeechRecognizer) {
+                this.startWebSpeechFallback();
+            }
+        }, 2200);
+    }
+
+    stopSpeechWatchdog() {
+        if (this.speechWatchdogTimer) {
+            clearInterval(this.speechWatchdogTimer);
+            this.speechWatchdogTimer = null;
+        }
+    }
+
     startWebSpeechFallback() {
         const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRec) {
@@ -663,24 +847,30 @@ class WDOSMultilinguaMeeting {
         }
         try {
             if (this.webSpeechRecognizer) {
-                try { this.webSpeechRecognizer.stop(); } catch (_) {}
+                try { this.webSpeechRecognizer.onend = null; this.webSpeechRecognizer.stop(); } catch (_) {}
             }
-            this.webSpeechRecognizer = new SpeechRec();
-            this.webSpeechRecognizer.lang = this.speakingLang || "en-US";
-            this.webSpeechRecognizer.continuous = true;
-            this.webSpeechRecognizer.interimResults = true;
+            const recognizer = new SpeechRec();
+            this.webSpeechRecognizer = recognizer;
+            recognizer.lang = this.speakingLang || "en-US";
+            recognizer.continuous = true;
+            recognizer.interimResults = true;
 
-            this.webSpeechRecognizer.onspeechstart = () => {
+            recognizer.onspeechstart = () => {
                 if (this.isSuppressedByTTS()) return;
                 this.triggerSpeakingPulse(this.userDisplayName, 1800);
             };
 
-            this.webSpeechRecognizer.onresult = async (event) => {
+            recognizer.onresult = async (event) => {
                 if (this.isSuppressedByTTS()) return;
                 let interimText = "";
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
+                        if (this.interimFlushTimer) {
+                            clearTimeout(this.interimFlushTimer);
+                            this.interimFlushTimer = null;
+                        }
+                        this.pendingInterimText = "";
                         const clean = transcript.trim();
                         if (clean && !this.isSystemEchoPhrase(clean)) {
                             this.triggerSpeakingPulse(this.userDisplayName, 2000);
@@ -694,25 +884,43 @@ class WDOSMultilinguaMeeting {
                 }
                 const cleanInterim = interimText.trim();
                 if (cleanInterim && !this.isSystemEchoPhrase(cleanInterim)) {
+                    this.pendingInterimText = cleanInterim;
                     this.triggerSpeakingPulse(this.userDisplayName, 1500);
                     this.renderLiveCaption(this.userDisplayName, cleanInterim, null, false);
+                    if (this.interimFlushTimer) clearTimeout(this.interimFlushTimer);
+                    // If the speaker pauses for 1.35s without Chrome firing isFinal, commit the statement immediately
+                    this.interimFlushTimer = setTimeout(() => {
+                        this.flushPendingInterimSpeech();
+                    }, 1350);
                 }
             };
 
-            this.webSpeechRecognizer.onerror = (ev) => {
+            recognizer.onerror = (ev) => {
                 if (ev && ev.error === "language-not-supported" && this.webSpeechRecognizer && this.webSpeechRecognizer.lang !== "en-NG") {
                     try { this.webSpeechRecognizer.stop(); } catch (_) {}
                     this.webSpeechRecognizer.lang = "en-NG";
                 }
             };
 
-            this.webSpeechRecognizer.onend = () => {
-                if (!this.isAudioMuted && this.webSpeechRecognizer) {
-                    try { this.webSpeechRecognizer.start(); } catch (_) {}
+            recognizer.onend = () => {
+                if (this.pendingInterimText) {
+                    this.flushPendingInterimSpeech();
+                }
+                if (!this.isAudioMuted && this.webSpeechRecognizer === recognizer) {
+                    setTimeout(() => {
+                        if (!this.isAudioMuted && this.webSpeechRecognizer === recognizer) {
+                            try {
+                                recognizer.start();
+                            } catch (_) {
+                                this.startWebSpeechFallback();
+                            }
+                        }
+                    }, 160);
                 }
             };
 
-            this.webSpeechRecognizer.start();
+            recognizer.start();
+            this.startSpeechWatchdog();
             return true;
         } catch (err) {
             return false;
@@ -726,6 +934,7 @@ class WDOSMultilinguaMeeting {
         if (shouldUnmute) {
             this.isAudioMuted = false;
             this.lastUnmuteAt = Date.now();
+            this.isSyncingMedia = true;
             micBtns.forEach((btn) => {
                 btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> <span>Mic On · Speak Now</span>`;
                 btn.style.background = "#16A34A";
@@ -734,8 +943,12 @@ class WDOSMultilinguaMeeting {
             });
             this.setMicStatus(`LIVE MICROPHONE ON — Speak in ${this.langNames[this.speakingLang] || this.speakingLang}. Other participants hear your speech in their preferred language.`);
 
+            // Immediately notify backend that participant unmuted BEFORE awaiting hardware getUserMedia
+            const syncPromise = this.syncMediaState(false);
             await this.startMicAudioVisualizer();
-            this.syncMediaState(false);
+            this.lastUnmuteAt = Date.now();
+            await syncPromise;
+            this.lastUnmuteAt = Date.now();
 
             if (this.mediaStream) {
                 try { await this.mediaStream.unmuteAudio(); } catch (_) {}
@@ -750,6 +963,10 @@ class WDOSMultilinguaMeeting {
             }
         } else {
             this.isAudioMuted = true;
+            this.stopSpeechWatchdog();
+            if (this.pendingInterimText) {
+                this.flushPendingInterimSpeech();
+            }
             this.stopMicAudioVisualizer();
             this.syncMediaState(true);
             if (this.mediaStream) {
@@ -761,7 +978,7 @@ class WDOSMultilinguaMeeting {
             if (this.webSpeechRecognizer) {
                 const rec = this.webSpeechRecognizer;
                 this.webSpeechRecognizer = null;
-                try { rec.stop(); } catch (_) {}
+                try { rec.onend = null; rec.stop(); } catch (_) {}
             }
             micBtns.forEach((btn) => {
                 btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> <span>Turn Mic On</span>`;
@@ -775,7 +992,11 @@ class WDOSMultilinguaMeeting {
     }
 
     async syncMediaState(isMuted) {
-        if (!this.switchLangUrl) return;
+        if (!this.switchLangUrl) {
+            this.isSyncingMedia = false;
+            return;
+        }
+        this.isSyncingMedia = true;
         try {
             const formData = new URLSearchParams();
             formData.append("action", "update_media_state");
@@ -789,7 +1010,10 @@ class WDOSMultilinguaMeeting {
                 },
                 body: formData.toString()
             });
-        } catch (_) {}
+        } catch (_) {
+        } finally {
+            this.isSyncingMedia = false;
+        }
     }
 
     async toggleRaiseHand() {
@@ -833,6 +1057,11 @@ class WDOSMultilinguaMeeting {
             clearInterval(this.pollTimer);
             this.pollTimer = null;
         }
+        this.stopSpeechWatchdog();
+        if (this.interimFlushTimer) {
+            clearTimeout(this.interimFlushTimer);
+            this.interimFlushTimer = null;
+        }
         this.isAudioMuted = true;
         this.stopMicAudioVisualizer();
         if (this.localVideoStream) {
@@ -845,16 +1074,10 @@ class WDOSMultilinguaMeeting {
             this.speechRecognizer = null;
         }
         if (this.webSpeechRecognizer) {
-            try { this.webSpeechRecognizer.stop(); } catch (_) {}
+            try { this.webSpeechRecognizer.onend = null; this.webSpeechRecognizer.stop(); } catch (_) {}
             this.webSpeechRecognizer = null;
         }
-        if (this.currentAudioEl) {
-            try { this.currentAudioEl.pause(); } catch (_) {}
-            this.currentAudioEl = null;
-        }
-        if ("speechSynthesis" in window) {
-            try { window.speechSynthesis.cancel(); } catch (_) {}
-        }
+        this.clearAudioQueue();
     }
 
     async toggleCamera() {
@@ -928,65 +1151,147 @@ class WDOSMultilinguaMeeting {
         }
     }
 
-    notifyTTSState(isStarting, durationMs = 2600) {
+    notifyTTSState(isStarting, durationMs = 2400) {
         if (isStarting) {
-            this.isPlayingTTS = true;
-            this.ttsSuppressionUntil = Date.now() + durationMs;
-            if (this.ttsChannel) {
-                try { this.ttsChannel.postMessage({ type: "tts_start", durationMs }); } catch (_) {}
-            }
+            this.ttsSuppressionUntil = Date.now() + Math.min(durationMs, 4500);
         } else {
-            this.isPlayingTTS = false;
-            this.ttsSuppressionUntil = Date.now() + 650;
-            if (this.ttsChannel) {
-                try { this.ttsChannel.postMessage({ type: "tts_end" }); } catch (_) {}
-            }
+            this.ttsSuppressionUntil = Date.now() + 350;
         }
     }
 
-    speakTranslation(text, azureData = null, forcePlay = false) {
+    clearAudioQueue() {
+        this.audioPlaybackQueue = [];
+        this.isPlayingQueueItem = false;
+        if (this.currentAudioEl) {
+            try {
+                this.currentAudioEl.onended = null;
+                this.currentAudioEl.onerror = null;
+                this.currentAudioEl.pause();
+            } catch (_) {}
+            this.currentAudioEl = null;
+        }
+        if ("speechSynthesis" in window) {
+            try { window.speechSynthesis.cancel(); } catch (_) {}
+        }
+    }
+
+    enqueueRawAudioChunk(audioDataUrl, speakerName) {
+        if (!audioDataUrl || this.isSpeakerAudioMuted) return;
+        if (this.audioPlaybackQueue.length >= 8) {
+            this.audioPlaybackQueue.shift();
+        }
+        this.audioPlaybackQueue.push({
+            type: "raw",
+            audioDataUrl,
+            speakerName: speakerName || "Speaker"
+        });
+        this.processAudioQueue();
+    }
+
+    speakTranslation(text, azureData = null, forcePlay = false, langOverride = null) {
         if (!text || this.isSystemEchoPhrase(text)) return;
         if (this.isSpeakerAudioMuted && !forcePlay) return;
 
-        const targetLang = this.listeningLang || "fr-FR";
-        const estDuration = Math.max(2200, String(text).length * 75);
-        this.notifyTTSState(true, estDuration);
+        const targetLang = langOverride || this.listeningLang || "fr-FR";
+        const cleanText = String(text).replace(/^\[[^\]]+\]\s*/, "").trim();
+        if (!cleanText) return;
+
+        if (forcePlay) {
+            this.clearAudioQueue();
+        }
+        if (this.audioPlaybackQueue.length >= 10) {
+            this.audioPlaybackQueue.shift();
+        }
+        this.audioPlaybackQueue.push({
+            type: "tts",
+            text: cleanText,
+            lang: targetLang
+        });
+        this.processAudioQueue();
+    }
+
+    processAudioQueue() {
+        if (this.isPlayingQueueItem) return;
+        if (this.isSpeakerAudioMuted || this.audioPlaybackQueue.length === 0) {
+            this.isPlayingQueueItem = false;
+            return;
+        }
+        const item = this.audioPlaybackQueue.shift();
+        if (!item) return;
+
+        this.isPlayingQueueItem = true;
+        let finished = false;
+        const estTimeout = item.type === "raw"
+            ? 4200
+            : Math.min(18000, Math.max(4500, String(item.text || "").length * 110));
+
+        const safetyTimer = setTimeout(() => {
+            finishItem();
+        }, estTimeout);
+
+        const finishItem = () => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(safetyTimer);
+            this.currentAudioEl = null;
+            this.isPlayingQueueItem = false;
+            this.notifyTTSState(false);
+            setTimeout(() => this.processAudioQueue(), 60);
+        };
+
+        if (item.type === "raw" && item.audioDataUrl) {
+            try {
+                const audio = this.ttsAudioPlayer || new Audio();
+                audio.src = item.audioDataUrl;
+                this.currentAudioEl = audio;
+                audio.onended = () => finishItem();
+                audio.onerror = () => finishItem();
+                const playPromise = audio.play();
+                if (playPromise && typeof playPromise.catch === "function") {
+                    playPromise.catch(() => finishItem());
+                }
+                return;
+            } catch (_) {
+                finishItem();
+                return;
+            }
+        }
+
+        const text = item.text;
+        const targetLang = item.lang || this.listeningLang || "fr-FR";
+        this.notifyTTSState(true, estTimeout);
 
         if (this.ttsUrl) {
             try {
-                if (this.currentAudioEl) {
-                    try { this.currentAudioEl.pause(); } catch (_) {}
-                    this.currentAudioEl = null;
-                }
                 const audioUrl = `${this.ttsUrl}?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(targetLang)}`;
-                const audio = new Audio(audioUrl);
+                const audio = this.ttsAudioPlayer || new Audio();
+                audio.src = audioUrl;
                 this.currentAudioEl = audio;
-                audio.onended = () => {
-                    this.currentAudioEl = null;
-                    this.notifyTTSState(false);
-                };
+                audio.onended = () => finishItem();
                 audio.onerror = () => {
                     this.currentAudioEl = null;
-                    this.speakWithBrowserSynthesis(text, targetLang);
+                    this.speakWithBrowserSynthesis(text, targetLang, finishItem);
                 };
                 const playPromise = audio.play();
                 if (playPromise && typeof playPromise.catch === "function") {
                     playPromise.catch(() => {
                         this.currentAudioEl = null;
-                        this.speakWithBrowserSynthesis(text, targetLang);
+                        this.speakWithBrowserSynthesis(text, targetLang, finishItem);
                     });
                 }
                 return;
-            } catch (_) {
-                // Fall back to browser speech synthesis below
-            }
+            } catch (_) {}
         }
-        this.speakWithBrowserSynthesis(text, targetLang);
+        this.speakWithBrowserSynthesis(text, targetLang, finishItem);
     }
 
-    speakWithBrowserSynthesis(text, targetLang) {
-        if (!("speechSynthesis" in window) || !text || this.isSystemEchoPhrase(text)) {
+    speakWithBrowserSynthesis(text, targetLang, onComplete = null) {
+        const done = () => {
             this.notifyTTSState(false);
+            if (typeof onComplete === "function") onComplete();
+        };
+        if (!("speechSynthesis" in window) || !text || this.isSystemEchoPhrase(text)) {
+            done();
             return;
         }
         try {
@@ -997,22 +1302,18 @@ class WDOSMultilinguaMeeting {
             const shortCode = this.getShortLang(targetLang);
             const matchingVoice = voices.find((v) => v.lang.toLowerCase().startsWith(shortCode));
             if (matchingVoice) utterance.voice = matchingVoice;
-            utterance.onend = () => {
-                this.notifyTTSState(false);
-            };
-            utterance.onerror = () => {
-                this.notifyTTSState(false);
-            };
+            utterance.onend = () => done();
+            utterance.onerror = () => done();
             window.speechSynthesis.speak(utterance);
         } catch (err) {
-            this.notifyTTSState(false);
+            done();
         }
     }
 
     async postTranscriptSegment(originalText, translatedText, targetShort, allTranslations = null) {
         if (!this.transcriptUrl || !originalText || this.isSystemEchoPhrase(originalText)) return null;
         const normText = originalText.trim().toLowerCase();
-        if (this.lastSubmittedText === normText && this.lastSubmittedAt && Date.now() - this.lastSubmittedAt < 3500) {
+        if (this.lastSubmittedText === normText && this.lastSubmittedAt && Date.now() - this.lastSubmittedAt < 3000) {
             return null;
         }
         this.lastSubmittedText = normText;
@@ -1049,10 +1350,12 @@ class WDOSMultilinguaMeeting {
                     const tText = (data.segment.translations || {})[shortListen] || data.segment.original_text;
                     const isNewSeq = (data.segment.sequence_number || 0) > this.lastSeenSequence;
                     this.lastSeenSequence = Math.max(this.lastSeenSequence, data.segment.sequence_number || 0);
+                    this.lastOriginalText = data.segment.original_text || "";
+                    this.lastOriginalLang = data.segment.original_language || this.speakingLang || "en-US";
                     this.triggerSpeakingPulse(data.segment.speaker_name, 2600);
                     this.renderLiveCaption(data.segment.speaker_name, data.segment.original_text, tText, true);
                     // Only auto-speak your own statement if you are solo-testing in a 1-person room with different Speak/Hear languages
-                    if (isNewSeq && this.participantCount <= 1 && shortListen !== sourceShort) {
+                    if (isNewSeq && this.participantCount <= 1 && shortListen !== sourceShort && this.isTranslationEnabled) {
                         this.speakTranslation(tText, this.azureData);
                     }
                 }
@@ -1076,7 +1379,8 @@ class WDOSMultilinguaMeeting {
         if (!this.transcriptUrl) return;
         try {
             const shortListen = this.getShortLang(this.listeningLang);
-            const resp = await fetch(`${this.transcriptUrl}?lang=${encodeURIComponent(shortListen)}`, {
+            const audioSeqParam = this.lastSeenAudioSeq >= 0 ? `&after_audio_seq=${this.lastSeenAudioSeq}` : "";
+            const resp = await fetch(`${this.transcriptUrl}?lang=${encodeURIComponent(shortListen)}${audioSeqParam}`, {
                 headers: { "Accept": "application/json" }
             });
             if (!resp.ok) return;
@@ -1101,13 +1405,36 @@ class WDOSMultilinguaMeeting {
                     window.location.href = this.isGuest ? "/auth/login/" : "/foundation/meetings/";
                     return;
                 }
+                // Only force-mute when the Host explicitly clicked Mute / Mute All (connection_status === "Muted by Host")
                 if (
                     data.my_participant.is_muted &&
+                    data.my_participant.connection_status === "Muted by Host" &&
                     !this.isAudioMuted &&
-                    Date.now() - (this.lastUnmuteAt || 0) > 2200
+                    !this.isSyncingMedia &&
+                    Date.now() - (this.lastUnmuteAt || 0) > 4500
                 ) {
                     await this.toggleMicrophone(true);
                     this.setMicStatus("Your microphone was muted by the meeting host.");
+                }
+            }
+
+            // 3. Process live original voice audio chunks when Real-Time Translation is turned OFF
+            if (typeof data.latest_audio_seq === "number") {
+                if (this.lastSeenAudioSeq < 0) {
+                    this.lastSeenAudioSeq = data.latest_audio_seq;
+                } else if (Array.isArray(data.audio_chunks) && data.audio_chunks.length > 0) {
+                    for (const chunk of data.audio_chunks) {
+                        if (chunk.seq > this.lastSeenAudioSeq) {
+                            this.lastSeenAudioSeq = chunk.seq;
+                            if (chunk.speaker_name !== this.userDisplayName) {
+                                this.triggerSpeakingPulse(chunk.speaker_name, 2200);
+                                if (!this.isTranslationEnabled && speakNewSegments) {
+                                    this.lastReceivedRawAudioAt = Date.now();
+                                    this.enqueueRawAudioChunk(chunk.audio_data_url, chunk.speaker_name);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1163,21 +1490,32 @@ class WDOSMultilinguaMeeting {
                 this.hasLiveSegments = true;
                 this.renderTranscriptFeed(segments);
                 const latest = segments[segments.length - 1];
-                const isNew = latest.sequence_number > this.lastSeenSequence;
                 const translated = (latest.translations || {})[shortListen] || latest.translated_text || latest.original_text;
                 this.lastTranslatedText = translated;
+                this.lastOriginalText = latest.original_text || "";
+                this.lastOriginalLang = latest.original_language || "en-US";
                 this.renderLiveCaption(latest.speaker_name, latest.original_text, translated, true);
 
-                if (isNew) {
-                    const prevSeq = this.lastSeenSequence;
-                    this.lastSeenSequence = latest.sequence_number;
+                const prevSeq = this.lastSeenSequence;
+                const newSegments = segments.filter((s) => s.sequence_number > prevSeq);
+                if (newSegments.length > 0) {
+                    this.lastSeenSequence = newSegments[newSegments.length - 1].sequence_number;
                     if (speakNewSegments && prevSeq >= 0) {
-                        this.triggerSpeakingPulse(latest.speaker_name, 3200);
-                        const isOtherSpeaker = latest.speaker_name !== this.userDisplayName;
-                        const isDifferentLang = this.getShortLang(this.listeningLang) !== this.getShortLang(latest.original_language);
-                        // Always play translated speech when another participant speaks, or when solo-testing with different Speak/Hear languages
-                        if (isOtherSpeaker || (this.participantCount <= 1 && isDifferentLang)) {
-                            this.speakTranslation(translated, this.azureData);
+                        for (const seg of newSegments) {
+                            this.triggerSpeakingPulse(seg.speaker_name, 3200);
+                            const isOtherSpeaker = seg.speaker_name !== this.userDisplayName;
+                            const isDifferentLang = this.getShortLang(this.listeningLang) !== this.getShortLang(seg.original_language);
+                            if (isOtherSpeaker || (this.participantCount <= 1 && isDifferentLang)) {
+                                if (this.isTranslationEnabled) {
+                                    const segTrans = (seg.translations || {})[shortListen] || seg.translated_text || seg.original_text;
+                                    this.speakTranslation(segTrans, this.azureData, false, this.listeningLang);
+                                } else {
+                                    // Original Audio mode: if raw microphone chunks weren't streamed in the last 4.5s (e.g. Type-to-Speak), play original language voice
+                                    if (Date.now() - (this.lastReceivedRawAudioAt || 0) > 4500) {
+                                        this.speakTranslation(seg.original_text, this.azureData, false, seg.original_language || "en-US");
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -1206,7 +1206,7 @@ def room_host_admit_api(request, meeting_id: str):
     action = (request.POST.get("action") or payload.get("action") or "admit").strip().lower()
 
     if action == "mute_all":
-        room_session.participants.exclude(meeting_role="Host").update(is_muted=True)
+        room_session.participants.exclude(meeting_role="Host").update(is_muted=True, connection_status="Muted by Host")
         return JsonResponse({"status": "updated", "action": "mute_all"})
 
     if action == "admit_all":
@@ -1268,12 +1268,16 @@ def room_host_admit_api(request, meeting_id: str):
     )
 
 
+_ROOM_LIVE_AUDIO_CHUNKS: Dict[str, list[Dict[str, Any]]] = {}
+_ROOM_LIVE_AUDIO_SEQ: Dict[str, int] = {}
+
+
 @require_http_methods(["GET", "POST"])
 def room_transcript_api(request, meeting_id: str):
     """
     Live Transcript Segment API (ROOM-03, ROOM-04, ROOM-05):
-    GET returns ordered transcript segments, live room status, and participant states.
-    POST records a new spoken segment and populates multilingual translations via AzureSpeechAdapter.
+    GET returns ordered transcript segments, live room status, participant states, and live original voice chunks.
+    POST records a new spoken segment (or live original voice audio chunk) and populates multilingual translations.
     """
     auth_bundle, err_resp = _resolve_stage10_auth(request, meeting_id=meeting_id)
     if err_resp:
@@ -1283,9 +1287,16 @@ def room_transcript_api(request, meeting_id: str):
     if not _check_room_network_isolation(auth_bundle, meeting, room_session):
         return JsonResponse({"error": "Cross-network room isolation enforced."}, status=403)
 
+    room_key = str(room_session.id) if room_session else str(meeting_id)
+    now_ts = timezone.now().timestamp()
+
     if request.method == "GET":
         raw_lang = request.GET.get("lang", "fr").strip()
         target_lang = LANGUAGE_CODE_TO_SHORT.get(raw_lang, raw_lang.split("-")[0].lower())
+        try:
+            after_audio_seq = int(request.GET.get("after_audio_seq", "-1"))
+        except (ValueError, TypeError):
+            after_audio_seq = -1
         my_p = _ensure_participant_session(auth_bundle, meeting, room_session)
         is_host = _is_user_room_host(auth_bundle, meeting, room_session)
         segments = []
@@ -1314,6 +1325,16 @@ def room_transcript_api(request, meeting_id: str):
                 }
             )
         participants_list, waiting_list = _serialize_room_participants(room_session)
+        raw_chunks = _ROOM_LIVE_AUDIO_CHUNKS.get(room_key, [])
+        fresh_chunks = [c for c in raw_chunks if now_ts - c.get("ts", 0) < 25.0]
+        if len(fresh_chunks) != len(raw_chunks):
+            _ROOM_LIVE_AUDIO_CHUNKS[room_key] = fresh_chunks
+        latest_audio_seq = _ROOM_LIVE_AUDIO_SEQ.get(room_key, 0)
+        new_audio_chunks = (
+            [c for c in fresh_chunks if c["seq"] > after_audio_seq]
+            if after_audio_seq >= 0
+            else []
+        )
         return JsonResponse(
             {
                 "status": "ok",
@@ -1336,6 +1357,8 @@ def room_transcript_api(request, meeting_id: str):
                 "participants": participants_list,
                 "waiting_participants": waiting_list,
                 "segments": segments,
+                "latest_audio_seq": latest_audio_seq,
+                "audio_chunks": new_audio_chunks,
             }
         )
 
@@ -1345,6 +1368,31 @@ def room_transcript_api(request, meeting_id: str):
             payload = json.loads(request.body.decode("utf-8") or "{}")
         except json.JSONDecodeError:
             payload = {}
+
+    req_action = (request.POST.get("action") or payload.get("action") or "").strip().lower()
+    if req_action == "audio_chunk":
+        audio_data_url = (request.POST.get("audio_data_url") or payload.get("audio_data_url") or "").strip()
+        if not audio_data_url or not audio_data_url.startswith("data:audio/") or len(audio_data_url) > 280000:
+            return JsonResponse({"status": "ignored_audio_chunk"}, status=200)
+        participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
+        speaker_name = (
+            request.POST.get("speaker_name")
+            or payload.get("speaker_name")
+            or (participant.participant_name if participant else "Speaker")
+        )
+        next_audio_seq = _ROOM_LIVE_AUDIO_SEQ.get(room_key, 0) + 1
+        _ROOM_LIVE_AUDIO_SEQ[room_key] = next_audio_seq
+        room_chunks = [c for c in _ROOM_LIVE_AUDIO_CHUNKS.get(room_key, []) if now_ts - c.get("ts", 0) < 25.0]
+        room_chunks.append(
+            {
+                "seq": next_audio_seq,
+                "speaker_name": speaker_name,
+                "audio_data_url": audio_data_url,
+                "ts": now_ts,
+            }
+        )
+        _ROOM_LIVE_AUDIO_CHUNKS[room_key] = room_chunks[-10:]
+        return JsonResponse({"status": "audio_chunk_recorded", "seq": next_audio_seq}, status=200)
 
     original_text = (request.POST.get("original_text") or payload.get("original_text") or "").strip()
     if not original_text:

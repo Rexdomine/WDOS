@@ -7,9 +7,17 @@
 <style>
   {% if is_guest_session %}
   aside.sidebar, .mobile-bottom-nav, .shell-header, .breadcrumbs { display: none !important; }
-  .shell-main, .main-content, main { margin-left: 0 !important; width: 100% !important; max-width: 1360px !important; margin: 0 auto !important; padding: 20px !important; }
+  .shell-main, .main-content, main { margin-left: 0 !important; width: 100% !important; max-width: 1360px !important; margin: 0 auto !important; padding: 0 !important; box-sizing: border-box !important; }
   {% endif %}
-  .zm-wrap { display: flex; flex-direction: column; gap: 14px; }
+  .zm-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
 
   .zm-alert {
     display: flex;
@@ -24,15 +32,25 @@
     color: #234700;
     font-size: 13px;
     font-weight: 600;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .zm-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.85fr) minmax(350px, 1fr);
+    grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
     gap: 18px;
     align-items: stretch;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
-  @media (max-width: 1080px) { .zm-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 1080px) {
+    .zm-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
 
   /* Main Dark Video & Interpretation Stage */
   .zm-stage {
@@ -45,6 +63,10 @@
     justify-content: space-between;
     gap: 16px;
     box-shadow: 0 16px 36px rgba(15, 10, 16, 0.22);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .zm-topbar {
@@ -55,6 +77,9 @@
     gap: 10px;
     padding-bottom: 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .zm-top-menu {
     position: relative;
@@ -70,7 +95,8 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    min-width: 295px;
+    min-width: 280px;
+    max-width: calc(100vw - 36px);
     background: #231926;
     border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 14px;
@@ -80,6 +106,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    box-sizing: border-box;
   }
   .zm-top-popover-row {
     display: flex;
@@ -103,30 +130,34 @@
     align-items: center;
     gap: 6px;
     letter-spacing: 0.04em;
+    flex-shrink: 0;
   }
 
   .zm-canvas {
     background: radial-gradient(circle at center, #2B1D2E 0%, #130E15 100%);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
-    min-height: 250px;
+    min-height: 230px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 28px 20px 40px 20px;
+    padding: 24px 18px 16px 18px;
     text-align: center;
     position: relative;
     overflow: hidden;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .zm-avatar {
-    width: 76px;
-    height: 76px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     background: #D4006A;
     color: #FFFFFF;
     font-family: 'Manrope', sans-serif;
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 800;
     display: flex;
     align-items: center;
@@ -134,6 +165,7 @@
     box-shadow: 0 0 0 6px rgba(212, 0, 106, 0.22);
     margin-bottom: 10px;
     transition: box-shadow 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
   }
   .zm-avatar.is-speaking {
     box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.45), 0 0 24px rgba(74, 222, 128, 0.65);
@@ -152,8 +184,8 @@
     align-items: center;
     justify-content: center;
     gap: 5px;
-    height: 44px;
-    margin-top: 8px;
+    height: 40px;
+    margin-top: 6px;
   }
   .zm-wave span {
     width: 5px;
@@ -191,19 +223,43 @@
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 14px;
-    padding: 14px 18px;
+    padding: 14px 16px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .zm-caption-pill-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .zm-caption-pill-btn {
+    border-radius: 999px;
+    padding: 5px 11px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    white-space: nowrap;
+    line-height: 1.2;
   }
   .zm-caption-translated {
-    font-size: 17px;
+    font-size: 16.5px;
     font-weight: 800;
     color: #86EFAC;
     line-height: 1.45;
     margin-bottom: 4px;
+    word-break: break-word;
   }
   .zm-caption-original {
     font-size: 13px;
     color: #D8CBD9;
     line-height: 1.4;
+    word-break: break-word;
   }
 
   /* Sleek Single-Row Bottom Control Bar */
@@ -217,22 +273,39 @@
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 14px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .zm-dock-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .zm-dock-langs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
   }
   .zm-btn {
     background: rgba(255, 255, 255, 0.12);
     color: #FFFFFF;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 10px;
-    padding: 9px 15px;
+    padding: 9px 14px;
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 7px;
     min-height: 40px;
     transition: background 0.15s ease;
+    box-sizing: border-box;
   }
   .zm-btn:hover { background: rgba(255, 255, 255, 0.22); color: #FFFFFF; }
   .zm-btn-primary { background: #D4006A; border-color: #F4C2DA; color: #FFFFFF; }
@@ -247,8 +320,9 @@
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.22);
     border-radius: 10px;
-    padding: 5px 12px;
+    padding: 5px 11px;
     min-height: 40px;
+    box-sizing: border-box;
   }
   .zm-lang-pill label { font-size: 12px; font-weight: 700; color: #F4C2DA; white-space: nowrap; }
   .zm-lang-pill select {
@@ -259,6 +333,7 @@
     font-weight: 800;
     cursor: pointer;
     outline: none;
+    min-width: 0;
   }
   .zm-lang-pill select option { background: #18121A; color: #FFFFFF; }
 
@@ -271,6 +346,10 @@
     display: flex;
     flex-direction: column;
     gap: 18px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .zm-side-heading {
     font-family: 'Manrope', sans-serif;
@@ -287,12 +366,13 @@
   .zm-person-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     padding: 10px 12px;
     border: 1px solid #EFE6EE;
     border-radius: 12px;
     background: #FAF8FA;
     margin-bottom: 8px;
+    box-sizing: border-box;
   }
   .zm-person-avatar {
     width: 36px;
@@ -339,6 +419,7 @@
     border-radius: 12px;
     background: #FAF8FA;
     margin-bottom: 10px;
+    word-break: break-word;
   }
   .zm-msg-header {
     display: flex;
@@ -347,6 +428,7 @@
     font-size: 12px;
     color: #19131A;
     margin-bottom: 6px;
+    gap: 8px;
   }
   .zm-msg-badge {
     font-size: 10px;
@@ -356,6 +438,7 @@
     border-radius: 999px;
     background: #FCEEF5;
     color: #D4006A;
+    flex-shrink: 0;
   }
   .zm-msg-translated {
     font-size: 14px;
@@ -368,6 +451,93 @@
     font-size: 12px;
     color: #5E5061;
     line-height: 1.4;
+  }
+
+  /* ===================================================================== */
+  /* MOBILE RESPONSIVE OVERHAUL (<= 640px)                                 */
+  /* ===================================================================== */
+  @media (max-width: 640px) {
+    .zm-stage {
+      padding: 14px 12px !important;
+      border-radius: 16px;
+      gap: 12px;
+    }
+    .zm-side {
+      padding: 14px 12px !important;
+      border-radius: 16px;
+      gap: 14px;
+    }
+    .zm-topbar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .zm-top-popover {
+      left: 0;
+      right: auto;
+      min-width: min(260px, calc(100vw - 48px));
+    }
+    .zm-canvas {
+      min-height: 195px;
+      padding: 18px 12px 12px 12px;
+    }
+    .zm-avatar {
+      width: 60px;
+      height: 60px;
+      font-size: 19px;
+    }
+    .zm-captions {
+      padding: 12px;
+    }
+    .zm-caption-pill-group {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 6px;
+    }
+    .zm-caption-pill-btn {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+    .zm-caption-translated {
+      font-size: 15px;
+    }
+    .zm-dock {
+      padding: 10px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .zm-dock-actions {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .zm-dock-actions > .zm-btn:first-child {
+      grid-column: 1 / -1;
+    }
+    .zm-dock-langs {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .zm-dock-langs .zm-lang-pill {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .zm-dock-langs .zm-lang-pill select {
+      flex: 1;
+      text-align: right;
+    }
+    #room-04-speak-form {
+      flex-direction: column;
+    }
+    #room-04-speak-form button {
+      width: 100%;
+    }
   }
 </style>
 
@@ -461,9 +631,6 @@
               <option value="pt-BR" {% if participant.speaking_language == "pt-BR" %}selected{% endif %}>Portuguese</option>
               <option value="ar-EG" {% if participant.speaking_language == "ar-EG" %}selected{% endif %}>Arabic</option>
               <option value="sw-KE" {% if participant.speaking_language == "sw-KE" %}selected{% endif %}>Swahili</option>
-              <option value="ha-NG" {% if participant.speaking_language == "ha-NG" %}selected{% endif %}>Hausa</option>
-              <option value="yo-NG" {% if participant.speaking_language == "yo-NG" %}selected{% endif %}>Yoruba</option>
-              <option value="ig-NG" {% if participant.speaking_language == "ig-NG" %}selected{% endif %}>Igbo</option>
             </select>
           </div>
           <div class="zm-lang-pill" style="justify-content:space-between; padding:10px 14px;">
@@ -474,9 +641,6 @@
               <option value="pt-BR" {% if participant.listening_language == "pt-BR" %}selected{% endif %}>Portuguese</option>
               <option value="ar-EG" {% if participant.listening_language == "ar-EG" %}selected{% endif %}>Arabic</option>
               <option value="sw-KE" {% if participant.listening_language == "sw-KE" %}selected{% endif %}>Swahili</option>
-              <option value="ha-NG" {% if participant.listening_language == "ha-NG" %}selected{% endif %}>Hausa</option>
-              <option value="yo-NG" {% if participant.listening_language == "yo-NG" %}selected{% endif %}>Yoruba</option>
-              <option value="ig-NG" {% if participant.listening_language == "ig-NG" %}selected{% endif %}>Igbo</option>
             </select>
           </div>
         </div>
@@ -783,10 +947,10 @@
       <!-- Center Video / Active Speaker Canvas -->
       <div class="zm-canvas">
         <video id="live-stage-video" autoplay playsinline muted style="display:none; width:100%; max-height:280px; border-radius:14px; object-fit:cover;"></video>
-        <div id="stage-avatar-container" style="display:flex; flex-direction:column; align-items:center;">
+        <div id="stage-avatar-container" style="display:flex; flex-direction:column; align-items:center; width:100%;">
           <div id="stage-speaker-initials" class="zm-avatar">{{ initials|default:"SP" }}</div>
-          <div id="stage-speaker-name" style="font-size:20px; font-weight:800;">{{ room_session.active_speaker_name }}</div>
-          <div id="stage-speaker-role" style="font-size:13px; color:#B4A5B8; margin-top:2px;">{{ room_session.active_speaker_role }}</div>
+          <div id="stage-speaker-name" style="font-size:19px; font-weight:800; word-break:break-word;">{{ room_session.active_speaker_name }}</div>
+          <div id="stage-speaker-role" style="font-size:12.5px; color:#B4A5B8; margin-top:2px;">{{ room_session.active_speaker_role }}</div>
           <div id="stage-waveform" class="zm-wave" aria-hidden="true">
             <span></span>
             <span class="alt"></span>
@@ -796,28 +960,32 @@
             <span class="alt"></span>
             <span></span>
           </div>
-          <div id="stage-speaking-indicator" style="font-size:12px; font-weight:700; color:#9CA3AF; margin-top:4px; min-height:18px;">
+          <div id="stage-speaking-indicator" style="font-size:12px; font-weight:700; color:#9CA3AF; margin-top:4px; min-height:18px; word-break:break-word;">
             Microphone muted · Waiting for speaker
           </div>
         </div>
         <div id="stage-camera-notice" style="display:none; margin-top:10px; padding:6px 12px; border-radius:8px; background:rgba(255,255,255,0.1); font-size:12px; color:#FDE68A;"></div>
-        <div id="live-mic-status" style="position:absolute; bottom:10px; left:16px; right:16px; font-size:12px; color:#D8CBD9; text-align:left;">
+        <div id="live-mic-status" style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); width:100%; font-size:11.5px; color:#D8CBD9; text-align:center; line-height:1.4; word-break:break-word;">
           Connected as {{ participant.participant_name }} · Speaking {{ participant.speaking_language_display }} · Hearing {{ participant.listening_language_display }}
         </div>
       </div>
 
       <!-- Live Translated Subtitles Box -->
       <div id="caption-container" class="zm-captions" aria-live="polite">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
           <span id="caption-header-label" style="font-size:11px; font-weight:800; color:#F4C2DA; text-transform:uppercase; letter-spacing:0.08em;">
             LIVE TRANSLATION ({{ participant.listening_language_display|upper }})
           </span>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <button type="button" id="btn-toggle-tts-audio" style="background:rgba(34,197,94,0.18); color:#86EFAC; border:1px solid rgba(134,239,172,0.35); border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" title="Toggle automatic translated voice audio playback">
+          <div class="zm-caption-pill-group">
+            <button type="button" id="btn-toggle-translation-mode" class="zm-caption-pill-btn" style="background:rgba(212,0,106,0.25); color:#F4C2DA; border:1px solid rgba(244,194,218,0.45);" title="Turn Real-Time Voice Translation ON or OFF to hear original audio normally">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <span id="btn-toggle-translation-mode-label">Real-Time Translation: ON</span>
+            </button>
+            <button type="button" id="btn-toggle-tts-audio" class="zm-caption-pill-btn" style="background:rgba(34,197,94,0.18); color:#86EFAC; border:1px solid rgba(134,239,172,0.35);" title="Toggle automatic voice output playback">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
               <span id="btn-toggle-tts-label">Voice Output: ON</span>
             </button>
-            <button type="button" id="btn-play-translation" style="background:rgba(255,255,255,0.14); color:#FFFFFF; border:1px solid rgba(255,255,255,0.22); border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+            <button type="button" id="btn-play-translation" class="zm-caption-pill-btn" style="background:rgba(255,255,255,0.14); color:#FFFFFF; border:1px solid rgba(255,255,255,0.22);">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
               <span id="btn-play-translation-label">Replay Voice ({{ participant.listening_language_display }})</span>
             </button>
@@ -837,7 +1005,7 @@
 
       <!-- Sleek Bottom Control Bar (Crisp SVG Icons) -->
       <div class="zm-dock">
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <div class="zm-dock-actions">
           <button type="button" id="btn-toggle-mic" class="zm-btn zm-btn-primary">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             <span>Turn Mic On</span>
@@ -854,7 +1022,7 @@
           </button>
         </div>
 
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <div class="zm-dock-langs">
           <div class="zm-lang-pill">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F4C2DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
             <label for="quick-speaking-lang">I Speak:</label>
@@ -864,9 +1032,6 @@
               <option value="pt-BR" {% if participant.speaking_language == "pt-BR" %}selected{% endif %}>Portuguese</option>
               <option value="ar-EG" {% if participant.speaking_language == "ar-EG" %}selected{% endif %}>Arabic</option>
               <option value="sw-KE" {% if participant.speaking_language == "sw-KE" %}selected{% endif %}>Swahili</option>
-              <option value="ha-NG" {% if participant.speaking_language == "ha-NG" %}selected{% endif %}>Hausa</option>
-              <option value="yo-NG" {% if participant.speaking_language == "yo-NG" %}selected{% endif %}>Yoruba</option>
-              <option value="ig-NG" {% if participant.speaking_language == "ig-NG" %}selected{% endif %}>Igbo</option>
             </select>
           </div>
 
@@ -879,18 +1044,15 @@
               <option value="pt-BR" {% if participant.listening_language == "pt-BR" %}selected{% endif %}>Portuguese</option>
               <option value="ar-EG" {% if participant.listening_language == "ar-EG" %}selected{% endif %}>Arabic</option>
               <option value="sw-KE" {% if participant.listening_language == "sw-KE" %}selected{% endif %}>Swahili</option>
-              <option value="ha-NG" {% if participant.listening_language == "ha-NG" %}selected{% endif %}>Hausa</option>
-              <option value="yo-NG" {% if participant.listening_language == "yo-NG" %}selected{% endif %}>Yoruba</option>
-              <option value="ig-NG" {% if participant.listening_language == "ig-NG" %}selected{% endif %}>Igbo</option>
             </select>
           </div>
         </div>
       </div>
 
       <!-- Type-to-Speak Input Bar -->
-      <form id="room-04-speak-form" method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" style="display:flex; gap:8px;">
+      <form id="room-04-speak-form" method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" style="display:flex; gap:8px; width:100%; min-width:0; box-sizing:border-box;">
         {% csrf_token %}
-        <input type="text" name="original_text" placeholder="Type a statement here to broadcast &amp; translate live to the room..." style="flex:1; min-height:42px; padding:8px 16px; border:1px solid rgba(255,255,255,0.2); border-radius:10px; font-size:13.5px; background:rgba(0,0,0,0.45); color:#FFFFFF;">
+        <input type="text" name="original_text" placeholder="Type a statement here to broadcast &amp; translate live to the room..." style="flex:1; min-width:0; min-height:42px; padding:8px 14px; border:1px solid rgba(255,255,255,0.2); border-radius:10px; font-size:13.5px; background:rgba(0,0,0,0.45); color:#FFFFFF; box-sizing:border-box;">
         <button type="submit" class="zm-btn zm-btn-primary">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           <span>Speak</span>
@@ -1056,7 +1218,7 @@
 
 {% if screen_code != "ROOM-02" and room_session.status != "COMPLETED" %}
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech-sdk.bundle-min.js" crossorigin="anonymous"></script>
-<script src="/static/foundation/js/multilingua_engine.js?v=15"></script>
+<script src="/static/foundation/js/multilingua_engine.js?v=16"></script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function() {

@@ -177,39 +177,38 @@ class AzureSpeechAdapter:
         session = cls._get_http_session()
         sl_candidates = [source_short, "auto"] if (source_short and source_short != "auto") else ["auto"]
         for sl_val in sl_candidates:
-            for _attempt in range(2):
-                try:
-                    resp = session.get(
-                        "https://translate.googleapis.com/translate_a/single",
-                        params={
-                            "client": "gtx",
-                            "sl": sl_val,
-                            "tl": target_short,
-                            "dt": "t",
-                            "q": text,
-                        },
-                        headers={"User-Agent": "Mozilla/5.0"},
-                        timeout=4.5,
-                    )
-                    if resp.status_code == 200:
-                        payload = resp.json()
-                        detected_lang = payload[2] if isinstance(payload, list) and len(payload) > 2 and isinstance(payload[2], str) else source_short
-                        if isinstance(payload, list) and payload and isinstance(payload[0], list):
-                            translated_parts = [part[0] for part in payload[0] if isinstance(part, list) and part and part[0]]
-                            if translated_parts:
-                                result = "".join(translated_parts).strip()
-                                if (
-                                    sl_val != "auto"
-                                    and target_short != source_short
-                                    and len(text.strip()) > 4
-                                    and result.lower() == text.strip().lower()
-                                ):
-                                    break
-                                if len(cls._TRANSLATION_CACHE) < 2000:
-                                    cls._TRANSLATION_CACHE[cache_key] = (result, detected_lang)
-                                return result, detected_lang
-                except Exception:
-                    continue
+            try:
+                resp = session.get(
+                    "https://translate.googleapis.com/translate_a/single",
+                    params={
+                        "client": "gtx",
+                        "sl": sl_val,
+                        "tl": target_short,
+                        "dt": "t",
+                        "q": text,
+                    },
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=2.2,
+                )
+                if resp.status_code == 200:
+                    payload = resp.json()
+                    detected_lang = payload[2] if isinstance(payload, list) and len(payload) > 2 and isinstance(payload[2], str) else source_short
+                    if isinstance(payload, list) and payload and isinstance(payload[0], list):
+                        translated_parts = [part[0] for part in payload[0] if isinstance(part, list) and part and part[0]]
+                        if translated_parts:
+                            result = "".join(translated_parts).strip()
+                            if (
+                                sl_val != "auto"
+                                and target_short != source_short
+                                and len(text.strip()) > 18
+                                and result.lower() == text.strip().lower()
+                            ):
+                                continue
+                            if len(cls._TRANSLATION_CACHE) < 2000:
+                                cls._TRANSLATION_CACHE[cache_key] = (result, detected_lang)
+                            return result, detected_lang
+            except Exception:
+                continue
         return text, source_short
 
     @classmethod
@@ -237,8 +236,8 @@ class AzureSpeechAdapter:
     def synthesize_speech_mp3(cls, text: str, target_language: str = "fr-FR") -> bytes | None:
         """
         Generates natural-sounding neural speech audio (MP3 bytes) for the given text and target language.
-        Splits multi-sentence or multi-byte UTF-8 statements into safe <=185-byte chunks and concatenates
-        MP3 frames so long statements in English, French, Portuguese, Arabic, and Swahili never truncate or 204.
+        Uses Azure AI Neural TTS (JennyNeural, DeniseNeural, FranciscaNeural, SalmaNeural, ZuriNeural)
+        for low-latency, human-like voice output, with multi-chunk fallback if Azure is offline.
         """
         clean_text = re.sub(r"^\[[^\]]+\]\s*", "", (text or "").strip()).strip()
         if not clean_text or cls.is_system_echo_phrase(clean_text):
@@ -246,6 +245,7 @@ class AzureSpeechAdapter:
         short_lang = (target_language or "fr-FR").split("-")[0].lower()
         if short_lang not in cls._SHORT_TO_BCP47:
             short_lang = "fr"
+        bcp47_lang = cls._SHORT_TO_BCP47.get(short_lang, "fr-FR")
         trimmed = clean_text[:450]
         cache_key = (short_lang, trimmed.lower())
         if cache_key in cls._TTS_AUDIO_CACHE:
@@ -256,6 +256,53 @@ class AzureSpeechAdapter:
             cls._TTS_AUDIO_CACHE[cache_key] = stub
             return stub
 
+        session = cls._get_http_session()
+
+        # 1. Primary: Azure AI Speech Neural TTS (Fast, natural human-like neural voices)
+        speech_key = getattr(settings, "AZURE_SPEECH_KEY", "")
+        speech_key_2 = getattr(settings, "AZURE_SPEECH_KEY_2", "")
+        speech_region = getattr(settings, "AZURE_SPEECH_REGION", "eastus")
+        provider_mode = getattr(settings, "MEETING_TRANSLATION_PROVIDER", "azure")
+        candidate_keys = [k for k in (speech_key, speech_key_2) if k and not k.startswith("wdos-dev-")]
+
+        if provider_mode != "mock" and candidate_keys:
+            voice_meta = cls.SUPPORTED_LANGUAGES.get(bcp47_lang, cls.SUPPORTED_LANGUAGES["fr-FR"])
+            voice_name = voice_meta.get("voice", "fr-FR-DeniseNeural")
+            xml_safe_text = (
+                trimmed.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                .replace("'", "&apos;")
+            )
+            ssml = (
+                f"<speak version='1.0' xml:lang='{bcp47_lang}'>"
+                f"<voice xml:lang='{bcp47_lang}' name='{voice_name}'>"
+                f"<prosody rate='+4%'>{xml_safe_text}</prosody>"
+                f"</voice></speak>"
+            )
+            tts_url = f"https://{speech_region}.tts.speech.microsoft.com/cognitiveservices/v1"
+            for api_key in candidate_keys:
+                try:
+                    resp = session.post(
+                        tts_url,
+                        headers={
+                            "Ocp-Apim-Subscription-Key": api_key,
+                            "Content-Type": "application/ssml+xml",
+                            "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
+                            "User-Agent": "WDOS-Multilingua",
+                        },
+                        data=ssml.encode("utf-8"),
+                        timeout=3.2,
+                    )
+                    if resp.status_code == 200 and resp.content and len(resp.content) > 128:
+                        if len(cls._TTS_AUDIO_CACHE) < 500:
+                            cls._TTS_AUDIO_CACHE[cache_key] = resp.content
+                        return resp.content
+                except Exception:
+                    continue
+
+        # 2. Fallback: Multi-chunk TTS if Azure Speech credentials are not active
         candidate_tls = [short_lang]
         if short_lang in ("yo", "ig"):
             candidate_tls.extend(["ha", "sw"])
@@ -265,29 +312,26 @@ class AzureSpeechAdapter:
         if not chunks:
             return None
 
-        session = cls._get_http_session()
         for tl_code in candidate_tls:
             combined_mp3 = bytearray()
             for chunk_str in chunks:
                 chunk_bytes = None
-                for _attempt in range(2):
-                    try:
-                        resp = session.get(
-                            "https://translate.googleapis.com/translate_tts",
-                            params={
-                                "ie": "UTF-8",
-                                "client": "tw-ob",
-                                "tl": tl_code,
-                                "q": chunk_str,
-                            },
-                            headers={"User-Agent": "Mozilla/5.0"},
-                            timeout=4.0,
-                        )
-                        if resp.status_code == 200 and resp.content and len(resp.content) > 128:
-                            chunk_bytes = resp.content
-                            break
-                    except Exception:
-                        continue
+                try:
+                    resp = session.get(
+                        "https://translate.googleapis.com/translate_tts",
+                        params={
+                            "ie": "UTF-8",
+                            "client": "tw-ob",
+                            "tl": tl_code,
+                            "q": chunk_str,
+                        },
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        timeout=2.8,
+                    )
+                    if resp.status_code == 200 and resp.content and len(resp.content) > 128:
+                        chunk_bytes = resp.content
+                except Exception:
+                    pass
                 if chunk_bytes:
                     combined_mp3.extend(chunk_bytes)
             if len(combined_mp3) > 128:
@@ -315,8 +359,6 @@ class AzureSpeechAdapter:
                 continue
             val_clean = v.strip()
             if not val_clean or val_clean.startswith("[") or cls.is_system_echo_phrase(val_clean):
-                continue
-            if k != source_short and len(clean_text) > 3 and val_clean.lower() == clean_text.lower():
                 continue
             merged[k] = val_clean
 

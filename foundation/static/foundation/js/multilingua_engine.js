@@ -185,18 +185,18 @@ class WDOSMultilinguaMeeting {
                     transModeBtn.style.background = "rgba(212,0,106,0.25)";
                     transModeBtn.style.color = "#F4C2DA";
                     transModeBtn.style.borderColor = "rgba(244,194,218,0.45)";
-                    if (modeLabelEl) modeLabelEl.textContent = "Real-Time Translation: ON";
+                    if (modeLabelEl) modeLabelEl.textContent = "Live Translation: ON";
                     if (headerLabelEl) headerLabelEl.textContent = `LIVE TRANSLATION (${langName.toUpperCase()})`;
                     if (replayLabelEl) replayLabelEl.textContent = `Replay Voice (${langName})`;
-                    this.setMicStatus(`Real-Time Voice Translation ON — Hearing translated voice in ${langName}.`);
+                    this.setMicStatus(`Live Voice Translation ON — Hearing translated voice in ${langName}.`);
                 } else {
                     transModeBtn.style.background = "rgba(56,189,248,0.22)";
                     transModeBtn.style.color = "#7DD3FC";
                     transModeBtn.style.borderColor = "rgba(125,211,252,0.45)";
-                    if (modeLabelEl) modeLabelEl.textContent = "Real-Time Translation: OFF (Original Audio)";
-                    if (headerLabelEl) headerLabelEl.textContent = "ORIGINAL AUDIO MODE (TRANSLATION OFF)";
-                    if (replayLabelEl) replayLabelEl.textContent = "Replay Original Audio";
-                    this.setMicStatus("Real-Time Voice Translation OFF — Hearing speaker's original audio normally.");
+                    if (modeLabelEl) modeLabelEl.textContent = "Live Translation: OFF (Original Voice)";
+                    if (headerLabelEl) headerLabelEl.textContent = "ORIGINAL VOICE MODE (AI TRANSLATION OFF)";
+                    if (replayLabelEl) replayLabelEl.textContent = "Replay Original Voice";
+                    this.setMicStatus("Live Voice Translation OFF — Hearing the speaker's real human voice only (no AI voice).");
                 }
             });
         }
@@ -221,8 +221,8 @@ class WDOSMultilinguaMeeting {
                     if (labelEl) labelEl.textContent = "Voice Output: ON";
                     if (this.isTranslationEnabled && this.lastTranslatedText) {
                         this.speakTranslation(this.lastTranslatedText, this.azureData, true);
-                    } else if (!this.isTranslationEnabled && this.lastOriginalText) {
-                        this.speakTranslation(this.lastOriginalText, this.azureData, true, this.lastOriginalLang || "en-US");
+                    } else if (!this.isTranslationEnabled && this.lastRawAudioDataUrl) {
+                        this.enqueueRawAudioChunk(this.lastRawAudioDataUrl, "Speaker");
                     }
                 }
             });
@@ -243,9 +243,9 @@ class WDOSMultilinguaMeeting {
                     ttsBtn.style.borderColor = "rgba(134,239,172,0.35)";
                 }
                 if (!this.isTranslationEnabled) {
-                    const origText = this.lastOriginalText || document.getElementById("caption-text")?.textContent;
-                    if (origText) {
-                        this.speakTranslation(origText.trim(), this.azureData, true, this.lastOriginalLang || "en-US");
+                    if (this.lastRawAudioDataUrl) {
+                        this.clearAudioQueue();
+                        this.enqueueRawAudioChunk(this.lastRawAudioDataUrl, "Speaker");
                     }
                     return;
                 }
@@ -462,7 +462,7 @@ class WDOSMultilinguaMeeting {
         return Boolean(this.ttsSuppressionUntil && Date.now() < this.ttsSuppressionUntil);
     }
 
-    async initAzureTranslation(azureData) {
+    async initAzureTranslation(azureData, mediaStream = null) {
         if (!window.SpeechSDK || !azureData || !azureData.token || azureData.mode === "mock") {
             return;
         }
@@ -472,6 +472,10 @@ class WDOSMultilinguaMeeting {
             return;
         }
         try {
+            if (this.speechRecognizer) {
+                try { this.speechRecognizer.close(); } catch (_) {}
+                this.speechRecognizer = null;
+            }
             const speechConfig = window.SpeechSDK.SpeechTranslationConfig.fromAuthorizationToken(
                 azureData.token,
                 azureData.region
@@ -480,8 +484,7 @@ class WDOSMultilinguaMeeting {
 
             if (window.SpeechSDK.PropertyId) {
                 try {
-                    speechConfig.setProperty(window.SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "650");
-                    speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "650");
+                    speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "800");
                 } catch (_) {}
             }
 
@@ -492,7 +495,17 @@ class WDOSMultilinguaMeeting {
                 }
             });
 
-            const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+            let audioConfig = null;
+            if (mediaStream && typeof window.SpeechSDK.AudioConfig.fromStreamInput === "function") {
+                try {
+                    audioConfig = window.SpeechSDK.AudioConfig.fromStreamInput(mediaStream);
+                } catch (_) {
+                    audioConfig = null;
+                }
+            }
+            if (!audioConfig) {
+                audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+            }
             this.speechRecognizer = new window.SpeechSDK.TranslationRecognizer(speechConfig, audioConfig);
 
             this.speechRecognizer.recognizing = (s, e) => {
@@ -501,13 +514,10 @@ class WDOSMultilinguaMeeting {
                 const interimClean = e.result.text.trim();
                 if (!interimClean || this.isSystemEchoPhrase(interimClean)) return;
 
+                this.hadVoiceInCurrentChunk = true;
                 this.triggerSpeakingPulse(this.userDisplayName, 1200);
                 const targetShort = this.getShortLang(this.listeningLang);
-                const sourceShort = this.getShortLang(this.speakingLang);
-                let liveTranslation = e.result.translations ? e.result.translations.get(targetShort) : null;
-                if (liveTranslation && targetShort !== sourceShort && liveTranslation.trim().toLowerCase() === interimClean.toLowerCase()) {
-                    liveTranslation = null;
-                }
+                const liveTranslation = e.result.translations ? e.result.translations.get(targetShort) : null;
                 this.renderLiveCaption(this.userDisplayName, interimClean, liveTranslation || null, false);
             };
 
@@ -517,15 +527,13 @@ class WDOSMultilinguaMeeting {
                     const cleanText = e.result.text.trim();
                     if (this.isSystemEchoPhrase(cleanText)) return;
 
+                    this.hadVoiceInCurrentChunk = true;
                     this.triggerSpeakingPulse(this.userDisplayName, 1600);
-                    const sourceShort = this.getShortLang(this.speakingLang);
                     const allTranslations = {};
                     Object.values(azureData.supported_languages || {}).forEach((lang) => {
                         const tVal = e.result.translations ? e.result.translations.get(lang.short) : null;
                         if (tVal && tVal.trim()) {
-                            if (lang.short === sourceShort || tVal.trim().toLowerCase() !== cleanText.toLowerCase()) {
-                                allTranslations[lang.short] = tVal.trim();
-                            }
+                            allTranslations[lang.short] = tVal.trim();
                         }
                     });
                     const targetShort = this.getShortLang(this.listeningLang);
@@ -638,7 +646,7 @@ class WDOSMultilinguaMeeting {
                         const hadVoice = this.hadVoiceInCurrentChunk;
                         if (hadVoice && chunks.length > 0 && this.transcriptUrl) {
                             const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
-                            if (blob.size > 400 && blob.size < 200000) {
+                            if (blob.size > 200 && blob.size < 220000) {
                                 const reader = new FileReader();
                                 reader.onloadend = () => {
                                     const dataUrl = reader.result;
@@ -675,7 +683,7 @@ class WDOSMultilinguaMeeting {
                     try { this.liveMediaRecorder.stop(); } catch (_) {}
                 }
                 startCycle();
-            }, 1800);
+            }, 1350);
         } catch (_) {}
     }
 
@@ -698,7 +706,14 @@ class WDOSMultilinguaMeeting {
         this.resetSpeakingIndicatorState();
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-            this.localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            this.localAudioStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                },
+                video: false
+            });
             this.startLiveVoiceRecorder(this.localAudioStream);
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (!AudioCtx) return;
@@ -722,6 +737,24 @@ class WDOSMultilinguaMeeting {
             const timeData = new Uint8Array(this.analyserNode.fftSize);
             const bandWeights = [0.55, 0.85, 1.05, 1.3, 1.05, 0.85, 0.55];
 
+            // Background-safe interval so voice energy is detected even on mobile or inactive tabs
+            if (this.audioEnergyInterval) clearInterval(this.audioEnergyInterval);
+            this.audioEnergyInterval = setInterval(() => {
+                if (this.isAudioMuted || !this.analyserNode) return;
+                this.analyserNode.getByteFrequencyData(freqData);
+                this.analyserNode.getByteTimeDomainData(timeData);
+                let sumSquares = 0;
+                for (let i = 0; i < timeData.length; i++) {
+                    const normalized = (timeData[i] - 128) / 128;
+                    sumSquares += normalized * normalized;
+                }
+                const rms = Math.sqrt(sumSquares / timeData.length);
+                const voiceBinsAvg = (freqData[1] + freqData[2] + freqData[3] + freqData[4] + freqData[5]) / (5 * 255);
+                if (rms > 0.006 || voiceBinsAvg > 0.012) {
+                    this.hadVoiceInCurrentChunk = true;
+                }
+            }, 80);
+
             const animateBars = () => {
                 if (this.isAudioMuted || !this.analyserNode) return;
                 this.analyserNode.getByteFrequencyData(freqData);
@@ -734,8 +767,8 @@ class WDOSMultilinguaMeeting {
                 }
                 const rms = Math.sqrt(sumSquares / timeData.length);
                 const voiceBinsAvg = (freqData[1] + freqData[2] + freqData[3] + freqData[4] + freqData[5]) / (5 * 255);
-                const energy = Math.max(rms * 4.2, voiceBinsAvg * 1.45);
-                const isVoiceDetected = energy > 0.055;
+                const energy = Math.max(rms * 4.8, voiceBinsAvg * 1.6);
+                const isVoiceDetected = energy > 0.032;
                 const isPulseActive = Date.now() < (this.speechPulseUntil || 0);
 
                 if (isVoiceDetected) {
@@ -793,6 +826,10 @@ class WDOSMultilinguaMeeting {
 
     stopMicAudioVisualizer() {
         this.stopLiveVoiceRecorder();
+        if (this.audioEnergyInterval) {
+            clearInterval(this.audioEnergyInterval);
+            this.audioEnergyInterval = null;
+        }
         if (this.visualizerFrame) {
             cancelAnimationFrame(this.visualizerFrame);
             this.visualizerFrame = null;
@@ -816,6 +853,9 @@ class WDOSMultilinguaMeeting {
         }
         const pending = (this.pendingInterimText || "").trim();
         this.pendingInterimText = "";
+        if (typeof this.pendingInterimMaxIndex === "number" && this.pendingInterimMaxIndex > (this.webSpeechCommittedIndex ?? -1)) {
+            this.webSpeechCommittedIndex = this.pendingInterimMaxIndex;
+        }
         if (!pending || this.isSystemEchoPhrase(pending)) return;
         this.triggerSpeakingPulse(this.userDisplayName, 2000);
         this.renderLiveCaption(this.userDisplayName, pending, null, false);
@@ -851,47 +891,71 @@ class WDOSMultilinguaMeeting {
             }
             const recognizer = new SpeechRec();
             this.webSpeechRecognizer = recognizer;
+            this.webSpeechCommittedIndex = -1;
+            this.pendingInterimMaxIndex = -1;
             recognizer.lang = this.speakingLang || "en-US";
             recognizer.continuous = true;
             recognizer.interimResults = true;
 
             recognizer.onspeechstart = () => {
                 if (this.isSuppressedByTTS()) return;
+                this.hadVoiceInCurrentChunk = true;
                 this.triggerSpeakingPulse(this.userDisplayName, 1800);
             };
 
             recognizer.onresult = async (event) => {
                 if (this.isSuppressedByTTS()) return;
-                let interimText = "";
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        if (this.interimFlushTimer) {
-                            clearTimeout(this.interimFlushTimer);
-                            this.interimFlushTimer = null;
+                this.hadVoiceInCurrentChunk = true;
+                let finalPieces = [];
+                let interimPieces = [];
+                const startIdx = (typeof this.webSpeechCommittedIndex === "number" ? this.webSpeechCommittedIndex : -1) + 1;
+
+                for (let i = startIdx; i < event.results.length; i++) {
+                    const res = event.results[i];
+                    if (res && res.isFinal) {
+                        // Collect all uncommitted results from startIdx up through i so earlier words are never dropped!
+                        for (let j = (this.webSpeechCommittedIndex + 1); j <= i; j++) {
+                            const piece = (event.results[j] && event.results[j][0]) ? event.results[j][0].transcript : "";
+                            if (piece && piece.trim()) {
+                                finalPieces.push(piece.trim());
+                            }
                         }
-                        this.pendingInterimText = "";
-                        const clean = transcript.trim();
-                        if (clean && !this.isSystemEchoPhrase(clean)) {
-                            this.triggerSpeakingPulse(this.userDisplayName, 2000);
-                            this.renderLiveCaption(this.userDisplayName, clean, null, false);
-                            await this.postTranscriptSegment(clean, null, null);
-                            await this.fetchLatestTranscript(false);
+                        this.webSpeechCommittedIndex = i;
+                        interimPieces = [];
+                    } else if (res && res[0] && res[0].transcript) {
+                        const piece = res[0].transcript.trim();
+                        if (piece) {
+                            interimPieces.push(piece);
                         }
-                    } else {
-                        interimText += transcript;
                     }
                 }
-                const cleanInterim = interimText.trim();
+
+                if (finalPieces.length > 0) {
+                    if (this.interimFlushTimer) {
+                        clearTimeout(this.interimFlushTimer);
+                        this.interimFlushTimer = null;
+                    }
+                    this.pendingInterimText = "";
+                    const fullClean = finalPieces.join(" ").trim();
+                    if (fullClean && !this.isSystemEchoPhrase(fullClean)) {
+                        this.triggerSpeakingPulse(this.userDisplayName, 2000);
+                        this.renderLiveCaption(this.userDisplayName, fullClean, null, false);
+                        await this.postTranscriptSegment(fullClean, null, null);
+                        await this.fetchLatestTranscript(false);
+                    }
+                }
+
+                const cleanInterim = interimPieces.join(" ").trim();
                 if (cleanInterim && !this.isSystemEchoPhrase(cleanInterim)) {
                     this.pendingInterimText = cleanInterim;
+                    this.pendingInterimMaxIndex = event.results.length - 1;
                     this.triggerSpeakingPulse(this.userDisplayName, 1500);
                     this.renderLiveCaption(this.userDisplayName, cleanInterim, null, false);
                     if (this.interimFlushTimer) clearTimeout(this.interimFlushTimer);
-                    // If the speaker pauses for 1.35s without Chrome firing isFinal, commit the statement immediately
+                    // If the speaker pauses for 1.05s without Chrome firing isFinal, commit the full statement immediately
                     this.interimFlushTimer = setTimeout(() => {
                         this.flushPendingInterimSpeech();
-                    }, 1350);
+                    }, 1050);
                 }
             };
 
@@ -906,6 +970,8 @@ class WDOSMultilinguaMeeting {
                 if (this.pendingInterimText) {
                     this.flushPendingInterimSpeech();
                 }
+                this.webSpeechCommittedIndex = -1;
+                this.pendingInterimMaxIndex = -1;
                 if (!this.isAudioMuted && this.webSpeechRecognizer === recognizer) {
                     setTimeout(() => {
                         if (!this.isAudioMuted && this.webSpeechRecognizer === recognizer) {
@@ -915,7 +981,7 @@ class WDOSMultilinguaMeeting {
                                 this.startWebSpeechFallback();
                             }
                         }
-                    }, 160);
+                    }, 140);
                 }
             };
 
@@ -952,6 +1018,9 @@ class WDOSMultilinguaMeeting {
 
             if (this.mediaStream) {
                 try { await this.mediaStream.unmuteAudio(); } catch (_) {}
+            }
+            if (this.localAudioStream && this.azureData) {
+                await this.initAzureTranslation(this.azureData, this.localAudioStream);
             }
             if (this.speechRecognizer) {
                 this.speechRecognizer.startContinuousRecognitionAsync(
@@ -1176,7 +1245,9 @@ class WDOSMultilinguaMeeting {
     }
 
     enqueueRawAudioChunk(audioDataUrl, speakerName) {
-        if (!audioDataUrl || this.isSpeakerAudioMuted) return;
+        if (!audioDataUrl) return;
+        this.lastRawAudioDataUrl = audioDataUrl;
+        if (this.isSpeakerAudioMuted) return;
         if (this.audioPlaybackQueue.length >= 8) {
             this.audioPlaybackQueue.shift();
         }
@@ -1189,6 +1260,7 @@ class WDOSMultilinguaMeeting {
     }
 
     speakTranslation(text, azureData = null, forcePlay = false, langOverride = null) {
+        if (!this.isTranslationEnabled) return;
         if (!text || this.isSystemEchoPhrase(text)) return;
         if (this.isSpeakerAudioMuted && !forcePlay) return;
 
@@ -1222,7 +1294,7 @@ class WDOSMultilinguaMeeting {
         this.isPlayingQueueItem = true;
         let finished = false;
         const estTimeout = item.type === "raw"
-            ? 4200
+            ? 3600
             : Math.min(18000, Math.max(4500, String(item.text || "").length * 110));
 
         const safetyTimer = setTimeout(() => {
@@ -1236,13 +1308,13 @@ class WDOSMultilinguaMeeting {
             this.currentAudioEl = null;
             this.isPlayingQueueItem = false;
             this.notifyTTSState(false);
-            setTimeout(() => this.processAudioQueue(), 60);
+            setTimeout(() => this.processAudioQueue(), item.type === "raw" ? 15 : 55);
         };
 
         if (item.type === "raw" && item.audioDataUrl) {
             try {
-                const audio = this.ttsAudioPlayer || new Audio();
-                audio.src = item.audioDataUrl;
+                const audio = new Audio(item.audioDataUrl);
+                audio.playsInline = true;
                 this.currentAudioEl = audio;
                 audio.onended = () => finishItem();
                 audio.onerror = () => finishItem();
@@ -1290,7 +1362,7 @@ class WDOSMultilinguaMeeting {
             this.notifyTTSState(false);
             if (typeof onComplete === "function") onComplete();
         };
-        if (!("speechSynthesis" in window) || !text || this.isSystemEchoPhrase(text)) {
+        if (!this.isTranslationEnabled || !("speechSynthesis" in window) || !text || this.isSystemEchoPhrase(text)) {
             done();
             return;
         }
@@ -1321,12 +1393,7 @@ class WDOSMultilinguaMeeting {
         try {
             const sourceShort = this.getShortLang(this.speakingLang);
             const translations = allTranslations ? { ...allTranslations } : {};
-            if (
-                targetShort &&
-                translatedText &&
-                !this.isSystemEchoPhrase(translatedText) &&
-                (targetShort === sourceShort || translatedText.trim().toLowerCase() !== originalText.trim().toLowerCase())
-            ) {
+            if (targetShort && translatedText && !this.isSystemEchoPhrase(translatedText)) {
                 translations[targetShort] = translatedText.trim();
             }
             const resp = await fetch(this.transcriptUrl, {
@@ -1372,7 +1439,7 @@ class WDOSMultilinguaMeeting {
         this.fetchLatestTranscript(false);
         this.pollTimer = setInterval(() => {
             this.fetchLatestTranscript(true);
-        }, 700);
+        }, 650);
     }
 
     async fetchLatestTranscript(speakNewSegments = true) {
@@ -1428,8 +1495,9 @@ class WDOSMultilinguaMeeting {
                             this.lastSeenAudioSeq = chunk.seq;
                             if (chunk.speaker_name !== this.userDisplayName) {
                                 this.triggerSpeakingPulse(chunk.speaker_name, 2200);
+                                this.lastReceivedRawAudioAt = Date.now();
+                                this.lastRawAudioDataUrl = chunk.audio_data_url;
                                 if (!this.isTranslationEnabled && speakNewSegments) {
-                                    this.lastReceivedRawAudioAt = Date.now();
                                     this.enqueueRawAudioChunk(chunk.audio_data_url, chunk.speaker_name);
                                 }
                             }
@@ -1506,14 +1574,11 @@ class WDOSMultilinguaMeeting {
                             const isOtherSpeaker = seg.speaker_name !== this.userDisplayName;
                             const isDifferentLang = this.getShortLang(this.listeningLang) !== this.getShortLang(seg.original_language);
                             if (isOtherSpeaker || (this.participantCount <= 1 && isDifferentLang)) {
+                                // Only synthesize AI translated voice when Real-Time Translation is ON.
+                                // When Real-Time Translation is OFF, listeners hear ONLY the speaker's real human voice (never a bot/AI voice).
                                 if (this.isTranslationEnabled) {
                                     const segTrans = (seg.translations || {})[shortListen] || seg.translated_text || seg.original_text;
                                     this.speakTranslation(segTrans, this.azureData, false, this.listeningLang);
-                                } else {
-                                    // Original Audio mode: if raw microphone chunks weren't streamed in the last 4.5s (e.g. Type-to-Speak), play original language voice
-                                    if (Date.now() - (this.lastReceivedRawAudioAt || 0) > 4500) {
-                                        this.speakTranslation(seg.original_text, this.azureData, false, seg.original_language || "en-US");
-                                    }
                                 }
                             }
                         }

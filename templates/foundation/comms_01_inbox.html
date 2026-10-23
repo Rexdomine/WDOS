@@ -1,0 +1,123 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Inbox · WDOS{% endblock %}
+
+{% block content %}
+<div class="stage4-pagehead">
+  <div>
+    <div class="eyebrow">{{ identity_context.network_short_name|default:"HQ" }} / {{ identity_context.country_name|default:"BOTH NETWORKS"|upper }}</div>
+    <h1>{{ page_title|default:"Inbox" }}</h1>
+    <p>{{ page_description|default:"Find authorised direct, team and group conversations, attachments and unread replies." }}</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/dashboard/" class="btn secondary">Back</a>
+    <button type="button" class="btn primary" onclick="document.getElementById('compose-input').focus()">New conversation</button>
+  </div>
+</div>
+
+{% if state_feedback %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta, #D4006A); background: white; padding: 16px 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+  <div>
+    <h3 style="margin: 0 0 4px 0; font-size: 15px; color: var(--wdos-ink, #1F1924);">{{ state_feedback.title }}</h3>
+    <p style="margin: 0; font-size: 13px; color: var(--wdos-muted, #524956);">{{ state_feedback.message }}</p>
+  </div>
+  <a href="{{ state_feedback.action_url }}" class="btn primary small" style="white-space: nowrap;">{{ state_feedback.action_label }}</a>
+</div>
+{% endif %}
+
+<!-- Tabs -->
+<div class="tabs" style="margin-bottom: 24px;">
+  <a class="tab {% if active_tab == 'overview' or not active_tab %}active{% endif %}" href="?tab=overview">All messages</a>
+  <a class="tab {% if active_tab == 'announcements' or active_tab == 'records' %}active{% endif %}" href="?tab=announcements">Announcements &amp; priority</a>
+  <a class="tab {% if active_tab == 'history' or active_tab == 'sent' %}active{% endif %}" href="?tab=history">Sent &amp; read</a>
+  <a class="tab" href="/foundation/notifications/" style="margin-left: auto; color: var(--wdos-magenta); font-weight: 600;">Notifications →</a>
+</div>
+
+<!-- Main Messaging Grid -->
+<div style="display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start;" class="inbox-grid-container">
+  
+  <!-- Conversations List (Left Column) -->
+  <div class="stage4-card" style="padding: 0; overflow: hidden; background: white; border-radius: 12px; border: 1px solid var(--wdos-line, #E8E6E1);">
+    <div style="padding: 16px 18px; border-bottom: 1px solid var(--wdos-line, #E8E6E1); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--wdos-ink, #1F1924);">Conversations</h3>
+      <span style="font-size: 11px; background: #FAF9FB; padding: 2px 8px; border-radius: 12px; font-weight: 600; color: var(--wdos-muted);">{{ conversations|length }} threads</span>
+    </div>
+    
+    <div style="display: flex; flex-direction: column;">
+      {% for conv in conversations %}
+      <a href="?c={{ conv.id }}{% if active_tab %}&tab={{ active_tab }}{% endif %}" style="display: block; padding: 14px 18px; text-decoration: none; border-bottom: 1px solid var(--wdos-line, #F0EEF2); background: {% if active_conv.id == conv.id %}#FAF5F8{% else %}#FFFFFF{% endif %}; border-left: 3px solid {% if active_conv.id == conv.id %}var(--wdos-magenta, #D4006A){% else %}transparent{% endif %}; transition: background 0.15s ease;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+          <strong style="font-size: 13.5px; color: {% if active_conv.id == conv.id %}var(--wdos-magenta, #D4006A){% else %}var(--wdos-ink, #1F1924){% endif %}; font-weight: 600;">{{ conv.title }}</strong>
+          <span style="font-size: 11px; color: var(--wdos-muted, #7A7280);">{{ conv.time }}</span>
+        </div>
+        <div style="font-size: 12.5px; color: var(--wdos-muted, #524956); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;">
+          {{ conv.snippet }}
+        </div>
+      </a>
+      {% empty %}
+      <div style="padding: 32px 18px; text-align: center; color: var(--wdos-muted);">
+        <p style="margin: 0; font-size: 13px;">No conversations found in this view.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Active Conversation Thread (Right Column) -->
+  <div class="stage4-card" style="padding: 0; overflow: hidden; background: white; border-radius: 12px; border: 1px solid var(--wdos-line, #E8E6E1); display: flex; flex-direction: column; min-height: 480px;">
+    
+    <!-- Thread Header -->
+    <div style="padding: 16px 20px; border-bottom: 1px solid var(--wdos-line, #E8E6E1); background: #FAF9FB; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--wdos-ink, #1F1924);">{{ active_conv.title|default:"Inbox" }}</h2>
+        <small style="color: var(--wdos-muted, #524956); font-size: 12px;">Authorised discussion channel · Scoped to active unit</small>
+      </div>
+      <span style="font-size: 11px; background: #ECE8EE; color: #524956; padding: 4px 8px; border-radius: 4px; font-weight: 600;">Verified scope</span>
+    </div>
+
+    <!-- Message Bubbles Container -->
+    <div style="padding: 24px 20px; flex: 1; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; background: #FFFFFF;" id="messages-container">
+      {% for msg in active_conv.messages %}
+      <div style="display: flex; flex-direction: column; align-items: {% if msg.is_self %}flex-end{% else %}flex-start{% endif %};">
+        <div style="font-size: 11px; font-weight: 600; color: var(--wdos-muted, #7A7280); margin-bottom: 4px; display: flex; gap: 6px; align-items: center;">
+          <span>{{ msg.sender }}</span>
+          <span>·</span>
+          <span>{{ msg.time }}</span>
+        </div>
+        <div style="max-width: 78%; padding: 12px 16px; border-radius: {% if msg.is_self %}14px 14px 2px 14px{% else %}14px 14px 14px 2px{% endif %}; background: {% if msg.is_self %}var(--wdos-magenta, #D4006A){% else %}#F4F2F5{% endif %}; color: {% if msg.is_self %}#FFFFFF{% else %}var(--wdos-ink, #1F1924){% endif %}; font-size: 13.5px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+          {{ msg.text }}
+        </div>
+      </div>
+      {% empty %}
+      <div style="padding: 40px 20px; text-align: center; color: var(--wdos-muted);">
+        <p style="margin: 0; font-size: 13.5px;">Select a conversation on the left to read messages.</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Compose Message Box -->
+    <div style="padding: 16px 20px; border-top: 1px solid var(--wdos-line, #E8E6E1); background: #FAF9FB;">
+      <form method="post" action="{% url 'messages-inbox' %}" style="margin: 0; display: flex; gap: 12px;" id="message-compose-form">
+        {% csrf_token %}
+        <input type="hidden" name="conversation_id" value="{{ active_conv.id }}">
+        <input type="text" name="message" id="compose-input" placeholder="Write a message…" required autocomplete="off" style="flex: 1; padding: 10px 14px; border: 1px solid var(--wdos-line, #D6D2DA); border-radius: 8px; font-size: 13px; background: white;">
+        <button type="submit" class="btn primary" style="padding: 10px 20px;">Send</button>
+      </form>
+      <div style="margin-top: 10px; font-size: 11.5px; color: var(--wdos-muted, #7A7280); display: flex; align-items: center; gap: 6px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>Bulk delivery requires approved content, audience, consent and frequency checks.</span>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<style>
+@media (max-width: 860px) {
+  .inbox-grid-container {
+    grid-template-columns: 1fr !important;
+  }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Review task completion · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Review task completion</h1>
+      <p class="dash-subtitle">Check the submitted information, record a reason and confirm the next state.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="{% if task %}/foundation/tasks/{{ task.task_code }}/{% else %}/foundation/tasks/{% endif %}?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      <button type="submit" form="review-task-form" name="reviewer_decision" value="close_task" class="dash-btn-primary">&rarr; Approve and close</button>
+    </div>
+  </div>
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Review Outcome:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+    <!-- Left Card: Details to check -->
+    <div class="dash-card" style="grid-column: span 2;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 class="dash-card-title" style="margin:0;">Details to check</h2>
+        <span class="dash-pill dash-pill-amber">&bull; Needs review</span>
+      </div>
+
+      <table class="dash-table dash-desktop-table" aria-label="Task submission details to check" style="margin-bottom:20px;">
+        <thead>
+          <tr>
+            <th scope="col">STEP</th>
+            <th scope="col">OWNER</th>
+            <th scope="col">HISTORY</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600; color:#111827;">Submitted</td>
+            <td>Task owner &middot; version {{ task.current_version|default:0 }}</td>
+            <td>{{ task.evidence_file|default:"—" }}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; color:#111827;">Waiting for review</td>
+            <td>{{ task.reviewer_name|default:"Assigned reviewer" }}</td>
+            <td>{% if task.evidence_checked %}Evidence verified ({{ task.status }}){% else %}No verification result yet{% endif %}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <form id="review-task-form" method="post" action="/foundation/tasks/review/?task={{ task.task_code }}&country={{ target_country }}&network={{ target_network }}">
+        {% csrf_token %}
+        <input type="hidden" name="task_code" value="{{ task.task_code }}">
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div>
+            <label style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Current state</label>
+            <input type="text" value="{{ task.status }} · read only" readonly style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px; background:#F9FAFB; color:#4B5563;">
+          </div>
+          <div>
+            <label for="id_reviewer_decision" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Reviewer decision</label>
+            <select id="id_reviewer_decision" name="reviewer_decision" style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px; background:#FFFFFF;">
+              <option value="mark_reviewed">Mark reviewed</option>
+              <option value="mark_verified">Mark verified</option>
+              <option value="close_task">Approve and close</option>
+              <option value="return_for_correction">Return for correction</option>
+              <option value="reopen_task">Reopen task</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label for="id_decision_reason" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Decision reason</label>
+          <textarea id="id_decision_reason" name="decision_reason" rows="3" placeholder="Record what was checked or what needs correction." required style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px;">{{ task.return_or_reopen_reason }}</textarea>
+        </div>
+
+        <div style="border:1px solid #E5E7EB; border-radius:10px; padding:12px 14px; background:#FAF9FB; margin-bottom:20px;">
+          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer;">
+            <input type="checkbox" name="evidence_checked" value="1" checked style="margin-top:3px;">
+            <div>
+              <div style="font-size:13.5px; font-weight:700; color:#111827;">Evidence checked</div>
+              <div style="font-size:12.5px; color:#6B7280;">{{ task.evidence_file|default:"—" }}</div>
+            </div>
+          </label>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <a href="{% if task %}/foundation/tasks/{{ task.task_code }}/{% else %}/foundation/tasks/{% endif %}?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+          <div style="display:flex; gap:10px;">
+            <button type="submit" name="reviewer_decision" value="return_for_correction" class="dash-btn-secondary">Return for correction</button>
+            <button type="submit" name="reviewer_decision" value="close_task" class="dash-btn-primary">&rarr; Approve and close</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Card: Governance & Audit -->
+    <div class="dash-card">
+      <h2 class="dash-card-title" style="margin:0 0 16px 0;">Human review &amp; audit</h2>
+
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:14px;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:6px;">Human decision required</div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.5;">Automated checks can prepare context, but an authorized person records the final decision.</div>
+      </div>
+
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:14px;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:6px;">Audit trail</div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.5;">Approvals, returns and reasons are stored with actor, role, scope and timestamp.</div>
+      </div>
+
+      <div class="stage6-shield-notice">
+        <div class="stage6-shield-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>Tasks retain their source, owner and history when reassigned.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

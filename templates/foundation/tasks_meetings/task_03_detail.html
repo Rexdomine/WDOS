@@ -1,0 +1,162 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}{{ task.title|default:"Confirm Chapter meeting agenda" }} · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">{{ task.title|default:"Confirm Chapter meeting agenda" }}</h1>
+      <p class="dash-subtitle">Review the current record, related history and permitted actions.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/tasks/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      <a href="/foundation/tasks/lifecycle/?task={{ task.task_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Submit evidence</a>
+    </div>
+  </div>
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Task Update:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+    <!-- Left Card: Task Record & Actions -->
+    <div class="dash-card" style="grid-column: span 2;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:18px;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div style="width:44px; height:44px; border-radius:50%; background:var(--wdos-magenta, #D4006A); color:#FFFFFF; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px;">CO</div>
+          <div>
+            <h2 style="font-size:18px; font-weight:700; color:#111827; margin:0 0 2px 0;">{{ task.title|default:"Confirm Chapter meeting agenda" }}</h2>
+            <div style="font-size:13px; color:#6B7280;">{{ target_network }} / {{ target_country_name }} &middot; Tasks &amp; meetings</div>
+          </div>
+        </div>
+        <span class="dash-pill dash-pill-green">&bull; Task</span>
+      </div>
+
+      <!-- 4-Box Summary Grid -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+        <div style="border:1px solid #E5E7EB; border-radius:10px; padding:12px 14px; background:#FAF9FB;">
+          <div style="font-size:12px; color:#6B7280; margin-bottom:4px;">Owner</div>
+          <div style="font-size:14px; font-weight:700; color:#111827;">{{ task.owner_name }}</div>
+        </div>
+        <div style="border:1px solid #E5E7EB; border-radius:10px; padding:12px 14px; background:#FAF9FB;">
+          <div style="font-size:12px; color:#6B7280; margin-bottom:4px;">Status</div>
+          <div style="font-size:14px; font-weight:700; color:#111827;">{{ task.status }}</div>
+        </div>
+        <div style="border:1px solid #E5E7EB; border-radius:10px; padding:12px 14px; background:#FAF9FB;">
+          <div style="font-size:12px; color:#6B7280; margin-bottom:4px;">Evidence</div>
+          <div style="font-size:14px; font-weight:700; color:#111827;">{{ task.evidence_file|default:"—" }}</div>
+        </div>
+        <div style="border:1px solid #E5E7EB; border-radius:10px; padding:12px 14px; background:#FAF9FB;">
+          <div style="font-size:12px; color:#6B7280; margin-bottom:4px;">Next action</div>
+          <div style="font-size:14px; font-weight:700; color:#111827;">{{ task.next_action }}</div>
+        </div>
+      </div>
+
+      <!-- Scoped Tasks Table -->
+      <table class="dash-table dash-desktop-table" aria-label="Scoped tasks">
+        <thead>
+          <tr>
+            <th scope="col">TASK</th>
+            <th scope="col">OWNER</th>
+            <th scope="col">DUE</th>
+            <th scope="col">STATUS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for st in scoped_tasks %}
+          <tr>
+            <td style="font-weight:600; color:#111827;">
+              <a href="/foundation/tasks/{{ st.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="color:#111827; text-decoration:none;">{{ st.title }}</a>
+            </td>
+            <td>{{ st.owner_name }}</td>
+            <td>{{ st.due_short_label }}</td>
+            <td>
+              <span class="dash-pill {% if st.status == 'Closed' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">&bull; {{ st.status }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Interactive Task Update / Evidence Submission / Reassignment Form -->
+      <div style="margin-top:20px; padding-top:18px; border-top:1px solid #E5E7EB;">
+        <h3 style="font-size:14px; font-weight:700; color:#111827; margin:0 0 12px 0;">Update task progress or submit evidence</h3>
+        <form method="post" action="{% if task %}/foundation/tasks/{{ task.task_code }}/{% else %}/foundation/tasks/lifecycle/{% endif %}?country={{ target_country }}&network={{ target_network }}">
+          {% csrf_token %}
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:12px;">
+            <div>
+              <label for="id_action" style="display:block; font-size:12.5px; font-weight:700; color:#111827; margin-bottom:4px;">Action</label>
+              <select id="id_action" name="action" style="width:100%; padding:9px 11px; border:1px solid #D1D5DB; border-radius:8px; font-size:13.5px; background:#FFFFFF;">
+                <option value="submit_evidence">Submit evidence</option>
+                <option value="start_work">Mark In progress</option>
+                <option value="mark_blocked">Mark Blocked</option>
+                <option value="reassign_task">Reassign task</option>
+              </select>
+            </div>
+            <div>
+              <label for="id_evidence_file" style="display:block; font-size:12.5px; font-weight:700; color:#111827; margin-bottom:4px;">Evidence reference</label>
+              <input id="id_evidence_file" type="text" name="evidence_file" value="{{ task.evidence_file|default:'' }}" style="width:100%; padding:9px 11px; border:1px solid #D1D5DB; border-radius:8px; font-size:13.5px;">
+            </div>
+            <div>
+              <label for="id_new_owner_name" style="display:block; font-size:12.5px; font-weight:700; color:#111827; margin-bottom:4px;">Reassign to (optional)</label>
+              <input id="id_new_owner_name" type="text" name="new_owner_name" placeholder="e.g. Lina Mensah" style="width:100%; padding:9px 11px; border:1px solid #D1D5DB; border-radius:8px; font-size:13.5px;">
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label for="id_reason_or_note" style="display:block; font-size:12.5px; font-weight:700; color:#111827; margin-bottom:4px;">Progress or blocker note</label>
+            <input id="id_reason_or_note" type="text" name="reason_or_note" placeholder="Add submission note, blocker detail, or reassignment reason" style="width:100%; padding:9px 11px; border:1px solid #D1D5DB; border-radius:8px; font-size:13.5px;">
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <a href="/foundation/tasks/lifecycle/?task={{ task.task_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Open full lifecycle</a>
+            {% if is_organizer_or_reviewer %}
+            <a href="/foundation/tasks/review/?task={{ task.task_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Review completion</a>
+            {% endif %}
+            <button type="submit" class="dash-btn-primary">&rarr; Save task update</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Right Card: Related information -->
+    <div class="dash-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 class="dash-card-title" style="margin:0;">Related information</h2>
+        <span class="dash-pill dash-pill-amber">&bull; In progress</span>
+      </div>
+
+      {% for rt in scoped_tasks|slice:":3" %}
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:14px; background:#FAF9FB; margin-bottom:12px;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:4px;">
+          <a href="/foundation/tasks/{{ rt.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="color:#111827; text-decoration:none;">{{ rt.title }}</a>
+        </div>
+        <div style="font-size:12.5px; color:#4B5563;">{{ rt.owner_name }} &middot; Due {{ rt.due_short_label }}</div>
+      </div>
+      {% endfor %}
+
+      <div class="stage6-shield-notice" style="margin-top:14px;">
+        <div class="stage6-shield-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>Tasks retain their source, owner and history when reassigned.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

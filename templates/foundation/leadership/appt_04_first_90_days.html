@@ -1,0 +1,112 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Your first 90 days · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Your first 90 days</h1>
+      <p class="dash-subtitle">See the relevant appointments and continuity records, linked evidence and next actions for your scope.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+
+  <!-- Appointments & Continuity Sub-Navigation -->
+  <div class="stage6-subnav">
+    <a href="/foundation/appointments/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment processing</a>
+    <a href="/foundation/appointments/offer/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment offer</a>
+    <a href="/foundation/appointments/onboarding/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Leader onboarding</a>
+    <a href="/foundation/appointments/first-90-days/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link active">First 90 days</a>
+    <a href="/foundation/appointments/reviews/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">30 / 60 / 90 day reviews</a>
+    <a href="/foundation/appointments/identity/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment &amp; identity</a>
+    <a href="/foundation/appointments/status-change/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Status change</a>
+    <a href="/foundation/appointments/transition/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Plan transition</a>
+    <a href="/foundation/appointments/handover/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Handover workspace</a>
+  </div>
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:24px;">Your first 90 days</h2>
+
+      <div style="display:flex; flex-direction:column; gap:20px; margin-bottom:28px;">
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <span style="width:28px; height:28px; border-radius:50%; background:#DCFCE7; color:#166534; display:inline-flex; align-items:center; justify-content:center; font-weight:700; flex-shrink:0;">&#10003;</span>
+          <div>
+            <div style="font-size:11px; font-weight:700; color:#6B7280; letter-spacing:0.6px; text-transform:uppercase;">S T E P 0 1</div>
+            <div style="font-size:15px; font-weight:700; color:#111827; margin:2px 0;">First 30 days &middot; Orientation</div>
+            <div style="font-size:13px; color:#4B5563;">Acceptance, declarations and required onboarding precede full role access.</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <span style="width:28px; height:28px; border-radius:50%; background:var(--wdos-magenta, #D4006A); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:700; flex-shrink:0;">&bull;</span>
+          <div>
+            <div style="font-size:11px; font-weight:700; color:#6B7280; letter-spacing:0.6px; text-transform:uppercase;">S T E P 0 2</div>
+            <div style="font-size:15px; font-weight:700; color:#111827; margin:2px 0;">First 60 days &middot; Apply learning</div>
+            <div style="font-size:13px; color:#4B5563;">Official records transfer safely; private conversations do not.</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <span style="width:28px; height:28px; border-radius:50%; background:#DCFCE7; color:#166534; display:inline-flex; align-items:center; justify-content:center; font-weight:700; flex-shrink:0;">&#10003;</span>
+          <div>
+            <div style="font-size:11px; font-weight:700; color:#6B7280; letter-spacing:0.6px; text-transform:uppercase;">S T E P 0 3</div>
+            <div style="font-size:15px; font-weight:700; color:#111827; margin:2px 0;">First 90 days &middot; Reflect and review</div>
+            <div style="font-size:13px; color:#4B5563;">Your progress and next action remain available here.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:12px;">
+        <a href="/foundation/appointments/onboarding/" class="dash-btn-secondary">Back</a>
+        <a href="/foundation/appointments/reviews/" class="dash-btn-primary">&rarr; Open next action</a>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:10px;">At a glance</h3>
+        <span class="dash-pill" style="margin-bottom:16px; display:inline-block;">&bull; In progress</span>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">A clear start</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Acceptance, declarations and required onboarding precede full role access.</p>
+          <span class="stage6-sidebar-badge">Appointment gates</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">History stays with WODDI</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Official records transfer safely; private conversations do not.</p>
+          <span class="stage6-sidebar-badge">Institutional continuity</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shield Notice -->
+  <div class="stage6-shield-notice" style="margin-top:20px;">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Changing an appointment does not create a new person or erase prior service.</div>
+  </div>
+</div>
+{% endblock %}

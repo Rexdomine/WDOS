@@ -171,6 +171,55 @@ class UserScope:
     chapter_name: Optional[str] = None
 
     @property
+    def switchable_roles(self) -> List[str]:
+        """Return the ordered list of distinct roles this user is authorized to switch between."""
+        alias_to_canon = {
+            "membership": "member",
+            "applicant": "candidate",
+            "supporter": "community",
+            "hq": "founder",
+            "executive": "founder",
+            "ops": "operations",
+            "hofco": "operations",
+            "country_director": "country_lead",
+            "country_representative": "country_lead",
+            "field_lead": "country_lead",
+            "regional_lead": "state_lead",
+            "state_coordinator": "state_lead",
+            "lga_coordinator": "lga_lead",
+            "cluster_coordinator": "cluster_lead",
+            "chapter_coordinator": "chapter_lead",
+            "chapter": "chapter_lead",
+        }
+        primary = alias_to_canon.get(
+            (self.primary_role or "member").lower().strip().replace("-", "_"),
+            (self.primary_role or "member").lower().strip().replace("-", "_"),
+        )
+        ordered: List[str] = [primary]
+
+        for r in sorted(self.roles):
+            norm = alias_to_canon.get(r.lower().strip().replace("-", "_"), r.lower().strip().replace("-", "_"))
+            if norm and norm not in ordered:
+                ordered.append(norm)
+
+        if self.is_management_or_admin or bool(self.roles.intersection({"founder", "hq", "it_admin", "management"})):
+            for r in ("founder", "operations", "country_lead", "state_lead", "lga_lead", "cluster_lead", "chapter_lead", "member"):
+                if r not in ordered:
+                    ordered.append(r)
+        elif self.leadership_tier <= 4:
+            # Leadership tiers can switch between their leadership role(s), subordinate leadership roles, and member view
+            for r in ("country_lead", "state_lead", "lga_lead", "cluster_lead", "chapter_lead", "member"):
+                if r not in ordered and self.can_access_role(r):
+                    ordered.append(r)
+
+        return ordered
+
+    @property
+    def has_multiple_roles(self) -> bool:
+        """Return True only when the user holds more than one switchable role."""
+        return len(self.switchable_roles) > 1
+
+    @property
     def can_cross_network(self) -> bool:
         return (
             self.is_management_or_admin
@@ -534,6 +583,14 @@ def get_user_scope(account: Account, session=None) -> UserScope:
             else:
                 chapter_code = chapter_code or h_code
 
+        if isinstance(membership.home, dict):
+            first_level_area = first_level_area or membership.home.get("state") or membership.home.get("region")
+            second_level_area = second_level_area or membership.home.get("lga") or membership.home.get("district")
+            community_cluster = community_cluster or membership.home.get("cluster") or membership.home.get("community_cluster")
+            if not chapter_name and membership.home.get("label"):
+                if not is_broad_geographic_place(membership.home["label"], next(iter(allowed_countries)) if allowed_countries else "NG"):
+                    chapter_name = membership.home["label"]
+
         if h_label and not chapter_name:
             if not is_broad_geographic_place(h_label, next(iter(allowed_countries)) if allowed_countries else "NG"):
                 chapter_name = h_label
@@ -543,6 +600,20 @@ def get_user_scope(account: Account, session=None) -> UserScope:
                     first_level_area = h_label
                 elif not second_level_area and h_label != first_level_area:
                     second_level_area = h_label
+
+    # Fallback to OnboardingDraft data if local area details remain unresolved
+    if not (first_level_area and second_level_area and community_cluster):
+        draft_record = OnboardingDraft.objects.filter(account=account).first()
+        if draft_record and draft_record.data:
+            d = draft_record.data
+            first_level_area = first_level_area or d.get("region_name") or d.get("region")
+            second_level_area = second_level_area or d.get("district_name") or (d.get("district") if d.get("district") and not str(d.get("district")).startswith("NG-") else None)
+            d_cluster = d.get("community_cluster")
+            if d_cluster:
+                community_cluster = community_cluster or d_cluster
+                cluster_name = cluster_name or d_cluster
+            if not chapter_name and second_level_area:
+                chapter_name = f"{second_level_area} Chapter"
 
     # 3. Inspect AccessGrants
     for grant in active_grants:

@@ -1,0 +1,117 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Review a proposed partnership · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"HQ / BOTH NETWORKS" }}</div>
+      <h1 class="dash-title">Review a proposed partnership</h1>
+      <p class="dash-subtitle">{{ screen.subtitle|default:"Check the evidence and the impact of this decision before confirming." }}</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/relationships/" class="dash-btn-secondary">Back</a>
+    </div>
+  </div>
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <div class="dash-layout">
+    <div class="dash-main-col">
+      <div class="dash-card">
+        <h2 class="dash-card-title" style="margin-bottom:16px;">Proposed Partnership Evaluation</h2>
+
+        <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:16px; margin-bottom:20px;">
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:700; color:var(--wdos-muted); text-transform:uppercase;">Proposed relationship</div>
+            <div style="font-size:16px; font-weight:700; color:var(--wdos-ink);">{{ relationship.relationship }}</div>
+            <small style="color:var(--wdos-muted);">{{ relationship.partner_type }} · {{ relationship.scope }}</small>
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:700; color:var(--wdos-muted); text-transform:uppercase;">Responsible owner</div>
+            <div style="font-weight:600;">{{ relationship.owner }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; font-weight:700; color:var(--wdos-muted); text-transform:uppercase;">Proposed commitment</div>
+            <div style="font-style:italic; color:#374151;">{{ relationship.proposed_commitment }}</div>
+          </div>
+        </div>
+
+        <form method="POST" action="">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="record_decision">
+
+          <div style="margin-bottom:16px;">
+            <label style="display:block; font-size:13px; font-weight:700; color:var(--wdos-ink); margin-bottom:6px;">Executive Review Decision</label>
+            <select name="decision" style="width:100%; padding:10px 14px; border:1px solid #D1D5DB; border-radius:8px; font-weight:600;">
+              <option value="Approve MoU">Approve & Sign Strategic MoU</option>
+              <option value="Ratify Strategic Partnership">Ratify Continental Partnership</option>
+              <option value="Further review" selected>Require Further Review & Legal Checks</option>
+              <option value="Reject">Formally Decline Partnership</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:700; color:var(--wdos-ink); margin-bottom:6px;">Executive Notes / Delegated Conditions</label>
+            <textarea name="notes" rows="4" placeholder="Enter terms of agreement, governance scope, or conditions of signature..." style="width:100%; padding:10px 14px; border:1px solid #D1D5DB; border-radius:8px;"></textarea>
+          </div>
+
+          <div class="dash-scoped-notice" style="margin-bottom:20px;">
+            <span>Partnership and contracting decisions require the correct delegated authority. A decision requires appropriate executive clearance.</span>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <a href="/foundation/relationships/" class="dash-btn-secondary">Back</a>
+            <button type="submit" class="dash-btn-primary">Record Authorized Decision</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Side Column -->
+    <div class="dash-side-col">
+      <div class="dash-attention-card">
+        <h2 class="dash-card-title" style="margin-bottom:14px;">Before you continue</h2>
+        
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Delegated authority</h3>
+            <p class="dash-attention-text">Partnership and contracting decisions require the correct delegated authority.</p>
+          </div>
+        </div>
+
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Your information is protected</h3>
+            <p class="dash-attention-text">Only the people authorized for this record can review the submission.</p>
+            <div class="dash-attention-tag" style="margin-top:6px;">Scoped access</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-support-note">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>WODDI · No Woman Is Left Out · REL-02 UI Review v2</span>
+  </div>
+</div>
+{% endblock %}

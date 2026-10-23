@@ -1,0 +1,125 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}You have been referred · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">You have been referred</h1>
+      <p class="dash-subtitle">Complete the information below, then review it before you continue.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Referral Intake:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+
+  <!-- 2-Column Form Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <form method="post" action="/foundation/recruitment/referred/">
+        {% csrf_token %}
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+        {% if referral and referral.updated_at %}
+        <input type="hidden" name="expected_updated_at" value="{{ referral.updated_at|date:'Y-m-d\TH:i:s' }}">
+        {% endif %}
+
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">You have been referred</h2>
+
+        <!-- 3-Step Stepper: Details / Review / Confirm -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; max-width:440px;">
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:var(--wdos-magenta, #D4006A); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span>
+            <div style="font-size:11.5px; font-weight:700; color:var(--wdos-magenta, #D4006A); margin-top:4px;">Details</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 12px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">Review</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 12px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">Confirm</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div class="stage6-field-group">
+            <label for="id_referral_code" class="stage6-label">Referral reference</label>
+            <input type="text" id="id_referral_code" name="referral_code" class="stage6-input" value="{{ referral.referral_code|default:'REF-NG-042' }}" readonly>
+          </div>
+
+          <div class="stage6-field-group">
+            <label for="id_candidate_name" class="stage6-label">Person</label>
+            <input type="text" id="id_candidate_name" name="candidate_name" class="stage6-input" value="{{ referral.candidate_name|default:'Ada Okafor' }}">
+          </div>
+        </div>
+
+        <div class="stage6-field-group" style="margin-bottom:16px;">
+          <label for="id_proposed_seat_title" class="stage6-label">Proposed seat</label>
+          <input type="text" id="id_proposed_seat_title" name="proposed_seat_title" class="stage6-input" value="{{ referral.proposed_seat_title|default:'Chapter Coordinator · Ikeja' }}">
+        </div>
+
+        <div class="stage6-checkbox-row" style="margin-bottom:20px;">
+          <input type="checkbox" id="id_contact_confirmed" name="contact_confirmed" class="stage6-checkbox" value="true" checked>
+          <label for="id_contact_confirmed" class="stage6-checkbox-label">
+            Contact confirmation
+            <span style="display:block; font-size:12.5px; font-weight:400; color:#4B5563; margin-top:2px;">This referral uses my existing WDOS identity.</span>
+          </label>
+        </div>
+
+        <hr style="border:none; border-top:1px solid #E5E7EB; margin:20px 0;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <span style="font-size:12.5px; color:#6B7280;">Your information stays within your authorized scope.</span>
+          <div style="display:flex; gap:10px;">
+            <a href="/foundation/recruitment/opportunities/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+            <button type="submit" name="action" value="verify" class="dash-btn-primary">&rarr; Verify my details</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:10px;">At a glance</h3>
+        <span class="dash-pill" style="margin-bottom:16px; display:inline-block;">&bull; In progress</span>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Before you continue</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Candidate evidence is visible only within your authorized review scope.</p>
+          <span class="stage6-sidebar-badge">Please review</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your information is protected</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Only the people authorized for this record can review the submission.</p>
+          <span class="stage6-sidebar-badge">Scoped access</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

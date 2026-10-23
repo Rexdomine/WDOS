@@ -1,0 +1,148 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}My calendar · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">My calendar</h1>
+      <p class="dash-subtitle">See the relevant meetings and follow-up records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/tasks/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      {% if is_organizer_or_reviewer %}
+      <a href="/foundation/meetings/schedule/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Schedule meeting</a>
+      {% else %}
+      <a href="/foundation/meetings/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Open meetings</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom:16px; padding:12px 16px; border-radius:12px; font-size:13.5px; font-weight:700; {% if result_success %}background:#DCFCE7; color:#166534; border:1px solid #86EFAC;{% else %}background:#FEE2E2; color:#991B1B; border:1px solid #FCA5A5;{% endif %}" role="status">
+    {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="/foundation/calendar/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item active" role="tab">Calendar</a>
+    <a href="/foundation/meetings/?tab=upcoming&country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Upcoming &amp; active</a>
+    <a href="/foundation/meetings/?tab=history&country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Past &amp; history</a>
+    <a href="/foundation/meetings/follow-up/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Follow-up &amp; minutes</a>
+  </div>
+
+  <!-- Dark Hero Calendar Banner -->
+  <div style="background:linear-gradient(135deg, #211829 0%, #382342 100%); color:#FFFFFF; border-radius:16px; padding:24px; margin-bottom:20px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#F9A8D4; margin-bottom:6px;">{% if meetings %}IN PROGRESS{% else %}CALENDAR OVERVIEW{% endif %}</div>
+    <h2 style="font-size:22px; font-weight:700; margin:0 0 6px 0; color:#FFFFFF !important;">My calendar</h2>
+    <p style="font-size:13.5px; color:#E5E7EB; margin:0 0 20px 0;">See the relevant meetings and follow-up records, linked evidence and next actions for your scope.</p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+      {% for m in meetings|slice:":2" %}
+      <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); border-radius:12px; padding:16px;">
+        <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">{{ m.title }} &middot; {{ m.local_time_label }}</div>
+        <div style="font-size:13px; color:#E5E7EB; line-height:1.45; margin-bottom:14px;">{{ m.description }}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="dash-pill {% if m.status == 'Attending' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">&bull; {{ m.status }}</span>
+          <a href="/foundation/meetings/{{ m.meeting_code }}/?country={{ target_country }}&network={{ target_network }}" style="font-size:12.5px; font-weight:700; color:#F9A8D4; text-decoration:none;">{% if m.status == 'Attending' %}Open meeting{% else %}Respond{% endif %} &rarr;</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Main Grid: Schedule & Participation + At a glance -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+    <div class="dash-card" style="grid-column: span 2;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 class="dash-card-title" style="margin:0;">Schedule &amp; participation</h2>
+        <span class="dash-pill dash-pill-amber">&bull; In progress</span>
+      </div>
+
+      <table class="dash-table dash-desktop-table" aria-label="Schedule and participation">
+        <thead>
+          <tr>
+            <th scope="col">MEETING</th>
+            <th scope="col">LOCAL TIME</th>
+            <th scope="col">HOST</th>
+            <th scope="col">STATUS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in meetings %}
+          <tr>
+            <td style="font-weight:600; color:#111827;">
+              <a href="/foundation/meetings/{{ m.meeting_code }}/?country={{ target_country }}&network={{ target_network }}" style="color:#111827; text-decoration:none;">{{ m.title }}</a>
+            </td>
+            <td>{{ m.local_time_label }}</td>
+            <td>{{ m.host_name }}</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span class="dash-pill {% if m.status == 'Attending' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">&bull; {{ m.status }}</span>
+                {% if m.can_delete %}
+                <form method="post" action="/foundation/calendar/?country={{ target_country }}&network={{ target_network }}" style="margin:0;" onsubmit="return confirm('Delete meeting &quot;{{ m.title|escapejs }}&quot;?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_meeting">
+                  <input type="hidden" name="meeting_code" value="{{ m.meeting_code }}">
+                  <button type="submit" style="background:#FEF2F2; color:#B91C1C; border:1px solid #FECACA; border-radius:6px; padding:3px 9px; font-size:11.5px; font-weight:700; cursor:pointer;">Delete</button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" style="text-align:center; padding:28px; color:#6B7280;">No scheduled meetings in this view.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Due Tasks on Calendar -->
+      {% if due_tasks %}
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB;">
+        <h3 style="font-size:14px; font-weight:700; color:#111827; margin:0 0 10px 0;">Linked task deadlines on your calendar</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+          {% for dt in due_tasks|slice:":3" %}
+          <a href="/foundation/tasks/{{ dt.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="border:1px solid #E5E7EB; border-radius:10px; padding:12px; background:#FAF9FB; text-decoration:none; display:block;">
+            <div style="font-size:13.5px; font-weight:700; color:#111827; margin-bottom:4px;">{{ dt.title }}</div>
+            <div style="font-size:12px; color:#6B7280;">Due {{ dt.due_short_label }} &middot; {{ dt.status }}</div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="dash-card">
+      <h2 class="dash-card-title" style="margin:0 0 16px 0;">At a glance</h2>
+
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:14px;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:6px;">Local time is clear</div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.5;">Times are shown in Africa/Lagos. Joining, speaking and moderating are separate permissions.</div>
+      </div>
+
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:6px;">Decisions become work</div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.5;">Approved meeting actions can be converted into tracked tasks with owners and due dates.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Request a controlled change · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"HQ / AUTHORIZED SCOPE" }}</div>
+      <h1 class="dash-title">Request a controlled change</h1>
+      <p class="dash-subtitle">{{ screen.subtitle|default:"Complete the information below, then review it before you continue." }}</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/governance/decisions/" class="dash-btn-secondary">Back</a>
+    </div>
+  </div>
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <!-- Stepper Indicator -->
+  <div style="display:flex; gap:16px; margin:20px 0; border-bottom:1px solid var(--wdos-line); padding-bottom:12px;">
+    <div style="font-weight:700; color:{% if step == '1' %}var(--wdos-magenta){% else %}var(--wdos-muted){% endif %};">
+      <span style="display:inline-block; width:22px; height:22px; border-radius:50%; background:{% if step == '1' %}var(--wdos-magenta){% else %}#E5E7EB{% endif %}; color:white; text-align:center; line-height:22px; font-size:12px; margin-right:6px;">1</span>
+      Details
+    </div>
+    <div style="font-weight:700; color:{% if step == '2' %}var(--wdos-magenta){% else %}var(--wdos-muted){% endif %};">
+      <span style="display:inline-block; width:22px; height:22px; border-radius:50%; background:{% if step == '2' %}var(--wdos-magenta){% else %}#E5E7EB{% endif %}; color:white; text-align:center; line-height:22px; font-size:12px; margin-right:6px;">2</span>
+      Review
+    </div>
+    <div style="font-weight:700; color:{% if step == '3' %}var(--wdos-lemon){% else %}var(--wdos-muted){% endif %};">
+      <span style="display:inline-block; width:22px; height:22px; border-radius:50%; background:{% if step == '3' %}var(--wdos-lemon){% else %}#E5E7EB{% endif %}; color:white; text-align:center; line-height:22px; font-size:12px; margin-right:6px;">3</span>
+      Confirm
+    </div>
+  </div>
+
+  <div class="dash-layout">
+    <div class="dash-main-col">
+      <div class="dash-card">
+        <h2 class="dash-card-title" style="margin-bottom:16px;">Request a controlled change</h2>
+        
+        <form method="POST" action="">
+          {% csrf_token %}
+          <div style="margin-bottom:16px;">
+            <label style="display:block; font-size:13px; font-weight:700; color:var(--wdos-ink); margin-bottom:6px;">Change title</label>
+            <input type="text" name="change_title" value="Update country reporting template" required style="width:100%; padding:10px 14px; border:1px solid #D1D5DB; border-radius:8px;">
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <label style="display:block; font-size:13px; font-weight:700; color:var(--wdos-ink); margin-bottom:6px;">Reason</label>
+            <textarea name="reason" rows="3" required style="width:100%; padding:10px 14px; border:1px solid #D1D5DB; border-radius:8px;">Clarify evidence-source fields without changing approved reporting obligations.</textarea>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <label style="display:block; font-size:13px; font-weight:700; color:var(--wdos-ink); margin-bottom:6px;">Affected module</label>
+            <select name="affected_module" style="width:100%; padding:10px 14px; border:1px solid #D1D5DB; border-radius:8px; font-weight:600;">
+              <option value="Reports and accountability" selected>Reports and accountability</option>
+              <option value="People and leadership">People and leadership</option>
+              <option value="Conferences and large events">Conferences and large events</option>
+              <option value="Finance and resources">Finance and resources</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:700; color:var(--wdos-ink); margin-bottom:6px;">Risk and rollback</label>
+            <textarea name="risk_rollback" rows="3" style="width:100%; padding:10px 14px; border:1px solid #D1D5DB; border-radius:8px;">Review compatibility and preserve submitted snapshots.</textarea>
+          </div>
+
+          <div class="dash-scoped-notice" style="margin-bottom:20px;">
+            <span>Your information stays within your authorized scope.</span>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <a href="/foundation/governance/decisions/" class="dash-btn-secondary">Back</a>
+            <button type="submit" class="dash-btn-primary">Submit change request</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Side Column -->
+    <div class="dash-side-col">
+      <div class="dash-attention-card">
+        <h2 class="dash-card-title" style="margin-bottom:14px;">Before you continue</h2>
+        
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Review authority rules</h3>
+            <p class="dash-attention-text">Review authority does not permit altering operational data simply to make a check pass.</p>
+          </div>
+        </div>
+
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Your information is protected</h3>
+            <p class="dash-attention-text">Only the people authorized for this record can review the submission.</p>
+            <div class="dash-attention-tag" style="margin-top:6px;">Scoped access</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-support-note">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>WODDI · No Woman Is Left Out · GOV-04 UI Review v2</span>
+  </div>
+</div>
+{% endblock %}

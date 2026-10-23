@@ -1,0 +1,135 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Resources for your role · WDOS{% endblock %}
+
+{% block content %}
+<div class="stage4-pagehead">
+  <div>
+    <div class="eyebrow">{{ identity_context.network_short_name|default:"WGMN" }} / {{ identity_context.country_name|default:"NIGERIA"|upper }}</div>
+    <h1>{{ page_title|default:"Resources for your role" }}</h1>
+    <p>{{ page_description|default:"Find current policies, role packs, templates and guidance within the user’s permitted scope." }}</p>
+  </div>
+  <div class="actions">
+    <a href="/foundation/learning/" class="btn secondary">Back</a>
+    <button type="button" class="btn primary">Open Leadership Pack</button>
+  </div>
+</div>
+
+{% if state_feedback %}
+<div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta, #D4006A); background: white; padding: 16px 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+  <div>
+    <h3 style="margin: 0 0 4px 0; font-size: 15px; color: var(--wdos-ink, #1F1924);">{{ state_feedback.title }}</h3>
+    <p style="margin: 0; font-size: 13px; color: var(--wdos-muted, #524956);">{{ state_feedback.message }}</p>
+  </div>
+  <a href="{{ state_feedback.action_url }}" class="btn primary small" style="white-space: nowrap;">{{ state_feedback.action_label }}</a>
+</div>
+{% endif %}
+
+<!-- Tabs -->
+<div class="tabs" style="margin-bottom: 24px;">
+  <a class="tab" href="/foundation/learning/">Learning &amp; development</a>
+  <a class="tab active" href="/foundation/resources/">Resources for your role</a>
+</div>
+
+<!-- Main Resources Grid -->
+<div style="display: grid; grid-template-columns: 340px 1fr; gap: 24px; align-items: start;" class="resources-grid-container">
+  
+  <!-- Left Column: Featured Resource Cards -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div class="stage4-card" style="padding: 20px; background: white; border-radius: 12px; border: 1px solid var(--wdos-line, #E8E6E1);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--wdos-ink, #1F1924);">Find a resource</h3>
+        <span class="stage4-filter-pill-active" style="font-size: 11px; padding: 3px 8px;">For my role</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        {% for res in resources %}
+        <div style="padding: 12px; border: 1px solid var(--wdos-line, #E8E6E1); border-radius: 8px; background: #FAF9FB;">
+          <strong style="display: block; font-size: 13.5px; color: var(--wdos-ink, #1F1924); margin-bottom: 4px;">{{ res.title }}</strong>
+          <p style="font-size: 12px; color: var(--wdos-muted, #524956); margin: 0 0 8px 0; line-height: 1.4;">{{ res.description }}</p>
+          <span style="font-size: 11px; font-weight: 700; color: var(--wdos-magenta, #D4006A);">{{ res.format }} · {{ res.version }} →</span>
+        </div>
+        {% empty %}
+        <div style="padding: 16px; text-align: center; color: var(--wdos-muted, #524956); font-size: 13px;">
+          No published resources found for this scope.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Resources Table (RES-01) -->
+  <div class="stage4-card" style="padding: 0; overflow: hidden; background: white; border-radius: 12px; border: 1px solid var(--wdos-line, #E8E6E1);">
+    <div style="padding: 18px 22px; border-bottom: 1px solid var(--wdos-line, #E8E6E1); display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--wdos-ink, #1F1924);">Resources for your role</h2>
+      <span style="font-size: 11.5px; background: #FAF9FB; padding: 3px 10px; border-radius: 12px; font-weight: 600; color: var(--wdos-muted);">{{ resources|length }} published records</span>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table class="stage4-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--wdos-line, #E8E6E1); background: #FAF9FB;">
+            <th style="padding: 12px 20px; font-size: 11.5px; font-weight: 700; color: var(--wdos-muted, #524956); text-transform: uppercase; letter-spacing: 0.5px;">Resource</th>
+            <th style="padding: 12px 20px; font-size: 11.5px; font-weight: 700; color: var(--wdos-muted, #524956); text-transform: uppercase; letter-spacing: 0.5px;">Version</th>
+            <th style="padding: 12px 20px; font-size: 11.5px; font-weight: 700; color: var(--wdos-muted, #524956); text-transform: uppercase; letter-spacing: 0.5px;">Effective</th>
+            <th style="padding: 12px 20px; font-size: 11.5px; font-weight: 700; color: var(--wdos-muted, #524956); text-transform: uppercase; letter-spacing: 0.5px; text-align: right;">Access</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for res in resources %}
+          <tr style="border-bottom: 1px solid var(--wdos-line, #F0EEF2);">
+            <td style="padding: 16px 20px;">
+              <strong style="display: block; font-size: 13.5px; color: var(--wdos-ink, #1F1924);">{{ res.title }}</strong>
+              <small style="color: var(--wdos-muted, #7A7280); font-size: 12px;">{{ res.description }}</small>
+            </td>
+            <td style="padding: 16px 20px;">
+              <span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: #ECE8EE; color: #524956;">
+                {{ res.version }}
+              </span>
+            </td>
+            <td style="padding: 16px 20px; font-size: 13px; color: var(--wdos-ink, #1F1924);">
+              {{ res.effective }}
+            </td>
+            <td style="padding: 16px 20px; text-align: right;">
+              <button type="button" class="btn secondary small">{{ res.access }}</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" style="padding: 32px 20px; text-align: center; color: var(--wdos-muted);">
+              No resources found for this scope.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination footer -->
+    <div style="padding: 14px 20px; border-top: 1px solid var(--wdos-line, #E8E6E1); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--wdos-muted);">
+      <span>Showing {{ resources|length }} of {{ resources|length }} records in this view</span>
+      <div style="display: flex; gap: 8px;">
+        <span style="padding: 4px 10px; border: 1px solid var(--wdos-line, #E8E6E1); border-radius: 6px; background: #FAF9FB; color: #9CA3AF;">←</span>
+        <span style="padding: 4px 10px; border: 1px solid var(--wdos-magenta, #D4006A); border-radius: 6px; background: white; font-weight: 700; color: var(--wdos-magenta);">1</span>
+        <span style="padding: 4px 10px; border: 1px solid var(--wdos-line, #E8E6E1); border-radius: 6px; background: #FAF9FB; color: #9CA3AF;">→</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Notice banner -->
+<div style="margin-top: 24px; padding: 14px 18px; border-radius: 8px; background: #F4F2F5; border: 1px solid var(--wdos-line, #E8E6E1); font-size: 12.5px; color: var(--wdos-muted, #524956); display: flex; align-items: center; gap: 8px;">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  <span>Use the effective version. Superseded files remain in the controlled archive.</span>
+</div>
+
+<style>
+@media (max-width: 860px) {
+  .resources-grid-container {
+    grid-template-columns: 1fr !important;
+  }
+}
+</style>
+{% endblock %}

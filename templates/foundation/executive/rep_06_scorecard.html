@@ -1,0 +1,142 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Performance scorecard · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"HQ / BOTH NETWORKS" }}</div>
+      <h1 class="dash-title">Performance scorecard</h1>
+      <p class="dash-subtitle">{{ screen.subtitle|default:"Inspect metric definitions, period values, RAG labels and linked evidence rather than opaque scores." }}</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/reporting/management/" class="dash-btn-secondary">Management Reports</a>
+      <a href="/foundation/dashboards/DASH-01/" class="dash-btn-primary">→ Continental Overview</a>
+    </div>
+  </div>
+
+  <!-- 3-Column Scorecard Stat Cards -->
+  <div class="dash-kpis-grid" role="region" aria-label="Key Performance Indicators">
+    {% for card in scorecard_kpis %}
+    <div class="dash-kpi-card {% if card.is_dark %}dark{% endif %}">
+      <div class="dash-kpi-label">{{ card.label }}</div>
+      <div class="dash-kpi-val">{{ card.value }}</div>
+      <p class="dash-kpi-sub">{{ card.sub }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="dash-layout">
+    <div class="dash-main-col">
+      <!-- Performance Scorecard Breakdown Table -->
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h2 class="dash-card-title">Performance scorecard</h2>
+          <span style="font-size:12px; color:var(--wdos-muted);">Key strategic indicators</span>
+        </div>
+
+        <table class="dash-table dash-desktop-table">
+          <thead>
+            <tr>
+              <th scope="col">METRIC</th>
+              <th scope="col">SOURCE</th>
+              <th scope="col">CURRENT</th>
+              <th scope="col">RULE</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in metrics %}
+            <tr>
+              <td class="item-col" style="font-weight:700; color:var(--wdos-ink);">{{ m.metric }}</td>
+              <td>{{ m.source }}</td>
+              <td>{{ m.current }}</td>
+              <td>
+                <span class="dash-pill dash-pill-{{ m.rag|default:'green' }}">
+                  {{ m.rule }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <!-- Mobile View -->
+        <div class="dash-mobile-list">
+          {% for m in metrics %}
+          <div class="dash-mobile-item">
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">METRIC</span>
+              <span class="dash-mobile-val" style="font-weight:700;">{{ m.metric }}</span>
+            </div>
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">CURRENT</span>
+              <span class="dash-mobile-val">{{ m.current }}</span>
+            </div>
+            <div class="dash-mobile-row" style="margin-top:6px;">
+              <span class="dash-mobile-label">SCORE</span>
+              <span class="dash-pill dash-pill-{{ m.rag|default:'green' }}">{{ m.rule }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="dash-table-foot">
+          <span>Showing {{ metrics|length }} metrics</span>
+        </div>
+      </div>
+
+      <!-- Local Unit Performance Breakdown -->
+      <div class="dash-card" style="margin-top:20px;">
+        <h2 class="dash-card-title" style="margin-bottom:12px;">Reporting evidence by local unit</h2>
+        <small style="color:var(--wdos-muted); display:block; margin-bottom:14px;">Illustrative · approved returns by chapter</small>
+        
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px;">
+          {% for u in local_units %}
+          <div style="background:#F9FAFB; padding:12px; border-radius:8px; border:1px solid #E5E7EB; text-align:center;">
+            <div style="font-size:22px; font-weight:800; color:var(--wdos-ink);">{{ u.count }}</div>
+            <div style="font-size:12px; font-weight:600; color:var(--wdos-muted);">{{ u.name }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Side Column -->
+    <div class="dash-side-col">
+      <div class="dash-attention-card">
+        <h2 class="dash-card-title" style="margin-bottom:14px;">Attention required</h2>
+        
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Enter once, report clearly</h3>
+            <p class="dash-attention-text">Source-linked tasks, meetings and programme records fill the factual sections.</p>
+            <div class="dash-attention-tag">Add context, not duplicates</div>
+          </div>
+        </div>
+
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">A durable review history</h3>
+            <p class="dash-attention-text">Submitted snapshots remain frozen. Corrections create a new version.</p>
+            <div class="dash-attention-tag">Evidence-linked reporting</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-support-note">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>WODDI · No Woman Is Left Out · REP-06 UI Review v2</span>
+  </div>
+</div>
+{% endblock %}

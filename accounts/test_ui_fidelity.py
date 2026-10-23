@@ -17,7 +17,7 @@ class AuthUiFidelityTests(SimpleTestCase):
         for text in (
                 'network-line', '>WGMN<', '>WNNN<', 'language-picker', 'cream-notice',
                 'footer_privacy', 'footer_terms', 'footer_help', 'csrf_token',
-                'woddi-logo.png', 'welcome-actions'):
+                'woddi-logo.png'):
             self.assertIn(text, html)
         self.assertIn("{% url 'accounts:privacy' %}", html)
         self.assertIn("{% url 'accounts:terms' %}", html)

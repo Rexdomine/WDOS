@@ -9,17 +9,38 @@
   <link rel="stylesheet" href="{% static 'accounts/refinements.css' %}">
   <link rel="stylesheet" href="{% static 'foundation/tokens.css' %}">
   <link rel="stylesheet" href="{% static 'foundation/shell.css' %}">
-  <style>html, body { overflow-x: hidden; }</style>
+  <style>
+    html, body { overflow-x: hidden; }
+    body.foundation-shell.guest-shell {
+      background-image: none !important;
+      background-color: #F6F5F7 !important;
+    }
+    body.foundation-shell.guest-shell .content {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      padding: 20px 28px 36px !important;
+      min-height: 100vh !important;
+    }
+    body.foundation-shell.guest-shell main#main-content {
+      max-width: 1360px !important;
+      width: 100% !important;
+      margin: 0 auto !important;
+    }
+  </style>
 </head>
-<body class="foundation-shell {% if high_contrast %}theme-high-contrast{% endif %} {% if reduced_motion %}reduce-motion{% endif %} font-size-{{ font_size|default:'standard' }}">
+<body class="foundation-shell {% if is_guest_session %}guest-shell{% endif %} {% if high_contrast %}theme-high-contrast{% endif %} {% if reduced_motion %}reduce-motion{% endif %} font-size-{{ font_size|default:'standard' }}">
   
+  {% if not is_guest_session %}
   <!-- Desktop Sidebar -->
   <aside class="sidebar" aria-label="Main Navigation">
-    <a href="/foundation/" style="display:block; margin-bottom:20px;">
+    <a href="/foundation/dashboard/" style="display:block; margin-bottom:20px;">
       <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer" style="max-width:135px; height:auto; display:block;">
     </a>
     
     <!-- Active Network & Geography Scope Indicator -->
+    {% if identity_context.has_multiple_roles or user_scope.has_multiple_roles %}
     <a href="/foundation/dashboard/switch-role/" class="scope-box" aria-label="Switch active scope or network" style="text-decoration:none;">
       <div class="scope-box-text">
         <div class="scope-network" style="display:flex; align-items:center; gap:6px;">
@@ -29,13 +50,28 @@
         </div>
         <div class="scope-role">{{ identity_context.active_role_title|default:active_role_title|default:"Member" }}</div>
         {% if identity_context.cluster_name %}
-        <div class="scope-sub-unit" style="font-size:10.5px; color:var(--wdos-muted); margin-top:2px;">{{ identity_context.cluster_name }} · {{ identity_context.chapter_name }}</div>
+        <div class="scope-sub-unit" style="font-size:10.5px; color:var(--wdos-muted); margin-top:2px;" title="Community Cluster: {{ identity_context.cluster_name }} · Chapter: {{ identity_context.chapter_name }}">{{ identity_context.cluster_name }} · {{ identity_context.chapter_name }}</div>
         {% endif %}
       </div>
       <div class="scope-box-arrow" aria-hidden="true">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </a>
+    {% else %}
+    <div class="scope-box scope-box-static" aria-label="Active network and geographic scope">
+      <div class="scope-box-text">
+        <div class="scope-network" style="display:flex; align-items:center; gap:6px;">
+          <span>{{ identity_context.network_short_name|default:user_scope.active_network }}</span>
+          <span>·</span>
+          <span>{{ identity_context.country_flag_emoji }} {{ identity_context.country_name|default:country_name|default:user_scope.active_country }}</span>
+        </div>
+        <div class="scope-role">{{ identity_context.active_role_title|default:active_role_title|default:"Member" }}</div>
+        {% if identity_context.cluster_name %}
+        <div class="scope-sub-unit" style="font-size:10.5px; color:var(--wdos-muted); margin-top:2px;" title="Community Cluster: {{ identity_context.cluster_name }} · Chapter: {{ identity_context.chapter_name }}">{{ identity_context.cluster_name }} · {{ identity_context.chapter_name }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
 
     {% if is_leadership_tier or is_privacy_reviewer %}
     <div class="nav-label">WORKSPACE</div>
@@ -43,27 +79,27 @@
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       Home
     </a>
-    <a class="navitem {% if active_nav == 'people' %}active{% endif %}" href="/foundation/#people">
+    <a class="navitem {% if active_nav == 'people' %}active{% endif %}" href="/foundation/people/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       People & leadership
     </a>
-    <a class="navitem {% if active_nav == 'work' %}active{% endif %}" href="/foundation/work-queue/">
+    <a class="navitem {% if active_nav == 'work' or active_nav == 'work_queue' %}active{% endif %}" href="/foundation/work-queue/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="10" x2="11" y2="14"/></svg>
       Work & programmes
     </a>
-    <a class="navitem {% if active_nav == 'meetings' %}active{% endif %}" href="/foundation/#meetings">
+    <a class="navitem {% if active_nav == 'meetings' %}active{% endif %}" href="/foundation/meetings/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Meetings & events
     </a>
-    <a class="navitem {% if active_nav == 'communications' %}active{% endif %}" href="/foundation/#comms">
+    <a class="navitem {% if active_nav == 'communications' or active_nav == 'messages' %}active{% endif %}" href="/foundation/messages/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Communications
     </a>
-    <a class="navitem {% if active_nav == 'learning' %}active{% endif %}" href="/foundation/settings/">
+    <a class="navitem {% if active_nav == 'learning' %}active{% endif %}" href="/foundation/learning/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
       Learning & resources
     </a>
-    <a class="navitem {% if active_nav == 'reports' %}active{% endif %}" href="/foundation/dashboard/export/">
+    <a class="navitem {% if active_nav == 'reports' %}active{% endif %}" href="/foundation/dashboard/drilldown/reports/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Reports & oversight
     </a>
@@ -85,18 +121,15 @@
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="10" x2="11" y2="14"/></svg>
       My activities
     </a>
-    <a class="navitem {% if active_nav == 'meetings' %}active{% endif %}" href="/foundation/#meetings">
+    <a class="navitem {% if active_nav == 'meetings' %}active{% endif %}" href="/foundation/meetings/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Meetings & events
     </a>
-    <a class="navitem {% if active_nav == 'notifications' %}active{% endif %}" href="/foundation/notifications/">
+    <a class="navitem {% if active_nav == 'messages' %}active{% endif %}" href="/foundation/messages/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Messages
-      {% if unread_notifications_count > 0 %}
-      <span class="nav-count scope-badge" data-notif-badge>{{ unread_notifications_count }}</span>
-      {% endif %}
     </a>
-    <a class="navitem {% if active_nav == 'learning' %}active{% endif %}" href="/foundation/settings/">
+    <a class="navitem {% if active_nav == 'learning' %}active{% endif %}" href="/foundation/learning/">
       <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
       Learning & resources
     </a>
@@ -124,11 +157,11 @@
         {% elif has_profile_photo and profile_photo_url %}
           <img src="{{ profile_photo_url }}" alt="{{ display_name }}" style="width:100%; height:100%; object-fit:cover; border-radius:50%; display:block;">
         {% else %}
-          {{ identity_context.initials|default:initials|default:"AO" }}
+          {{ identity_context.initials|default:initials|default:"WD" }}
         {% endif %}
       </div>
       <div class="user-info">
-        <div class="user-name">{{ identity_context.display_name|default:display_name|default:"Ada Okafor" }}</div>
+        <div class="user-name">{{ identity_context.display_name|default:display_name|default:"Member" }}</div>
         <div class="user-role">{{ identity_context.active_role_title|default:active_role_title|default:"Member" }}</div>
       </div>
     </div>
@@ -136,7 +169,7 @@
 
   <!-- Mobile Top Header -->
   <header class="mobile-head">
-    <a href="/foundation/" style="display:flex; align-items:center; text-decoration:none;">
+    <a href="/foundation/dashboard/" style="display:flex; align-items:center; text-decoration:none;">
       <img class="brand" src="{% static 'accounts/assets/woddi-logo.png' %}" alt="WODDI — The Nurturer">
     </a>
     <div class="right" style="display:flex; align-items:center; gap:12px;">
@@ -152,11 +185,11 @@
         </button>
         <div class="profile-menu-panel" data-profile-panel role="menu" hidden>
           <div class="profile-menu-header">
-            <strong class="profile-menu-name">{{ display_name|default:"Ada Okafor" }}</strong>
+            <strong class="profile-menu-name">{{ display_name|default:"Member" }}</strong>
             <small class="profile-menu-scope">{{ active_role_title|default:"Member" }} ({{ user_scope.active_network }})</small>
           </div>
           <div class="profile-menu-items">
-            <a href="/foundation/" role="menuitem" class="profile-menu-link">Workspace Home</a>
+            <a href="/foundation/dashboard/" role="menuitem" class="profile-menu-link">Workspace Home</a>
             <a href="/foundation/work-queue/" role="menuitem" class="profile-menu-link">My Work Queue</a>
             <a href="/foundation/profile/" role="menuitem" class="profile-menu-link">My Profile</a>
             <a href="/foundation/account/security/" role="menuitem" class="profile-menu-link">Account Security</a>
@@ -185,9 +218,11 @@
       {% endif %}
     </span>
   </div>
+  {% endif %}
 
   <!-- Main Content Shell -->
   <div class="content">
+    {% if not is_guest_session %}
     <div class="topbar">
       <!-- Scoped Breadcrumbs Trail -->
       <nav aria-label="Breadcrumb" class="scoped-breadcrumbs">
@@ -254,11 +289,16 @@
         </div>
       </div>
     </div>
-
-    <!-- Persistent Identity & Operational Scope Block -->
-    {% if identity_context %}
-      {% include "foundation/components/identity_context_block.html" %}
     {% endif %}
+
+    <!-- Identity & Operational Scope Block (Rendered exclusively on settings page) -->
+    {% block identity_context_banner %}
+      {% if active_nav == 'settings' or is_settings_page %}
+        {% if identity_context %}
+          {% include "foundation/components/identity_context_block.html" %}
+        {% endif %}
+      {% endif %}
+    {% endblock %}
 
     <!-- Page Body Block -->
     <main id="main-content">
@@ -272,9 +312,10 @@
     </footer>
   </div>
 
+  {% if not is_guest_session %}
   <!-- Mobile Bottom Navigation -->
   <nav class="mobile-nav" aria-label="Mobile Navigation">
-    <a href="/foundation/" {% if active_nav == 'workspace' %}aria-current="page"{% endif %}>
+    <a href="/foundation/dashboard/" {% if active_nav == 'workspace' %}aria-current="page"{% endif %}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       Home
     </a>
@@ -282,11 +323,11 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="10" x2="11" y2="14"/></svg>
       My work
     </a>
-    <a href="/foundation/#meetings" {% if active_nav == 'meetings' %}aria-current="page"{% endif %}>
+    <a href="/foundation/meetings/" {% if active_nav == 'meetings' %}aria-current="page"{% endif %}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Meetings
     </a>
-    <a href="/foundation/notifications/" {% if active_nav == 'notifications' %}aria-current="page"{% endif %}>
+    <a href="/foundation/messages/" {% if active_nav == 'messages' %}aria-current="page"{% endif %}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Messages
     </a>
@@ -295,6 +336,7 @@
       More
     </a>
   </nav>
+  {% endif %}
 
   <script src="{% static 'foundation/shell.js' %}"></script>
 </body>

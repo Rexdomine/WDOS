@@ -998,6 +998,7 @@ function initializeEligibilityWatcher() {
   const elScript = document.getElementById("eligibility-data");
   const elSelect = document.getElementById("id_eligibility");
   const basisInput = document.getElementById("id_verification_basis");
+  const netSelect = document.getElementById("id_network");
   if (!elScript || !elSelect || !basisInput) return;
 
   let elList = [];
@@ -1007,26 +1008,57 @@ function initializeEligibilityWatcher() {
     return;
   }
 
+  let syncing = false;
+
   function updateBasis() {
-    const val = elSelect.value;
-    const match = elList.find((r) => r.code === val);
-    if (match) {
-      if (match.basis) {
-        basisInput.value = match.basis;
+    if (syncing) return;
+    syncing = true;
+    try {
+      const val = elSelect.value;
+      const match = elList.find((r) => r.code === val);
+      if (match) {
+        if (match.basis) {
+          basisInput.value = match.basis;
+        }
+        if (netSelect && match.network && netSelect.value !== match.network) {
+          netSelect.value = match.network;
+          netSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      } else {
+        basisInput.value = "Pending review";
       }
-      const netSelect = document.getElementById("id_network");
-      if (netSelect && match.network) {
-        netSelect.value = match.network;
-        netSelect.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-    } else {
-      basisInput.value = "Pending review";
+    } finally {
+      syncing = false;
     }
   }
 
   elSelect.addEventListener("change", updateBasis);
   if (elSelect.value) {
     updateBasis();
+  }
+
+  if (netSelect) {
+    netSelect.addEventListener("change", () => {
+      if (syncing) return;
+      syncing = true;
+      try {
+        const selectedNet = netSelect.value;
+        if (!selectedNet) return;
+        const currentMatch = elList.find((r) => r.code === elSelect.value);
+        if (!currentMatch || currentMatch.network !== selectedNet) {
+          const match = elList.find((r) => r.network === selectedNet);
+          if (match) {
+            elSelect.value = match.code;
+            elSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            if (match.basis) {
+              basisInput.value = match.basis;
+            }
+          }
+        }
+      } finally {
+        syncing = false;
+      }
+    });
   }
 }
 

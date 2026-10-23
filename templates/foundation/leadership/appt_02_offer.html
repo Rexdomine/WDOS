@@ -1,0 +1,140 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Your appointment offer · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Your appointment offer</h1>
+      <p class="dash-subtitle">Complete the information below, then review it before you continue.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Appointment Offer Response:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+
+  <!-- Appointments & Continuity Sub-Navigation -->
+  <div class="stage6-subnav">
+    <a href="/foundation/appointments/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment processing</a>
+    <a href="/foundation/appointments/offer/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link active">Appointment offer</a>
+    <a href="/foundation/appointments/onboarding/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Leader onboarding</a>
+    <a href="/foundation/appointments/first-90-days/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">First 90 days</a>
+    <a href="/foundation/appointments/reviews/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">30 / 60 / 90 day reviews</a>
+    <a href="/foundation/appointments/identity/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment &amp; identity</a>
+    <a href="/foundation/appointments/status-change/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Status change</a>
+    <a href="/foundation/appointments/transition/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Plan transition</a>
+    <a href="/foundation/appointments/handover/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Handover workspace</a>
+  </div>
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <form method="post" action="/foundation/appointments/offer/">
+        {% csrf_token %}
+        <input type="hidden" name="appointment_code" value="{{ appointment.appointment_code|default:'APPT-NG-001' }}">
+        {% if appointment.updated_at %}
+        <input type="hidden" name="expected_updated_at" value="{{ appointment.updated_at|date:'Y-m-d\TH:i:s' }}">
+        {% endif %}
+
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">Your appointment offer</h2>
+
+        <!-- Stepper -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; max-width:440px;">
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:var(--wdos-magenta, #D4006A); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span>
+            <div style="font-size:11.5px; font-weight:700; color:var(--wdos-magenta, #D4006A); margin-top:4px;">Details</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 12px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">Review</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 12px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">Confirm</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div class="stage6-field-group">
+            <label class="stage6-label">Appointed position</label>
+            <div class="stage6-readonly-field">{{ appointment.position_title|default:"Chapter Coordinator" }} &middot; {{ appointment.unit_name|default:"Ikeja" }}</div>
+          </div>
+
+          <div class="stage6-field-group">
+            <label class="stage6-label">Appointment letter</label>
+            <div class="stage6-readonly-field">{{ appointment.letter_reference|default:"Open issued appointment letter" }}</div>
+          </div>
+        </div>
+
+        <div class="stage6-checkbox-row" style="margin-bottom:14px;">
+          <input type="checkbox" id="id_acceptance_confirmed" name="acceptance_confirmed" class="stage6-checkbox" value="true" checked>
+          <label for="id_acceptance_confirmed" class="stage6-checkbox-label">
+            Acceptance declaration
+            <span style="display:block; font-size:12.5px; font-weight:400; color:#4B5563; margin-top:2px;">I accept the responsibilities described in the letter.</span>
+          </label>
+        </div>
+
+        <div class="stage6-checkbox-row" style="margin-bottom:20px;">
+          <input type="checkbox" id="id_commitment_confirmed" name="commitment_confirmed" class="stage6-checkbox" value="true" checked>
+          <label for="id_commitment_confirmed" class="stage6-checkbox-label">
+            Commitment declaration
+            <span style="display:block; font-size:12.5px; font-weight:400; color:#4B5563; margin-top:2px;">I understand the reporting and conduct requirements.</span>
+          </label>
+        </div>
+
+        <hr style="border:none; border-top:1px solid #E5E7EB; margin:20px 0;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <span style="font-size:12.5px; color:#6B7280;">Your information stays within your authorized scope.</span>
+          <div style="display:flex; gap:10px;">
+            <a href="/foundation/appointments/" class="dash-btn-secondary">Back</a>
+            <button type="submit" name="action" value="accept" class="dash-btn-primary">&rarr; Accept appointment</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:10px;">At a glance</h3>
+        <span class="dash-pill" style="margin-bottom:16px; display:inline-block;">&bull; In progress</span>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Before you continue</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Changing an appointment does not create a new person or erase prior service.</p>
+          <span class="stage6-sidebar-badge">Please review</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your information is protected</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Only the people authorized for this record can review the submission.</p>
+          <span class="stage6-sidebar-badge">Scoped access</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

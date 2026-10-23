@@ -34,8 +34,12 @@ def localized_notice(catalogue, keys):
     return {'title': catalogue[keys[0]], 'body': catalogue[keys[1]]}
 
 
-def initial_data(account, draft, language='en'):
-    return {'full_name': account.display_name, 'email': account.email, 'timezone': 'UTC', 'reading': 'standard', **(draft.data if draft else {}), 'language': language}
+def initial_data(account, draft, language='en', chosen_network=None):
+    base = {'full_name': account.display_name, 'email': account.email, 'timezone': 'UTC', 'reading': 'standard', **(draft.data if draft else {}), 'language': language}
+    if not (draft and draft.data and draft.data.get('network')) and chosen_network in ('WGMN', 'WNNN'):
+        base.setdefault('network', chosen_network)
+        base.setdefault('eligibility', 'youth' if chosen_network == 'WNNN' else 'adult')
+    return base
 
 
 def get_draft_timezone(draft):
@@ -268,7 +272,8 @@ def step(request, step):
         notice = {'title': c['onb_more_needed'], 'body': c['onb_more_body']} if draft.state == 'review_needed' else None
         return render_step(request, step, draft, None, notice)
     form_class = FORMS[step]
-    form = form_class(request.POST if request.method == 'POST' else None, request.FILES if request.method == 'POST' else None, initial=initial_data(account, draft, lang), account=account)
+    chosen_net = request.session.get('chosen_network')
+    form = form_class(request.POST if request.method == 'POST' else None, request.FILES if request.method == 'POST' else None, initial=initial_data(account, draft, lang, chosen_network=chosen_net), account=account)
     if request.method == 'GET':
         return render_step(request, step, draft, form)
     if getattr(request, '_wdos_upload_rejected', False):
@@ -318,13 +323,13 @@ def step(request, step):
         # validation decodes uploaded images, so checking only after
         # form.is_valid() still permits expensive work on a full draft.
         if draft and draft.events.count() >= MAX_ONBOARDING_EVENTS:
-            safe_form = form_class(initial=initial_data(locked, draft, lang), account=locked)
+            safe_form = form_class(initial=initial_data(locked, draft, lang, chosen_network=chosen_net), account=locked)
             return render_step(request, step, draft, safe_form, localized_notice(c, INVALID_KEYS), 429)
         if step == 2 and request.FILES.get('photo') is not None and not throttle(
             'onboarding-photo-attempt', str(locked.pk), limit=MAX_PHOTO_ATTEMPTS,
             seconds=PHOTO_ATTEMPT_WINDOW,
         ):
-            safe_initial = initial_data(locked, draft, lang)
+            safe_initial = initial_data(locked, draft, lang, chosen_network=chosen_net)
             safe_initial.update({
                 name: request.POST.get(name)
                 for name in form.fields

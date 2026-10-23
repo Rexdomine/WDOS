@@ -261,9 +261,6 @@
           </div>
         </div>
 
-        <div class="welcome-actions">
-          <a class="btn primary" href="{% url 'accounts:register' %}">{% include 'accounts/arrow.html' %}{{ translations.join }}</a>
-        </div>
         <div class="auth-links"><a class="textlink" href="{% url 'accounts:login' %}">{{ translations.sign }}</a>
       {% else %}
         <div class="auth-links">

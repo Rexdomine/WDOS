@@ -1,0 +1,140 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Leadership Pack review · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Leadership Pack review</h1>
+      <p class="dash-subtitle">Your separate 3-day Leadership Pack Review checks understanding of the role. It is not an Institute examination.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Leadership Pack Review:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="?tab=review&country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item {% if active_tab == 'review' or not active_tab %}active{% endif %}" role="tab">My review</a>
+    <a href="?tab=pack&country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item {% if active_tab == 'pack' %}active{% endif %}" role="tab">Leadership Pack</a>
+    <a href="?tab=help&country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item {% if active_tab == 'help' %}active{% endif %}" role="tab">Help</a>
+  </div>
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <form method="post" action="/foundation/recruitment/leadership-pack/">
+        {% csrf_token %}
+        <input type="hidden" name="application_code" value="{{ application.application_code|default:'CAND-NG-001' }}">
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">Day 2 of 3 &middot; Understanding the role</h2>
+
+        <!-- 4-Step Stepper: Read pack / Understanding / Declarations / Submit -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; max-width:520px;">
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:var(--wdos-magenta, #D4006A); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span>
+            <div style="font-size:11.5px; font-weight:700; color:var(--wdos-magenta, #D4006A); margin-top:4px;">Read pack</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 10px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">Understanding</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 10px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">Declarations</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 10px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">4</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">Submit</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div class="stage6-field-group">
+            <label class="stage6-label">Leadership Pack</label>
+            <div class="stage6-readonly-field">Read the current pack</div>
+          </div>
+
+          <div class="stage6-field-group">
+            <label class="stage6-label">Understanding question</label>
+            <div class="stage6-readonly-field">How would you raise a concern outside your authority?</div>
+          </div>
+        </div>
+
+        <div class="stage6-field-group" style="margin-bottom:16px;">
+          <label for="id_pack_answer" class="stage6-label">Your answer</label>
+          <textarea id="id_pack_answer" name="pack_answer" rows="3" class="stage6-textarea" placeholder="Describe the safe reporting and escalation route.">{{ application.leadership_pack_answer|default:"" }}</textarea>
+        </div>
+
+        <div class="stage6-checkbox-row" style="margin-bottom:20px;">
+          <input type="checkbox" id="id_declaration_confirmed" name="declaration_confirmed" class="stage6-checkbox" value="true" checked>
+          <label for="id_declaration_confirmed" class="stage6-checkbox-label">
+            Declaration
+            <span style="display:block; font-size:12.5px; font-weight:400; color:#4B5563; margin-top:2px;">I have read the responsibilities and understand the review process.</span>
+          </label>
+        </div>
+
+        <hr style="border:none; border-top:1px solid #E5E7EB; margin:20px 0;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <span style="font-size:12.5px; color:#6B7280;">Your information stays within your authorized scope.</span>
+          <div style="display:flex; gap:10px;">
+            <a href="/foundation/recruitment/application/?candidate={{ application.application_code|default:'CAND-NG-001' }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+            <button type="submit" name="action" value="continue_review" class="dash-btn-primary">&rarr; Continue review</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:10px;">At a glance</h3>
+        <span class="dash-pill" style="margin-bottom:16px; display:inline-block;">&bull; Day 2 of 3</span>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Day 1 &middot; Read the current pack</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Review responsibilities, authority boundaries and safe escalation.</p>
+          <span class="stage6-sidebar-badge">Pack reader</span>
+        </div>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Day 2 &middot; Show your understanding</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Answer in your own words. Your progress is saved before you continue.</p>
+          <span class="stage6-sidebar-badge">Current step</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Day 3 &middot; Review and submit</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Confirm your declarations and submit for an authorized human review.</p>
+          <span class="stage6-sidebar-badge">No automatic appointment</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

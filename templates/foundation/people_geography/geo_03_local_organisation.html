@@ -1,0 +1,302 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Local organisation · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Local organisation</h1>
+      <p class="dash-subtitle">Follow local units, responsible leaders and evidence within the selected country.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="{{ screen.secondary_action.url|default:'/foundation/geography/country/NG/command/' }}" class="dash-btn-secondary">Back</a>
+      <a href="{{ screen.primary_action.url|default:'/foundation/geography/local-org/' }}" class="dash-btn-primary">Open unit</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card (when ?state= is requested) -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Organisation Update:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="/foundation/people/" class="stage6-subnav-item" role="tab">People directory</a>
+    <a href="/foundation/community/relationships/" class="stage6-subnav-item" role="tab">Community relationships</a>
+    <a href="/foundation/geography/local-org/" class="stage6-subnav-item active" role="tab">Local organisation</a>
+    <a href="/foundation/leadership/structure/" class="stage6-subnav-item" role="tab">Leadership structure</a>
+    <a href="/foundation/leadership/register/" class="stage6-subnav-item" role="tab">Leadership register</a>
+    <a href="/foundation/leadership/vacancies/" class="stage6-subnav-item" role="tab">Vacancies</a>
+    <a href="/foundation/leadership/direct-reports/" class="stage6-subnav-item" role="tab">Direct reports</a>
+    <a href="/foundation/leadership/positions/" class="stage6-subnav-item" role="tab">Positions</a>
+  </div>
+
+  <div class="stage6-filter-bar">
+    <a href="?tab=structure{% if target_country %}&country={{ target_country }}{% endif %}{% if state_mode %}&state={{ state_mode }}{% endif %}" class="{% if active_tab == 'structure' or not active_tab %}stage6-pill-active{% else %}stage6-pill-btn{% endif %}" style="text-decoration:none;">Structure</a>
+    <a href="?tab=unit_directory{% if target_country %}&country={{ target_country }}{% endif %}{% if state_mode %}&state={{ state_mode }}{% endif %}" class="{% if active_tab == 'unit_directory' %}stage6-pill-active{% else %}stage6-pill-btn{% endif %}" style="text-decoration:none;">Unit directory</a>
+    <a href="?tab=evidence{% if target_country %}&country={{ target_country }}{% endif %}{% if state_mode %}&state={{ state_mode }}{% endif %}" class="{% if active_tab == 'evidence' %}stage6-pill-active{% else %}stage6-pill-btn{% endif %}" style="text-decoration:none;">Evidence</a>
+  </div>
+
+  <!-- Vertical Organization Hierarchy Flow with Side Meta Box -->
+  <div class="stage6-hierarchy-container">
+    <!-- Structure Tree -->
+    <div class="stage6-hierarchy-tree" role="region" aria-label="Organizational Hierarchy Tree">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="font-size:16px; font-weight:700; color:#111827; margin:0;">Local organisation</h2>
+        <a href="?tab=unit_directory{% if target_country %}&country={{ target_country }}{% endif %}" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">List view &rarr;</a>
+      </div>
+
+      <!-- Authoritative Hierarchy Trail Breadcrumb Box -->
+      <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:12px 14px; margin-bottom:18px;">
+        <div style="font-size:10.5px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Authoritative Hierarchy Trail</div>
+        <div style="font-size:13px; font-weight:600; color:#111827;">
+          {{ country_hierarchy.path_text|default:"WGMN → Nigeria → Lagos State → Ikeja LGA → Ikeja Central Cluster → Allen Chapter" }}
+        </div>
+        <div style="font-size:11px; color:#6B7280; margin-top:6px;">
+          <em>Rule: Public areas (such as {{ country_hierarchy.first_level_name|default:"Region" }} or {{ country_hierarchy.second_level_name|default:"District" }}) are public administrative geography and not chapters. Community Clusters and Chapters are distinct WDOS operating units.</em>
+        </div>
+      </div>
+
+      {% for h_unit in hierarchy_units %}
+      <div class="stage6-hierarchy-item">
+        <div class="stage6-hierarchy-bullet"></div>
+        <div class="stage6-hierarchy-item-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+            <div class="stage6-hierarchy-unit-name">{% if h_unit.level == 'Country' %}{{ h_unit.network|default:target_network|default:"WGMN" }} / {{ h_unit.unit_name }}{% else %}{{ h_unit.unit_name }}{% endif %}</div>
+            {% if h_unit.level == 'Country' or h_unit.level == 'Region / State' or h_unit.level == 'District / LGA' %}
+            <span class="badge-public-geo">Public Administrative Geography</span>
+            {% elif h_unit.level == 'Community Cluster' %}
+            <span class="badge-wdos-org">WDOS Organisational Unit</span>
+            {% elif h_unit.level == 'Chapter' %}
+            <span class="badge-wdos-operating">WDOS Operating Unit</span>
+            {% endif %}
+          </div>
+          <div class="stage6-hierarchy-unit-desc">{{ h_unit.description }}</div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+            <span class="stage6-hierarchy-unit-level">{{ h_unit.level }}</span>
+            <span style="font-size:11px; color:#6B7280;">Leader: {{ h_unit.responsible_leader_name }}</span>
+          </div>
+        </div>
+      </div>
+      {% if not forloop.last %}
+      <div class="stage6-hierarchy-arrow-down">&darr;</div>
+      {% endif %}
+      {% empty %}
+      <div class="stage6-hierarchy-item">
+        <div class="stage6-hierarchy-bullet"></div>
+        <div class="stage6-hierarchy-item-card">
+          <div class="stage6-hierarchy-unit-name">{{ target_network|default:"WGMN" }} / {{ target_country_name|default:"Nigeria" }}</div>
+          <div class="stage6-hierarchy-unit-desc">Assigned network and organisational scope</div>
+          <span class="badge-public-geo">Public Administrative Geography</span>
+          <span class="stage6-hierarchy-unit-level">Country</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Hierarchy Meta Box -->
+    <div class="stage6-sidebar-box">
+      <div style="margin-bottom:16px;">
+        <div class="stage6-profile-field-label">Network</div>
+        <div class="stage6-profile-field-value">{{ target_network|default:"WGMN" }}</div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div class="stage6-profile-field-label">Country</div>
+        <div class="stage6-profile-field-value">{{ target_country_name|default:"Nigeria" }}</div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div class="stage6-profile-field-label">Record state</div>
+        <div class="stage6-profile-field-value">Active unit records ({{ units|length }})</div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div class="stage6-profile-field-label">Visibility</div>
+        <div class="stage6-profile-field-value">Assigned country scope</div>
+      </div>
+      <div>
+        <a href="/foundation/geography/terminology/?country={{ target_country|default:'NG' }}" style="font-size:12.5px; color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">Edit local terminology &rarr;</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add or Update Local Organisation Unit Form -->
+  <div class="dash-card" style="margin-bottom:20px; padding:20px;">
+    <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 12px 0;">Add or update local organisation unit</h3>
+    <form method="post" action="/foundation/geography/local-org/?country={{ target_country|default:'NG' }}" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:end;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_unit">
+      <input type="hidden" name="country_code" value="{{ target_country|default:'NG' }}">
+      <input type="hidden" name="network" value="{{ target_network|default:'WGMN' }}">
+      <div>
+        <label class="stage6-label" for="id_unit_name" style="font-size:12px;">Unit name</label>
+        <input type="text" id="id_unit_name" name="unit_name" class="stage6-input" placeholder="e.g. Surulere Chapter" required>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_level" style="font-size:12px;">Local level</label>
+        <select id="id_level" name="level" class="stage6-input">
+          <option value="Chapter">Chapter</option>
+          <option value="Community Cluster">Community Cluster</option>
+          <option value="District / LGA">{{ second_level_term|default:"District / LGA" }}</option>
+          <option value="Region / State">{{ first_level_term|default:"Region / State" }}</option>
+          <option value="Country">Country</option>
+        </select>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_parent_id" style="font-size:12px;">Parent unit (Cluster / District)</label>
+        <select id="id_parent_id" name="parent_id" class="stage6-input">
+          <option value="">-- No parent / Root unit --</option>
+          {% for p_unit in available_parents %}
+          <option value="{{ p_unit.id }}">{{ p_unit.unit_name }} ({{ p_unit.level }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_leader_name" style="font-size:12px;">Responsible leader</label>
+        <input type="text" id="id_leader_name" name="responsible_leader_name" class="stage6-input" placeholder="Leader full name" required>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_evidence_type" style="font-size:12px;">Evidence</label>
+        <input type="text" id="id_evidence_type" name="evidence_type" class="stage6-input" value="Charter record" required>
+      </div>
+      <div>
+        <button type="submit" class="dash-btn-primary" style="width:100%;">Save unit record</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Unit Directory Table -->
+  <div class="dash-card">
+    <div class="dash-card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <h2 class="dash-card-title">Unit directory</h2>
+      <form method="get" action="/foundation/geography/local-org/" class="dash-search-box" style="min-width:240px; display:flex; align-items:center; gap:6px;">
+        <input type="hidden" name="country" value="{{ target_country|default:'NG' }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search local units" aria-label="Search local units">
+        <button type="submit" style="background:none; border:none; color:var(--wdos-magenta, #D4006A); font-size:12px; font-weight:600; cursor:pointer;">Search</button>
+      </form>
+    </div>
+
+    <table class="dash-table dash-desktop-table" aria-label="Unit Directory">
+      <thead>
+        <tr>
+          <th scope="col">UNIT</th>
+          <th scope="col">LOCAL LEVEL</th>
+          <th scope="col">RESPONSIBLE LEADER</th>
+          <th scope="col">EVIDENCE</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for unit in units %}
+        <tr>
+          <td style="font-weight:600; color:#111827;">
+            {{ unit.unit_name }}
+            {% if unit.parent %}
+            <span style="display:block; font-size:11.5px; color:#6B7280; font-weight:normal;">Parent: {{ unit.parent.unit_name }} ({{ unit.parent.level }})</span>
+            {% endif %}
+          </td>
+          <td>{{ unit.level }}</td>
+          <td>{{ unit.responsible_leader_name }}</td>
+          <td>
+            <span class="dash-pill dash-pill-green">{{ unit.evidence_type }}</span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center; padding:32px; color:#6B7280;">
+            No local organisation units match your search filter.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Mobile View List -->
+    <div class="dash-mobile-list">
+      {% for unit in units %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Unit</span>
+          <span class="dash-mobile-val" style="font-weight:700; color:#111827;">{{ unit.unit_name }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Local level</span>
+          <span class="dash-mobile-val">{{ unit.level }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Responsible leader</span>
+          <span class="dash-mobile-val">{{ unit.responsible_leader_name }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Evidence</span>
+          <span class="dash-pill dash-pill-green">{{ unit.evidence_type }}</span>
+        </div>
+      </div>
+      {% empty %}
+      <div style="padding:24px; text-align:center; color:#6B7280;">No local units in this view.</div>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination & Record Count -->
+    <div class="dash-pagination">
+      <span>Showing {{ units|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  {% if active_tab == 'evidence' and audit_history %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Unit charter &amp; verification evidence log</h2>
+    </div>
+    <table class="dash-table" aria-label="Unit Evidence Log">
+      <thead>
+        <tr>
+          <th scope="col">EVENT</th>
+          <th scope="col">SUMMARY</th>
+          <th scope="col">ACTOR</th>
+          <th scope="col">TIMESTAMP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in audit_history %}
+        <tr>
+          <td><span class="dash-pill dash-pill-green">{{ ev.action }}</span></td>
+          <td>{{ ev.summary }}</td>
+          <td>{{ ev.actor }}</td>
+          <td>{{ ev.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Scoped Notice -->
+  <div class="stage6-shield-notice">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Coverage and country records remain separate for WGMN and WNNN.</div>
+  </div>
+</div>
+{% endblock %}

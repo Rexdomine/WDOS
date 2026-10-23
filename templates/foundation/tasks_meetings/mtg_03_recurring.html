@@ -1,0 +1,130 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Recurring meeting series · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Recurring meeting series</h1>
+      <p class="dash-subtitle">Edit one meeting or future occurrences, cancel cleanly and handle missed meetings.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/meetings/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      <button type="submit" form="recurring-series-form" name="action_type" value="update_series" class="dash-btn-primary">&rarr; Update series</button>
+    </div>
+  </div>
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Series Update:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+    <!-- Left Card: Recurring meeting series form -->
+    <div class="dash-card" style="grid-column: span 2;">
+      <!-- Stepper -->
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+        <span class="dash-pill dash-pill-magenta"><strong style="margin-right:6px;">1</strong> Details</span>
+        <span class="dash-pill" style="background:#F3F4F6; color:#374151;"><strong style="margin-right:6px;">2</strong> Review</span>
+        <span class="dash-pill" style="background:#F3F4F6; color:#374151;"><strong style="margin-right:6px;">3</strong> Confirm</span>
+      </div>
+
+      <h2 class="dash-card-title" style="margin:0 0 6px 0;">Recurring meeting series</h2>
+      <p style="font-size:13px; color:#6B7280; margin:0 0 18px 0;">Keep each step clear. You can save and return before final submission.</p>
+
+      <form id="recurring-series-form" method="post" action="/foundation/meetings/recurring/?meeting={{ meeting.meeting_code }}&country={{ target_country }}&network={{ target_network }}">
+        {% csrf_token %}
+        <input type="hidden" name="meeting_code" value="{{ meeting.meeting_code }}">
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div>
+            <label style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Series</label>
+            <input type="text" value="{{ meeting.title }}" readonly style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px; background:#F9FAFB; color:#111827;">
+          </div>
+          <div>
+            <label for="id_rec_freq" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Frequency</label>
+            <select id="id_rec_freq" name="repeats_frequency" style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px; background:#FFFFFF;">
+              <option value="Weekly" {% if meeting.repeats_frequency == 'Weekly' %}selected{% endif %}>Weekly</option>
+              <option value="Bi-weekly" {% if meeting.repeats_frequency == 'Bi-weekly' %}selected{% endif %}>Bi-weekly</option>
+              <option value="Monthly" {% if meeting.repeats_frequency == 'Monthly' %}selected{% endif %}>Monthly</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div>
+            <label for="id_next_occ" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Next occurrence</label>
+            <input id="id_next_occ" type="text" name="next_occurrence_label" value="{{ meeting.next_occurrence_label }}" style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px;">
+          </div>
+          <div>
+            <label for="id_edit_scope" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Edit scope</label>
+            <select id="id_edit_scope" name="edit_scope" style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px; background:#FFFFFF;">
+              <option value="This meeting only" {% if meeting.edit_scope == 'This meeting only' %}selected{% endif %}>This meeting only</option>
+              <option value="Edit this and future meetings" {% if meeting.edit_scope == 'Edit this and future meetings' %}selected{% endif %}>Edit this and future meetings</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div>
+            <label for="id_cancellation" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Cancellation</label>
+            <select id="id_cancellation" name="cancellation_status" style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px; background:#FFFFFF;">
+              <option value="Keep series active" {% if meeting.cancellation_status == 'Keep series active' %}selected{% endif %}>Keep series active</option>
+              <option value="Cancel this occurrence" {% if meeting.cancellation_status == 'Cancel this occurrence' %}selected{% endif %}>Cancel this occurrence</option>
+              <option value="Cancel series" {% if meeting.cancellation_status == 'Cancel series' %}selected{% endif %}>Cancel series</option>
+              <option value="Occurrence missed" {% if meeting.cancellation_status == 'Occurrence missed' %}selected{% endif %}>Occurrence missed</option>
+            </select>
+          </div>
+          <div>
+            <label for="id_missed_note" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Missed occurrence note (if applicable)</label>
+            <input id="id_missed_note" type="text" name="missed_occurrence_note" value="{{ meeting.missed_occurrence_note }}" placeholder="Record what happened without inventing attendance" style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px;">
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding-top:8px;">
+          <a href="/foundation/meetings/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+          <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <button type="submit" name="action_type" value="record_missed_occurrence" class="dash-btn-secondary">Record missed occurrence</button>
+            <button type="submit" name="action_type" value="retry_failed_invitations" class="dash-btn-secondary">Retry failed recipient</button>
+            <button type="submit" name="action_type" value="update_series" class="dash-btn-primary">&rarr; Update series</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Card: At a glance -->
+    <div class="dash-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 class="dash-card-title" style="margin:0;">At a glance</h2>
+        <span class="dash-pill dash-pill-amber">&bull; In progress</span>
+      </div>
+
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:14px;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:6px;">Single or series</div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.5;">Choose whether a change applies only to one occurrence or to future meetings in the series.</div>
+      </div>
+
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:6px;">Past records stay intact</div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.5;">Changing future occurrences does not rewrite past attendance or approved minutes.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

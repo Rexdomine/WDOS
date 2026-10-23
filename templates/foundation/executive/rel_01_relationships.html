@@ -1,0 +1,173 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Stakeholder relationships · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"HQ / BOTH NETWORKS" }}</div>
+      <h1 class="dash-title">Stakeholder relationships</h1>
+      <p class="dash-subtitle">{{ screen.subtitle|default:"Track authorised partners, relationship owners, scope, history and the next agreed action." }}</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/dashboards/DASH-01/" class="dash-btn-secondary">Back</a>
+      <a href="/foundation/relationships/review/?partner=rel-04" class="dash-btn-primary">→ Review Pan-African MoU</a>
+    </div>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="dash-tabs" role="tablist">
+    <a href="?tab=overview" class="dash-tab {% if active_tab == 'overview' %}active{% endif %}" role="tab">Overview</a>
+    <a href="?tab=records" class="dash-tab {% if active_tab == 'records' %}active{% endif %}" role="tab">Records</a>
+    <a href="?tab=history" class="dash-tab {% if active_tab == 'history' %}active{% endif %}" role="tab">History</a>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="dash-toolbar">
+    <form method="GET" class="dash-search-box" style="flex:1;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" name="q" value="{{ search_query|default:'' }}" placeholder="Search these records" aria-label="Search records in this view">
+    </form>
+    <div class="dash-filter-actions">
+      <span class="dash-filter-pill-active">Current view</span>
+      <button type="button" class="dash-filter-pill">Status ↓</button>
+      <button type="button" class="dash-filter-pill">More filters</button>
+    </div>
+  </div>
+
+  <div class="dash-layout">
+    <div class="dash-main-col">
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h2 class="dash-card-title">Stakeholder relationships</h2>
+          <span style="font-size:12px; color:var(--wdos-muted);">Authorised institutional partnerships</span>
+        </div>
+
+        <table class="dash-table dash-desktop-table">
+          <thead>
+            <tr>
+              <th scope="col">RELATIONSHIP</th>
+              <th scope="col">OWNER</th>
+              <th scope="col">NEXT COMMITMENT</th>
+              <th scope="col">STATUS</th>
+              <th scope="col">ACTION</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in relationships %}
+            <tr>
+              <td class="item-col">
+                <div style="font-weight:700; color:var(--wdos-ink);">{{ r.relationship }}</div>
+                <small style="color:var(--wdos-muted);">{{ r.partner_type }} · {{ r.scope }}</small>
+              </td>
+              <td>{{ r.owner }}</td>
+              <td>{{ r.next_commitment }}</td>
+              <td>
+                <span class="dash-pill dash-pill-{{ r.status_style|default:'amber' }}">
+                  <span class="dot"></span> {{ r.status }}
+                </span>
+              </td>
+              <td>
+                <a href="/foundation/relationships/review/?partner={{ r.id }}" class="dash-btn-secondary" style="padding:4px 8px; font-size:11px; text-decoration:none;">
+                  Review & Sign ›
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" style="text-align:center; padding:28px; color:var(--wdos-muted);">
+                No partnerships found matching query.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="dash-mobile-list">
+          {% for r in relationships %}
+          <div class="dash-mobile-item">
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">RELATIONSHIP</span>
+              <span class="dash-mobile-val" style="font-weight:700;">{{ r.relationship }}</span>
+            </div>
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">OWNER</span>
+              <span class="dash-mobile-val">{{ r.owner }}</span>
+            </div>
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">NEXT COMMITMENT</span>
+              <span class="dash-mobile-val">{{ r.next_commitment }}</span>
+            </div>
+            <div class="dash-mobile-row" style="margin-top:6px;">
+              <span class="dash-mobile-label">STATUS</span>
+              <span class="dash-pill dash-pill-{{ r.status_style|default:'amber' }}"><span class="dot"></span> {{ r.status }}</span>
+            </div>
+            <div style="margin-top:8px;">
+              <a href="/foundation/relationships/review/?partner={{ r.id }}" class="dash-btn-secondary" style="display:block; text-align:center; padding:6px; font-size:12px; text-decoration:none;">
+                Review & Sign ›
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="dash-table-foot">
+          <span>Showing {{ relationships|length }} records in this view</span>
+          <div class="dash-pagination">
+            <button type="button" class="dash-pagination-btn" aria-label="Previous page">←</button>
+            <span>1</span>
+            <button type="button" class="dash-pagination-btn" aria-label="Next page">→</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Side Column -->
+    <div class="dash-side-col">
+      <div class="dash-attention-card">
+        <h2 class="dash-card-title" style="margin-bottom:14px;">Authority controls</h2>
+        
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Delegated authority</h3>
+            <p class="dash-attention-text">Partnership and contracting decisions require the correct delegated authority.</p>
+          </div>
+        </div>
+
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Clear ownership</h3>
+            <p class="dash-attention-text">Every institutional relationship has a responsible owner and next action.</p>
+            <a href="?tab=history" class="dash-card-action" style="font-size:12px;">Relationship history →</a>
+          </div>
+        </div>
+
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Approved commitments only</h3>
+            <p class="dash-attention-text">A draft discussion is not permission to contract or make commitments.</p>
+            <a href="/foundation/dashboards/DASH-07/" class="dash-card-action" style="font-size:12px;">Resource Accountability (DASH-07) →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-support-note">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>WODDI · No Woman Is Left Out · REL-01 UI Review v2</span>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Your application outcome · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Your application outcome</h1>
+      <p class="dash-subtitle">See the relevant recruitment and referrals records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/recruitment/application/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      <button type="submit" form="respond-outcome-form" class="dash-btn-primary">&rarr; Respond to the offer</button>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Application Outcome Response:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin:0;">An alternative role is available</h2>
+        <span class="dash-pill">&bull; {{ target_network }} / {{ target_country_name }}</span>
+      </div>
+
+      <table class="dash-table dash-desktop-table" aria-label="Your application outcome">
+        <thead>
+          <tr>
+            <th scope="col">OPPORTUNITY</th>
+            <th scope="col">LOCAL SCOPE</th>
+            <th scope="col">NEXT ACTION</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600; color:#111827;">{{ application.alternative_opportunity_title|default:"Chapter support opportunity" }}</td>
+            <td>{{ application.alternative_local_scope|default:"Ikeja" }}</td>
+            <td>
+              <form id="respond-outcome-form" method="post" action="/foundation/recruitment/outcome/" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="application_code" value="{{ application.application_code|default:'CAND-NG-001' }}">
+                <input type="hidden" name="response_choice" value="accept_alternative">
+                <button type="submit" class="dash-pill" style="border:none; cursor:pointer;">&bull; {{ application.alternative_next_action|default:"Review offer" }}</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="dash-mobile-list">
+        <div class="dash-mobile-item">
+          <div class="dash-mobile-row"><span class="dash-mobile-label">Opportunity</span><span class="dash-mobile-val" style="font-weight:700;">{{ application.alternative_opportunity_title|default:"Chapter support opportunity" }}</span></div>
+          <div class="dash-mobile-row"><span class="dash-mobile-label">Local scope</span><span class="dash-mobile-val">{{ application.alternative_local_scope|default:"Ikeja" }}</span></div>
+          <div class="dash-mobile-row"><span class="dash-mobile-label">Next action</span><span class="dash-pill">{{ application.alternative_next_action|default:"Review offer" }}</span></div>
+        </div>
+      </div>
+
+      <div class="dash-pagination" style="margin-bottom:20px;">
+        <span>Showing 1 records in this view</span>
+        <div class="dash-page-arrows">
+          <span class="dash-arrow" aria-hidden="true">&larr;</span>
+          <span class="dash-current-page">1</span>
+          <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+        </div>
+      </div>
+
+      <!-- Shield Notice -->
+      <div class="stage6-shield-notice">
+        <div class="stage6-shield-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>Your own application and permitted updates are shown here. Internal comparisons and reviewer-only evidence remain private.</div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:14px;">Related information</h3>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your original application</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">The decision and reason remain in your application history.</p>
+          <span class="stage6-sidebar-badge">No new registration</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your choice</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">You can accept a review of the alternative role or remain connected through Community.</p>
+          <span class="stage6-sidebar-badge">Respond to offer</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

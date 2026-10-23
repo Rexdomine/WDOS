@@ -1,0 +1,574 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}{{ screen.title }} — WDOS Events{% endblock %}
+
+{% block content %}
+<style>
+  .e10-wrap { display: flex; flex-direction: column; gap: 20px; }
+  .e10-subnav { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px; background: #FFF; border: 1px solid #E7DCE6; border-radius: 14px; }
+  .e10-subnav a { padding: 8px 13px; border-radius: 999px; font-size: 12px; font-weight: 700; text-decoration: none; color: #4A394D; border: 1px solid transparent; min-height: 38px; display: inline-flex; align-items: center; gap: 6px; }
+  .e10-subnav a.active { background: #FCEEF5; color: #D4006A; border-color: #F4C2DA; }
+
+  .e10-header { background: #FFF; border: 1px solid #E7DCE6; border-radius: 18px; padding: 22px 26px; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
+  .e10-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #D4006A; margin-bottom: 6px; }
+  .e10-title { font-family: 'Manrope', sans-serif; font-size: 28px; font-weight: 800; color: #19131A; margin: 0 0 6px 0; }
+  .e10-subtitle { font-size: 14px; color: #67586A; margin: 0; max-width: 720px; }
+  .e10-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .e10-btn-primary { background: #D4006A; color: #FFF; border: none; border-radius: 999px; padding: 11px 20px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .e10-btn-secondary { background: #FFF; color: #19131A; border: 1px solid #DECFE0; border-radius: 999px; padding: 11px 18px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+  .e10-grid { display: grid; grid-template-columns: minmax(0, 2.15fr) minmax(280px, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 960px) { .e10-grid { grid-template-columns: 1fr; } }
+
+  .e10-card { background: #FFF; border: 1px solid #E7DCE6; border-radius: 18px; padding: 22px; }
+  .e10-card h3 { font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 800; color: #19131A; margin: 0 0 8px 0; }
+  .e10-card p.muted { font-size: 13px; color: #67586A; margin: 0 0 16px 0; }
+
+  .e10-hero { background: linear-gradient(135deg, #291B2B 0%, #561846 58%, #7CB518 135%); color: #FFF; border-radius: 16px; padding: 26px 24px; margin-bottom: 18px; }
+  .e10-hero h2 { font-family: 'Manrope', sans-serif; font-size: 24px; font-weight: 800; margin: 0 0 6px 0; }
+  .e10-hero p { font-size: 13px; color: #F5EEF6; margin: 0; }
+
+  .e10-track-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .e10-track-grid { grid-template-columns: 1fr; } }
+  .e10-track-card { border: 1px solid #E7DCE6; border-radius: 14px; padding: 16px; background: #FCFAFC; display: flex; flex-direction: column; gap: 8px; }
+  .e10-track-card h4 { font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 800; margin: 0; color: #19131A; }
+  .e10-track-meta { font-size: 12px; font-weight: 700; color: #67586A; }
+  .e10-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; background: #EAF4D3; color: #2D5A00; width: fit-content; }
+  .e10-pill.choose { background: #FCEEF5; color: #D4006A; }
+
+  .e10-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .e10-table th { text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #67586A; padding: 10px 12px; border-bottom: 1px solid #E7DCE6; }
+  .e10-table td { padding: 13px 12px; border-bottom: 1px solid #F2EAF1; font-size: 13px; color: #19131A; }
+
+  .e10-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 720px) { .e10-form-grid { grid-template-columns: 1fr; } }
+  .e10-field { display: flex; flex-direction: column; gap: 6px; }
+  .e10-field label { font-size: 12px; font-weight: 700; color: #4A394D; }
+  .e10-field input, .e10-field select, .e10-field textarea { min-height: 44px; padding: 10px 14px; border: 1px solid #DECFE0; border-radius: 12px; font-size: 14px; color: #19131A; background: #FFF; }
+
+  .e10-side-item { border: 1px solid #E7DCE6; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: #FCFAFC; }
+  .e10-side-item .label { font-size: 11px; font-weight: 700; color: #67586A; }
+  .e10-side-item .val { font-size: 13px; font-weight: 800; color: #19131A; margin-top: 2px; }
+
+  .e10-kpi-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 820px) { .e10-kpi-row { grid-template-columns: 1fr; } }
+  .e10-kpi-card { background: #FFF; border: 1px solid #E7DCE6; border-radius: 16px; padding: 20px; }
+  .e10-kpi-num { font-family: 'Manrope', sans-serif; font-size: 32px; font-weight: 800; color: #19131A; margin: 6px 0; }
+  .e10-shield { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 14px; background: #FFF8EB; border: 1px solid #F5D699; color: #5C3D00; font-size: 13px; font-weight: 600; }
+</style>
+
+<div class="e10-wrap" data-screen-code="{{ screen_code }}" data-event-code="{{ conference_event.event_code }}">
+  <!-- Conference and Event Process Bar (4-Stage Event Process) -->
+  <nav class="e10-subnav" aria-label="Conference process stages" style="justify-content:space-between; align-items:center;">
+    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+      <a href="/foundation/events/" class="{% if screen_code == 'EVENT-01' or screen_code == 'EVENT-02' %}active{% endif %}">1. Event Overview &amp; Registration</a>
+      <span style="color:#B5A3B8; font-weight:700;">&rarr;</span>
+      <a href="/foundation/events/lobby/" class="{% if screen_code == 'EVENT-03' or screen_code == 'EVENT-04' %}active{% endif %}">2. Event Lobby &amp; Agenda</a>
+      <span style="color:#B5A3B8; font-weight:700;">&rarr;</span>
+      <a href="/foundation/events/plenary/" class="{% if screen_code == 'EVENT-05' or screen_code == 'EVENT-06' or screen_code == 'EVENT-07' %}active{% endif %}">3. Live Plenary, Breakouts &amp; Q&amp;A</a>
+      <span style="color:#B5A3B8; font-weight:700;">&rarr;</span>
+      <a href="/foundation/events/resources/" class="{% if screen_code == 'EVENT-08' %}active{% endif %}">4. Takeaways &amp; Resources</a>
+      {% if is_host or screen_code == 'EVENT-09' or screen_code == 'EVENT-10' %}
+      <a href="/foundation/events/operations/" class="{% if screen_code == 'EVENT-09' or screen_code == 'EVENT-10' %}active{% endif %}" style="border-color:#DECFE0;">⚙️ Organiser Console</a>
+      {% endif %}
+    </div>
+    <a href="/foundation/meetings/">&larr; Back to Meetings</a>
+  </nav>
+
+  {% if action_message %}
+  <div class="e10-shield" role="status" style="background:#EAF4D3; border-color:#BFE07E; color:#234700;">
+    <strong>Updated:</strong> <span>{{ action_message }}</span>
+  </div>
+  {% endif %}
+
+  {% if validation_error %}
+  <div class="e10-shield" role="alert" style="background:#FDECEC; border-color:#F9C6C6; color:#B42318;">
+    <strong>Validation:</strong> <span>{{ validation_error }}</span>
+  </div>
+  {% endif %}
+
+  {% if state_card %}
+  <div class="e10-shield" role="region" aria-label="Screen state contract">
+    <div>
+      <strong>{{ state_card.title }}</strong> — {{ state_card.summary }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Canonical Header -->
+  <header class="e10-header">
+    <div>
+      <div class="e10-eyebrow">{{ screen.eyebrow }}</div>
+      <h1 class="e10-title">{{ screen.title }}</h1>
+      <p class="e10-subtitle">{{ screen.subtitle }}</p>
+    </div>
+    <div class="e10-actions">
+      {% if screen_code == "EVENT-01" %}
+        <a href="/foundation/events/lobby/" class="e10-btn-secondary">Open event lobby</a>
+        <a href="/foundation/events/register/" class="e10-btn-primary">Register for event</a>
+      {% elif screen_code == "EVENT-02" %}
+        <button type="submit" form="event-02-form" name="action" value="save_draft" class="e10-btn-secondary">Save draft</button>
+        <button type="submit" form="event-02-form" name="action" value="confirm" class="e10-btn-primary">Confirm registration</button>
+      {% elif screen_code == "EVENT-03" %}
+        <a href="/foundation/events/breakouts/" class="e10-btn-secondary">Choose breakout room</a>
+        <a href="/foundation/events/plenary/" class="e10-btn-primary">Join opening plenary</a>
+      {% elif screen_code == "EVENT-04" %}
+        <button type="submit" form="event-04-schedule-form" class="e10-btn-primary">Add session to my schedule</button>
+      {% elif screen_code == "EVENT-05" %}
+        <a href="/foundation/events/lobby/" class="e10-btn-secondary">Leave room</a>
+        <a href="/foundation/events/moderation/" class="e10-btn-primary">Open Q&amp;A</a>
+      {% elif screen_code == "EVENT-06" %}
+        <button type="submit" form="event-06-breakout-form" class="e10-btn-primary">Join selected room</button>
+      {% elif screen_code == "EVENT-07" %}
+        {% if is_host %}
+        <form method="post" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="review_next">
+          <button type="submit" class="e10-btn-primary">Review next question</button>
+        </form>
+        {% else %}
+        <a href="/foundation/events/plenary/" class="e10-btn-secondary">Return to plenary</a>
+        {% endif %}
+      {% elif screen_code == "EVENT-08" %}
+        <button type="submit" form="event-08-reflection-form" class="e10-btn-primary">Open feedback</button>
+      {% elif screen_code == "EVENT-09" %}
+        <button type="submit" form="event-09-setup-form" name="action" value="save_draft" class="e10-btn-secondary">Save draft</button>
+        <button type="submit" form="event-09-setup-form" name="action" value="save" class="e10-btn-primary">Save event draft</button>
+      {% elif screen_code == "EVENT-10" %}
+        <form method="post" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="refresh_health">
+          <button type="submit" class="e10-btn-primary">Open session health</button>
+        </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- EVENT REGISTRATION                                                    -->
+  <!-- ===================================================================== -->
+  {% if screen_code == "EVENT-02" %}
+  <div class="e10-grid">
+    <section class="e10-card" aria-label="Event registration form">
+      <div style="display:flex; gap:10px; margin-bottom:18px;">
+        <span class="e10-pill choose">1 Details</span>
+        <span class="e10-pill" style="background:#F5EFF4; color:#67586A;">2 Review</span>
+        <span class="e10-pill" style="background:#F5EFF4; color:#67586A;">3 Confirm</span>
+      </div>
+      <form id="event-02-form" method="post">
+        {% csrf_token %}
+        <div class="e10-form-grid">
+          <div class="e10-field">
+            <label for="id_attendee_name">Attendee</label>
+            <input id="id_attendee_name" type="text" name="attendee_name" value="{{ event_registration.attendee_name|default:'Ada Okafor' }}">
+          </div>
+          <div class="e10-field">
+            <label for="id_network">Network</label>
+            <input id="id_network" type="text" name="network" value="{{ event_registration.network|default:'WGMN' }}">
+          </div>
+          <div class="e10-field">
+            <label for="id_listening_language">Listening language</label>
+            <input id="id_listening_language" type="text" name="listening_language" value="{{ event_registration.listening_language|default:'English' }}">
+          </div>
+          <div class="e10-field">
+            <label for="id_access_support">Access support</label>
+            <input id="id_access_support" type="text" name="access_support" value="{{ event_registration.access_support|default:'Tell us about any support you may need.' }}">
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <aside class="e10-card">
+      <h3>Before you submit</h3>
+      <p class="muted">Guidance for this step.</p>
+      <div class="e10-side-item">
+        <div class="val">Required information</div>
+        <div class="label">Complete every visible field before submitting. Use Save draft if you need to pause and return.</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="val">Next step</div>
+        <div class="label">Submissions that need review or approval enter the appropriate scoped queue with an audit trail.</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- OPENING PLENARY / BROADCAST ROOM                                      -->
+  <!-- ===================================================================== -->
+  {% elif screen_code == "EVENT-05" %}
+  <div class="e10-grid">
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <section style="background:#291B2B; color:#FFF; border-radius:18px; padding:22px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-family:'Manrope',sans-serif; font-size:20px; font-weight:800;">Opening plenary</div>
+            <div style="font-size:13px; color:#D8CBD9;">WODDI · Eligible attendees</div>
+          </div>
+          <span class="e10-pill">Live</span>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:14px; min-height:130px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;">
+          <div style="font-weight:800; font-size:15px;">Main Stage Broadcast · 09:00 WAT</div>
+          <div style="font-size:12px; color:#D8CBD9;">Simultaneous interpretation active in English, French, and Portuguese</div>
+        </div>
+
+        <div style="background:rgba(15,10,16,0.72); border:1px solid rgba(255,255,255,0.16); border-radius:14px; padding:14px 18px;">
+          <div style="font-size:11px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:#F4C2DA; margin-bottom:4px;">INTERPRETATION · LIVE CAPTION</div>
+          <div style="font-size:15px; font-weight:600;">Welcome. Please choose the language you would like to hear.</div>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <span class="e10-btn-secondary" style="background:rgba(255,255,255,0.12); color:#FFF; border-color:rgba(255,255,255,0.2);">Microphone</span>
+          <span class="e10-btn-secondary" style="background:rgba(255,255,255,0.12); color:#FFF; border-color:rgba(255,255,255,0.2);">Camera</span>
+          <a href="/foundation/rooms/preferences/" class="e10-btn-secondary" style="background:rgba(255,255,255,0.12); color:#FFF; border-color:rgba(255,255,255,0.2);">Languages</a>
+          <a href="/foundation/events/lobby/" class="e10-btn-secondary" style="background:#FDECEC; color:#B42318; border-color:#F9C6C6; margin-left:auto;">Leave room</a>
+        </div>
+      </section>
+
+      <section class="e10-card">
+        <table class="e10-table">
+          <thead>
+            <tr>
+              <th>SESSION</th>
+              <th>LOCAL TIME</th>
+              <th>FORMAT</th>
+              <th>ACCESS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for track in session_tracks %}
+            <tr>
+              <td><strong>{{ track.title }}</strong></td>
+              <td>{{ track.local_time_label }}</td>
+              <td>{{ track.format_label }}</td>
+              <td><span class="e10-pill {% if track.access_status == 'Choose session' %}choose{% endif %}">{{ track.access_status }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <aside class="e10-card">
+      <h3>Room controls</h3>
+      <p class="muted">Audio, captions and participant readiness.</p>
+      <div class="e10-side-item">
+        <div class="label">Presenter</div>
+        <div class="val">Active video and floor management</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="label">Your interpretation</div>
+        <div class="val">English, French or Portuguese</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="label">Language settings</div>
+        <div class="val">Update audio, captions and floor queue</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- QUESTIONS AND MODERATION                                              -->
+  <!-- ===================================================================== -->
+  {% elif screen_code == "EVENT-07" %}
+  <div class="e10-grid" style="grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);">
+    <section class="e10-card" aria-label="Moderation queues">
+      <h3>Conversations</h3>
+      <p class="muted">Scoped messages and announcements.</p>
+      <div class="e10-side-item" style="border-color:#F4C2DA; background:#FCEEF5;">
+        <div class="val">Moderation queue</div>
+        <div class="label">Questions awaiting host review. · {{ pending_questions|length }} questions</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="val">Published questions</div>
+        <div class="label">Approved questions visible to the audience. · Current session</div>
+      </div>
+    </section>
+
+    <section class="e10-card" aria-label="Session Q&A thread and submission">
+      <h3>Opening plenary</h3>
+      <p class="muted">Official communications stay tied to your authorised network and geography scope.</p>
+
+      <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:18px;">
+        {% for q in all_questions %}
+        <div style="padding:14px 16px; border-radius:14px; border:1px solid #E7DCE6; background:{% if q.moderation_state == 'Published' %}#FCEEF5{% else %}#FCFAFC{% endif %};">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <strong style="font-size:13px;">{{ q.author_name }} · {{ q.author_role }}</strong>
+            <span class="e10-pill {% if q.moderation_state == 'Pending' %}choose{% endif %}">{{ q.moderation_state }}</span>
+          </div>
+          <div style="font-size:14px; color:#19131A;">{{ q.question_text }}</div>
+          {% if q.host_reply %}
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08); font-size:13px; color:#4A394D;">
+            <strong>Host response:</strong> {{ q.host_reply }}
+          </div>
+          {% endif %}
+          {% if is_host and q.moderation_state == "Pending" %}
+          <div style="margin-top:10px; display:flex; gap:8px;">
+            <form method="post" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="question_id" value="{{ q.id }}">
+              <input type="hidden" name="action" value="approve_question">
+              <button type="submit" class="e10-btn-primary" style="padding:6px 12px; min-height:36px;">Approve &amp; publish</button>
+            </form>
+            <form method="post" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="question_id" value="{{ q.id }}">
+              <input type="hidden" name="action" value="dismiss_question">
+              <button type="submit" class="e10-btn-secondary" style="padding:6px 12px; min-height:36px;">Dismiss</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <form method="post" style="display:flex; gap:10px; align-items:center;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="submit_question">
+        <input type="text" name="question_text" placeholder="Write a message…" style="flex:1; min-height:44px; padding:10px 14px; border:1px solid #DECFE0; border-radius:12px;">
+        <button type="submit" class="e10-btn-primary">Send</button>
+      </form>
+    </section>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- CONFERENCE SETUP                                                      -->
+  <!-- ===================================================================== -->
+  {% elif screen_code == "EVENT-09" %}
+  <div class="e10-grid">
+    <section class="e10-card" aria-label="Conference setup form">
+      <div style="display:flex; gap:10px; margin-bottom:18px;">
+        <span class="e10-pill choose">1 Details</span>
+        <span class="e10-pill" style="background:#F5EFF4; color:#67586A;">2 Review</span>
+        <span class="e10-pill" style="background:#F5EFF4; color:#67586A;">3 Confirm</span>
+      </div>
+      <form id="event-09-setup-form" method="post">
+        {% csrf_token %}
+        <div class="e10-form-grid">
+          <div class="e10-field">
+            <label for="id_conf_title">Event title</label>
+            <input id="id_conf_title" type="text" name="title" value="{{ conference_event.title }}">
+          </div>
+          <div class="e10-field">
+            <label for="id_conf_dt">Date and timezone</label>
+            <input id="id_conf_dt" type="text" name="date_and_timezone" value="{{ conference_event.date_and_timezone }}">
+          </div>
+          <div class="e10-field">
+            <label for="id_conf_elig">Eligibility</label>
+            <input id="id_conf_elig" type="text" name="eligibility_label" value="{{ conference_event.eligibility_label }}">
+          </div>
+          <div class="e10-field">
+            <label for="id_conf_model">Session model</label>
+            <input id="id_conf_model" type="text" name="session_model" value="{{ conference_event.session_model }}">
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <aside class="e10-card">
+      <h3>Before you submit</h3>
+      <p class="muted">Guidance for this step.</p>
+      <div class="e10-side-item">
+        <div class="val">Required information</div>
+        <div class="label">Complete every visible field before submitting. Use Save draft if you need to pause and return.</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="val">Next step</div>
+        <div class="label">Submissions that need review or approval enter the appropriate scoped queue with an audit trail.</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- LIVE EVENT OPERATIONS                                                 -->
+  <!-- ===================================================================== -->
+  {% elif screen_code == "EVENT-10" %}
+  <div class="e10-kpi-row">
+    <div class="e10-kpi-card">
+      <div style="font-size:12px; font-weight:700; color:#67586A;">Checked-in attendees</div>
+      <div class="e10-kpi-num">{{ conference_event.checked_in_count }}</div>
+      <span class="e10-pill">Active event snapshot</span>
+    </div>
+    <div class="e10-kpi-card">
+      <div style="font-size:12px; font-weight:700; color:#67586A;">Live sessions</div>
+      <div class="e10-kpi-num">{{ conference_event.live_sessions_count }}</div>
+      <span class="e10-pill">Isolated rooms</span>
+    </div>
+    <div class="e10-kpi-card">
+      <div style="font-size:12px; font-weight:700; color:#67586A;">Support requests</div>
+      <div class="e10-kpi-num">{{ conference_event.support_requests_count }}</div>
+      <span class="e10-pill choose">Assigned event team</span>
+    </div>
+  </div>
+
+  <div class="e10-grid">
+    <section class="e10-card" aria-label="Live event operations table">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3>Live event operations</h3>
+          <p class="muted">Prioritised items, owners and statuses within the active scope.</p>
+        </div>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="resolve_support">
+          <button type="submit" class="e10-btn-secondary">Resolve support ticket</button>
+        </form>
+      </div>
+      <table class="e10-table">
+        <thead>
+          <tr>
+            <th>SESSION</th>
+            <th>LOCAL TIME</th>
+            <th>FORMAT</th>
+            <th>ACCESS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for track in session_tracks %}
+          <tr>
+            <td><strong>{{ track.title }}</strong></td>
+            <td>{{ track.local_time_label }}</td>
+            <td>{{ track.format_label }}</td>
+            <td><span class="e10-pill {% if track.access_status == 'Choose session' %}choose{% endif %}">{{ track.access_status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <aside class="e10-card">
+      <h3>Attention required</h3>
+      <p class="muted">Exceptions, overdue items and governance checks remain visible.</p>
+      <div class="e10-side-item">
+        <div class="val">1 · Review pending items</div>
+        <div class="label">Verify evidence before approving or closing records.</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="val">2 · Follow up overdue work</div>
+        <div class="label">Use reminders or escalations when deadlines pass.</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- OVERVIEW, LOBBY, AGENDA, BREAKOUTS, RESOURCES                         -->
+  <!-- ===================================================================== -->
+  {% else %}
+  <div class="e10-grid">
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <section class="e10-card">
+        {% if screen_code == "EVENT-04" or screen_code == "EVENT-06" or screen_code == "EVENT-08" %}
+        <form method="get" style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:10px; margin-bottom:18px;">
+          <input type="text" name="q" value="{{ query }}" placeholder="Find a resource" style="min-height:42px; padding:8px 14px; border:1px solid #DECFE0; border-radius:999px;">
+          <select name="role_filter" style="min-height:42px; padding:8px 14px; border:1px solid #DECFE0; border-radius:999px;">
+            <option>For my role</option>
+          </select>
+          <select name="format" style="min-height:42px; padding:8px 14px; border:1px solid #DECFE0; border-radius:999px;">
+            <option value="">All types</option>
+            <option value="Broadcast">Broadcast</option>
+            <option value="Breakouts">Breakouts</option>
+            <option value="Panel">Panel</option>
+          </select>
+        </form>
+        {% else %}
+        <div class="e10-hero">
+          <h2>{{ conference_event.title }}</h2>
+          <p>{{ conference_event.date_and_timezone }} · {{ conference_event.session_model }}</p>
+        </div>
+        {% endif %}
+
+        <div class="e10-track-grid">
+          {% for track in session_tracks %}
+          <div class="e10-track-card">
+            <div class="e10-track-meta">{{ track.local_time_label }} · {{ track.format_label }}</div>
+            <h4>{{ track.title }}</h4>
+            <p class="muted" style="margin:0;">{{ track.description }}</p>
+            {% if screen_code == "EVENT-08" and track.resource_title %}
+            <div style="font-size:12px; font-weight:700; color:#D4006A;">{{ track.resource_title }}</div>
+            {% endif %}
+            <span class="e10-pill {% if track.access_status == 'Choose session' %}choose{% endif %}">{{ track.access_status }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <h3 style="margin-top:6px;">Schedule &amp; participation</h3>
+        <table class="e10-table">
+          <thead>
+            <tr>
+              <th>SESSION</th>
+              <th>LOCAL TIME</th>
+              <th>FORMAT</th>
+              <th>ACCESS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for track in session_tracks %}
+            <tr>
+              <td><strong>{{ track.title }}</strong></td>
+              <td>{{ track.local_time_label }}</td>
+              <td>{{ track.format_label }}</td>
+              <td><span class="e10-pill {% if track.access_status == 'Choose session' %}choose{% endif %}">{{ track.access_status }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        {% if screen_code == "EVENT-04" %}
+        <form id="event-04-schedule-form" method="post" style="margin-top:14px;">
+          {% csrf_token %}
+          <input type="hidden" name="selected_session" value="Country conversations">
+        </form>
+        {% elif screen_code == "EVENT-06" %}
+        <form id="event-06-breakout-form" method="post" style="margin-top:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          {% csrf_token %}
+          <label for="id_selected_breakout" style="font-size:13px; font-weight:700;">Select breakout room:</label>
+          <select id="id_selected_breakout" name="selected_session" style="min-height:42px; padding:8px 14px; border:1px solid #DECFE0; border-radius:12px;">
+            <option value="Country conversations">Country conversations (11:00 WAT · WGMN Nigeria)</option>
+            <option value="Leadership in practice">Leadership in practice (14:00 WAT · Regional Panel)</option>
+          </select>
+          <button type="submit" class="e10-btn-primary">Confirm breakout selection</button>
+        </form>
+        {% elif screen_code == "EVENT-08" %}
+        <form id="event-08-reflection-form" method="post" style="margin-top:18px; padding-top:16px; border-top:1px solid #E7DCE6; display:flex; flex-direction:column; gap:10px;">
+          {% csrf_token %}
+          <label for="id_reflection_text" style="font-size:13px; font-weight:800;">Post-event reflection &amp; chapter takeaway</label>
+          <textarea id="id_reflection_text" name="reflection_text" rows="2" placeholder="Share how your chapter will apply the gathering takeaways...">{{ event_registration.reflection_text }}</textarea>
+          <div>
+            <button type="submit" class="e10-btn-primary">Submit reflection</button>
+          </div>
+        </form>
+        {% endif %}
+      </section>
+
+      {% if screen_code == "EVENT-04" %}
+      <div class="e10-shield">
+        <span>Session participation rights vary. Plenary viewing does not enable microphone or camera publishing.</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <aside class="e10-card" aria-label="At a glance">
+      <h3>At a glance</h3>
+      <p class="muted">Scoped details and governance guardrails.</p>
+      <div class="e10-side-item">
+        <div class="label">Network</div>
+        <div class="val">WGMN</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="label">Country</div>
+        <div class="val">Nigeria</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="label">Record state</div>
+        <div class="val">In progress</div>
+      </div>
+      <div class="e10-side-item">
+        <div class="label">Visibility</div>
+        <div class="val">Assigned scope only</div>
+      </div>
+    </aside>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

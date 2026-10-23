@@ -183,6 +183,9 @@ def welcome(request):
 @sensitive_post_parameters('password')
 @require_http_methods(['GET', 'POST'])
 def register(request):
+    net_param = request.GET.get('network') or request.POST.get('network')
+    if net_param in ('WGMN', 'WNNN'):
+        request.session['chosen_network'] = net_param
     form = forms.RegisterForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         request.session.pop('pending_registration_account', None)
@@ -233,7 +236,7 @@ def establish(request, account, mfa=False, remember=False):
     request.session['mfa_verified'] = mfa
     request.session['last_activity'] = now
     request.session['absolute_expiry'] = now + ttl
-    request.session.set_expiry(ttl if remember else 0)
+    request.session.set_expiry(ttl)
     request.session.pop('pending_mfa', None)
 
 

@@ -1,0 +1,143 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Review local-home reassignment · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Review local-home reassignment</h1>
+      <p class="dash-subtitle">Check the evidence and the impact of this decision before confirming.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card (when ?state= is requested) -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Decision Outcome:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <!-- Main Review Form -->
+    <div class="stage6-form-main">
+      <form method="post" action="/foundation/community/reassignment/review/">
+        {% csrf_token %}
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">Review local-home reassignment</h2>
+
+        {% if scoped_people %}
+        <div class="stage6-field-group">
+          <label class="stage6-label" for="person_code">Person</label>
+          <select id="person_code" name="person_code" class="stage6-input">
+            {% for p in scoped_people %}
+            <option value="{{ p.person_code }}" {% if selected_person and p.person_code == selected_person.person_code %}selected{% endif %}>{{ p.full_name }} ({{ p.person_code }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% else %}
+        <input type="hidden" name="person_code" value="{{ reassignment.person.person_code|default:'WD-00421' }}">
+        {% endif %}
+
+        <div class="stage6-field-group">
+          <label class="stage6-label">Current local home</label>
+          <div class="stage6-readonly-field">{{ reassignment.current_local_home|default:"—" }}</div>
+        </div>
+
+        <div class="stage6-field-group">
+          <label class="stage6-label" for="proposed_local_home">Proposed local home</label>
+          <input type="text" id="proposed_local_home" name="proposed_local_home" class="stage6-input" value="{{ reassignment.proposed_local_home|default:'' }}" required>
+        </div>
+
+        <div class="stage6-field-group">
+          <label class="stage6-label" for="reason">Reason for change</label>
+          <input type="text" id="reason" name="reason" class="stage6-input" value="{{ reassignment.reason|default:'' }}" required>
+        </div>
+
+        <div class="stage6-checkbox-row">
+          <input type="checkbox" id="member_confirmation" name="member_confirmation" class="stage6-checkbox" value="true" {% if reassignment.member_confirmation or True %}checked{% endif %}>
+          <label for="member_confirmation" class="stage6-checkbox-label">
+            Member confirmation
+            <span style="display:block; font-size:12.5px; font-weight:400; color:#4B5563; margin-top:2px;">Confirmation received and linked to the request.</span>
+          </label>
+        </div>
+
+        <div class="stage6-shield-notice" style="margin-bottom:24px;">
+          <div class="stage6-shield-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>Only authorized profile fields and relationships are visible in this view. A decision requires the appropriate authority.</div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <a href="{% if reassignment and reassignment.person %}/foundation/people/{{ reassignment.person.person_code }}/{% else %}/foundation/people/{% endif %}" class="dash-btn-secondary">Back</a>
+          <button type="submit" class="dash-btn-primary">Submit reassignment</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Sidebar Cards -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title">Decision context</h3>
+        <p class="stage6-sidebar-box-text">Before you continue</p>
+      </div>
+
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title">Before you continue</h3>
+        <p class="stage6-sidebar-box-text">Only authorized profile fields and relationships are visible in this view.</p>
+        <span class="stage6-sidebar-badge">Please review</span>
+      </div>
+
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title">Your information is protected</h3>
+        <p class="stage6-sidebar-box-text">Only the people authorized for this record can review the submission.</p>
+        <span class="stage6-sidebar-badge">Scoped access</span>
+      </div>
+    </div>
+  </div>
+
+  {% if reassignments_history %}
+  <div class="dash-card" style="margin-top:24px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Local-home reassignment history</h2>
+    </div>
+    <table class="dash-table" aria-label="Local-home Reassignment History">
+      <thead>
+        <tr>
+          <th scope="col">PERSON</th>
+          <th scope="col">PREVIOUS HOME &rarr; NEW HOME</th>
+          <th scope="col">REASON</th>
+          <th scope="col">STATUS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in reassignments_history %}
+        <tr>
+          <td><a href="/foundation/people/{{ item.person.person_code }}/" style="color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">{{ item.person.full_name }}</a></td>
+          <td>{{ item.current_local_home }} &rarr; <strong>{{ item.proposed_local_home }}</strong></td>
+          <td>{{ item.reason }}</td>
+          <td><span class="dash-pill {% if item.status == 'approved' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">{{ item.status|title }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

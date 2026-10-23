@@ -1,0 +1,36 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Assigned case · SG-024 · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"RESTRICTED / ASSIGNED CASES" }}</div>
+      <h1 class="dash-title">Assigned case · {{ case_id|default:"SG-024" }}</h1>
+      <p class="dash-subtitle">{{ screen.subtitle|default:"Manage authorised assignment, referral, escalation and closure controls with access history." }}</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/dashboard/" class="dash-btn-secondary">Back</a>
+    </div>
+  </div>
+
+  <div class="dash-layout">
+    <div class="dash-main-col">
+      <div class="dash-card">
+        <h2 class="dash-card-title">Confidential Case File · {{ case_id|default:"SG-024" }}</h2>
+        <div style="background:#FEF2F2; border:1px solid #FCA5A5; border-radius:8px; padding:16px; margin:16px 0;">
+          <strong style="color:#991B1B;">Restricted Access Protocol</strong>
+          <p style="margin:4px 0 0 0; font-size:13px; color:#7F1D1D;">
+            Only specifically authorized members of the Safeguarding Lead team can review this case narrative.
+          </p>
+        </div>
+        <p style="font-size:13px; color:#4B5563;">
+          Narrative and evidence: Restricted to assigned handler.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

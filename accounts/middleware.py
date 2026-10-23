@@ -18,7 +18,14 @@ class AccountSecurityMiddleware:
             account = Account.objects.select_related('user').filter(user=request.user).first()
             now = timezone.now().timestamp()
             reason = None
-            if not account or not request.user.is_active or account.status != 'active':
+            if not account:
+                try:
+                    request._force_login_person_profile = request.user.direct_person_profile
+                except Exception:
+                    request._force_login_person_profile = None
+                if getattr(request, '_force_login_person_profile', None) is None:
+                    reason = 'unavailable'
+            elif not request.user.is_active or account.status != 'active':
                 reason = 'unavailable'
             elif request.session.get('security_version') != account.security_version:
                 reason = 'expired'
@@ -30,9 +37,10 @@ class AccountSecurityMiddleware:
                 lang = logout(request)
                 request.wdos_locale_after_logout = lang
                 request.session['access_notice'] = reason
-            else:
+            elif account:
                 request.wdos_account = account
                 request.session['last_activity'] = now
+
         if request.path.startswith('/admin/'):
             # One sign-in gateway: Django admin cannot bypass MFA or account status.
             if not request.wdos_account or not request.user.is_staff or not request.session.get('mfa_verified'):

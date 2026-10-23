@@ -1,0 +1,242 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}People directory · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">People directory</h1>
+      <p class="dash-subtitle">See the relevant people and relationships records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="{{ screen.secondary_action.url|default:'/foundation/dashboards/dash-03/' }}" class="dash-btn-secondary">Back</a>
+      <a href="{{ screen.primary_action.url|default:'/foundation/people/add-or-link/' }}" class="dash-btn-primary">Add or link person</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card (when ?state= is requested) -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="/foundation/people/" class="stage6-subnav-item active" role="tab">People directory</a>
+    <a href="/foundation/community/relationships/" class="stage6-subnav-item" role="tab">Community relationships</a>
+    <a href="/foundation/geography/local-org/" class="stage6-subnav-item" role="tab">Local organisation</a>
+    <a href="/foundation/leadership/structure/" class="stage6-subnav-item" role="tab">Leadership structure</a>
+    <a href="/foundation/leadership/register/" class="stage6-subnav-item" role="tab">Leadership register</a>
+    <a href="/foundation/leadership/vacancies/" class="stage6-subnav-item" role="tab">Vacancies</a>
+    <a href="/foundation/leadership/direct-reports/" class="stage6-subnav-item" role="tab">Direct reports</a>
+    <a href="/foundation/leadership/positions/" class="stage6-subnav-item" role="tab">Positions</a>
+  </div>
+
+  <!-- Toolbar with Search and Filters -->
+  <div class="dash-toolbar">
+    <form method="get" action="/foundation/people/" class="dash-search-box" style="flex:1; display:flex; align-items:center; gap:8px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search these records" aria-label="Search these records" style="flex:1;">
+      {% if state_mode %}<input type="hidden" name="state" value="{{ state_mode }}">{% endif %}
+      {% if active_tab %}<input type="hidden" name="tab" value="{{ active_tab }}">{% endif %}
+      <button type="submit" style="background:none; border:none; color:var(--wdos-magenta, #D4006A); font-size:12px; font-weight:600; cursor:pointer;">Search</button>
+    </form>
+    <div class="dash-filter-actions">
+      <a href="/foundation/people/" class="{% if not status_filter and not verification_filter and not query %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">Current view</a>
+      <a href="?status={% if status_filter == 'Active' %}Review due{% else %}Active{% endif %}{% if query %}&q={{ query }}{% endif %}" class="{% if status_filter %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">Status ↓{% if status_filter %}: {{ status_filter }}{% endif %}</a>
+      <a href="?verification={% if verification_filter == 'Verified' %}Pending review{% else %}Verified{% endif %}{% if query %}&q={{ query }}{% endif %}" class="{% if verification_filter %}dash-filter-pill-active{% else %}dash-filter-pill{% endif %}" style="text-decoration:none;">More filters{% if verification_filter %}: {{ verification_filter }}{% endif %}</a>
+    </div>
+  </div>
+
+  {% if active_tab == 'overview' %}
+  <!-- Overview Summary Strip -->
+  <div class="stage6-cards-grid" style="margin-bottom:20px;">
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Authorized scope summary</h3>
+        <p class="stage6-info-card-text">{{ total_people_count|default:people|length }} people in scope &middot; {{ active_people_count|default:0 }} Active &middot; {{ review_due_count|default:0 }} Review due &middot; {{ verified_count|default:0 }} Contact verified.</p>
+      </div>
+      <a href="?tab=records" class="stage6-info-card-link">View all records &rarr;</a>
+    </div>
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Geography &amp; network spine</h3>
+        <p class="stage6-info-card-text">Active scope: {{ user_scope.active_network }} / {{ country_name }}. Records outside your authorized scope are automatically filtered.</p>
+      </div>
+      <a href="/foundation/geography/local-org/" class="stage6-info-card-link">Explore local hierarchy &rarr;</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Records Table Card -->
+  <div class="dash-card">
+    <div class="dash-card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <h2 class="dash-card-title">People directory</h2>
+      {% if query or status_filter or verification_filter %}
+      <a href="/foundation/people/" style="font-size:12.5px; color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">Clear active filters &times;</a>
+      {% endif %}
+    </div>
+
+    <!-- Desktop Table -->
+    <table class="dash-table dash-desktop-table" aria-label="People Directory Records">
+      <thead>
+        <tr>
+          <th scope="col">PERSON</th>
+          <th scope="col">LOCAL HOME</th>
+          <th scope="col">RELATIONSHIP</th>
+          <th scope="col">STATUS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for person in people %}
+        <tr>
+          <td>
+            <a href="/foundation/people/{{ person.person_code }}/" style="color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">{{ person.full_name }}</a>
+            <span style="display:block; font-size:11.5px; color:#6B7280;">{{ person.person_code }} &middot; {{ person.network }}</span>
+            {% if person.is_changed_record %}
+            <span class="dash-pill dash-pill-amber" style="display:inline-block; margin-top:4px; font-size:10.5px;">Changed record</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-weight:600; color:#111827;">{{ person.hierarchy_path.chapter_name|default:person.chapter_name|default:person.local_home }}</div>
+            <div style="font-size:11.5px; color:#6B7280; display:flex; align-items:center; gap:5px; margin-top:3px; flex-wrap:wrap;">
+              {% if person.hierarchy_path.cluster_name %}
+              <span class="dash-pill" style="font-size:10px; padding:1px 6px; background:#F5F3FF; color:#5B21B6; border:1px solid #DDD6FE;">Cluster: {{ person.hierarchy_path.cluster_name }}</span>
+              {% elif person.community_cluster %}
+              <span class="dash-pill" style="font-size:10px; padding:1px 6px; background:#F5F3FF; color:#5B21B6; border:1px solid #DDD6FE;">Cluster: {{ person.community_cluster }}</span>
+              {% endif %}
+              <span>&middot; {{ person.hierarchy_path.second_level_name|default:person.lga_or_district|default:person.region|default:person.country }}</span>
+            </div>
+          </td>
+          <td>{{ person.primary_relationship }}</td>
+          <td>
+            <span class="dash-pill {% if person.status == 'Active' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">
+              {{ person.status }}
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center; padding:32px; color:#6B7280;">
+            No records in this view matching the selected scope.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Mobile View Cards -->
+    <div class="dash-mobile-list" aria-label="People Directory Records Mobile List">
+      {% for person in people %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Person</span>
+          <span>
+            <a href="/foundation/people/{{ person.person_code }}/" class="dash-mobile-val" style="color:var(--wdos-magenta, #D4006A); font-weight:700; text-decoration:none;">{{ person.full_name }}</a>
+            {% if person.is_changed_record %}
+            <span class="dash-pill dash-pill-amber" style="margin-left:6px; font-size:10.5px;">Changed record</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Local home</span>
+          <span class="dash-mobile-val">
+            <span style="font-weight:600;">{{ person.hierarchy_path.chapter_name|default:person.chapter_name|default:person.local_home }}</span>
+            <span style="display:block; font-size:11px; color:#5B21B6;">Cluster: {{ person.hierarchy_path.cluster_name|default:person.community_cluster|default:"Assigned" }}</span>
+            <span style="display:block; font-size:11px; color:#6B7280;">{{ person.hierarchy_path.second_level_name|default:person.lga_or_district|default:person.region|default:person.country }}</span>
+          </span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Relationship</span>
+          <span class="dash-mobile-val">{{ person.primary_relationship }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Status</span>
+          <span class="dash-pill {% if person.status == 'Active' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">
+            {{ person.status }}
+          </span>
+        </div>
+      </div>
+      {% empty %}
+      <div style="padding:24px; text-align:center; color:#6B7280;">No records in this view.</div>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination & Record Count -->
+    <div class="dash-pagination">
+      <span>Showing {{ people|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  {% if active_tab == 'history' %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Recent people &amp; geography activity history</h2>
+    </div>
+    <table class="dash-table" aria-label="Audit History">
+      <thead>
+        <tr>
+          <th scope="col">EVENT</th>
+          <th scope="col">SUMMARY</th>
+          <th scope="col">ACTOR</th>
+          <th scope="col">TIMESTAMP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in audit_history %}
+        <tr>
+          <td><span class="dash-pill dash-pill-green">{{ ev.action }}</span></td>
+          <td>{{ ev.summary }}</td>
+          <td>{{ ev.actor }}</td>
+          <td>{{ ev.timestamp }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan=\"4\" style=\"text-align:center; padding:28px; color:#6B7280;\">No people or geography activity history recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Scoped Notice -->
+  <div class="stage6-shield-notice">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Only authorized profile fields and relationships are visible in this view.</div>
+  </div>
+
+  <!-- Bottom Insight Cards -->
+  <div class="stage6-cards-grid">
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Connected relationships</h3>
+        <p class="stage6-info-card-text">Membership, participation and leadership attach to one person identity.</p>
+      </div>
+      <a href="/foundation/community/relationships/" class="stage6-info-card-link">No duplicate registration &rarr;</a>
+    </div>
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Verification required</h3>
+        <p class="stage6-info-card-text">Confirm material changes against approved evidence.</p>
+      </div>
+      <a href="/foundation/community/reassignment/review/" class="stage6-info-card-link">Record history retained &rarr;</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

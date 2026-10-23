@@ -4,7 +4,25 @@ import json
 import sys
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load local .env file values if present (without overriding existing environment variables)
+_env_path = BASE_DIR / ".env"
+_is_test_run = any(arg == "test" or arg.endswith("test") for arg in sys.argv)
+if _env_path.exists():
+    for _raw_line in _env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        _line = _raw_line.strip()
+        if not _line or _line.startswith("#") or "=" not in _line:
+            continue
+        _k, _v = _line.split("=", 1)
+        _k = _k.strip()
+        _v = _v.strip()
+        if _is_test_run and _k in ("WDOS_ONBOARDING_POLICY_JSON", "WDOS_SECURE_COOKIES"):
+            continue
+        if _k and (_k not in os.environ or not os.environ[_k]):
+            os.environ[_k] = _v
+
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "wdos-local-development-only")
+
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",") if h]
 
@@ -68,9 +86,9 @@ AUTH_PASSWORD_VALIDATORS = [
 WDOS_VERIFY_TTL = 600
 WDOS_RESET_TTL = 1800
 WDOS_MFA_TTL = 600
-WDOS_IDLE_TTL = 1800
-WDOS_SESSION_TTL = 43200
-WDOS_REMEMBER_TTL = 604800
+WDOS_IDLE_TTL = int(os.getenv("WDOS_IDLE_TTL", "86400"))
+WDOS_SESSION_TTL = int(os.getenv("WDOS_SESSION_TTL", "86400"))
+WDOS_REMEMBER_TTL = int(os.getenv("WDOS_REMEMBER_TTL", "604800"))
 WDOS_PUBLIC_ORIGIN = os.getenv("WDOS_PUBLIC_ORIGIN", "https://wdos-staging.onrender.com")
 if os.getenv("WDOS_ENVIRONMENT") == "production":
     from urllib.parse import urlsplit
@@ -152,3 +170,14 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Stage 10 Multilingua & Event Provider Configuration
+MEETING_VIDEO_PROVIDER = os.getenv("MEETING_VIDEO_PROVIDER", "zoom")
+MEETING_TRANSLATION_PROVIDER = os.getenv("MEETING_TRANSLATION_PROVIDER", "azure")
+ZOOM_SDK_KEY = os.getenv("ZOOM_SDK_KEY", "wdos-dev-zoom-sdk-key")
+ZOOM_SDK_SECRET = os.getenv("ZOOM_SDK_SECRET", "wdos-dev-zoom-sdk-secret-hs256-min-32-bytes")
+AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "wdos-dev-azure-speech-key")
+AZURE_SPEECH_KEY_2 = os.getenv("AZURE_SPEECH_KEY_2", "")
+AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
+
+

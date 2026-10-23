@@ -1,0 +1,113 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}My application · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">My application</h1>
+      <p class="dash-subtitle">See the relevant recruitment and referrals records, linked evidence and next actions for your scope.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="/foundation/recruitment/opportunities/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item " role="tab">Opportunities</a>
+    <a href="/foundation/recruitment/referrals/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item " role="tab">Referrals</a>
+    <a href="/foundation/recruitment/my-application/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item active" role="tab">My application</a>
+    <a href="/foundation/recruitment/pipeline/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item " role="tab">Pipeline</a>
+    <a href="/foundation/recruitment/reserve-pool/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item " role="tab">Reserve pool</a>
+  </div>
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">My application</h2>
+
+      <!-- 4-Step Journey Progress List -->
+      <div style="display:flex; flex-direction:column; gap:14px; margin-bottom:24px;">
+        <div style="padding:16px; border:1px solid #E5E7EB; border-radius:10px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+          <div>
+            <div style="font-size:10.5px; font-weight:700; letter-spacing:0.12em; color:#6B7280; margin-bottom:4px;">S T E P 0 1</div>
+            <div style="font-size:14.5px; font-weight:700; color:#111827; margin-bottom:4px;">Application received</div>
+            <div style="font-size:13px; color:#4B5563;">Open-call recruits complete Activation. Referred candidates review the Leadership Pack.</div>
+          </div>
+          <span class="dash-pill dash-pill-green">&check;</span>
+        </div>
+
+        <div style="padding:16px; border:1.5px solid var(--wdos-magenta, #D4006A); border-radius:10px; background:#FDF2F8; display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+          <div>
+            <div style="font-size:10.5px; font-weight:700; letter-spacing:0.12em; color:var(--wdos-magenta, #D4006A); margin-bottom:4px;">S T E P 0 2</div>
+            <div style="font-size:14.5px; font-weight:700; color:#111827; margin-bottom:4px;">Eligibility checked</div>
+            <div style="font-size:13px; color:#4B5563;">Recommendations support an authorized human decision.</div>
+          </div>
+          <span class="dash-pill dash-pill-magenta">&bull;</span>
+        </div>
+
+        <div style="padding:16px; border:1px solid #E5E7EB; border-radius:10px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+          <div>
+            <div style="font-size:10.5px; font-weight:700; letter-spacing:0.12em; color:#6B7280; margin-bottom:4px;">S T E P 0 3</div>
+            <div style="font-size:14.5px; font-weight:700; color:#111827; margin-bottom:4px;">Activation underway</div>
+            <div style="font-size:13px; color:#4B5563;">Your progress and next action remain available here.</div>
+          </div>
+          <span class="dash-pill">&check;</span>
+        </div>
+
+        <div style="padding:16px; border:1px solid #E5E7EB; border-radius:10px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+          <div>
+            <div style="font-size:10.5px; font-weight:700; letter-spacing:0.12em; color:#6B7280; margin-bottom:4px;">S T E P 0 4</div>
+            <div style="font-size:14.5px; font-weight:700; color:#111827; margin-bottom:4px;">Human decision pending</div>
+            <div style="font-size:13px; color:#4B5563;">Your progress and next action remain available here.</div>
+          </div>
+          <span class="dash-pill">&check;</span>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <a href="/foundation/recruitment/opportunities/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+        {% if application and application.route == '3-day referral' %}
+        <a href="/foundation/recruitment/leadership-pack/?candidate={{ application.application_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Continue my journey</a>
+        {% else %}
+        <a href="/foundation/recruitment/activation/?candidate={{ application.application_code|default:'CAND-NG-001' }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Continue my journey</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:10px;">At a glance</h3>
+        <span class="dash-pill" style="margin-bottom:16px; display:inline-block;">&bull; In progress</span>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Two distinct routes</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Open-call recruits complete Activation. Referred candidates review the Leadership Pack.</p>
+          <span class="stage6-sidebar-badge">7 days / 3 days</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">A decision, not a score</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Recommendations support an authorized human decision.</p>
+          <span class="stage6-sidebar-badge">No automatic appointment</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

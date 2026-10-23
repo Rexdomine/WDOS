@@ -1,0 +1,153 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Meeting attendance and minutes · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Meeting attendance and minutes</h1>
+      <p class="dash-subtitle">Record attendance, approve or correct minutes and convert decisions into Mission Control tasks.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/meetings/{{ meeting.meeting_code }}/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back to Meeting</a>
+      <button type="submit" form="minutes-review-form" name="decision" value="Approve minutes" class="dash-btn-primary">&rarr; Approve or convert</button>
+    </div>
+  </div>
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Minutes &amp; Actions Decision:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+    <!-- Left Card: Details to check -->
+    <div class="dash-card" style="grid-column: span 2;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <h2 class="dash-card-title" style="margin:0;">Details to check &middot; {{ meeting.title }}</h2>
+          <div style="font-size:12.5px; color:#6B7280; margin-top:2px;">{{ meeting.meeting_code }} &middot; {{ meeting.local_time_label }}</div>
+        </div>
+        <span class="dash-pill {% if meeting.minutes_status == 'Approved' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">&bull; {{ meeting.minutes_status|default:"Needs review" }}</span>
+      </div>
+
+      <table class="dash-table dash-desktop-table" aria-label="Meeting attendance, decisions and actions" style="margin-bottom:20px;">
+        <thead>
+          <tr>
+            <th scope="col">RECORD</th>
+            <th scope="col">PERSON / OWNER</th>
+            <th scope="col">ATTENDANCE / DEADLINE</th>
+            <th scope="col">DETAIL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in participants %}
+          <tr>
+            <td style="font-weight:600; color:#111827;">Attendance</td>
+            <td>{{ p.participant_name }}</td>
+            <td>{{ p.attendance_status }} ({{ p.rsvp_status }})</td>
+            <td>{{ p.detail_note }}</td>
+          </tr>
+          {% endfor %}
+          {% for item in decisions_and_actions %}
+          <tr>
+            <td style="font-weight:600; color:#111827;">{{ item.record_code }}</td>
+            <td>{{ item.owner_label }}</td>
+            <td>{{ item.deadline_or_version }}</td>
+            <td>{{ item.detail_text }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <form id="minutes-review-form" method="post" action="/foundation/meetings/attendance-minutes/?meeting={{ meeting.meeting_code }}&country={{ target_country }}&network={{ target_network }}">
+        {% csrf_token %}
+        <input type="hidden" name="meeting_code" value="{{ meeting.meeting_code }}">
+
+        <div style="margin-bottom:16px;">
+          <label for="id_minutes_text" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Meeting minutes &amp; recorded transcript</label>
+          <textarea id="id_minutes_text" name="minutes_text" rows="6" {% if meeting.minutes_frozen %}readonly{% endif %} placeholder="Record discussion summary, resolutions, and live interpretation transcript..." style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px; line-height:1.5; font-family:inherit;">{{ meeting.minutes_text }}</textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div>
+            <label for="id_minutes_version" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Minutes version</label>
+            <input id="id_minutes_version" type="text" name="minutes_version" value="{{ meeting.minutes_draft_label|default:'v2 · draft' }}" style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px;">
+          </div>
+          <div>
+            <label for="id_mtg_decision" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Decision</label>
+            <select id="id_mtg_decision" name="decision" style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px; background:#FFFFFF;">
+              <option value="Approve minutes">Approve minutes</option>
+              <option value="Request correction">Request correction</option>
+              <option value="Convert actions to Mission Control">Convert actions to Mission Control</option>
+              <option value="Save minutes">Save draft minutes</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label for="id_reviewer_comment" style="display:block; font-size:13px; font-weight:700; color:#111827; margin-bottom:6px;">Reviewer comment</label>
+          <textarea id="id_reviewer_comment" name="reviewer_comment" rows="3" placeholder="Record minutes approval or the correction required." style="width:100%; padding:10px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:14px;"></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <a href="/foundation/meetings/follow-up/?meeting={{ meeting.meeting_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Follow-up &amp; Action Items</a>
+          <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            {% if not meeting.minutes_frozen %}
+            <button type="submit" name="decision" value="Save minutes" class="dash-btn-secondary">Save draft</button>
+            {% endif %}
+            <button type="submit" name="decision" value="Request correction" class="dash-btn-secondary">Return for correction</button>
+            <button type="submit" name="decision" value="Convert actions to Mission Control" class="dash-btn-secondary">Convert actions to Mission Control</button>
+            <button type="submit" name="decision" value="Approve minutes" class="dash-btn-primary">&rarr; Approve or convert</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Card: Governance Rules -->
+    <div class="dash-card">
+      <h2 class="dash-card-title" style="margin:0 0 16px 0;">Minutes &amp; task conversion</h2>
+
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:14px;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:6px;">Versioned minutes</div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.5;">Approving minutes freezes that version; corrections create a new version with reason and reviewer record.</div>
+      </div>
+
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:14px;">
+        <div style="font-size:14px; font-weight:700; color:#111827; margin-bottom:6px;">Action conversion</div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.5;">Each agreed action can be converted once into a linked Mission Control task and keeps its meeting reference.</div>
+      </div>
+
+      {% if is_organizer_or_reviewer %}
+      <div style="margin-bottom:14px;">
+        <a href="/foundation/meetings/command-centre/?meeting={{ meeting.meeting_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary" style="width:100%; justify-content:center; box-sizing:border-box;">
+          Correct Attendance Record &rarr;
+        </a>
+      </div>
+      {% endif %}
+
+      <div class="stage6-shield-notice">
+        <div class="stage6-shield-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>Times are shown in Africa/Lagos. Joining, speaking and moderating are separate permissions.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,143 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Positions and reporting lines · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Positions and reporting lines</h1>
+      <p class="dash-subtitle">Prepare a controlled change. Current settings remain effective until the required approval.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Position Revision:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="/foundation/people/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">People directory</a>
+    <a href="/foundation/community/relationships/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Community relationships</a>
+    <a href="/foundation/geography/local-org/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Local organisation</a>
+    <a href="/foundation/leadership/structure/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Leadership structure</a>
+    <a href="/foundation/leadership/register/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Leadership register</a>
+    <a href="/foundation/leadership/vacancies/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Vacancies</a>
+    <a href="/foundation/leadership/direct-reports/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Direct reports</a>
+    <a href="/foundation/leadership/positions/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item active" role="tab">Positions</a>
+  </div>
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <form method="post" action="/foundation/leadership/positions/">
+        {% csrf_token %}
+        {% if selected_position.updated_at %}
+        <input type="hidden" name="expected_updated_at" value="{{ selected_position.updated_at|date:'Y-m-d\TH:i:s' }}">
+        {% endif %}
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">Positions and reporting lines</h2>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+          <div class="stage6-field-group">
+            <label class="stage6-label" for="id_position_code">Stable position code</label>
+            <input type="text" id="id_position_code" name="position_code" class="stage6-input" value="{{ selected_position.position_code|default:'STATE_COORDINATOR' }}" required>
+          </div>
+
+          <div class="stage6-field-group">
+            <label class="stage6-label" for="id_wgmn_title">WGMN display title</label>
+            <input type="text" id="id_wgmn_title" name="wgmn_title" class="stage6-input" value="{{ selected_position.wgmn_title|default:'State Coordinator' }}" required>
+          </div>
+
+          <div class="stage6-field-group">
+            <label class="stage6-label" for="id_wnnn_title">WNNN display title</label>
+            <input type="text" id="id_wnnn_title" name="wnnn_title" class="stage6-input" value="{{ selected_position.wnnn_title|default:'State Lead' }}" required>
+          </div>
+
+          <div class="stage6-field-group">
+            <label class="stage6-label" for="id_reports_to_label">Reports to</label>
+            <input type="text" id="id_reports_to_label" name="reports_to_label" class="stage6-input" value="{{ selected_position.reports_to_label|default:'Country principal' }}" required>
+          </div>
+        </div>
+
+        <hr style="border:none; border-top:1px solid #E5E7EB; margin:20px 0;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <span style="font-size:12.5px; color:#6B7280;">Changes are recorded in the activity history.</span>
+          <div style="display:flex; gap:10px;">
+            <a href="/foundation/leadership/structure/" class="dash-btn-secondary">Back</a>
+            <button type="submit" class="dash-btn-primary">&rarr; Save position revision</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:10px;">At a glance</h3>
+        <span class="dash-pill" style="margin-bottom:16px; display:inline-block;">&bull; In progress</span>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Before you continue</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">A vacancy exists only for an approved seat. Former holders remain in history.</p>
+          <span class="stage6-sidebar-badge">Please review</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your information is protected</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Only the people authorized for this record can review the submission.</p>
+          <span class="stage6-sidebar-badge">Scoped access</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Position Master Catalogue Table -->
+  {% if all_positions %}
+  <div class="dash-card" style="margin-top:24px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Canonical position master catalogue</h2>
+    </div>
+    <table class="dash-table" aria-label="Canonical Position Master Catalogue">
+      <thead>
+        <tr>
+          <th scope="col">STABLE POSITION CODE</th>
+          <th scope="col">WGMN DISPLAY TITLE</th>
+          <th scope="col">WNNN DISPLAY TITLE</th>
+          <th scope="col">REPORTS TO</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pos in all_positions %}
+        <tr>
+          <td style="font-weight:700; color:#111827;">
+            <a href="?position={{ pos.position_code }}" style="color:var(--wdos-magenta, #D4006A); text-decoration:none;">{{ pos.position_code }}</a>
+          </td>
+          <td>{{ pos.wgmn_title }}</td>
+          <td>{{ pos.wnnn_title }}</td>
+          <td>{{ pos.reports_to_label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

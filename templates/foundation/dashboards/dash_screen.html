@@ -205,7 +205,7 @@
           {% for bar in screen.chart_card.bars %}
           <div class="dash-bar-col">
             <div class="dash-bar-val">{{ bar.value }}</div>
-            <div class="dash-bar" style="height: calc({{ bar.value }} * 18px); min-height: 24px; background-color: {{ bar.color|default:'#D4006A' }};"></div>
+            <div class="dash-bar" style="height: calc({{ bar.value }} * 18px); min-height: {% if bar.value == 0 %}4px{% else %}24px{% endif %}; background-color: {{ bar.color|default:'#D4006A' }};"></div>
             <div class="dash-bar-lbl">{{ bar.label }}</div>
           </div>
           {% endfor %}

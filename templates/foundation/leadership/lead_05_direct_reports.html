@@ -1,0 +1,164 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}My direct reports · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">My direct reports</h1>
+      <p class="dash-subtitle">See the relevant leadership and seats records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/leadership/structure/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      <a href="#assign-followup-form" class="dash-btn-primary">&rarr; Assign follow-up</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Follow-up Assigned:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="/foundation/people/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">People directory</a>
+    <a href="/foundation/community/relationships/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Community relationships</a>
+    <a href="/foundation/geography/local-org/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Local organisation</a>
+    <a href="/foundation/leadership/structure/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Leadership structure</a>
+    <a href="/foundation/leadership/register/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Leadership register</a>
+    <a href="/foundation/leadership/vacancies/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Vacancies</a>
+    <a href="/foundation/leadership/direct-reports/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item active" role="tab">Direct reports</a>
+    <a href="/foundation/leadership/positions/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-item" role="tab">Positions</a>
+  </div>
+
+  <!-- Direct Reports Card -->
+  <div class="dash-card" style="margin-bottom:20px;">
+    <div class="dash-card-header" style="margin-bottom:16px;">
+      <h2 class="dash-card-title">My direct reports</h2>
+    </div>
+
+    <div class="dash-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+      <form method="get" action="/foundation/leadership/direct-reports/" class="dash-search-box" style="min-width:240px; display:flex; align-items:center; gap:6px;">
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search these records" aria-label="Search these records">
+      </form>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="/foundation/leadership/direct-reports/?country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if not status_filter %}dash-pill-magenta{% endif %}" style="text-decoration:none;">Current view</a>
+        <a href="/foundation/leadership/direct-reports/?status=Onboarding&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if status_filter == 'Onboarding' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Status &darr;</a>
+        <a href="/foundation/appointments/reviews/?country={{ target_country }}&network={{ target_network }}" class="dash-pill" style="text-decoration:none; background:#F3F4F6; color:#374151;">More filters</a>
+      </div>
+    </div>
+
+    <table class="dash-table dash-desktop-table" aria-label="My Direct Reports">
+      <thead>
+        <tr>
+          <th scope="col">POSITION</th>
+          <th scope="col">UNIT</th>
+          <th scope="col">HOLDER</th>
+          <th scope="col">STATUS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for seat in seats %}
+        <tr>
+          <td style="font-weight:600; color:#111827;">
+            <a href="/foundation/leadership/seats/{{ seat.seat_code }}/" style="color:#111827; text-decoration:none;">{{ seat.position_title }}</a>
+          </td>
+          <td>{{ seat.unit_name }}</td>
+          <td>{{ seat.holder_name }}</td>
+          <td>
+            <span class="dash-pill {% if seat.status == 'Active' %}dash-pill-green{% elif seat.status == 'Onboarding' %}dash-pill-amber{% endif %}">{{ seat.status }}</span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center; padding:32px; color:#6B7280;">No direct report seats match this filter.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="dash-pagination">
+      <span>Showing {{ seats|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assign Follow-up Form -->
+  <div id="assign-followup-form" class="dash-card" style="margin-bottom:20px;">
+    <h3 class="dash-card-title" style="margin-bottom:14px;">Assign leadership follow-up action</h3>
+    <form method="post" action="/foundation/leadership/direct-reports/?country={{ target_country }}&network={{ target_network }}" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; align-items:end;">
+      {% csrf_token %}
+      <div>
+        <label class="stage6-label" for="id_seat_code">Direct report seat</label>
+        <select id="id_seat_code" name="seat_code" class="stage6-input">
+          {% for s in all_scoped_seats %}
+          <option value="{{ s.seat_code }}">{{ s.position_title }} &middot; {{ s.unit_name }} ({{ s.holder_name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_followup_title">Follow-up task title</label>
+        <input type="text" id="id_followup_title" name="followup_title" class="stage6-input" placeholder="e.g. Complete 30-day orientation check-in" required>
+      </div>
+      <div>
+        <label class="stage6-label" for="id_followup_summary">Guidance notes</label>
+        <input type="text" id="id_followup_summary" name="followup_summary" class="stage6-input" value="Review reporting line and monthly activity schedule.">
+      </div>
+      <div>
+        <button type="submit" class="dash-btn-primary" style="width:100%;">Assign follow-up</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Shield Notice -->
+  <div class="stage6-shield-notice" style="margin-bottom:20px;">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>A vacancy exists only for an approved seat. Former holders remain in history.</div>
+  </div>
+
+  <!-- Bottom Cards -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
+    <div class="dash-card">
+      <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 6px 0;">Lagos State</h3>
+      <p style="font-size:13px; color:#4B5563; margin:0 0 12px 0;">Lina Mensah &middot; State Coordinator.</p>
+      <a href="/foundation/leadership/seats/SEAT-NG-LAG-SC/" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Active &rarr;</a>
+    </div>
+    <div class="dash-card">
+      <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 6px 0;">Ikeja LGA</h3>
+      <p style="font-size:13px; color:#4B5563; margin:0 0 12px 0;">Kemi Bello &middot; LGA Coordinator.</p>
+      <a href="/foundation/leadership/seats/SEAT-NG-IKJ-LC/" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Onboarding &rarr;</a>
+    </div>
+    <div class="dash-card">
+      <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 6px 0;">Chapter support</h3>
+      <p style="font-size:13px; color:#4B5563; margin:0 0 12px 0;">An approved deputy seat needs a candidate referral.</p>
+      <a href="/foundation/leadership/vacancies/" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Vacant &rarr;</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -77,7 +77,7 @@ class AuthUIStateRegressionTests(TestCase):
 
     def test_welcome_and_registration_navigation_are_present_without_duplicates(self):
         welcome = self.client.get('/')
-        self.assertContains(welcome, 'Join as a member')
+        self.assertNotContains(welcome, 'Join as a member')
         self.assertContains(welcome, 'I already have an account')
         registration = self.client.get('/auth/register/')
         self.assertContains(registration, 'Already registered? Sign in')

@@ -16,11 +16,6 @@
   </div>
 </div>
 
-<div class="stage4-tabs">
-  <a href="?tab=overview{% if q %}&q={{ q }}{% endif %}" class="stage4-tab {% if active_tab == 'overview' or not active_tab %}active{% endif %}">Overview</a>
-  <a href="?tab=records{% if q %}&q={{ q }}{% endif %}" class="stage4-tab {% if active_tab == 'records' %}active{% endif %}">Records</a>
-  <a href="?tab=history{% if q %}&q={{ q }}{% endif %}" class="stage4-tab {% if active_tab == 'history' %}active{% endif %}">History</a>
-</div>
 
 {% if state_mode %}
 <div class="stage4-state-card" style="margin-bottom: 20px; border-left: 4px solid var(--wdos-magenta);">

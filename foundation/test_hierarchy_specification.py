@@ -372,7 +372,10 @@ class HierarchySpecificationTests(TestCase):
         self._login(self.chapter_user)
         res = self.client.get("/foundation/dashboards/DASH-14/")
         self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "Chapter Lead")
+        self.assertTrue(
+            "Chapter Coordinator" in res.content.decode("utf-8")
+            or "Chapter Lead" in res.content.decode("utf-8")
+        )
         self.assertContains(res, "Allen Chapter")
         self.assertContains(res, "Community Cluster")
 

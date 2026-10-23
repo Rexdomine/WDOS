@@ -1,0 +1,134 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Handover assets and access checks · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Handover assets and access checks</h1>
+      <p class="dash-subtitle">Use the information and next action for this role only.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/appointments/handover/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back to dashboard</a>
+      <form method="post" action="/foundation/appointments/handover/assets/" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="complete_all">
+        <button type="submit" class="dash-btn-primary">&rarr; Open</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Handover Verification:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- Handover Assets & Access Checks Table Card -->
+  <div class="dash-card" style="margin-bottom:20px;">
+    <div class="dash-card-header" style="margin-bottom:16px;">
+      <h2 class="dash-card-title">Appointment and onboarding</h2>
+    </div>
+
+    <div class="dash-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+      <form method="get" action="/foundation/appointments/handover/assets/" class="dash-search-box" style="min-width:240px; display:flex; align-items:center; gap:6px;">
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search these records" aria-label="Search these records">
+      </form>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="/foundation/appointments/handover/assets/?country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if not status_filter %}dash-pill-magenta{% endif %}" style="text-decoration:none;">Current view</a>
+        <a href="/foundation/appointments/handover/assets/?status=Open&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if status_filter == 'Open' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Status &darr;</a>
+        <a href="/foundation/appointments/handover/?country={{ target_country }}&network={{ target_network }}" class="dash-pill" style="text-decoration:none; background:#F3F4F6; color:#374151;">More filters</a>
+      </div>
+    </div>
+
+    <table class="dash-table dash-desktop-table" aria-label="Handover Assets and Access Checks">
+      <thead>
+        <tr>
+          <th scope="col">ASSET / TASK</th>
+          <th scope="col">FROM</th>
+          <th scope="col">TO</th>
+          <th scope="col">DUE</th>
+          <th scope="col">ACCESS ACTION</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in handover_tasks %}
+        <tr>
+          <td style="font-weight:600; color:#111827;">{{ task.asset_or_task }}</td>
+          <td>{{ task.from_actor }}</td>
+          <td>{{ task.to_actor }}</td>
+          <td>{{ task.due_date }}</td>
+          <td>
+            <form method="post" action="/foundation/appointments/handover/assets/" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="complete_task">
+              <input type="hidden" name="task_id" value="{{ task.id }}">
+              <button type="submit" class="dash-pill {% if task.status == 'Completed' %}dash-pill-green{% endif %}" style="border:none; cursor:pointer;">&bull; {{ task.access_action }}</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="text-align:center; padding:32px; color:#6B7280;">No handover asset records in this view.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="dash-mobile-list">
+      {% for task in handover_tasks %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Asset / task</span><span class="dash-mobile-val" style="font-weight:700;">{{ task.asset_or_task }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">From</span><span class="dash-mobile-val">{{ task.from_actor }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">To</span><span class="dash-mobile-val">{{ task.to_actor }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Due</span><span class="dash-mobile-val">{{ task.due_date }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Access action</span><span class="dash-pill">{{ task.access_action }}</span></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="dash-pagination">
+      <span>Showing {{ handover_tasks|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shield Notice -->
+  <div class="stage6-shield-notice" style="margin-bottom:20px;">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Changing an appointment does not create a new person or erase prior service.</div>
+  </div>
+
+  <!-- Handover Completion Summary Card -->
+  <div class="dash-card" style="max-width:400px;">
+    <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 6px 0;">Handover completion</h3>
+    <p style="font-size:13px; color:#4B5563; margin:0 0 12px 0;">Each asset has a named from/to record, due date and access action; verify completion before closing transition.</p>
+    <a href="/foundation/appointments/handover/" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">{{ handover_tasks|length }} records &rarr;</a>
+  </div>
+</div>
+{% endblock %}

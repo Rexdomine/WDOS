@@ -1,0 +1,138 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Plan a safe leadership transition · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Plan a safe leadership transition</h1>
+      <p class="dash-subtitle">Check the evidence and the impact of this decision before confirming.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Leadership Transition Plan:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+
+  <!-- Appointments & Continuity Sub-Navigation -->
+  <div class="stage6-subnav">
+    <a href="/foundation/appointments/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment processing</a>
+    <a href="/foundation/appointments/offer/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment offer</a>
+    <a href="/foundation/appointments/onboarding/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Leader onboarding</a>
+    <a href="/foundation/appointments/first-90-days/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">First 90 days</a>
+    <a href="/foundation/appointments/reviews/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">30 / 60 / 90 day reviews</a>
+    <a href="/foundation/appointments/identity/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment &amp; identity</a>
+    <a href="/foundation/appointments/status-change/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Status change</a>
+    <a href="/foundation/appointments/transition/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link active">Plan transition</a>
+    <a href="/foundation/appointments/handover/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Handover workspace</a>
+  </div>
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <form method="post" action="/foundation/appointments/transition/">
+        {% csrf_token %}
+        <input type="hidden" name="appointment_code" value="{{ appointment.appointment_code|default:'APPT-NG-003' }}">
+        {% if appointment.updated_at %}
+        <input type="hidden" name="expected_updated_at" value="{{ appointment.updated_at|date:'Y-m-d\TH:i:s' }}">
+        {% endif %}
+
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:10px;">Plan a safe leadership transition</h2>
+        <span class="dash-pill" style="margin-bottom:18px; display:inline-block;">&bull; In progress</span>
+
+        <div style="padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Before you continue</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:4px 0;">Changing an appointment does not create a new person or erase prior service.</p>
+          <span class="stage6-sidebar-badge">Please review</span>
+        </div>
+
+        <div style="padding-bottom:16px; margin-bottom:16px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your information is protected</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:4px 0;">Only the people authorized for this record can review the submission.</p>
+          <span class="stage6-sidebar-badge">Scoped access</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+          <div class="stage6-field-group">
+            <label class="stage6-label">Outgoing appointment</label>
+            <div class="stage6-readonly-field">{{ transition_plan.outgoing_appointment_label|default:"Kemi Bello · LGA Coordinator" }}</div>
+          </div>
+
+          <div class="stage6-field-group">
+            <label class="stage6-label" for="id_transition_type">Transition type</label>
+            <select id="id_transition_type" name="transition_type" class="stage6-input">
+              <option value="Transfer">Transfer</option>
+              <option value="Resignation / Exit">Resignation / Exit</option>
+              <option value="End of term">End of term</option>
+              <option value="Replacement">Replacement</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="stage6-field-group">
+          <label class="stage6-label" for="id_effective_date">Effective date</label>
+          <input type="text" id="id_effective_date" name="effective_date" class="stage6-input" value="{{ transition_plan.effective_date|default:'01 October 2026' }}" required>
+        </div>
+
+        <div class="stage6-field-group">
+          <label class="stage6-label" for="id_access_and_handover_notes">Access and handover review</label>
+          <textarea id="id_access_and_handover_notes" name="access_and_handover_notes" class="stage6-input" rows="3" required>{{ transition_plan.access_and_handover_notes|default:"Official records, groups and outstanding actions require review." }}</textarea>
+        </div>
+
+        <div class="stage6-shield-notice" style="margin-bottom:20px;">
+          <div class="stage6-shield-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>Changing an appointment does not create a new person or erase prior service.</div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <span style="font-size:12.5px; color:#6B7280;">A decision requires the appropriate authority.</span>
+          <div style="display:flex; gap:10px;">
+            <a href="/foundation/appointments/" class="dash-btn-secondary">Back</a>
+            <button type="submit" class="dash-btn-primary">&rarr; Open transition review</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:14px;">Decision context</h3>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Before you continue</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Changing an appointment does not create a new person or erase prior service.</p>
+          <span class="stage6-sidebar-badge">Please review</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your information is protected</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Only the people authorized for this record can review the submission.</p>
+          <span class="stage6-sidebar-badge">Scoped access</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

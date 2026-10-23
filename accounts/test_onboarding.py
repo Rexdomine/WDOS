@@ -62,6 +62,14 @@ class OnboardingDraftTests(TestCase):
         self.assertEqual(page.context['form'].initial['timezone'], 'Africa/Lagos')
         self.assertEqual(page.context['revision'], 1)
 
+    def test_registration_chosen_network_prefills_step3(self):
+        session = self.client.session
+        session['chosen_network'] = 'WNNN'
+        session.save()
+        page = self.client.get('/onboarding/3/')
+        self.assertEqual(page.context['form'].initial['network'], 'WNNN')
+        self.assertEqual(page.context['form'].initial['eligibility'], 'youth')
+
     def test_explicit_locale_overrides_saved_draft_language(self):
         self.save(1, {'language': 'en', 'timezone': 'UTC', 'reading': 'standard'})
         page = self.client.get('/onboarding/1/?lang=fr')

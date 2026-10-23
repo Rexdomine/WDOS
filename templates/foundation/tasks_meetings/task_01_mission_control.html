@@ -1,0 +1,206 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Mission Control tasks · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Mission Control tasks</h1>
+      <p class="dash-subtitle">Move work from Not started to Closed with one clear next action.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/work-queue/" class="dash-btn-secondary">Back</a>
+      <a href="/foundation/tasks/create/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Create task</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <!-- Unified Sub-navigation Tabs -->
+  <div class="stage6-subnav" style="margin-bottom:16px;">
+    <a href="/foundation/work-queue/?tab=overview&country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Priority queue</a>
+    <a href="/foundation/work-queue/?tab=records&country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Active items</a>
+    <a href="/foundation/work-queue/?tab=history&country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Completed history</a>
+    <a href="/foundation/tasks/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link active">Mission Control tasks</a>
+  </div>
+
+  <!-- Scoped Queue Filters -->
+  <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px;">
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      <a href="/foundation/tasks/?country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if not queue_filter %}dash-pill-magenta{% endif %}" style="text-decoration:none;">All scoped tasks</a>
+      <a href="/foundation/tasks/?queue=assigned_to_me&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if queue_filter == 'assigned_to_me' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Assigned to me</a>
+      <a href="/foundation/tasks/?queue=assigned_by_me&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if queue_filter == 'assigned_by_me' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Assigned by me</a>
+      <a href="/foundation/tasks/?queue=overdue&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if queue_filter == 'overdue' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Overdue</a>
+      <a href="/foundation/tasks/?queue=blocked&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if queue_filter == 'blocked' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Blocked</a>
+      <a href="/foundation/tasks/?queue=returned&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if queue_filter == 'returned' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Returned</a>
+      <a href="/foundation/tasks/?queue=completed&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if queue_filter == 'completed' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Completed</a>
+    </div>
+  </div>
+
+  <!-- 3-Column Scoped Task Board -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px; margin-bottom:22px;">
+    <!-- Column 1: To do -->
+    <div class="dash-card" style="background:#FFFFFF;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:15px; font-weight:700; color:#111827; margin:0;">To do</h2>
+        <span class="dash-pill" style="font-weight:700;">{{ todo_tasks|length|stringformat:"02d" }}</span>
+      </div>
+      {% for t in todo_tasks %}
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:12px;">
+        <div style="font-size:14.5px; font-weight:700; color:#111827; margin-bottom:6px;">
+          <a href="/foundation/tasks/{{ t.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="color:#111827; text-decoration:none;">{{ t.title }}</a>
+        </div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.45; margin-bottom:14px;">{{ t.description }}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="dash-pill dash-pill-amber">Due {{ t.due_short_label }}</span>
+          <a href="/foundation/tasks/{{ t.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="font-size:12.5px; font-weight:700; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Open &rarr;</a>
+        </div>
+      </div>
+      {% empty %}
+      <div style="border:1px dashed #D1D5DB; border-radius:12px; padding:18px; text-align:center; color:#6B7280; font-size:13px;">
+        No tasks waiting in To do.
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Column 2: In progress -->
+    <div class="dash-card" style="background:#FFFFFF;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:15px; font-weight:700; color:#111827; margin:0;">In progress</h2>
+        <span class="dash-pill" style="font-weight:700;">{{ in_progress_tasks|length|stringformat:"02d" }}</span>
+      </div>
+      {% for t in in_progress_tasks %}
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:12px;">
+        <div style="font-size:14.5px; font-weight:700; color:#111827; margin-bottom:6px;">
+          <a href="/foundation/tasks/{{ t.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="color:#111827; text-decoration:none;">{{ t.title }}</a>
+        </div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.45; margin-bottom:14px;">{{ t.description }}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="dash-pill dash-pill-amber">Due {{ t.due_short_label }}</span>
+          <a href="/foundation/tasks/{{ t.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="font-size:12.5px; font-weight:700; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Open &rarr;</a>
+        </div>
+      </div>
+      {% empty %}
+      <div style="border:1px dashed #D1D5DB; border-radius:12px; padding:18px; text-align:center; color:#6B7280; font-size:13px;">
+        No tasks currently in progress.
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Column 3: Review -->
+    <div class="dash-card" style="background:#FFFFFF;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:15px; font-weight:700; color:#111827; margin:0;">Review</h2>
+        <span class="dash-pill" style="font-weight:700;">{{ review_tasks|length|stringformat:"02d" }}</span>
+      </div>
+      {% for t in review_tasks %}
+      <div style="border:1px solid #E5E7EB; border-radius:12px; padding:16px; background:#FAF9FB; margin-bottom:12px;">
+        <div style="font-size:14.5px; font-weight:700; color:#111827; margin-bottom:6px;">
+          <a href="/foundation/tasks/{{ t.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="color:#111827; text-decoration:none;">{{ t.title }}</a>
+        </div>
+        <div style="font-size:13px; color:#4B5563; line-height:1.45; margin-bottom:14px;">{{ t.description }}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="dash-pill dash-pill-green">Due {{ t.due_short_label }}</span>
+          <a href="/foundation/tasks/{{ t.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="font-size:12.5px; font-weight:700; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Open &rarr;</a>
+        </div>
+      </div>
+      {% empty %}
+      <div style="border:1px dashed #D1D5DB; border-radius:12px; padding:18px; text-align:center; color:#6B7280; font-size:13px;">
+        No tasks awaiting review.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Tasks and Follow-up Table Card -->
+  <div class="dash-card" style="margin-bottom:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+      <h2 class="dash-card-title" style="margin:0;">Tasks and follow-up</h2>
+      <form method="get" action="/foundation/tasks/" class="dash-search-box" style="min-width:240px; display:flex; align-items:center; gap:6px;">
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search tasks or owners" aria-label="Search tasks or owners">
+      </form>
+    </div>
+
+    <table class="dash-table dash-desktop-table" aria-label="Tasks and follow-up">
+      <thead>
+        <tr>
+          <th scope="col">TASK</th>
+          <th scope="col">OWNER</th>
+          <th scope="col">STATUS</th>
+          <th scope="col">NEXT ACTION</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tasks %}
+        <tr>
+          <td style="font-weight:600; color:#111827;">
+            <a href="/foundation/tasks/{{ t.task_code }}/?country={{ target_country }}&network={{ target_network }}" style="color:#111827; text-decoration:none;">{{ t.title }}</a>
+          </td>
+          <td>{{ t.owner_name }}</td>
+          <td>{{ t.status }}</td>
+          <td>
+            {% if t.next_action == 'Review' or t.status == 'Submitted' %}
+            <a href="/foundation/tasks/review/?task={{ t.task_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-pill dash-pill-amber" style="text-decoration:none;">&bull; {{ t.next_action }}</a>
+            {% elif t.status == 'Closed' %}
+            <a href="/foundation/tasks/lifecycle/?task={{ t.task_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-pill dash-pill-green" style="text-decoration:none;">&bull; {{ t.next_action }}</a>
+            {% else %}
+            <a href="/foundation/tasks/{{ t.task_code }}/?country={{ target_country }}&network={{ target_network }}" class="dash-pill dash-pill-amber" style="text-decoration:none;">&bull; {{ t.next_action }}</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center; padding:32px; color:#6B7280;">No tasks match the selected scope or filter.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Mobile Responsive List -->
+    <div class="dash-mobile-list">
+      {% for t in tasks %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Task</span><span class="dash-mobile-val" style="font-weight:700;"><a href="/foundation/tasks/{{ t.task_code }}/" style="color:#111827; text-decoration:none;">{{ t.title }}</a></span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Owner</span><span class="dash-mobile-val">{{ t.owner_name }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Status</span><span class="dash-mobile-val">{{ t.status }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Next action</span><span class="dash-pill">{{ t.next_action }}</span></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="dash-pagination">
+      <span>Showing {{ tasks|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shield Notice -->
+  <div class="stage6-shield-notice">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Tasks retain their source, owner and history when reassigned.</div>
+  </div>
+</div>
+{% endblock %}

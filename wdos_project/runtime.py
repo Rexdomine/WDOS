@@ -46,7 +46,7 @@ def main():
     startup_commands = [['migrate', '--noinput'], ['seed_roles']]
     if os.getenv('WDOS_ENVIRONMENT') != 'production' and os.getenv('WDOS_SETUP_ADMIN') == '1':
         startup_commands.append(['setup_admin'])
-    if os.getenv('WDOS_ENVIRONMENT') != 'production':
+    if os.getenv('WDOS_ENVIRONMENT') != 'production' and os.getenv('WDOS_SEED_DEMO_DATA') == '1':
         startup_commands.append(['seed_test_accounts'])
     for command in startup_commands:
         subprocess.run([sys.executable, 'manage.py', *command], check=True)

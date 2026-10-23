@@ -118,11 +118,20 @@ class IdentityContextBlockTestCase(TestCase):
         self.assertIn("Ikeja LGA", ctx["context_breadcrumb_text"])
 
     def test_context_block_rendered_on_authenticated_dashboards(self):
-        """Verify the persistent context block is rendered on root workspace and role dashboards."""
+        """Verify the persistent context block is rendered on the settings page and omitted from dashboards."""
         self.login_as(self.user_member_ada)
         
-        # Workspace view
-        resp = self.client.get("/foundation/")
+        # Workspace view and dashboard should NOT contain the full identity-context-block
+        resp_home = self.client.get("/foundation/")
+        self.assertEqual(resp_home.status_code, 200)
+        self.assertNotContains(resp_home, "identity-context-block")
+
+        resp_dash = self.client.get("/foundation/dashboard/")
+        self.assertEqual(resp_dash.status_code, 200)
+        self.assertNotContains(resp_dash, "identity-context-block")
+
+        # Settings view SHOULD render the identity-context-block
+        resp = self.client.get("/foundation/settings/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "identity-context-block")
         self.assertContains(resp, "Ada Okafor")
@@ -133,17 +142,10 @@ class IdentityContextBlockTestCase(TestCase):
         self.assertContains(resp, "Community Cluster")
         self.assertContains(resp, "Chapter")
 
-        # Generic Role Dashboard Screen (DASH-15 for member)
-        resp_dash = self.client.get("/foundation/dashboard/")
-        self.assertEqual(resp_dash.status_code, 200)
-        self.assertContains(resp_dash, "identity-context-block")
-        self.assertContains(resp_dash, "Ada Okafor")
-        self.assertContains(resp_dash, "Nigeria")
-
     def test_distinguishes_chapter_from_cluster_and_public_geo(self):
-        """Verify that Chapter, Community Cluster, and Public Geography have distinct markup & semantic classes."""
+        """Verify that Chapter, Community Cluster, and Public Geography have distinct markup & semantic classes on settings."""
         self.login_as(self.user_chapter_lagos)
-        resp = self.client.get("/foundation/")
+        resp = self.client.get("/foundation/settings/")
         self.assertEqual(resp.status_code, 200)
 
         # Public Geography nodes
@@ -166,13 +168,13 @@ class IdentityContextBlockTestCase(TestCase):
         self.login_as(self.user_founder)
 
         # Default WGMN
-        resp_wgmn = self.client.get("/foundation/?network=WGMN")
+        resp_wgmn = self.client.get("/foundation/settings/?network=WGMN")
         self.assertEqual(resp_wgmn.status_code, 200)
         self.assertContains(resp_wgmn, "brand-wgmn")
         self.assertContains(resp_wgmn, "WODDI Good Mother Network")
 
         # Switch to WNNN (WNN)
-        resp_wnnn = self.client.get("/foundation/?network=WNNN")
+        resp_wnnn = self.client.get("/foundation/settings/?network=WNNN")
         self.assertEqual(resp_wnnn.status_code, 200)
         self.assertContains(resp_wnnn, "brand-wnnn")
         self.assertContains(resp_wnnn, "WNN")
@@ -184,17 +186,17 @@ class IdentityContextBlockTestCase(TestCase):
         self.login_as(self.user_founder)
 
         # As Founder
-        resp_founder = self.client.get("/foundation/?role=founder")
+        resp_founder = self.client.get("/foundation/settings/?role=founder")
         self.assertEqual(resp_founder.status_code, 200)
         self.assertContains(resp_founder, "Founder / Executive")
 
         # Switch to Country Lead
-        resp_country = self.client.get("/foundation/?role=country_lead")
+        resp_country = self.client.get("/foundation/settings/?role=country_lead")
         self.assertEqual(resp_country.status_code, 200)
         self.assertContains(resp_country, "Country Representative")
 
         # Switch to Chapter Lead
-        resp_chapter = self.client.get("/foundation/?role=chapter_lead")
+        resp_chapter = self.client.get("/foundation/settings/?role=chapter_lead")
         self.assertEqual(resp_chapter.status_code, 200)
         self.assertContains(resp_chapter, "Chapter Coordinator")
 
@@ -203,7 +205,7 @@ class IdentityContextBlockTestCase(TestCase):
         self.login_as(self.user_founder)
 
         # Kenya
-        resp_ke = self.client.get("/foundation/?country=KE")
+        resp_ke = self.client.get("/foundation/settings/?country=KE")
         self.assertEqual(resp_ke.status_code, 200)
         self.assertContains(resp_ke, "Kenya")
         self.assertContains(resp_ke, "🇰🇪")
@@ -280,18 +282,41 @@ class IdentityContextBlockTestCase(TestCase):
         self.assertNotContains(resp, "security_version")
 
     def test_remains_available_during_dashboard_workflows(self):
-        """Context block remains available across drill-downs, settings, and work queue workflows."""
+        """Context block is rendered exclusively on settings and omitted from other workflows."""
         self.login_as(self.user_member_ada)
 
-        workflows = [
+        # Excluded workflows: identity-context-block should NOT be present
+        excluded_workflows = [
+            "/foundation/",
             "/foundation/work-queue/",
-            "/foundation/settings/",
             "/foundation/notifications/",
             "/foundation/profile/",
         ]
-        for url in workflows:
+        for url in excluded_workflows:
             resp = self.client.get(url)
             self.assertEqual(resp.status_code, 200, f"Workflow {url} failed with {resp.status_code}")
-            self.assertContains(resp, "identity-context-block", msg_prefix=f"Missing on {url}")
-            self.assertContains(resp, "Ada Okafor", msg_prefix=f"Missing name on {url}")
-            self.assertContains(resp, "Nigeria", msg_prefix=f"Missing country on {url}")
+            self.assertNotContains(resp, "identity-context-block", msg_prefix=f"Unexpected context block on {url}")
+
+        # Settings workflow: identity-context-block SHOULD be present
+        resp_settings = self.client.get("/foundation/settings/")
+        self.assertEqual(resp_settings.status_code, 200)
+        self.assertContains(resp_settings, "identity-context-block")
+        self.assertContains(resp_settings, "Ada Okafor")
+        self.assertContains(resp_settings, "Nigeria")
+
+    def test_switch_role_only_shown_for_multiple_roles_and_block_is_collapsible(self):
+        """Verify Switch Scope / Role is hidden for single-role users and shown for multi-role users."""
+        # Single-role member (Ada Okafor) on settings page
+        self.login_as(self.user_member_ada)
+        resp_member = self.client.get("/foundation/settings/")
+        self.assertEqual(resp_member.status_code, 200)
+        self.assertContains(resp_member, "data-context-collapse-toggle")
+        self.assertNotContains(resp_member, "Switch Scope / Role")
+
+        # Multi-role user (Founder / Leadership) on settings page
+        self.login_as(self.user_founder)
+        resp_founder = self.client.get("/foundation/settings/")
+        self.assertEqual(resp_founder.status_code, 200)
+        self.assertContains(resp_founder, "data-context-collapse-toggle")
+        self.assertContains(resp_founder, "Switch Scope / Role")
+

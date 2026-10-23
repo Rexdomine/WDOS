@@ -1,0 +1,531 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}{{ meeting.title|default:"Country coordination" }} meeting · WDOS{% endblock %}
+
+{% block content %}
+<style>
+  .mtg-detail-wrap {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .mtg-section-box {
+    border: 1px solid #E7DCE6;
+    border-radius: 16px;
+    background: #FAF8FA;
+    padding: 20px 22px;
+    margin-top: 20px;
+  }
+  .mtg-section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .mtg-section-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #19131A;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mtg-rsvp-grid {
+    display: grid;
+    grid-template-columns: minmax(160px, 200px) minmax(220px, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+  }
+  @media (max-width: 680px) {
+    .mtg-rsvp-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .mtg-field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #4A394D;
+    margin-bottom: 6px;
+  }
+  .mtg-field-input,
+  .mtg-field-select {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid #D6C7D8;
+    border-radius: 10px;
+    font-size: 13.5px;
+    color: #19131A;
+    background: #FFFFFF;
+    box-sizing: border-box;
+  }
+  .mtg-field-input:focus,
+  .mtg-field-select:focus,
+  .mtg-field-textarea:focus {
+    outline: none;
+    border-color: #D4006A;
+    box-shadow: 0 0 0 3px rgba(212, 0, 106, 0.12);
+  }
+  .mtg-field-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #D6C7D8;
+    border-radius: 10px;
+    font-size: 13.5px;
+    color: #19131A;
+    background: #FFFFFF;
+    box-sizing: border-box;
+    line-height: 1.5;
+    font-family: inherit;
+  }
+  .mtg-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 800;
+  }
+  .mtg-status-pill.attending { background: #DCFCE7; color: #166534; }
+  .mtg-status-pill.tentative { background: #FEF3C7; color: #92400E; }
+  .mtg-status-pill.declined { background: #FEE2E2; color: #991B1B; }
+  .mtg-status-pill.neutral { background: #F3E8FF; color: #6B21A8; }
+
+  .mtg-roster-list {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #E7DCE6;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mtg-roster-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #FFFFFF;
+    border: 1px solid #EFE6EE;
+    font-size: 13px;
+  }
+
+  .mtg-records-bar {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid #EFE6EE;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .mtg-tab-btn {
+    background: #FFFFFF;
+    color: #19131A;
+    border: 1px solid #D6C7D8;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: all 0.15s ease;
+  }
+  .mtg-tab-btn:hover {
+    background: #F8F3F7;
+    border-color: #B89EB9;
+  }
+  .mtg-tab-btn.active {
+    background: #FCEEF5;
+    color: #D4006A;
+    border-color: #F5B8D5;
+  }
+  .mtg-drawer-panel {
+    margin-top: 16px;
+    padding: 20px;
+    border-radius: 14px;
+    background: #FFFFFF;
+    border: 1px solid #E7DCE6;
+  }
+</style>
+
+<div class="dash-container mtg-detail-wrap">
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert" style="margin-bottom:18px;">
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom:18px; padding:14px 18px; border-radius:12px; background:{% if result_success %}#DCFCE7; color:#166534; border:1px solid #86EFAC;{% else %}#FEE2E2; color:#991B1B; border:1px solid #FCA5A5;{% endif %}">
+    <strong>Updated:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <div class="dash-card" style="padding:32px; border-radius:22px; box-shadow:0 10px 28px rgba(25,19,26,0.05);">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+      {% if meeting.meeting_format_label == "In-Person" %}
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:#E0F2FE; color:#0369A1; font-size:12px; font-weight:800;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        In-Person Meeting &middot; {{ meeting.venue_label }}
+      </span>
+      {% elif meeting.meeting_format_label == "Hybrid" %}
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:#FCEEF5; color:#D4006A; font-size:12px; font-weight:800;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        Hybrid Meeting &middot; {{ meeting.venue_label }}
+      </span>
+      {% else %}
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:#EAF4D3; color:#2D5A00; font-size:12px; font-weight:800;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        Online Room Ready &middot; {{ meeting.meeting_code|default:"ROOM-NG-001" }}
+      </span>
+      {% endif %}
+
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        {% if can_delete_meeting %}
+        <form method="post" action="/foundation/meetings/{{ meeting.meeting_code }}/?country={{ target_country }}&network={{ target_network }}" style="margin:0;" onsubmit="return confirm('Delete meeting &quot;{{ meeting.title|escapejs }}&quot;? This action cannot be undone.');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="delete_meeting">
+          <button type="submit" class="dash-btn-secondary" style="min-height:36px; padding:6px 14px; font-size:12.5px; color:#B91C1C; border-color:#FECACA; background:#FEF2F2; display:inline-flex; align-items:center; gap:6px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Delete Meeting
+          </button>
+        </form>
+        {% endif %}
+        <a href="/foundation/meetings/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary" style="min-height:36px; padding:6px 14px; font-size:12.5px;">Back to Meetings</a>
+      </div>
+    </div>
+
+    <h1 class="dash-title" style="font-size:28px; margin:0 0 8px 0;">{{ meeting.title|default:"Country coordination" }} meeting</h1>
+    <p style="font-size:14px; color:#5E5061; margin:0 0 22px 0;">
+      Host: <strong>{{ meeting.host_name }}</strong> &middot; {{ meeting.local_time_label|default:"Scheduled Session" }} &middot; {{ meeting.scope_label }}
+    </p>
+
+    {% if meeting.agenda %}
+    <div style="margin-bottom:22px; padding:14px 18px; border-radius:12px; background:#FAF7FA; border:1px solid #E7DCE6; font-size:14px; color:#19131A;">
+      <strong>Agenda &amp; Purpose:</strong> {{ meeting.agenda }}
+    </div>
+    {% endif %}
+
+    {% if meeting.has_online_room %}
+    <!-- Online / Hybrid Room Launch Box -->
+    <div style="padding:24px; border-radius:16px; background:#231626; color:#FFFFFF; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:6px;">
+      <div style="max-width:440px;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+          <div style="font-size:16px; font-weight:800;">Online Video &amp; Live Interpretation Room</div>
+          <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; {% if meeting.allow_guest_access %}background:rgba(34,197,94,0.2); color:#86EFAC; border:1px solid rgba(134,239,172,0.35);{% else %}background:rgba(255,255,255,0.12); color:#E5D9E6; border:1px solid rgba(255,255,255,0.2);{% endif %}">
+            {{ meeting.access_policy_label }}
+          </span>
+        </div>
+        <div style="font-size:13px; color:#D8CBD9;">
+          {% if meeting.allow_guest_access %}
+            Anyone with the link can join directly (no WDOS account required). Speak in your own language and hear in yours in real time.
+          {% else %}
+            Restricted to signed-in WDOS accounts only. Speak in your own language and hear in yours in real time.
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/foundation/rooms/{{ meeting.meeting_code|default:'ROOM-NG-001' }}/live/'); this.textContent='Link Copied';" style="background:rgba(255,255,255,0.12); color:#FFFFFF; border:1px solid rgba(255,255,255,0.24); border-radius:10px; padding:11px 16px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy Room Link
+        </button>
+        <a href="/foundation/rooms/{{ meeting.meeting_code|default:'ROOM-NG-001' }}/live/" class="dash-btn-primary" style="padding:11px 22px; font-size:14px; border-radius:10px; display:inline-flex; align-items:center; gap:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+          Join Online Room
+        </a>
+      </div>
+    </div>
+    {% else %}
+    <!-- In-Person Venue Card (Shown when meeting is In-Person Only) -->
+    <div style="padding:20px 22px; border-radius:16px; background:#F0F9FF; border:1px solid #BAE6FD; color:#0C4A6E; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:6px;">
+      <div>
+        <div style="font-size:15px; font-weight:800; margin-bottom:4px;">In-Person Physical Gathering</div>
+        <div style="font-size:13.5px;">Venue: <strong>{{ meeting.venue_label }}</strong> &middot; No online video room is required for this session.</div>
+      </div>
+      <a href="/foundation/meetings/attendance-minutes/?meeting={{ meeting.meeting_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">
+        Attendance &amp; Minutes
+      </a>
+    </div>
+    {% endif %}
+
+    <!-- 1. Well-Arranged Attendance Status & RSVP Section -->
+    <section class="mtg-section-box" aria-label="Attendance status and RSVP">
+      <div class="mtg-section-head">
+        <h2 class="mtg-section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4006A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+          Attendance Status &amp; RSVP
+        </h2>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span class="mtg-status-pill {% if user_rsvp_status == 'Attending' %}attending{% elif user_rsvp_status == 'Tentative' %}tentative{% else %}declined{% endif %}">
+            &bull; Your status: {{ user_rsvp_status }}
+          </span>
+          <span class="mtg-status-pill neutral">
+            {{ meeting.attendance_summary|default:"1 confirmed" }}
+          </span>
+        </div>
+      </div>
+
+      <form id="rsvp-form" method="post" action="{% if meeting %}/foundation/meetings/{{ meeting.meeting_code }}/{% else %}/foundation/meetings/{% endif %}?country={{ target_country }}&network={{ target_network }}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_rsvp">
+        <div class="mtg-rsvp-grid">
+          <div>
+            <label for="id_rsvp_status" class="mtg-field-label">Attendance status</label>
+            <select id="id_rsvp_status" name="rsvp_status" class="mtg-field-select">
+              <option value="Attending" {% if user_rsvp_status == 'Attending' %}selected{% endif %}>Attending</option>
+              <option value="Tentative" {% if user_rsvp_status == 'Tentative' %}selected{% endif %}>Tentative</option>
+              <option value="Declined" {% if user_rsvp_status == 'Declined' %}selected{% endif %}>Declined</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="id_rsvp_note" class="mtg-field-label">Optional note</label>
+            <input id="id_rsvp_note" type="text" name="note" value="{{ user_rsvp_note }}" placeholder="Add a note (e.g. joining 10 mins late, apology, or delegate)..." class="mtg-field-input">
+          </div>
+
+          <div>
+            <button type="submit" class="dash-btn-primary" style="min-height:40px; padding:8px 20px; font-size:13.5px; border-radius:10px; width:100%;">
+              Save Status
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {% if participants %}
+      <div class="mtg-roster-list" aria-label="Participant attendance roster">
+        <div style="font-size:11.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#67586A;">
+          Recorded Participant Responses ({{ participants|length }})
+        </div>
+        {% for p in participants %}
+        <div class="mtg-roster-row">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <strong style="color:#19131A;">{{ p.participant_name }}</strong>
+            <span style="font-size:12px; color:#67586A;">&middot; {{ p.role_or_title }}</span>
+            {% if p.detail_note %}
+            <span style="font-size:12px; color:#4A394D; background:#F6F1F5; padding:2px 8px; border-radius:6px;">
+              {{ p.detail_note }}
+            </span>
+            {% endif %}
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="mtg-status-pill {% if p.rsvp_status == 'Attending' %}attending{% elif p.rsvp_status == 'Tentative' %}tentative{% elif p.rsvp_status == 'Declined' %}declined{% else %}neutral{% endif %}">
+              {{ p.rsvp_status }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- 2. Well-Arranged Minutes & Action Items Controls + Functional Drawers -->
+    <div class="mtg-records-bar">
+      <div>
+        <div style="font-size:14px; font-weight:800; color:#19131A;">Meeting Minutes &amp; Action Items</div>
+        <div style="font-size:12.5px; color:#5E5061;">
+          Minutes: <strong>{{ meeting.minutes_version|default:"v1 · draft" }}</strong> ({{ meeting.minutes_status|default:"Draft" }})
+          &middot; Action Items: <strong>{{ meeting.open_actions_label|default:"0" }}</strong>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <button type="button" id="btn-toggle-minutes" onclick="toggleMtgPanel('minutes')" class="mtg-tab-btn {% if active_panel == 'minutes' %}active{% endif %}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Minutes
+        </button>
+        <button type="button" id="btn-toggle-actions" onclick="toggleMtgPanel('actions')" class="mtg-tab-btn {% if active_panel == 'actions' %}active{% endif %}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Action Items ({{ decisions_and_actions|length }})
+        </button>
+        <a href="/foundation/meetings/attendance-minutes/?meeting={{ meeting.meeting_code }}&country={{ target_country }}&network={{ target_network }}" class="mtg-tab-btn" title="Open full attendance and minutes review page">
+          Full Minutes View &rarr;
+        </a>
+        <a href="/foundation/meetings/follow-up/?meeting={{ meeting.meeting_code }}&country={{ target_country }}&network={{ target_network }}" class="mtg-tab-btn" title="Open full follow-up and action items page">
+          Full Follow-Up View &rarr;
+        </a>
+      </div>
+    </div>
+
+    <!-- Functional Minutes Panel -->
+    <div id="mtg-panel-minutes" class="mtg-drawer-panel" style="display:{% if active_panel == 'minutes' %}block{% else %}none{% endif %};">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+        <div>
+          <h3 style="font-size:15px; font-weight:800; color:#19131A; margin:0;">Meeting Minutes &amp; Transcript</h3>
+          <div style="font-size:12.5px; color:#5E5061;">Record key discussion points, review live room transcripts, and save or approve minutes.</div>
+        </div>
+        <span class="mtg-status-pill {% if meeting.minutes_status == 'Approved' %}attending{% else %}tentative{% endif %}">
+          {{ meeting.minutes_version }} &middot; {{ meeting.minutes_status }}
+        </span>
+      </div>
+
+      <form method="post" action="/foundation/meetings/{{ meeting.meeting_code }}/?country={{ target_country }}&network={{ target_network }}">
+        {% csrf_token %}
+        <div style="margin-bottom:12px;">
+          <label for="id_inline_minutes_text" class="mtg-field-label">Minutes &amp; Recorded Transcript</label>
+          <textarea id="id_inline_minutes_text" name="minutes_text" rows="6" class="mtg-field-textarea" {% if meeting.minutes_frozen %}readonly{% endif %} placeholder="Type meeting minutes, key takeaways, and summary notes...">{{ meeting.minutes_text }}</textarea>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div style="font-size:12px; color:#67586A;">
+            {% if meeting.minutes_frozen %}
+              Approved minutes are frozen. Open the <a href="/foundation/meetings/attendance-minutes/?meeting={{ meeting.meeting_code }}&country={{ target_country }}&network={{ target_network }}" style="color:#D4006A; font-weight:700;">Full Minutes View</a> to request a correction version.
+            {% else %}
+              Changes save directly to <strong>{{ meeting.minutes_draft_label }}</strong>.
+            {% endif %}
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            {% if not meeting.minutes_frozen %}
+            <button type="submit" name="action" value="save_minutes" class="dash-btn-secondary" style="min-height:38px; padding:7px 16px; font-size:13px;">
+              Save Minutes Draft
+            </button>
+            <button type="submit" name="action" value="approve_minutes" class="dash-btn-primary" style="min-height:38px; padding:7px 16px; font-size:13px;">
+              Approve Minutes
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Functional Action Items & Decisions Panel -->
+    <div id="mtg-panel-actions" class="mtg-drawer-panel" style="display:{% if active_panel == 'actions' %}block{% else %}none{% endif %};">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+        <div>
+          <h3 style="font-size:15px; font-weight:800; color:#19131A; margin:0;">Meeting Action Items &amp; Decisions</h3>
+          <div style="font-size:12.5px; color:#5E5061;">Add agreed action items or decisions and convert them into tracked Mission Control tasks.</div>
+        </div>
+        {% if decisions_and_actions %}
+        <form method="post" action="/foundation/meetings/{{ meeting.meeting_code }}/?country={{ target_country }}&network={{ target_network }}" style="margin:0;">
+          {% csrf_token %}
+          <button type="submit" name="action" value="convert_actions" class="dash-btn-secondary" style="min-height:36px; padding:6px 14px; font-size:12.5px;">
+            Convert All Actions to Tasks
+          </button>
+        </form>
+        {% endif %}
+      </div>
+
+      {% if decisions_and_actions %}
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+        {% for item in decisions_and_actions %}
+        <div class="mtg-roster-row" style="background:#FAF8FA;">
+          <div style="flex:1; min-width:220px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:2px;">
+              <span style="font-size:11.5px; font-weight:800; color:#D4006A; background:#FCEEF5; padding:2px 8px; border-radius:6px;">{{ item.record_code }}</span>
+              <strong style="color:#19131A; font-size:13.5px;">{{ item.detail_text }}</strong>
+            </div>
+            <div style="font-size:12px; color:#5E5061;">
+              Owner: <strong>{{ item.owner_label }}</strong> &middot; Due / Version: {{ item.deadline_or_version }}
+            </div>
+          </div>
+          <div>
+            {% if item.is_converted and item.converted_task %}
+              <a href="/foundation/tasks/{{ item.converted_task.task_code }}/?country={{ target_country }}&network={{ target_network }}" class="mtg-status-pill attending" style="text-decoration:none;">
+                &check; Task {{ item.converted_task.task_code }}
+              </a>
+            {% elif item.record_type == 'Action' %}
+              <form method="post" action="/foundation/meetings/{{ meeting.meeting_code }}/?country={{ target_country }}&network={{ target_network }}" style="margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="action_id" value="{{ item.id }}">
+                <button type="submit" name="action" value="create_action_task" class="dash-btn-secondary" style="min-height:32px; padding:4px 12px; font-size:12px;">
+                  &rarr; Convert to Task
+                </button>
+              </form>
+            {% else %}
+              <span class="mtg-status-pill neutral">Decision Recorded</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="padding:14px; border-radius:10px; background:#FAF8FA; border:1px dashed #D6C7D8; font-size:13px; color:#5E5061; margin-bottom:16px;">
+        No action items or decisions recorded for this meeting yet. Use the form below to add one.
+      </div>
+      {% endif %}
+
+      <!-- Add New Action Item / Decision Form -->
+      <form method="post" action="/foundation/meetings/{{ meeting.meeting_code }}/?country={{ target_country }}&network={{ target_network }}" style="border-top:1px solid #EFE6EE; padding-top:14px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_action_item">
+        <div style="font-size:13px; font-weight:800; color:#19131A; margin-bottom:10px;">Add New Action Item or Decision</div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
+          <div style="grid-column: span 2;">
+            <label for="id_action_detail_text" class="mtg-field-label">Action item or decision description</label>
+            <input id="id_action_detail_text" type="text" name="detail_text" required placeholder="e.g. Share verified chapter attendance register with State Lead" class="mtg-field-input">
+          </div>
+          <div>
+            <label for="id_action_owner" class="mtg-field-label">Assigned owner</label>
+            <input id="id_action_owner" type="text" name="owner_label" list="mtg-people-list" placeholder="e.g. {{ meeting.host_name }}" class="mtg-field-input">
+            <datalist id="mtg-people-list">
+              {% for person_name in people_options %}
+              <option value="{{ person_name }}"></option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <div>
+            <label for="id_action_deadline" class="mtg-field-label">Due date / version</label>
+            <input id="id_action_deadline" type="text" name="deadline_or_version" value="25 Sep 2026 WAT" placeholder="e.g. 25 Sep 2026 WAT" class="mtg-field-input">
+          </div>
+          <div>
+            <label for="id_action_type" class="mtg-field-label">Record type</label>
+            <select id="id_action_type" name="record_type" class="mtg-field-select">
+              <option value="Action" selected>Action Item</option>
+              <option value="Decision">Meeting Decision</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <label style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; color:#4A394D; cursor:pointer;">
+            <input type="checkbox" name="convert_to_task" value="1" checked>
+            Immediately create a linked Mission Control task for this action item
+          </label>
+          <button type="submit" class="dash-btn-primary" style="min-height:38px; padding:7px 18px; font-size:13px;">
+            + Add Action Item
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleMtgPanel(which) {
+    var minPanel = document.getElementById('mtg-panel-minutes');
+    var actPanel = document.getElementById('mtg-panel-actions');
+    var minBtn = document.getElementById('btn-toggle-minutes');
+    var actBtn = document.getElementById('btn-toggle-actions');
+    if (which === 'minutes') {
+      var openMin = minPanel.style.display === 'none';
+      minPanel.style.display = openMin ? 'block' : 'none';
+      actPanel.style.display = 'none';
+      minBtn.classList.toggle('active', openMin);
+      actBtn.classList.remove('active');
+    } else if (which === 'actions') {
+      var openAct = actPanel.style.display === 'none';
+      actPanel.style.display = openAct ? 'block' : 'none';
+      minPanel.style.display = 'none';
+      actBtn.classList.toggle('active', openAct);
+      minBtn.classList.remove('active');
+    }
+  }
+</script>
+{% endblock %}

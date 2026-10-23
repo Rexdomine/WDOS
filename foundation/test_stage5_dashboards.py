@@ -208,3 +208,51 @@ class Stage5DashboardsTestCase(TestCase):
             resp = self.client.get(f"/foundation/dashboards/dash-01/?tab={tab}")
             self.assertEqual(resp.status_code, 200)
             self.assertEqual(resp.context["active_tab"], tab)
+
+    def test_dash15_member_dashboard_isolation_and_no_confidential_leak(self):
+        """Standard member dashboard DASH-15 strictly isolates chapter meetings and never leaks confidential audits."""
+        from datetime import timedelta
+        from foundation.models import ScheduledMeeting, WorkItem
+
+        # Create a confidential audit item
+        WorkItem.objects.update_or_create(
+            title="Q3 Whistleblower & Compliance Audit",
+            defaults={
+                "category": "compliance",
+                "network": "WGMN",
+                "country": "NG",
+                "required_role": "member",
+                "priority": "critical",
+                "status": "pending",
+                "confidential": True,
+            },
+        )
+
+        # Create an upcoming meeting in another chapter (Eastern Obolo)
+        ScheduledMeeting.objects.update_or_create(
+            title="Eastern Obolo Chapter Outreach",
+            defaults={
+                "meeting_type": "chapter_meetup",
+                "network": "WGMN",
+                "country": "NG",
+                "target_role": "member",
+                "scheduled_at": timezone.now() + timedelta(days=2),
+                "location": "Eastern Obolo Civic Center",
+                "organizer_name": "Local Coordinator",
+                "attendees_count": 15,
+            },
+        )
+
+        # Log in as Ada (Lagos Central Chapter member)
+        self.login_as(self.user_member_ada)
+        resp = self.client.get("/foundation/dashboards/dash-15/")
+        self.assertEqual(resp.status_code, 200)
+
+        # Verify confidential audit is NEVER leaked to standard member
+        self.assertNotContains(resp, "Whistleblower &amp; Compliance Audit")
+        self.assertNotContains(resp, "Whistleblower & Compliance Audit")
+
+        # Verify other chapter's local meetup does not appear in table
+        table_rows = resp.context["screen"]["table_card"]["rows"]
+        row_titles = [r["item"] for r in table_rows]
+        self.assertNotIn("Eastern Obolo Chapter Outreach", row_titles)

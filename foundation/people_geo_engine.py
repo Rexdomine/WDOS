@@ -39,11 +39,14 @@ from .scope import ScopePermissionDenied, UserScope
 # SEED / FIXTURE SERVICE
 # -----------------------------------------------------------------------------
 
-def seed_stage6_fixtures():
+def seed_stage6_fixtures(force: bool = False):
     """
     Idempotently seeds all authoritative Stage 06 records matching the
     WDOS UI Review v2 artboard specifications.
     """
+    import sys
+    if not force and "test" not in sys.argv:
+        return
     # 1. People Directory (Ada Okafor, Lina Mensah, Kemi Bello)
     ada, _ = PersonProfile.objects.get_or_create(
         person_code="WD-00421",

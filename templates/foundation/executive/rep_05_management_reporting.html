@@ -1,0 +1,143 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Management reporting · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"HQ / BOTH NETWORKS" }}</div>
+      <h1 class="dash-title">Management reporting</h1>
+      <p class="dash-subtitle">{{ screen.subtitle|default:"Compare reconciled weekly, monthly, biannual and annual reporting views by authorised scope." }}</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/dashboards/DASH-01/" class="dash-btn-secondary">Back</a>
+      <a href="/foundation/reporting/scorecard/" class="dash-btn-primary">→ Performance Scorecard (REP-06)</a>
+    </div>
+  </div>
+
+  <!-- 3-Column KPI Stat Cards -->
+  <div class="dash-kpis-grid" role="region" aria-label="Key Performance Indicators">
+    <div class="dash-kpi-card dark">
+      <div class="dash-kpi-label">Programme activities</div>
+      <div class="dash-kpi-val">{{ kpis.activities|default:"12" }}</div>
+      <p class="dash-kpi-sub">Selected reporting period</p>
+    </div>
+    <div class="dash-kpi-card">
+      <div class="dash-kpi-label">Meetings held</div>
+      <div class="dash-kpi-val">{{ kpis.meetings|default:"18" }}</div>
+      <p class="dash-kpi-sub">Source-linked records</p>
+    </div>
+    <div class="dash-kpi-card">
+      <div class="dash-kpi-label">Actions completed</div>
+      <div class="dash-kpi-val">{{ kpis.actions|default:"34" }}</div>
+      <p class="dash-kpi-sub">Current period</p>
+    </div>
+  </div>
+
+  <div class="dash-layout">
+    <div class="dash-main-col">
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h2 class="dash-card-title">Management reporting</h2>
+          <span style="font-size:12px; color:var(--wdos-muted);">Periodic reconciled reports</span>
+        </div>
+
+        <table class="dash-table dash-desktop-table">
+          <thead>
+            <tr>
+              <th scope="col">REPORT</th>
+              <th scope="col">REPORTING PERIOD</th>
+              <th scope="col">OWNER</th>
+              <th scope="col">STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in reports %}
+            <tr>
+              <td class="item-col" style="font-weight:700; color:var(--wdos-ink);">{{ r.report }}</td>
+              <td>{{ r.reporting_period }}</td>
+              <td>{{ r.owner }}</td>
+              <td>
+                <span class="dash-pill dash-pill-{{ r.status_style|default:'amber' }}">
+                  <span class="dot"></span> {{ r.status }}
+                </span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" style="text-align:center; padding:28px; color:var(--wdos-muted);">
+                No reports submitted for this period.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="dash-mobile-list">
+          {% for r in reports %}
+          <div class="dash-mobile-item">
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">REPORT</span>
+              <span class="dash-mobile-val" style="font-weight:700;">{{ r.report }}</span>
+            </div>
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">PERIOD</span>
+              <span class="dash-mobile-val">{{ r.reporting_period }}</span>
+            </div>
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">OWNER</span>
+              <span class="dash-mobile-val">{{ r.owner }}</span>
+            </div>
+            <div class="dash-mobile-row" style="margin-top:6px;">
+              <span class="dash-mobile-label">STATUS</span>
+              <span class="dash-pill dash-pill-{{ r.status_style|default:'amber' }}"><span class="dot"></span> {{ r.status }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="dash-table-foot">
+          <span>Showing {{ reports|length }} records in this view</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Side Column -->
+    <div class="dash-side-col">
+      <div class="dash-attention-card">
+        <h2 class="dash-card-title" style="margin-bottom:14px;">Attention required</h2>
+        
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Enter once, report clearly</h3>
+            <p class="dash-attention-text">Source-linked tasks, meetings and programme records fill the factual sections.</p>
+            <div class="dash-attention-tag">Add context, not duplicates</div>
+          </div>
+        </div>
+
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">A durable review history</h3>
+            <p class="dash-attention-text">Submitted snapshots remain frozen. Corrections create a new version.</p>
+            <div class="dash-attention-tag">Evidence-linked reporting</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-support-note">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>WODDI · No Woman Is Left Out · REP-05 UI Review v2</span>
+  </div>
+</div>
+{% endblock %}

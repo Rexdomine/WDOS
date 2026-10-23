@@ -54,15 +54,61 @@ class Command(BaseCommand):
         # Determine network and home
         data = draft.data or {}
         network = options["network"] or data.get("network") or "WGMN"
-        country = data.get("country") or "NG"
-        chapter_code = options["chapter"] or data.get("district") or data.get("chapter_code") or "NG-LOS-01"
+        raw_country = data.get("country_iso2") or data.get("country") or "NG"
+        from accounts.african_geography import get_country as af_get_country
+        c_lk = af_get_country(raw_country)
+        country = c_lk["code"] if c_lk else (raw_country.upper() if len(raw_country) == 2 else "NG")
 
-        chap = Chapter.objects.filter(code=chapter_code).first()
-        chapter_label = chap.name if chap else (data.get("district") or "Lagos Central Chapter")
+        region = data.get("region_name") or data.get("region") or ""
+        district = data.get("district_name") or (data.get("district") if data.get("district") and not str(data.get("district")).startswith("NG-") else "") or ""
+        cluster = data.get("community_cluster") or (f"{district} Cluster" if district else "")
+
+        chap = None
+        chapter_code = options["chapter"] or data.get("district_id") or data.get("chapter_code")
+        if chapter_code:
+            chap = Chapter.objects.filter(code=chapter_code).first()
+        if not chap and district:
+            chap = Chapter.objects.filter(name__icontains=district).first() or Chapter.objects.filter(district__iexact=district).first()
+            if chap:
+                chapter_code = chap.code
+
+        if chap:
+            chapter_code = chap.code
+            chapter_label = chap.name
+            region = region or chap.region
+            district = district or chap.district
+            cluster = cluster or chap.community_cluster
+        else:
+            if not chapter_code:
+                from django.utils.text import slugify
+                sub_slug = slugify(district or region or "chap")
+                chapter_code = f"{country}-{sub_slug}"[:32] if (region or district) else "NG-LOS-01"
+            chapter_label = f"{district} Chapter" if district else (f"{region} Chapter" if region else "Lagos Central Chapter")
+
+        if not chap and (region or district):
+            chap, _ = Chapter.objects.get_or_create(
+                code=chapter_code,
+                defaults={
+                    "name": chapter_label,
+                    "network": network,
+                    "country": country,
+                    "region": region,
+                    "district": district,
+                    "community_cluster": cluster,
+                    "status": "active",
+                }
+            )
 
         home = {
             "code": chapter_code,
             "country": country,
+            "country_name": data.get("country_name") or data.get("country") or country,
+            "state": region,
+            "region": region,
+            "lga": district,
+            "district": district,
+            "cluster": cluster,
+            "community_cluster": cluster,
             "label": chapter_label,
         }
 
@@ -92,6 +138,40 @@ class Command(BaseCommand):
                 "approved_by": account,
             },
         )
+
+        from foundation.models import PersonProfile
+        prof = PersonProfile.objects.filter(account=account).first() or PersonProfile.objects.filter(email__iexact=account.email).first()
+        if not prof:
+            PersonProfile.objects.create(
+                account=account,
+                person_code=f"WD-{str(account.id).zfill(5)}",
+                full_name=data.get("full_name") or account.display_name or "Member",
+                email=account.email,
+                network=network,
+                country=country,
+                state_or_region=region,
+                lga_or_district=district,
+                community_cluster=cluster,
+                local_home=chapter_label,
+                chapter=chap,
+                status="Active",
+            )
+        else:
+            prof.account = account
+            prof.network = network
+            prof.country = country
+            if region:
+                prof.state_or_region = region
+            if district:
+                prof.lga_or_district = district
+            if cluster:
+                prof.community_cluster = cluster
+            if chap:
+                prof.chapter = chap
+            if chapter_label:
+                prof.local_home = chapter_label
+            prof.status = "Active"
+            prof.save()
 
         draft.state = "accepted"
         draft.next_step = 8

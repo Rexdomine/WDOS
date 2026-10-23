@@ -1,0 +1,134 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Compare candidates for this seat · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Compare candidates for this seat</h1>
+      <p class="dash-subtitle">See the relevant recruitment and referrals records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/recruitment/pipeline/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      <a href="/foundation/recruitment/decision/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Open decision review</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+
+  <!-- Main Table Card -->
+  <div class="dash-card" style="margin-bottom:20px;">
+    <div class="dash-card-header" style="margin-bottom:16px;">
+      <h2 class="dash-card-title">Compare candidates for this seat</h2>
+    </div>
+
+    <div class="dash-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+      <form method="get" action="/foundation/recruitment/compare/" class="dash-search-box" style="min-width:240px; display:flex; align-items:center; gap:6px;">
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search these records" aria-label="Search these records">
+      </form>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="/foundation/recruitment/compare/?country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if not status_filter %}dash-pill-magenta{% endif %}" style="text-decoration:none;">Current view</a>
+        <a href="/foundation/recruitment/compare/?status=Completed&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if status_filter %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Status &darr;</a>
+        <a href="/foundation/recruitment/rubric/?country={{ target_country }}&network={{ target_network }}" class="dash-pill" style="text-decoration:none; background:#F3F4F6; color:#374151;">More filters</a>
+      </div>
+    </div>
+
+    <table class="dash-table dash-desktop-table" aria-label="Compare candidates for this seat">
+      <thead>
+        <tr>
+          <th scope="col">CANDIDATE</th>
+          <th scope="col">ROUTE</th>
+          <th scope="col">CURRENT STAGE</th>
+          <th scope="col">NEXT ACTION</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cand in candidates %}
+        <tr>
+          <td style="font-weight:600; color:#111827;">
+            <a href="/foundation/recruitment/evidence/?candidate={{ cand.application_code }}&country={{ target_country }}&network={{ target_network }}" style="color:#111827; text-decoration:none;">{{ cand.candidate_name }}</a>
+          </td>
+          <td>{{ cand.route }}</td>
+          <td>{{ cand.current_stage }}</td>
+          <td>
+            {% if cand.next_action == 'Review evidence' %}
+            <a href="/foundation/recruitment/evidence/?candidate={{ cand.application_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-pill" style="text-decoration:none;">&bull; {{ cand.next_action }}</a>
+            {% elif cand.next_action == 'Human review' %}
+            <a href="/foundation/recruitment/evidence/?candidate={{ cand.application_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-pill dash-pill-amber" style="text-decoration:none;">&bull; {{ cand.next_action }}</a>
+            {% else %}
+            <a href="/foundation/recruitment/decision/?candidate={{ cand.application_code }}&country={{ target_country }}&network={{ target_network }}" class="dash-pill dash-pill-green" style="text-decoration:none;">&bull; {{ cand.next_action }}</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center; padding:32px; color:#6B7280;">No recruitment and referrals records matching the selected scope.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="dash-mobile-list">
+      {% for cand in candidates %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Candidate</span><span class="dash-mobile-val" style="font-weight:700;">{{ cand.candidate_name }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Route</span><span class="dash-mobile-val">{{ cand.route }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Current stage</span><span class="dash-mobile-val">{{ cand.current_stage }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Next action</span><span class="dash-pill">{{ cand.next_action }}</span></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="dash-pagination">
+      <span>Showing {{ candidates|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shield Notice -->
+  <div class="stage6-shield-notice" style="margin-bottom:20px;">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Candidate evidence is visible only within your authorized review scope.</div>
+  </div>
+
+  <!-- Bottom Cards -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:14px;">
+    <div class="dash-card">
+      <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 6px 0;">Two distinct routes</h3>
+      <p style="font-size:13px; color:#4B5563; margin:0 0 12px 0;">Open-call recruits complete Activation. Referred candidates review the Leadership Pack.</p>
+      <a href="/foundation/recruitment/route-settings/?country={{ target_country }}&network={{ target_network }}" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">7 days / 3 days &rarr;</a>
+    </div>
+    <div class="dash-card">
+      <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 6px 0;">A decision, not a score</h3>
+      <p style="font-size:13px; color:#4B5563; margin:0 0 12px 0;">Recommendations support an authorized human decision.</p>
+      <a href="/foundation/recruitment/human-decision/?country={{ target_country }}&network={{ target_network }}" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">No automatic appointment &rarr;</a>
+    </div>
+  </div>
+
+  <p style="font-size:12px; color:#6B7280; margin:0;">Ask your support team if you need guidance.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,430 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}{{ dossier.country_name|default:"Nigeria" }} · Country Command Profile · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"H Q / B OT H N E T W O R K S" }}</div>
+      <h1 class="dash-title">{{ dossier.country_name|default:"Nigeria" }} &middot; Country Command Profile</h1>
+      <p class="dash-subtitle">See the relevant country and local coverage records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="{{ screen.secondary_action.url|default:'/foundation/geography/coverage/' }}" class="dash-btn-secondary">Back</a>
+      <a href="/foundation/geography/dossier/verify/?country={{ dossier.country_code|default:'NG' }}" class="dash-btn-primary">Request verification</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card (when ?state= is requested) -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <!-- Sub Navigation Tabs -->
+  <div class="stage6-subnav" role="tablist">
+    <a href="/foundation/people/" class="stage6-subnav-item" role="tab">People directory</a>
+    <a href="/foundation/geography/local-org/" class="stage6-subnav-item active" role="tab">Local organisation</a>
+    <a href="/foundation/community/relationships/" class="stage6-subnav-item" role="tab">Community relationships</a>
+  </div>
+
+  <!-- Command Profile Summary Box -->
+  <div class="stage6-profile-box" role="region" aria-label="Country Command Summary">
+    <h2 class="stage6-profile-title">{{ dossier.country_name|default:"Nigeria" }} &middot; Country Command Profile</h2>
+    <div class="stage6-profile-subtitle">HQ / Both networks {% if dossier.country_lead_name %}&middot; Country Lead: {{ dossier.country_lead_name }}{% endif %}</div>
+    <div class="stage6-profile-grid">
+      <div>
+        <div class="stage6-profile-field-label">Network</div>
+        <div class="stage6-profile-field-value">{{ dossier.network|default:"WGMN" }}</div>
+      </div>
+      <div>
+        <div class="stage6-profile-field-label">Country</div>
+        <div class="stage6-profile-field-value">{{ dossier.country_name|default:"Nigeria" }}</div>
+      </div>
+      <div>
+        <div class="stage6-profile-field-label">Timezone reference</div>
+        <div class="stage6-profile-field-value">{{ dossier.timezone_reference|default:"Africa/Lagos · WAT" }}</div>
+      </div>
+      <div>
+        <div class="stage6-profile-field-label">Verification</div>
+        <div class="stage6-profile-field-value" style="display:flex; align-items:center; gap:6px;">
+          <span style="color:#10B981;">&#10003;</span> {{ dossier.verification_status|default:"Country verified" }} &middot; HQ review due
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:14px; padding-top:12px; border-top:1px solid #E5E7EB; display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:#4B5563;">
+      <span><strong>Authorized people in country:</strong> {{ country_people_count|default:0 }}</span>
+      <span><strong>Active local units:</strong> {{ country_units|length }}</span>
+      {% if terminology %}
+      <span><strong>Local terms:</strong> {{ terminology.first_level_term }} / {{ terminology.second_level_term }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Approved Country Geographic Visualisation & Full Hierarchy Path (Acceptance Criteria #2, #3, #4, #5) -->
+  <div class="country-map-card {% if dossier.network == 'WNNN' or dossier.network == 'WNN' or active_network == 'WNNN' or active_network == 'WNN' %}theme-wnn{% else %}theme-wgmn{% endif %}" role="region" aria-label="{{ dossier.country_name|default:'Nigeria' }} Geographic Visualisation">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <h2 style="font-size:16px; font-weight:700; color:#111827; margin:0;">
+          {{ dossier.country_name|default:"Nigeria" }} &middot; Country Geographic Visualisation
+        </h2>
+        <span class="dash-pill {% if dossier.network == 'WNNN' or dossier.network == 'WNN' or active_network == 'WNNN' or active_network == 'WNN' %}dash-pill-green{% else %}dash-pill-magenta{% endif %}">
+          {% if dossier.network == 'WNNN' or dossier.network == 'WNN' or active_network == 'WNNN' or active_network == 'WNN' %}WNN &middot; Next-Gen Nurturers{% else %}WGMN &middot; Good Mother Network{% endif %}
+        </span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <a href="/foundation/geography/local-org/?country={{ dossier.country_code|default:'NG' }}{% if dossier.network %}&network={{ dossier.network }}{% endif %}" style="font-size:13px; font-weight:600; color:{% if dossier.network == 'WNNN' or dossier.network == 'WNN' or active_network == 'WNNN' or active_network == 'WNN' %}#2E7D32{% else %}var(--wdos-magenta, #D4006A){% endif %}; text-decoration:none;">Explore local organisation &rarr;</a>
+      </div>
+    </div>
+
+    <div class="country-map-grid">
+      <!-- Left: Dynamic SVG Country Map Graphic with Explicit Public vs WDOS Units -->
+      <div class="country-map-svg-wrap">
+        {% if dossier.country_code == 'KE' %}
+        <!-- Kenya Geographic Visualisation -->
+        <svg viewBox="0 0 500 360" class="country-map-svg" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Geographic Visualisation of Kenya with Administrative Counties and WDOS Units">
+          <defs>
+            <linearGradient id="keGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F9FAFB"/>
+              <stop offset="100%" stop-color="#F0FDF4"/>
+            </linearGradient>
+          </defs>
+          <path d="M 170,50 C 230,40 310,60 360,110 C 390,160 380,240 340,300 C 310,320 250,310 200,280 C 170,250 140,210 130,160 C 120,110 140,70 170,50 Z" fill="url(#keGrad)" stroke="#CBD5E1" stroke-width="2"/>
+          
+          <circle cx="230" cy="220" r="30" fill="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}" stroke="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="2"/>
+          <text x="230" y="265" font-size="11" font-weight="700" fill="#334155" text-anchor="middle">Nairobi County</text>
+          <text x="230" y="278" font-size="9" fill="#64748B" text-anchor="middle">(Public County &middot; Level 1)</text>
+
+          <circle cx="310" cy="290" r="18" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+          <text x="310" y="287" font-size="10" font-weight="600" fill="#475569" text-anchor="middle">Mombasa</text>
+          <text x="310" y="299" font-size="8.5" fill="#64748B" text-anchor="middle">(Public County)</text>
+
+          <circle cx="160" cy="200" r="18" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+          <text x="160" y="197" font-size="10" font-weight="600" fill="#475569" text-anchor="middle">Kisumu</text>
+          <text x="160" y="209" font-size="8.5" fill="#64748B" text-anchor="middle">(Public County)</text>
+
+          <rect x="215" y="212" width="10" height="10" fill="#64748B" rx="2"/>
+          <path d="M 230,210 L 236,216 L 230,222 L 224,216 Z" fill="#7C3AED"/>
+          <polygon points="242,207 244,212 249,212 245,215 247,220 242,217 237,220 239,215 235,212 240,212" fill="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}"/>
+
+          <line x1="242" y1="207" x2="290" y2="160" stroke="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <rect x="290" y="142" width="175" height="42" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+          <text x="298" y="158" font-size="10" font-weight="700" fill="#111827">★ {{ country_hierarchy.chapter_name|default:"Nairobi Central Chapter" }}</text>
+          <text x="298" y="172" font-size="9" fill="#7C3AED">❖ {{ country_hierarchy.cluster_name|default:"Westlands Cluster" }}</text>
+        </svg>
+
+        {% elif dossier.country_code == 'GH' %}
+        <!-- Ghana Geographic Visualisation -->
+        <svg viewBox="0 0 500 360" class="country-map-svg" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Geographic Visualisation of Ghana with Administrative Regions and WDOS Units">
+          <defs>
+            <linearGradient id="ghGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F9FAFB"/>
+              <stop offset="100%" stop-color="#F0FDF4"/>
+            </linearGradient>
+          </defs>
+          <path d="M 210,60 C 260,50 300,80 300,140 C 310,210 290,280 270,320 C 240,325 180,310 170,260 C 160,200 170,120 210,60 Z" fill="url(#ghGrad)" stroke="#CBD5E1" stroke-width="2"/>
+          <circle cx="260" cy="295" r="26" fill="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}" stroke="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="2"/>
+          <text x="260" y="335" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">Greater Accra Region</text>
+          <text x="260" y="347" font-size="8.5" fill="#64748B" text-anchor="middle">(Public Region &middot; Level 1)</text>
+
+          <circle cx="230" cy="220" r="20" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+          <text x="230" y="217" font-size="10" font-weight="600" fill="#475569" text-anchor="middle">Ashanti</text>
+
+          <rect x="250" y="290" width="10" height="10" fill="#64748B" rx="2"/>
+          <path d="M 265,288 L 271,294 L 265,300 L 259,294 Z" fill="#7C3AED"/>
+          <polygon points="275,285 277,290 282,290 278,293 280,298 275,295 270,298 272,293 268,290 273,290" fill="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}"/>
+
+          <line x1="275" y1="285" x2="330" y2="230" stroke="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <rect x="330" y="212" width="165" height="42" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+          <text x="338" y="228" font-size="10" font-weight="700" fill="#111827">★ {{ country_hierarchy.chapter_name|default:"Accra Central Chapter" }}</text>
+          <text x="338" y="242" font-size="9" fill="#7C3AED">❖ {{ country_hierarchy.cluster_name|default:"Osu-Labone Cluster" }}</text>
+        </svg>
+
+        {% else %}
+        <!-- Nigeria & Master Country Visualisation -->
+        <svg viewBox="0 0 500 360" class="country-map-svg" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Geographic Visualisation of {{ dossier.country_name|default:'Nigeria' }} with Administrative Divisions and WDOS Units">
+          <defs>
+            <linearGradient id="ngGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F9FAFB"/>
+              <stop offset="100%" stop-color="#F0FDF4"/>
+            </linearGradient>
+          </defs>
+          <path d="M 90,140 C 130,90 200,80 270,70 C 340,60 410,100 440,160 C 470,220 440,290 380,310 C 320,330 250,300 200,310 C 150,320 100,280 80,240 C 60,200 70,160 90,140 Z" fill="url(#ngGrad2)" stroke="#CBD5E1" stroke-width="2"/>
+          
+          <path d="M 95,250 C 110,245 135,248 140,265 C 130,275 105,275 95,265 Z" fill="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#DCFCE7{% else %}#FCE7F3{% endif %}" stroke="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="2"/>
+          <text x="115" y="290" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">{{ country_hierarchy.first_level_name|default:"Lagos State" }}</text>
+          <text x="115" y="302" font-size="8.5" fill="#64748B" text-anchor="middle">(Public {{ country_hierarchy.first_level_term|default:"State" }} &middot; Level 1)</text>
+
+          <circle cx="250" cy="190" r="16" fill="#F1F5F9" stroke="#94A3B8" stroke-dasharray="2 2" stroke-width="1.5"/>
+          <text x="250" y="170" font-size="10" font-weight="600" fill="#475569" text-anchor="middle">{% if dossier.country_code == 'AO' %}Luanda{% elif dossier.country_code == 'ET' %}Addis Ababa{% else %}FCT Abuja{% endif %}</text>
+          <text x="250" y="180" font-size="8.5" fill="#64748B" text-anchor="middle">(Public Capital Zone)</text>
+
+          <circle cx="280" cy="115" r="20" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+          <text x="280" y="118" font-size="10" font-weight="600" fill="#475569" text-anchor="middle">Northern Zone</text>
+
+          <circle cx="230" cy="285" r="18" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+          <text x="230" y="288" font-size="10" font-weight="600" fill="#475569" text-anchor="middle">Southern Zone</text>
+
+          <rect x="110" y="250" width="10" height="10" fill="#64748B" rx="2"/>
+          <path d="M 125,248 L 131,254 L 125,260 L 119,254 Z" fill="#7C3AED"/>
+          <polygon points="135,242 137,247 142,247 138,250 140,255 135,252 130,255 132,250 128,247 133,247" fill="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}"/>
+
+          <line x1="135" y1="242" x2="175" y2="215" stroke="{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <rect x="175" y="198" width="170" height="44" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+          <text x="183" y="214" font-size="10" font-weight="700" fill="#111827">★ {{ country_hierarchy.chapter_name|default:"Allen Chapter" }}</text>
+          <text x="183" y="228" font-size="9" fill="#7C3AED">❖ {{ country_hierarchy.cluster_name|default:"Ikeja Central Cluster" }}</text>
+          <text x="183" y="238" font-size="8" fill="#64748B">■ {{ country_hierarchy.second_level_name|default:"Ikeja LGA" }} (Public Geo)</text>
+        </svg>
+        {% endif %}
+
+        <!-- Country Map Legend with Strict Hierarchy Roles -->
+        <div style="margin-top:12px; font-size:11.5px; color:#4B5563; display:flex; justify-content:center; gap:14px; flex-wrap:wrap;">
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="display:inline-block; width:10px; height:10px; background:#64748B; border-radius:2px;"></span>
+            <strong>Public Geography</strong> ({{ country_hierarchy.first_level_term|default:"State" }} / {{ country_hierarchy.second_level_term|default:"LGA" }})
+          </span>
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="color:#7C3AED; font-size:12px;">❖</span>
+            <strong>WDOS Cluster</strong> (Community Unit)
+          </span>
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="color:{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}; font-size:12px;">★</span>
+            <strong>WDOS Chapter</strong> (Operating Unit)
+          </span>
+        </div>
+      </div>
+
+      <!-- Right: Scoped Country Summary Panel -->
+      <div class="country-map-meta-panel">
+        <div>
+          <span style="font-size:10.5px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px;">Permitted National Scope</span>
+          <h3 style="font-size:16px; font-weight:700; color:#111827; margin:2px 0 4px 0;">{{ dossier.country_name|default:"Nigeria" }}</h3>
+          <span class="dash-pill {% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}dash-pill-green{% else %}dash-pill-magenta{% endif %}" style="font-size:11px;">
+            {{ dossier.network|default:"WGMN" }} Network
+          </span>
+        </div>
+
+        <div style="border-top:1px solid #E5E7EB; padding-top:10px;">
+          <div style="font-size:11.5px; color:#6B7280;">Active Administrative Levels:</div>
+          <div style="font-size:12.5px; font-weight:600; color:#111827; margin-top:2px;">
+            {{ country_hierarchy.first_level_term }} &middot; {{ country_hierarchy.second_level_term }}
+          </div>
+        </div>
+
+        <div style="border-top:1px solid #E5E7EB; padding-top:10px;">
+          <div style="font-size:11.5px; color:#6B7280;">Permitted Local Unit:</div>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">
+            ★ {{ country_hierarchy.chapter_name }}
+          </div>
+          <div style="font-size:11.5px; color:#7C3AED; margin-top:2px;">
+            ❖ {{ country_hierarchy.cluster_name }}
+          </div>
+          <div style="font-size:11px; color:#6B7280; margin-top:2px;">
+            Beneath {{ country_hierarchy.second_level_name }}, {{ country_hierarchy.first_level_name }}
+          </div>
+        </div>
+
+        <div style="border-top:1px solid #E5E7EB; padding-top:12px; margin-top:auto;">
+          <a href="/foundation/geography/local-org/?country={{ dossier.country_code|default:'NG' }}{% if dossier.network %}&network={{ dossier.network }}{% endif %}" class="dash-btn-primary" style="width:100%; text-align:center; box-sizing:border-box;">
+            Explore local organisation
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text Equivalent for Country Map (Acceptance Criteria #4 & #5) -->
+    <div class="stage6-map-text-equivalent" role="region" aria-label="Accessible Map Text Equivalent and Full Hierarchy Path">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+        <div>
+          <h3 style="font-size:14px; font-weight:700; color:#111827; margin:0 0 4px 0;">Accessible Map Text Equivalent &middot; Full Hierarchy Path</h3>
+          <p style="font-size:12px; color:#4B5563; margin:0;">
+            Geographic representation of <strong>{{ dossier.country_name|default:"Nigeria" }}</strong> showing public boundaries and affiliated <strong>{{ dossier.network|default:"WGMN" }}</strong> operating units.
+          </p>
+        </div>
+        <span class="dash-pill {% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}dash-pill-green{% else %}dash-pill-magenta{% endif %}">
+          {{ dossier.country_name }} &middot; {{ dossier.network|default:"WGMN" }}
+        </span>
+      </div>
+
+      <!-- Current Hierarchy Trail Breadcrumb -->
+      <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:12px 14px; margin-bottom:14px;">
+        <div style="font-size:10.5px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Authoritative Hierarchy Trail</div>
+        <div style="font-size:13px; font-weight:600; color:#111827;">
+          {{ country_hierarchy.path_text|default:"WGMN → Nigeria → Lagos State → Ikeja LGA → Ikeja Central Cluster → Allen Chapter" }}
+        </div>
+        <div style="font-size:11px; color:#6B7280; margin-top:6px;">
+          <em>Rule: Public areas (such as {{ country_hierarchy.first_level_name }} or {{ country_hierarchy.second_level_name }}) are public administrative geography and not chapters. Community Clusters and Chapters are distinct WDOS operating units.</em>
+        </div>
+      </div>
+
+      <!-- 6-Level Hierarchy Breakdown Cards -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:{% if dossier.network == 'WNNN' or dossier.network == 'WNN' %}#2E7D32{% else %}#D4006A{% endif %}; text-transform:uppercase;">Network</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ dossier.network|default:"WGMN" }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">Country &middot; Public Geo</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ dossier.country_name|default:"Nigeria" }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">{{ country_hierarchy.first_level_term }} &middot; Public Geo</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ country_hierarchy.first_level_name }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#4B5563; text-transform:uppercase;">{{ country_hierarchy.second_level_term }} &middot; Public Geo</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ country_hierarchy.second_level_name }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#7C3AED; text-transform:uppercase;">Community Cluster</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ country_hierarchy.cluster_name }}</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:10px;">
+          <span style="font-size:10px; font-weight:700; color:#D97706; text-transform:uppercase;">Chapter &middot; Operating</span>
+          <div style="font-size:12.5px; font-weight:700; color:#111827; margin-top:2px;">{{ country_hierarchy.chapter_name }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Country Records Table -->
+  <div class="dash-card">
+    <table class="dash-table dash-desktop-table" aria-label="Country Records">
+      <thead>
+        <tr>
+          <th scope="col">NETWORK / COUNTRY</th>
+          <th scope="col">COUNTRY LEAD</th>
+          <th scope="col">VERIFICATION</th>
+          <th scope="col">NEXT REVIEW</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in dossiers %}
+        <tr>
+          <td>
+            <a href="/foundation/geography/country/{{ d.country_code }}/command/" style="color:var(--wdos-magenta, #D4006A); font-weight:600; text-decoration:none;">{{ d.network }} &middot; {{ d.country_name }}</a>
+          </td>
+          <td>{{ d.country_lead_name }}</td>
+          <td>
+            <span class="dash-pill {% if d.verification_status == 'Country verified' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">
+              {{ d.verification_status }}
+            </span>
+          </td>
+          <td>{{ d.next_review_date }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Mobile View List -->
+    <div class="dash-mobile-list">
+      {% for d in dossiers %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Network / country</span>
+          <span class="dash-mobile-val" style="color:var(--wdos-magenta, #D4006A); font-weight:700;">{{ d.network }} &middot; {{ d.country_name }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Country lead</span>
+          <span class="dash-mobile-val">{{ d.country_lead_name }}</span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Verification</span>
+          <span class="dash-pill {% if d.verification_status == 'Country verified' %}dash-pill-green{% else %}dash-pill-amber{% endif %}">
+            {{ d.verification_status }}
+          </span>
+        </div>
+        <div class="dash-mobile-row">
+          <span class="dash-mobile-label">Next review</span>
+          <span class="dash-mobile-val">{{ d.next_review_date }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination & Record Count -->
+    <div class="dash-pagination">
+      <span>Showing {{ dossiers|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  {% if active_tab == 'history' and audit_history %}
+  <div class="dash-card" style="margin-top:20px;">
+    <div class="dash-card-header">
+      <h2 class="dash-card-title">Country dossier activity history</h2>
+    </div>
+    <table class="dash-table" aria-label="Country Command History">
+      <thead>
+        <tr>
+          <th scope="col">EVENT</th>
+          <th scope="col">SUMMARY</th>
+          <th scope="col">ACTOR</th>
+          <th scope="col">TIMESTAMP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in audit_history %}
+        <tr>
+          <td><span class="dash-pill dash-pill-green">{{ ev.action }}</span></td>
+          <td>{{ ev.summary }}</td>
+          <td>{{ ev.actor }}</td>
+          <td>{{ ev.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Scoped Notice -->
+  <div class="stage6-shield-notice">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Coverage and country records remain separate for WGMN and WNNN.</div>
+  </div>
+
+  <!-- Bottom Insight Cards -->
+  <div class="stage6-cards-grid">
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Country context</h3>
+        <p class="stage6-info-card-text">Geography, timezones and local language readiness stay attached to the country dossier.</p>
+      </div>
+      <a href="/foundation/geography/terminology/?country={{ dossier.country_code|default:'NG' }}" class="stage6-info-card-link">Verified sources &amp; local terminology &rarr;</a>
+    </div>
+    <div class="stage6-info-card">
+      <div>
+        <h3 class="stage6-info-card-title">Follow the structure</h3>
+        <p class="stage6-info-card-text">Explore Country, Region, District, Community Cluster and Chapter.</p>
+      </div>
+      <a href="/foundation/geography/local-org/?country={{ dossier.country_code|default:'NG' }}" class="stage6-info-card-link">Local terms preserved &rarr;</a>
+    </div>
+  </div>
+
+  <!-- Related Screens & Support Notes -->
+  <div class="dash-related-screens">
+    <div style="font-weight: 700; font-size: 13px; color: #374151; display:flex; align-items:center; gap:6px;">
+      <span style="font-size:16px;">&#xFF0B;</span> Related operational views
+    </div>
+  </div>
+
+  <div class="dash-support-note">
+    Need help? Ask your support team. Never share your password or verification codes.
+  </div>
+</div>
+{% endblock %}

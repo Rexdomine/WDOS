@@ -1,0 +1,164 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Score candidate against approved criteria · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Score candidate against approved criteria</h1>
+      <p class="dash-subtitle">Use the information and next action for this role only.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Rubric Scoring:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- Approved Criteria Rubric Table Card -->
+  <div class="dash-card" style="margin-bottom:20px;">
+    <div class="dash-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 class="dash-card-title">Recruitment review</h2>
+      <span class="dash-pill">&bull; Ready for review</span>
+    </div>
+
+    <table class="dash-table dash-desktop-table" aria-label="Score candidate against approved criteria">
+      <thead>
+        <tr>
+          <th scope="col">CRITERION</th>
+          <th scope="col">EVIDENCE STATUS</th>
+          <th scope="col">REVIEWER NOTE</th>
+          <th scope="col">REQUIRED FOLLOW-UP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rubric_rows %}
+        <tr>
+          <td style="font-weight:600; color:#111827;">{{ row.criterion }}</td>
+          <td>{{ row.evidence_status }}</td>
+          <td>{{ row.reviewer_note }}</td>
+          <td>
+            <span class="dash-pill {% if row.required_followup == 'None' %}dash-pill-green{% elif row.required_followup == 'Request clarification' %}dash-pill-amber{% endif %}">&bull; {{ row.required_followup }}</span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td style="font-weight:600; color:#111827;">Community leadership</td>
+          <td>Meets evidence</td>
+          <td>Verified against submitted record</td>
+          <td><span class="dash-pill dash-pill-green">&bull; None</span></td>
+        </tr>
+        <tr>
+          <td style="font-weight:600; color:#111827;">Safeguarding readiness</td>
+          <td>Partially evidenced</td>
+          <td>Further Review required</td>
+          <td><span class="dash-pill dash-pill-amber">&bull; Request clarification</span></td>
+        </tr>
+        <tr>
+          <td style="font-weight:600; color:#111827;">Availability</td>
+          <td>Not scored</td>
+          <td>Awaiting reviewer</td>
+          <td><span class="dash-pill">&bull; Complete review</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="dash-mobile-list">
+      {% for row in rubric_rows %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Criterion</span><span class="dash-mobile-val" style="font-weight:700;">{{ row.criterion }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Evidence status</span><span class="dash-mobile-val">{{ row.evidence_status }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Reviewer note</span><span class="dash-mobile-val">{{ row.reviewer_note }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Required follow-up</span><span class="dash-pill">{{ row.required_followup }}</span></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="dash-pagination">
+      <span>Showing {{ rubric_rows|length|default:3 }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rubric Scoring Form Card -->
+  <div class="dash-card">
+    <form method="post" action="/foundation/recruitment/rubric/">
+      {% csrf_token %}
+      <input type="hidden" name="application_code" value="{{ application.application_code|default:'CAND-NG-001' }}">
+      <input type="hidden" name="country" value="{{ target_country }}">
+      <input type="hidden" name="network" value="{{ target_network }}">
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+        <div class="stage6-field-group">
+          <label class="stage6-label">Candidate</label>
+          <div class="stage6-readonly-field">{{ application.candidate_name|default:"Ada Okafor" }}</div>
+        </div>
+
+        <div class="stage6-field-group">
+          <label for="id_criterion" class="stage6-label">Criterion</label>
+          <select id="id_criterion" name="criterion" class="stage6-select">
+            <option value="Community leadership">Community leadership</option>
+            <option value="Safeguarding readiness">Safeguarding readiness</option>
+            <option value="Availability">Availability</option>
+          </select>
+        </div>
+
+        <div class="stage6-field-group">
+          <label for="id_score" class="stage6-label">Score</label>
+          <select id="id_score" name="score" class="stage6-select">
+            <option value="">Select approved score</option>
+            <option value="Meets evidence">Meets evidence</option>
+            <option value="Partially evidenced">Partially evidenced</option>
+            <option value="Does not meet evidence">Does not meet evidence</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="stage6-field-group" style="margin-bottom:16px;">
+        <label for="id_evidence_note" class="stage6-label">Evidence note</label>
+        <textarea id="id_evidence_note" name="evidence_note" rows="3" class="stage6-textarea" placeholder="Record observable evidence and source."></textarea>
+      </div>
+
+      <!-- Shield Notice -->
+      <div class="stage6-shield-notice" style="margin-bottom:16px;">
+        <div class="stage6-shield-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>Criterion examples only. WODDI must approve the rubric and thresholds before use.</div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <span style="font-size:12.5px; color:#6B7280;">A decision requires the appropriate authority.</span>
+        <div style="display:flex; gap:10px;">
+          <a href="/foundation/recruitment/pipeline/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back to dashboard</a>
+          <button type="submit" class="dash-btn-primary">&rarr; Save evidence review</button>
+        </div>
+      </div>
+
+      <p style="font-size:12px; color:#6B7280; margin-top:16px; margin-bottom:0;">Need help? Ask your support team. Never share your password or verification codes.</p>
+    </form>
+  </div>
+</div>
+{% endblock %}

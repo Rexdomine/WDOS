@@ -1,0 +1,1082 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}{{ room_session.title|default:screen.title }} — Live Room{% endblock %}
+
+{% block content %}
+<style>
+  {% if is_guest_session %}
+  aside.sidebar, .mobile-bottom-nav, .shell-header, .breadcrumbs { display: none !important; }
+  .shell-main, .main-content, main { margin-left: 0 !important; width: 100% !important; max-width: 1360px !important; margin: 0 auto !important; padding: 20px !important; }
+  {% endif %}
+  .zm-wrap { display: flex; flex-direction: column; gap: 14px; }
+
+  .zm-alert {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #EAF4D3;
+    border: 1px solid #BFE07E;
+    color: #234700;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .zm-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.85fr) minmax(350px, 1fr);
+    gap: 18px;
+    align-items: stretch;
+  }
+  @media (max-width: 1080px) { .zm-grid { grid-template-columns: 1fr; } }
+
+  /* Main Dark Video & Interpretation Stage */
+  .zm-stage {
+    background: #171219;
+    color: #FFFFFF;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+    box-shadow: 0 16px 36px rgba(15, 10, 16, 0.22);
+  }
+
+  .zm-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .zm-top-menu {
+    position: relative;
+  }
+  .zm-top-menu > summary {
+    list-style: none;
+    user-select: none;
+  }
+  .zm-top-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+  .zm-top-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 295px;
+    background: #231926;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .zm-top-popover-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .zm-top-popover-row:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  .zm-live-badge {
+    background: #22C55E;
+    color: #052E16;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.04em;
+  }
+
+  .zm-canvas {
+    background: radial-gradient(circle at center, #2B1D2E 0%, #130E15 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    min-height: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 20px 40px 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .zm-avatar {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: #D4006A;
+    color: #FFFFFF;
+    font-family: 'Manrope', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 6px rgba(212, 0, 106, 0.22);
+    margin-bottom: 10px;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .zm-avatar.is-speaking {
+    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.45), 0 0 24px rgba(74, 222, 128, 0.65);
+    animation: zmAvatarPulse 1.1s infinite ease-in-out;
+  }
+  @keyframes zmAvatarPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.35), 0 0 18px rgba(74, 222, 128, 0.5); }
+    50% { transform: scale(1.05); box-shadow: 0 0 0 11px rgba(74, 222, 128, 0.55), 0 0 30px rgba(74, 222, 128, 0.85); }
+  }
+  @keyframes zmWaveBounce {
+    0%, 100% { transform: scaleY(0.35); }
+    50% { transform: scaleY(1.15); }
+  }
+  .zm-wave {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 44px;
+    margin-top: 8px;
+  }
+  .zm-wave span {
+    width: 5px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.28);
+    display: inline-block;
+    transition: height 0.07s ease, background-color 0.15s ease, opacity 0.15s ease;
+  }
+  .zm-wave.is-listening span {
+    background: rgba(74, 222, 128, 0.55);
+    height: 8px;
+  }
+  .zm-wave.is-speaking span {
+    background: #D4006A;
+    opacity: 1;
+  }
+  .zm-wave.is-speaking span.alt {
+    background: #4ADE80;
+  }
+  .zm-wave.is-speaking.css-anim span {
+    height: 32px;
+    animation: zmWaveBounce 0.52s infinite ease-in-out;
+  }
+  .zm-wave.is-speaking.css-anim span:nth-child(1) { animation-delay: 0.0s; height: 18px; }
+  .zm-wave.is-speaking.css-anim span:nth-child(2) { animation-delay: 0.12s; height: 30px; }
+  .zm-wave.is-speaking.css-anim span:nth-child(3) { animation-delay: 0.24s; height: 24px; }
+  .zm-wave.is-speaking.css-anim span:nth-child(4) { animation-delay: 0.08s; height: 40px; }
+  .zm-wave.is-speaking.css-anim span:nth-child(5) { animation-delay: 0.20s; height: 28px; }
+  .zm-wave.is-speaking.css-anim span:nth-child(6) { animation-delay: 0.05s; height: 36px; }
+  .zm-wave.is-speaking.css-anim span:nth-child(7) { animation-delay: 0.16s; height: 20px; }
+
+  /* Live Subtitle / Translation Overlay */
+  .zm-captions {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    padding: 14px 18px;
+  }
+  .zm-caption-translated {
+    font-size: 17px;
+    font-weight: 800;
+    color: #86EFAC;
+    line-height: 1.45;
+    margin-bottom: 4px;
+  }
+  .zm-caption-original {
+    font-size: 13px;
+    color: #D8CBD9;
+    line-height: 1.4;
+  }
+
+  /* Sleek Single-Row Bottom Control Bar */
+  .zm-dock {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+  }
+  .zm-btn {
+    background: rgba(255, 255, 255, 0.12);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    padding: 9px 15px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 40px;
+    transition: background 0.15s ease;
+  }
+  .zm-btn:hover { background: rgba(255, 255, 255, 0.22); color: #FFFFFF; }
+  .zm-btn-primary { background: #D4006A; border-color: #F4C2DA; color: #FFFFFF; }
+  .zm-btn-primary:hover { background: #A80053; }
+  .zm-btn-danger { background: #DC2626; border-color: #DC2626; color: #FFFFFF; }
+  .zm-btn-danger:hover { background: #B91C1C; }
+
+  .zm-lang-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 10px;
+    padding: 5px 12px;
+    min-height: 40px;
+  }
+  .zm-lang-pill label { font-size: 12px; font-weight: 700; color: #F4C2DA; white-space: nowrap; }
+  .zm-lang-pill select {
+    background: transparent;
+    color: #FFFFFF;
+    border: none;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    outline: none;
+  }
+  .zm-lang-pill select option { background: #18121A; color: #FFFFFF; }
+
+  /* Right Sidebar: Spacious Participant Rows & Stacked Transcript Cards */
+  .zm-side {
+    background: #FFFFFF;
+    border: 1px solid #E7DCE6;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .zm-side-heading {
+    font-family: 'Manrope', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    color: #19131A;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Spacious Participant Card Row */
+  .zm-person-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #EFE6EE;
+    border-radius: 12px;
+    background: #FAF8FA;
+    margin-bottom: 8px;
+  }
+  .zm-person-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #FCEEF5;
+    color: #D4006A;
+    font-size: 12.5px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .zm-person-info { flex: 1; min-width: 0; }
+  .zm-person-name {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #19131A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .zm-person-meta {
+    font-size: 11.5px;
+    color: #5E5061;
+    margin-top: 2px;
+    line-height: 1.35;
+  }
+  .zm-person-status {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #DCFCE7;
+    color: #166534;
+    flex-shrink: 0;
+  }
+
+  /* Stacked Transcript Message Cards (Full Width — Never Squished!) */
+  .zm-msg-card {
+    padding: 12px 14px;
+    border: 1px solid #EFE6EE;
+    border-radius: 12px;
+    background: #FAF8FA;
+    margin-bottom: 10px;
+  }
+  .zm-msg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #19131A;
+    margin-bottom: 6px;
+  }
+  .zm-msg-badge {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #FCEEF5;
+    color: #D4006A;
+  }
+  .zm-msg-translated {
+    font-size: 14px;
+    font-weight: 700;
+    color: #D4006A;
+    line-height: 1.45;
+    margin-bottom: 4px;
+  }
+  .zm-msg-original {
+    font-size: 12px;
+    color: #5E5061;
+    line-height: 1.4;
+  }
+</style>
+
+<div class="zm-wrap" data-screen-code="{{ screen_code }}" data-screen-title="{{ screen.title }}" data-room-code="{{ room_session.room_code }}">
+  <span style="display:none;">{{ screen.title }}</span>
+
+  {% if validation_error %}
+  <div class="zm-alert" role="alert" style="background:#FEE2E2; border-color:#FCA5A5; color:#991B1B;">
+    <div><strong>Notice:</strong> {{ validation_error }}</div>
+    <a href="/foundation/meetings/" class="zm-btn zm-btn-primary" style="min-height:34px; padding:6px 14px;">Go to Meetings</a>
+  </div>
+  {% endif %}
+
+  {% if action_message %}
+  <div class="zm-alert" role="status">
+    <div>{{ action_message }}</div>
+    {% if not is_guest_session %}
+    <a href="/foundation/meetings/attendance-minutes/" style="font-weight:800; color:#166534;">View Minutes &rarr;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if state_card %}
+  <div class="zm-alert" role="region" aria-label="Screen state contract" style="background:#FFF8EB; border-color:#F5D699; color:#5C3D00;">
+    <div>
+      <strong>{{ state_card.title }}</strong> — {{ state_card.summary }}
+      {% if state_card.notice %}<div>{{ state_card.notice }}</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ===================================================================== -->
+  <!-- PRE-JOIN / GUEST JOIN PAGE (ROOM-01)                                  -->
+  <!-- ===================================================================== -->
+  {% if screen_code == "ROOM-01" %}
+  <div id="prejoin-screen" style="max-width:740px; margin:0 auto; width:100%;">
+    <div class="zm-stage" style="padding:28px;">
+      <div class="zm-topbar">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span class="zm-live-badge">ROOM READY</span>
+            {% if is_guest_session %}
+            <span style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; background:rgba(134,239,172,0.18); color:#86EFAC; border:1px solid rgba(134,239,172,0.35); font-size:11px; font-weight:800;">
+              Public Guest Access
+            </span>
+            {% endif %}
+            <span style="font-size:12px; color:#B4A5B8;">Code: {{ room_session.room_code }}</span>
+          </div>
+          <h1 style="font-family:'Manrope',sans-serif; font-size:22px; font-weight:800; margin:8px 0 2px 0; color:#FFFFFF !important;">{{ room_session.title }}</h1>
+          <div style="font-size:12.5px; color:#D8CBD9;">
+            Host: <strong>{{ room_session.host_name }}</strong>
+            {% if is_guest_session %}
+              &middot; Enter your display name and preferred languages below to join
+            {% endif %}
+          </div>
+        </div>
+        {% if not is_guest_session %}
+        <a href="/foundation/meetings/" class="zm-btn" style="min-height:36px; padding:6px 14px;">Back</a>
+        {% endif %}
+      </div>
+
+      <div class="zm-canvas" style="min-height:200px; padding:22px 20px;">
+        <video id="prejoin-preview" autoplay muted playsinline style="display:none; width:100%; max-height:200px; border-radius:12px; object-fit:cover;"></video>
+        <div id="stage-avatar-container" style="display:flex; flex-direction:column; align-items:center;">
+          <div id="stage-speaker-initials" class="zm-avatar" style="width:64px; height:64px; font-size:20px;">{% if is_guest_session and needs_guest_name %}GU{% else %}{{ participant.participant_name|slice:":2"|upper|default:"GU" }}{% endif %}</div>
+          <div style="margin-top:4px; font-size:13.5px; color:#D8CBD9;">
+            {% if is_guest_session and needs_guest_name %}
+              Ready to join <strong>{{ room_session.title }}</strong>
+            {% else %}
+              Joining as <strong>{{ participant.participant_name }}</strong>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <form id="room-01-form" method="post" {% if is_guest_session %}action="/foundation/rooms/{{ room_session.room_code }}/live/"{% endif %} style="display:flex; flex-direction:column; gap:14px;">
+        {% csrf_token %}
+        {% if is_guest_session %}
+        <input type="hidden" name="action" value="guest_join">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label for="guest-name-prejoin" style="font-size:12px; font-weight:800; color:#F4C2DA; text-transform:uppercase; letter-spacing:0.05em;">Your Display Name</label>
+          <input id="guest-name-prejoin" type="text" name="guest_name" value="{% if not needs_guest_name %}{{ participant.participant_name }}{% endif %}" placeholder="Enter your full name (e.g. James Okafor)" required autofocus style="background:rgba(255,255,255,0.1); color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.25); border-radius:10px; font-size:14px; font-weight:700; padding:11px 14px; outline:none; width:100%;">
+        </div>
+        {% endif %}
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+          <div class="zm-lang-pill" style="justify-content:space-between; padding:10px 14px;">
+            <label for="speaking-lang">I Speak:</label>
+            <select id="speaking-lang" name="speaking_language">
+              <option value="en-US" {% if participant.speaking_language == "en-US" %}selected{% endif %}>English</option>
+              <option value="fr-FR" {% if participant.speaking_language == "fr-FR" %}selected{% endif %}>French</option>
+              <option value="pt-BR" {% if participant.speaking_language == "pt-BR" %}selected{% endif %}>Portuguese</option>
+              <option value="ar-EG" {% if participant.speaking_language == "ar-EG" %}selected{% endif %}>Arabic</option>
+              <option value="sw-KE" {% if participant.speaking_language == "sw-KE" %}selected{% endif %}>Swahili</option>
+              <option value="ha-NG" {% if participant.speaking_language == "ha-NG" %}selected{% endif %}>Hausa</option>
+              <option value="yo-NG" {% if participant.speaking_language == "yo-NG" %}selected{% endif %}>Yoruba</option>
+              <option value="ig-NG" {% if participant.speaking_language == "ig-NG" %}selected{% endif %}>Igbo</option>
+            </select>
+          </div>
+          <div class="zm-lang-pill" style="justify-content:space-between; padding:10px 14px;">
+            <label for="listening-lang">I Hear &amp; Read:</label>
+            <select id="listening-lang" name="listening_language">
+              <option value="en-US" {% if participant.listening_language == "en-US" %}selected{% endif %}>English</option>
+              <option value="fr-FR" {% if participant.listening_language == "fr-FR" %}selected{% endif %}>French</option>
+              <option value="pt-BR" {% if participant.listening_language == "pt-BR" %}selected{% endif %}>Portuguese</option>
+              <option value="ar-EG" {% if participant.listening_language == "ar-EG" %}selected{% endif %}>Arabic</option>
+              <option value="sw-KE" {% if participant.listening_language == "sw-KE" %}selected{% endif %}>Swahili</option>
+              <option value="ha-NG" {% if participant.listening_language == "ha-NG" %}selected{% endif %}>Hausa</option>
+              <option value="yo-NG" {% if participant.listening_language == "yo-NG" %}selected{% endif %}>Yoruba</option>
+              <option value="ig-NG" {% if participant.listening_language == "ig-NG" %}selected{% endif %}>Igbo</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:4px;">
+          <button type="button" id="btn-toggle-cam" class="zm-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            <span>Turn Camera On</span>
+          </button>
+          <button type="button" id="btn-toggle-mic" class="zm-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <span>Test Mic</span>
+          </button>
+          <button type="submit" id="btn-join-room" {% if not is_guest_session %}name="action" value="join"{% endif %} class="zm-btn zm-btn-primary" style="padding:10px 28px; font-size:14.5px;">
+            Join Meeting Room
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% elif screen_code == "ROOM-02" %}
+  <!-- ===================================================================== -->
+  <!-- WAITING LOBBY (ROOM-02)                                               -->
+  <!-- ===================================================================== -->
+  <div id="waiting-lobby-screen" style="max-width:720px; margin:0 auto; width:100%; display:flex; flex-direction:column; gap:14px;">
+    <div class="zm-stage" style="padding:32px; text-align:center;">
+      <div class="zm-topbar" style="justify-content:space-between; text-align:left;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span id="lobby-status-badge" class="zm-live-badge" style="background:#F59E0B; color:#451A03;">
+            {% if participant.admission_status == "DENIED" %}
+              ENTRY DECLINED
+            {% elif room_session.status != "LIVE" %}
+              WAITING FOR HOST TO OPEN MEETING
+            {% else %}
+              IN WAITING LOBBY
+            {% endif %}
+          </span>
+          <strong style="font-size:19px; font-family:'Manrope',sans-serif;">{{ room_session.title }}</strong>
+          <span style="font-size:12px; color:#B4A5B8;">Code: {{ room_session.room_code }}</span>
+        </div>
+        {% if not is_guest_session %}
+        <a href="/foundation/meetings/" class="zm-btn" style="min-height:34px; padding:5px 12px; font-size:12px;">Back</a>
+        {% endif %}
+      </div>
+
+      <div style="padding:28px 20px; border-radius:16px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); display:flex; flex-direction:column; align-items:center; gap:12px;">
+        <div class="zm-avatar" style="width:68px; height:68px; font-size:22px; margin-bottom:4px;">{{ participant.participant_name|slice:":2"|upper }}</div>
+        <h2 id="lobby-heading-text" style="font-family:'Manrope',sans-serif; font-size:22px; font-weight:800; margin:0; color:#FFFFFF !important;">
+          {% if participant.admission_status == "DENIED" %}
+            The host declined your request to join
+          {% elif room_session.status != "LIVE" %}
+            Waiting for the host or co-host to open this meeting
+          {% else %}
+            {{ screen.title }}
+          {% endif %}
+        </h2>
+        <p id="lobby-subtitle-text" style="color:#D8CBD9; font-size:14px; max-width:520px; margin:0; line-height:1.5;">
+          {% if participant.admission_status == "DENIED" %}
+            Your join request for {{ room_session.title }} was not approved by the meeting host.
+          {% elif room_session.status != "LIVE" %}
+            The host ({{ room_session.host_name }}) has not opened the meeting room yet.
+            {% if room_session.bypass_lobby %}
+              Lobby bypass is enabled — you will enter the live room automatically as soon as the host or co-host opens it.
+            {% else %}
+              Once the host or co-host opens the meeting, they will admit you from the lobby.
+            {% endif %}
+          {% else %}
+            {{ screen.subtitle }} — The host ({{ room_session.host_name }}) has been notified that <strong>{{ participant.participant_name }}</strong> is waiting in the lobby. You will enter the live room automatically as soon as you are admitted.
+          {% endif %}
+        </p>
+
+        <div style="font-size:12.5px; color:#86EFAC; font-weight:700; margin-top:4px;">
+          Joining as <strong>{{ participant.participant_name }}</strong> &middot; Speaking {{ participant.speaking_language_display }} &middot; Hearing {{ participant.listening_language_display }}
+        </div>
+      </div>
+
+      <form id="lobby-action-form" method="post" action="/foundation/rooms/{{ room_session.room_code }}/waiting/" style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        {% csrf_token %}
+        <button type="submit" name="action" value="refresh" class="zm-btn">Check Status Now</button>
+        <a id="lobby-enter-room-link" href="/foundation/rooms/{{ room_session.room_code }}/live/" class="zm-btn zm-btn-primary">Enter Room</a>
+        <button type="submit" name="action" value="cancel" class="zm-btn zm-btn-danger">Cancel &amp; Leave Lobby</button>
+      </form>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var tokensUrl = "/api/rooms/{{ meeting.id|default:room_session.room_code }}/tokens/?check=lobby";
+      var waitingUrl = "/foundation/rooms/{{ room_session.room_code }}/waiting/";
+      var liveUrl = "/foundation/rooms/{{ room_session.room_code }}/live/";
+      var isNavigating = false;
+      var formEl = document.getElementById("lobby-action-form");
+      var enterLink = document.getElementById("lobby-enter-room-link");
+      if (formEl) {
+        formEl.addEventListener("submit", function() { isNavigating = true; });
+      }
+      if (enterLink) {
+        enterLink.addEventListener("click", function() { isNavigating = true; });
+      }
+      async function checkLobbyStatus() {
+        try {
+          var resp = await fetch(tokensUrl, { headers: { "Accept": "application/json" } });
+          var data = await resp.json();
+          if (resp.ok && data.status === "admitted") {
+            isNavigating = true;
+            clearInterval(pollLobby);
+            window.location.replace(liveUrl + "?admitted=1");
+            return;
+          }
+          var badgeEl = document.getElementById("lobby-status-badge");
+          var headEl = document.getElementById("lobby-heading-text");
+          var subEl = document.getElementById("lobby-subtitle-text");
+          if (data && data.admission_status === "DENIED") {
+            clearInterval(pollLobby);
+            if (badgeEl) { badgeEl.textContent = "ENTRY DECLINED"; badgeEl.style.background = "#EF4444"; badgeEl.style.color = "#FFFFFF"; }
+            if (headEl) headEl.textContent = "The host declined your request to join";
+            if (subEl) subEl.textContent = "Your request to join this meeting was declined by the host or co-host.";
+          } else if (data && data.waiting_reason === "lobby_admission_required") {
+            if (badgeEl) badgeEl.textContent = "IN WAITING LOBBY · HOST NOTIFIED";
+            if (headEl) headEl.textContent = "Waiting for host or co-host to admit you";
+            if (subEl) subEl.textContent = "The meeting is open! Please wait a moment while the host or co-host admits you from the lobby.";
+          }
+        } catch (e) {}
+      }
+      checkLobbyStatus();
+      var pollLobby = setInterval(checkLobbyStatus, 1800);
+      document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === "visible") {
+          checkLobbyStatus();
+        }
+      });
+    })();
+  </script>
+
+  {% elif room_session.status == "COMPLETED" and screen_code != "ROOM-07" and screen_code != "ROOM-08" and screen_code != "ROOM-06" %}
+  <!-- ===================================================================== -->
+  <!-- MEETING ENDED SCREEN (SHOWN IMMEDIATELY WHEN HOST ENDS MEETING)       -->
+  <!-- ===================================================================== -->
+  <div id="meeting-ended-screen" style="max-width:860px; margin:0 auto; width:100%;">
+    <div class="zm-stage" style="padding:32px; gap:20px;">
+      <div class="zm-topbar">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span class="zm-live-badge" style="background:#EF4444; color:#FFFFFF;">MEETING ENDED</span>
+          <strong style="font-size:22px; font-family:'Manrope',sans-serif;">{{ room_session.title }}</strong>
+          <span style="font-size:12px; color:#B4A5B8;">Code: {{ room_session.room_code }}</span>
+        </div>
+        <a href="{% if is_guest_session %}/auth/login/{% else %}/foundation/meetings/{% endif %}" class="zm-btn">
+          <span>Back to Meetings</span>
+        </a>
+      </div>
+
+      <div style="padding:24px; border-radius:16px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); text-align:center;">
+        <h2 style="font-family:'Manrope',sans-serif; font-size:22px; font-weight:800; margin:0 0 8px 0; color:#FFFFFF !important;">This online meeting has ended</h2>
+        <p style="font-size:14px; color:#D8CBD9; margin:0 0 20px 0;">
+          All live audio, video, and interpretation streams have been closed. {{ transcript_segments|length }} translated statement(s) have been compiled into the meeting minutes.
+        </p>
+        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+          {% if not is_guest_session %}
+          <a href="/foundation/meetings/attendance-minutes/" class="zm-btn zm-btn-primary">
+            <span>View Official Minutes &amp; Action Items</span>
+          </a>
+          <a href="/foundation/meetings/" class="zm-btn">
+            <span>Return to Meetings &amp; Events</span>
+          </a>
+          {% else %}
+          <a href="/auth/login/" class="zm-btn zm-btn-primary">
+            <span>Exit Guest Session</span>
+          </a>
+          {% endif %}
+          {% if is_host %}
+          <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reopen_session">
+            <button type="submit" class="zm-btn" style="background:rgba(34,197,94,0.2); border-color:rgba(134,239,172,0.4); color:#86EFAC;">
+              <span>Reopen Meeting Room</span>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if transcript_segments %}
+      <div style="background:#FFFFFF; color:#19131A; border-radius:16px; padding:20px;">
+        <h3 class="zm-side-heading" style="margin-bottom:12px;">Saved Multilingual Transcript ({{ transcript_segments|length }})</h3>
+        <div style="max-height:320px; overflow-y:auto;">
+          {% for seg in transcript_segments reversed %}
+          <div class="zm-msg-card">
+            <div class="zm-msg-header">
+              <strong>{{ seg.speaker_name }}</strong>
+              <span class="zm-msg-badge">{{ participant.listening_language_display }}</span>
+            </div>
+            <div class="zm-msg-translated">{{ seg.current_translation|default:seg.original_text }}</div>
+            <div class="zm-msg-original">Original: {{ seg.original_text }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- UNIFIED LIVE MEETING ROOM                                             -->
+  <!-- ===================================================================== -->
+  {% else %}
+
+  <div class="zm-grid">
+
+    <!-- LEFT: VIDEO STAGE, LIVE SUBTITLES & CONTROL DOCK -->
+    <section class="zm-stage" aria-label="Live meeting stage">
+      <!-- Top Bar -->
+      <div class="zm-topbar">
+        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap;">
+          <span class="zm-live-badge">LIVE</span>
+          <strong style="font-size:17px; font-family:'Manrope',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:340px;">{{ room_session.title }}</strong>
+          <span style="font-size:11.5px; font-weight:700; color:#D8CBD9; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); padding:3px 9px; border-radius:999px;">{{ room_session.room_code }}</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/foundation/rooms/{{ room_session.room_code }}/live/'); this.querySelector('span').textContent='Copied!';" class="zm-btn" style="min-height:36px; padding:6px 12px; font-size:12px;" title="Copy meeting invite link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span>Invite Link</span>
+          </button>
+
+          <details class="zm-top-menu">
+            <summary class="zm-btn" style="min-height:36px; padding:6px 12px; font-size:12px;" title="View or change room access and lobby settings">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>Room Access</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.75;"><polyline points="6 9 12 15 18 9"/></svg>
+            </summary>
+            <div class="zm-top-popover">
+              <div class="zm-top-popover-row">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                  <span style="font-size:11px; font-weight:800; color:#B4A5B8; text-transform:uppercase; letter-spacing:0.05em;">Who Can Join</span>
+                  {% if room_session.allow_guest_access %}
+                  <span id="badge-guest-access" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(34,197,94,0.18); color:#86EFAC; border:1px solid rgba(134,239,172,0.35);">Anyone with link</span>
+                  {% else %}
+                  <span id="badge-guest-access" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,0.1); color:#E5D9E6; border:1px solid rgba(255,255,255,0.18);">WDOS accounts only</span>
+                  {% endif %}
+                </div>
+                {% if is_host %}
+                <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="margin-top:4px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="toggle_room_access">
+                  <input type="hidden" name="room_access" id="input-toggle-room-access" value="{% if room_session.allow_guest_access %}wdos_only{% else %}anyone_with_link{% endif %}">
+                  <button type="submit" id="btn-toggle-room-access" class="zm-btn" style="width:100%; justify-content:center; min-height:34px; padding:5px 10px; font-size:12px;">
+                    {% if room_session.allow_guest_access %}
+                      <span>Restrict to WDOS Only</span>
+                    {% else %}
+                      <span>Allow Anyone with Link</span>
+                    {% endif %}
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+
+              <div class="zm-top-popover-row">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                  <span style="font-size:11px; font-weight:800; color:#B4A5B8; text-transform:uppercase; letter-spacing:0.05em;">Waiting Lobby</span>
+                  {% if room_session.bypass_lobby %}
+                  <span id="badge-lobby-policy" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(56,189,248,0.18); color:#7DD3FC; border:1px solid rgba(125,211,252,0.35);">Lobby: Bypass On</span>
+                  {% else %}
+                  <span id="badge-lobby-policy" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(245,158,11,0.18); color:#FCD34D; border:1px solid rgba(252,211,77,0.35);">Lobby: Host Admits</span>
+                  {% endif %}
+                </div>
+                {% if is_host %}
+                <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="margin-top:4px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="toggle_lobby_policy">
+                  <input type="hidden" name="lobby_policy" id="input-toggle-lobby-policy" value="{% if room_session.bypass_lobby %}wait_in_lobby{% else %}bypass_lobby{% endif %}">
+                  <button type="submit" id="btn-toggle-lobby-policy" class="zm-btn" style="width:100%; justify-content:center; min-height:34px; padding:5px 10px; font-size:12px;">
+                    {% if room_session.bypass_lobby %}
+                      <span>Require Lobby</span>
+                    {% else %}
+                      <span>Bypass Lobby</span>
+                    {% endif %}
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+          </details>
+
+          {% if is_host %}
+          <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" style="display:inline;" onsubmit="if(window.wdosRoomEngine){window.wdosRoomEngine.shutdownAllMedia();}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="end_session">
+            <button type="submit" id="btn-end-meeting" class="zm-btn zm-btn-danger" style="min-height:36px; padding:6px 12px; font-size:12px;" title="End meeting for all participants and save minutes">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+              <span>End Meeting</span>
+            </button>
+          </form>
+          {% endif %}
+          <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" style="display:inline;" onsubmit="if(window.wdosRoomEngine){window.wdosRoomEngine.shutdownAllMedia();}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="leave_room">
+            <button type="submit" id="btn-leave-meeting" class="zm-btn" style="min-height:36px; padding:6px 12px; font-size:12px; background:rgba(220,38,38,0.22); border-color:rgba(248,113,113,0.45); color:#FCA5A5;" title="Leave this room">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span>Leave</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Center Video / Active Speaker Canvas -->
+      <div class="zm-canvas">
+        <video id="live-stage-video" autoplay playsinline muted style="display:none; width:100%; max-height:280px; border-radius:14px; object-fit:cover;"></video>
+        <div id="stage-avatar-container" style="display:flex; flex-direction:column; align-items:center;">
+          <div id="stage-speaker-initials" class="zm-avatar">{{ initials|default:"SP" }}</div>
+          <div id="stage-speaker-name" style="font-size:20px; font-weight:800;">{{ room_session.active_speaker_name }}</div>
+          <div id="stage-speaker-role" style="font-size:13px; color:#B4A5B8; margin-top:2px;">{{ room_session.active_speaker_role }}</div>
+          <div id="stage-waveform" class="zm-wave" aria-hidden="true">
+            <span></span>
+            <span class="alt"></span>
+            <span></span>
+            <span class="alt"></span>
+            <span></span>
+            <span class="alt"></span>
+            <span></span>
+          </div>
+          <div id="stage-speaking-indicator" style="font-size:12px; font-weight:700; color:#9CA3AF; margin-top:4px; min-height:18px;">
+            Microphone muted · Waiting for speaker
+          </div>
+        </div>
+        <div id="stage-camera-notice" style="display:none; margin-top:10px; padding:6px 12px; border-radius:8px; background:rgba(255,255,255,0.1); font-size:12px; color:#FDE68A;"></div>
+        <div id="live-mic-status" style="position:absolute; bottom:10px; left:16px; right:16px; font-size:12px; color:#D8CBD9; text-align:left;">
+          Connected as {{ participant.participant_name }} · Speaking {{ participant.speaking_language_display }} · Hearing {{ participant.listening_language_display }}
+        </div>
+      </div>
+
+      <!-- Live Translated Subtitles Box -->
+      <div id="caption-container" class="zm-captions" aria-live="polite">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+          <span id="caption-header-label" style="font-size:11px; font-weight:800; color:#F4C2DA; text-transform:uppercase; letter-spacing:0.08em;">
+            LIVE TRANSLATION ({{ participant.listening_language_display|upper }})
+          </span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" id="btn-toggle-tts-audio" style="background:rgba(34,197,94,0.18); color:#86EFAC; border:1px solid rgba(134,239,172,0.35); border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" title="Toggle automatic translated voice audio playback">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              <span id="btn-toggle-tts-label">Voice Output: ON</span>
+            </button>
+            <button type="button" id="btn-play-translation" style="background:rgba(255,255,255,0.14); color:#FFFFFF; border:1px solid rgba(255,255,255,0.22); border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              <span id="btn-play-translation-label">Replay Voice ({{ participant.listening_language_display }})</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="caption-translated-wrap" class="zm-caption-translated">
+          <span id="caption-translated-label" style="font-size:13px; color:#F4C2DA; margin-right:6px;">[{{ participant.listening_language_display }}]:</span>
+          <span id="caption-translated-text">{% if latest_translated_text %}{{ latest_translated_text }}{% elif latest_segment %}{{ latest_segment.original_text }}{% else %}{{ ready_prompt_translated|default:'Click "Turn Mic On" or type a statement below to speak — live translation & voice synthesis will play automatically.' }}{% endif %}</span>
+        </div>
+
+        <div class="zm-caption-original">
+          <strong id="caption-speaker">{{ room_session.active_speaker_name }}:</strong>
+          <span id="caption-text">{% if latest_segment %}{{ latest_segment.original_text }}{% else %}Ready{% endif %}</span>
+        </div>
+      </div>
+
+      <!-- Sleek Bottom Control Bar (Crisp SVG Icons) -->
+      <div class="zm-dock">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <button type="button" id="btn-toggle-mic" class="zm-btn zm-btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <span>Turn Mic On</span>
+          </button>
+
+          <button type="button" id="btn-toggle-cam" class="zm-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            <span>Turn Camera On</span>
+          </button>
+
+          <button type="button" id="btn-raise-hand" class="zm-btn" {% if participant.hand_raised %}style="background:#D97706; border-color:#FCD34D; color:#FFFFFF;"{% endif %}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+            <span id="btn-raise-hand-label">{% if participant.hand_raised %}Lower Hand{% else %}Raise Hand{% endif %}</span>
+          </button>
+        </div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <div class="zm-lang-pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F4C2DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+            <label for="quick-speaking-lang">I Speak:</label>
+            <select id="quick-speaking-lang">
+              <option value="en-US" {% if participant.speaking_language == "en-US" %}selected{% endif %}>English</option>
+              <option value="fr-FR" {% if participant.speaking_language == "fr-FR" %}selected{% endif %}>French</option>
+              <option value="pt-BR" {% if participant.speaking_language == "pt-BR" %}selected{% endif %}>Portuguese</option>
+              <option value="ar-EG" {% if participant.speaking_language == "ar-EG" %}selected{% endif %}>Arabic</option>
+              <option value="sw-KE" {% if participant.speaking_language == "sw-KE" %}selected{% endif %}>Swahili</option>
+              <option value="ha-NG" {% if participant.speaking_language == "ha-NG" %}selected{% endif %}>Hausa</option>
+              <option value="yo-NG" {% if participant.speaking_language == "yo-NG" %}selected{% endif %}>Yoruba</option>
+              <option value="ig-NG" {% if participant.speaking_language == "ig-NG" %}selected{% endif %}>Igbo</option>
+            </select>
+          </div>
+
+          <div class="zm-lang-pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F4C2DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <label for="quick-switch-lang">I Hear &amp; Read:</label>
+            <select id="quick-switch-lang" name="listening_language">
+              <option value="en-US" {% if participant.listening_language == "en-US" %}selected{% endif %}>English</option>
+              <option value="fr-FR" {% if participant.listening_language == "fr-FR" %}selected{% endif %}>French</option>
+              <option value="pt-BR" {% if participant.listening_language == "pt-BR" %}selected{% endif %}>Portuguese</option>
+              <option value="ar-EG" {% if participant.listening_language == "ar-EG" %}selected{% endif %}>Arabic</option>
+              <option value="sw-KE" {% if participant.listening_language == "sw-KE" %}selected{% endif %}>Swahili</option>
+              <option value="ha-NG" {% if participant.listening_language == "ha-NG" %}selected{% endif %}>Hausa</option>
+              <option value="yo-NG" {% if participant.listening_language == "yo-NG" %}selected{% endif %}>Yoruba</option>
+              <option value="ig-NG" {% if participant.listening_language == "ig-NG" %}selected{% endif %}>Igbo</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Type-to-Speak Input Bar -->
+      <form id="room-04-speak-form" method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" style="display:flex; gap:8px;">
+        {% csrf_token %}
+        <input type="text" name="original_text" placeholder="Type a statement here to broadcast &amp; translate live to the room..." style="flex:1; min-height:42px; padding:8px 16px; border:1px solid rgba(255,255,255,0.2); border-radius:10px; font-size:13.5px; background:rgba(0,0,0,0.45); color:#FFFFFF;">
+        <button type="submit" class="zm-btn zm-btn-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <span>Speak</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- RIGHT SIDEBAR: SPACIOUS PARTICIPANT CARDS & STACKED TRANSCRIPT CARDS -->
+    <aside class="zm-side" aria-label="Participants and live transcript">
+      <!-- 1. People in Room (Clean Horizontal Cards — Never Squished) -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h3 class="zm-side-heading">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4006A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>People in Room (<span id="live-participants-count">{{ admitted_participants|length }}</span>)</span>
+          </h3>
+          {% if is_host %}
+          <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="mute_all">
+            <button type="submit" id="btn-mute-all" style="background:#F8F3F7; border:1px solid #DECFE0; border-radius:8px; padding:4px 10px; font-size:11.5px; font-weight:700; color:#4A394D; cursor:pointer;">Mute All</button>
+          </form>
+          {% endif %}
+        </div>
+
+        <div id="waiting-room-container">
+          {% if is_host and waiting_participants %}
+          <div id="waiting-room-queue" style="margin-bottom:12px; padding:10px 12px; border-radius:12px; background:#FFFBEB; border:1px solid #FDE68A;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:12px; font-weight:800; color:#92400E;">Waiting Lobby ({{ waiting_participants|length }})</span>
+              <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="admit_all">
+                <button type="submit" style="background:#D97706; color:#FFF; border:none; border-radius:6px; padding:3px 9px; font-size:11px; font-weight:700; cursor:pointer;">Admit All</button>
+              </form>
+            </div>
+            {% for wp in waiting_participants %}
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; padding-top:6px; border-top:1px dashed #FDE68A;">
+              <div>
+                <div style="font-size:12.5px; font-weight:700; color:#19131A;">{{ wp.participant_name }}</div>
+                <div style="font-size:11px; color:#78350F;">Speaks {{ wp.speaking_language_display }} &middot; Hears {{ wp.listening_language_display }}</div>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="admit">
+                  <input type="hidden" name="participant_id" value="{{ wp.id }}">
+                  <button type="submit" style="background:#16A34A; color:#FFF; border:none; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer;">Admit</button>
+                </form>
+                <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="deny">
+                  <input type="hidden" name="participant_id" value="{{ wp.id }}">
+                  <button type="submit" style="background:#FEE2E2; color:#991B1B; border:none; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer;">Deny</button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+
+        <div id="live-participants-list" style="max-height:210px; overflow-y:auto;">
+          {% for p in admitted_participants %}
+          <div class="zm-person-row" style="flex-wrap:wrap;">
+            <div class="zm-person-avatar">{{ p.participant_name|slice:":2"|upper }}</div>
+            <div class="zm-person-info">
+              <div class="zm-person-name">
+                {{ p.participant_name }}
+                {% if p.hand_raised %}<span style="font-size:11px; color:#D97706; margin-left:4px;">&#9995; Hand Raised</span>{% endif %}
+              </div>
+              <div class="zm-person-meta">{{ p.meeting_role }} &middot; Speaks {{ p.speaking_language_display }} &middot; Hears <strong>{{ p.listening_language_display }}</strong></div>
+            </div>
+            <span class="zm-person-status">{{ p.connection_status }}</span>
+            {% if is_host and p.meeting_role != "Host" %}
+            <div style="width:100%; display:flex; justify-content:flex-end; gap:6px; margin-top:6px; padding-top:6px; border-top:1px dashed #EFE6EE;">
+              <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="mute_participant">
+                <input type="hidden" name="participant_id" value="{{ p.id }}">
+                <button type="submit" style="background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; cursor:pointer;">Mute</button>
+              </form>
+              <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_cohost">
+                <input type="hidden" name="participant_id" value="{{ p.id }}">
+                <button type="submit" style="background:#FCEEF5; color:#D4006A; border:1px solid #F4C2DA; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; cursor:pointer;">{% if p.meeting_role == "Co-Host" %}Remove Co-Host{% else %}Make Co-Host{% endif %}</button>
+              </form>
+              <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="remove_participant">
+                <input type="hidden" name="participant_id" value="{{ p.id }}">
+                <button type="submit" style="background:#FEE2E2; color:#991B1B; border:1px solid #FCA5A5; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; cursor:pointer;">Remove</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 2. Live Translated Conversation Feed (Full-Width Stacked Cards) -->
+      <div style="border-top:1px solid #EFE6EE; padding-top:14px; flex:1; display:flex; flex-direction:column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h3 class="zm-side-heading">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4006A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Live Transcript (<span id="live-transcript-count">{{ transcript_segments|length }}</span>)</span>
+          </h3>
+          <span id="transcript-col-lang" style="font-size:11px; font-weight:800; color:#D4006A; background:#FCEEF5; padding:3px 9px; border-radius:999px;">{{ participant.listening_language_display|upper }}</span>
+        </div>
+
+        <div id="live-transcript-feed" style="max-height:330px; overflow-y:auto;">
+          {% for seg in transcript_segments reversed %}
+          <div class="zm-msg-card">
+            <div class="zm-msg-header">
+              <strong>{{ seg.speaker_name }}</strong>
+              <span class="zm-msg-badge">{{ participant.listening_language_display }}</span>
+            </div>
+            <div class="zm-msg-translated">{{ seg.current_translation|default:seg.original_text }}</div>
+            <div class="zm-msg-original">Original: {{ seg.original_text }}</div>
+          </div>
+          {% empty %}
+          <div style="color:#67586A; text-align:center; padding:28px 14px; font-size:13px; border:1px dashed #E7DCE6; border-radius:12px;">
+            Statements spoken in the meeting will appear here with live translations.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Collapsible Audio Settings & Diagnostics -->
+      <details style="border-top:1px solid #EFE6EE; padding-top:10px; font-size:12px; color:#67586A;">
+        <summary style="cursor:pointer; font-weight:700;">Audio Troubleshooting &amp; Settings</summary>
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+          {% if screen_code == "ROOM-07" or participant.audio_degraded %}
+          <div id="room-degraded-banner" role="alert" style="padding:8px; background:#FEF3C7; color:#92400E; border-radius:8px;">
+            <span class="degraded-reason">Translated voice fallback active.</span>
+          </div>
+          {% endif %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="retry_audio">
+            <button type="submit" id="btn-restore-audio" style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid #D1D5DB; background:#FFF; font-weight:700; cursor:pointer;">Retry / Restore Audio Stream</button>
+          </form>
+          <form id="room-06-form" method="post" style="display:flex; gap:6px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="apply">
+            <input type="text" name="listening_language" value="{{ participant.listening_language_display }}" style="flex:1; padding:6px; border:1px solid #D1D5DB; border-radius:6px; font-size:12px;">
+            <input type="hidden" name="caption_language" value="{{ participant.caption_language|default:participant.listening_language_display }}">
+            <input type="hidden" name="audio_output" value="{{ participant.audio_output_device|default:'Headphones' }}">
+            <input type="hidden" name="show_translated_captions" value="1">
+            <button type="submit" style="padding:6px 10px; border-radius:6px; border:1px solid #D1D5DB; background:#F9FAFB; font-weight:700;">Save</button>
+          </form>
+          {% for lane in diagnostic_lanes %}
+          <div style="font-size:11px;">{{ lane.lane_name }} ({{ lane.language_label }}): <strong>{{ lane.state_label }}</strong></div>
+          {% endfor %}
+        </div>
+      </details>
+    </aside>
+
+  </div>
+  {% endif %}
+</div>
+
+{% if screen_code != "ROOM-02" and room_session.status != "COMPLETED" %}
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech-sdk.bundle-min.js" crossorigin="anonymous"></script>
+<script src="/static/foundation/js/multilingua_engine.js?v=15"></script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    window.wdosRoomEngine = new WDOSMultilinguaMeeting({
+      meetingId: "{{ meeting.id|default:room_session.room_code }}",
+      roomCode: "{{ room_session.room_code }}",
+      tokensUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/tokens/",
+      transcriptUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/transcript/",
+      ttsUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/tts/",
+      restoreAudioUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/restore-audio/",
+      switchLangUrl: "/foundation/rooms/{{ room_session.room_code }}/live/",
+      userDisplayName: "{{ participant.participant_name|escapejs }}",
+      speakingLang: "{{ participant.speaking_language|escapejs }}",
+      listeningLang: "{{ participant.listening_language|escapejs }}",
+      isHost: {{ is_host|yesno:"true,false" }},
+      isGuest: {{ is_guest_session|yesno:"true,false" }},
+      initialSequence: {{ latest_segment.sequence_number|default:0 }}
+    });
+    window.wdosRoomEngine.boot();
+  });
+</script>
+{% endif %}
+{% endblock %}

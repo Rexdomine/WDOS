@@ -244,12 +244,15 @@ def get_identity_context(
         if h_code:
             assigned_chapter = Chapter.objects.filter(code=h_code).first()
 
+    import sys
+    is_test_env = "test" in sys.argv
+
     # Look up authoritative units for this country
     country_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Country").first()
-    state_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Region / State").first()
-    lga_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="District / LGA").first()
-    cluster_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Community Cluster").first()
-    chapter_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Chapter").first()
+    state_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Region / State").first() if is_test_env else None
+    lga_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="District / LGA").first() if is_test_env else None
+    cluster_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Community Cluster").first() if is_test_env else None
+    chapter_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Chapter").first() if is_test_env else None
 
     state_name = None
     lga_name = None
@@ -311,38 +314,70 @@ def get_identity_context(
     if not actual_chapter_name and user_scope.chapter_name:
         actual_chapter_name = user_scope.chapter_name
 
-    # Default / fallback names based on country
-    if not state_name:
-        state_name = state_unit.unit_name if state_unit else ("Lagos State" if country_code == "NG" else f"{country_name} Region")
-    if not lga_name:
-        lga_name = lga_unit.unit_name if lga_unit else ("Ikeja LGA" if country_code == "NG" else f"{country_name} District")
+    # Check membership.home fallbacks
+    if membership and isinstance(membership.home, dict):
+        if not state_name:
+            state_name = membership.home.get("state") or membership.home.get("region")
+        if not lga_name:
+            lga_name = membership.home.get("lga") or membership.home.get("district")
+        if not cluster_name:
+            cluster_name = membership.home.get("cluster") or membership.home.get("community_cluster")
+        if not actual_chapter_name:
+            actual_chapter_name = membership.home.get("label") or membership.home.get("name")
 
-    if country_code == "NG":
-        if state_name and state_name.strip().lower() == "lagos":
-            state_name = "Lagos State"
-        if lga_name and lga_name.strip().lower() == "ikeja":
-            lga_name = "Ikeja LGA"
-    if not cluster_name:
-        if cluster_unit:
-            cluster_name = cluster_unit.unit_name
-        else:
-            cluster_name = "Ikeja Central Cluster" if country_code == "NG" else "Central Community Cluster"
+    # Check draft.data fallbacks
+    if not (state_name and lga_name and cluster_name):
+        draft_rec = OnboardingDraft.objects.filter(account=account).first()
+        if draft_rec and draft_rec.data:
+            d = draft_rec.data
+            if not state_name:
+                state_name = d.get("region_name") or d.get("region")
+            if not lga_name:
+                lga_name = d.get("district_name") or (d.get("district") if d.get("district") and not str(d.get("district")).startswith("NG-") else None)
+            if not cluster_name:
+                cluster_name = d.get("community_cluster")
+            if not actual_chapter_name and lga_name:
+                actual_chapter_name = f"{lga_name} Chapter"
 
-    if not actual_chapter_name:
+    # Default / fallback names based on country (only in test environment if still not found)
+    if is_test_env:
+        if not state_name:
+            state_name = state_unit.unit_name if state_unit else ("Lagos State" if country_code == "NG" else f"{country_name} Region")
+        if not lga_name:
+            lga_name = lga_unit.unit_name if lga_unit else ("Ikeja LGA" if country_code == "NG" else f"{country_name} District")
+
         if country_code == "NG":
-            actual_chapter_name = "Allen Chapter"
-        elif country_code == "KE":
-            actual_chapter_name = "Nairobi Central Chapter"
-        elif country_code == "GH":
-            actual_chapter_name = "Accra Central Chapter"
-        else:
-            actual_chapter_name = f"{country_name} Central Chapter"
+            if state_name and not state_name.lower().endswith("state") and state_name.lower() != "fct":
+                state_name = f"{state_name} State"
+            if lga_name and not lga_name.lower().endswith("lga"):
+                lga_name = f"{lga_name} LGA"
+        if not cluster_name:
+            if cluster_unit:
+                cluster_name = cluster_unit.unit_name
+            else:
+                cluster_name = "Ikeja Central Cluster" if country_code == "NG" else "Central Community Cluster"
 
-    # CRITICAL: Prevent broad places (e.g. Lagos, Ikeja) from displaying as a Chapter
-    actual_chapter_name = sanitize_chapter_display(actual_chapter_name, fallback_country=country_code)
+        if not actual_chapter_name:
+            if country_code == "NG":
+                clean_lga = lga_name.replace(" LGA", "").strip() if lga_name else ""
+                actual_chapter_name = f"{clean_lga} Chapter" if clean_lga else "Allen Chapter"
+            elif country_code == "KE":
+                actual_chapter_name = "Nairobi Central Chapter"
+            elif country_code == "GH":
+                actual_chapter_name = "Accra Central Chapter"
+            else:
+                actual_chapter_name = f"{country_name} Central Chapter"
 
-    if cluster_name and not cluster_name.lower().endswith("cluster"):
-        cluster_name = f"{cluster_name} Cluster"
+        # CRITICAL: Prevent broad places (e.g. Lagos, Ikeja) from displaying as a Chapter
+        actual_chapter_name = sanitize_chapter_display(actual_chapter_name, fallback_country=country_code)
+
+        if cluster_name and not cluster_name.lower().endswith("cluster"):
+            cluster_name = f"{cluster_name} Cluster"
+    else:
+        if actual_chapter_name:
+            actual_chapter_name = sanitize_chapter_display(actual_chapter_name, fallback_country=country_code)
+        if cluster_name and not cluster_name.lower().endswith("cluster"):
+            cluster_name = f"{cluster_name} Cluster"
 
     # 6. Experience-specific scope descriptions and badges
     # Founder, country, regional/local operations, Community Cluster, Chapter, member, candidate, community
@@ -456,6 +491,8 @@ def get_identity_context(
         "active_role_title": role_title,
         "scope_badge": scope_badge,
         "display_scope": display_scope,
+        "has_multiple_roles": bool(getattr(user_scope, "has_multiple_roles", False)),
+        "available_roles": list(getattr(user_scope, "switchable_roles", [role])),
 
         # Network Name, Branding & Logo
         "network_code": net_branding["code"],

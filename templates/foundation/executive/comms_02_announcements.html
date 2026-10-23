@@ -1,0 +1,212 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Announcements · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"HQ / BOTH NETWORKS" }}</div>
+      <h1 class="dash-title">Announcements</h1>
+      <p class="dash-subtitle">{{ screen.subtitle|default:"Publish and acknowledge scoped network notices with clear audience and attachment permissions." }}</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/dashboards/DASH-01/" class="dash-btn-secondary">Back</a>
+      <a href="#new-announcement" class="dash-btn-primary" onclick="document.getElementById('announcement-modal').style.display='block'; return false;">→ Issue Continental Announcement</a>
+    </div>
+  </div>
+
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  <!-- Tabs Navigation -->
+  <div class="dash-tabs" role="tablist">
+    <a href="?tab=overview" class="dash-tab {% if active_tab == 'overview' %}active{% endif %}" role="tab">Overview</a>
+    <a href="?tab=records" class="dash-tab {% if active_tab == 'records' %}active{% endif %}" role="tab">Records</a>
+    <a href="?tab=history" class="dash-tab {% if active_tab == 'history' %}active{% endif %}" role="tab">History</a>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="dash-toolbar">
+    <form method="GET" class="dash-search-box" style="flex:1;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" name="q" value="{{ search_query|default:'' }}" placeholder="Search these records" aria-label="Search records in this view">
+    </form>
+    <div class="dash-filter-actions">
+      <span class="dash-filter-pill-active">Current view</span>
+      <button type="button" class="dash-filter-pill">Status ↓</button>
+      <button type="button" class="dash-filter-pill">More filters</button>
+    </div>
+  </div>
+
+  <div class="dash-layout">
+    <div class="dash-main-col">
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h2 class="dash-card-title">Announcements</h2>
+          <a href="/foundation/messages/" class="dash-card-action">Messaging Inbox (COMMS-01) →</a>
+        </div>
+
+        <table class="dash-table dash-desktop-table">
+          <thead>
+            <tr>
+              <th scope="col">COMMUNICATION</th>
+              <th scope="col">AUDIENCE</th>
+              <th scope="col">SCHEDULED</th>
+              <th scope="col">STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in announcements %}
+            <tr>
+              <td class="item-col">
+                <div style="font-weight:700; color:var(--wdos-ink);">{{ a.communication }}</div>
+                <small style="color:var(--wdos-muted);">{{ a.summary|truncatewords:8 }}</small>
+              </td>
+              <td><span class="scope-badge" style="font-size:11px;">{{ a.audience }}</span></td>
+              <td>{{ a.scheduled }}</td>
+              <td>
+                <span class="dash-pill dash-pill-{{ a.status_style|default:'green' }}">
+                  <span class="dot"></span> {{ a.status }}
+                </span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" style="text-align:center; padding:28px; color:var(--wdos-muted);">
+                No announcements in scope.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="dash-mobile-list">
+          {% for a in announcements %}
+          <div class="dash-mobile-item">
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">COMMUNICATION</span>
+              <span class="dash-mobile-val" style="font-weight:700;">{{ a.communication }}</span>
+            </div>
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">AUDIENCE</span>
+              <span class="dash-mobile-val">{{ a.audience }}</span>
+            </div>
+            <div class="dash-mobile-row">
+              <span class="dash-mobile-label">SCHEDULED</span>
+              <span class="dash-mobile-val">{{ a.scheduled }}</span>
+            </div>
+            <div class="dash-mobile-row" style="margin-top:6px;">
+              <span class="dash-mobile-label">STATUS</span>
+              <span class="dash-pill dash-pill-{{ a.status_style|default:'green' }}"><span class="dot"></span> {{ a.status }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="dash-table-foot">
+          <span>Showing {{ announcements|length }} records in this view</span>
+          <div class="dash-pagination">
+            <button type="button" class="dash-pagination-btn" aria-label="Previous page">←</button>
+            <span>1</span>
+            <button type="button" class="dash-pagination-btn" aria-label="Next page">→</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Side Column -->
+    <div class="dash-side-col">
+      <div class="dash-attention-card">
+        <h2 class="dash-card-title" style="margin-bottom:14px;">Announcements Feed</h2>
+        
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Monthly focus</h3>
+            <p class="dash-attention-text">Approved leadership priorities for the next reporting period.</p>
+            <div class="dash-attention-tag">WGMN · English →</div>
+          </div>
+        </div>
+
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Meeting reminder</h3>
+            <p class="dash-attention-text">Local-time guidance and a direct link to the scheduled meeting.</p>
+            <div class="dash-attention-tag">WNNN · English →</div>
+          </div>
+        </div>
+
+        <div class="dash-attention-item">
+          <div class="dash-attention-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          </div>
+          <div class="dash-attention-body">
+            <h3 class="dash-attention-title">Programme highlights</h3>
+            <p class="dash-attention-text">Rights-cleared stories from completed activities.</p>
+            <div class="dash-attention-tag">Community · Review required →</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-support-note">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>WODDI · No Woman Is Left Out · COMMS-02 UI Review v2</span>
+  </div>
+</div>
+
+<!-- Modal for Publishing Continental Announcement -->
+<div id="announcement-modal" style="display:none; position:fixed; z-index:9999; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
+  <div style="background:white; max-width:580px; margin:70px auto; border-radius:12px; padding:24px; box-shadow:0 12px 36px rgba(0,0,0,0.25);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="font-size:18px; font-weight:700; color:var(--wdos-ink);">Issue Official Continental Announcement</h2>
+      <button type="button" onclick="document.getElementById('announcement-modal').style.display='none';" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <form method="POST" action="">
+      {% csrf_token %}
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Title</label>
+        <input type="text" name="title" placeholder="Announcement Title" required style="width:100%; padding:8px 12px; border:1px solid #D1D5DB; border-radius:6px;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Target Audience</label>
+        <select name="audience" style="width:100%; padding:8px 12px; border:1px solid #D1D5DB; border-radius:6px; font-weight:600;">
+          <option value="HQ / Both Networks">HQ / Both Networks (All 55 Countries)</option>
+          <option value="WGMN · All Hubs">WGMN · All 55 Hubs</option>
+          <option value="WNNN · All Hubs">WNNN · All 55 Hubs</option>
+          <option value="All Network Leaders & Members">All Network Leaders, Members & Supporters</option>
+        </select>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Short Summary</label>
+        <input type="text" name="summary" placeholder="One-line summary for mobile push and email cards" required style="width:100%; padding:8px 12px; border:1px solid #D1D5DB; border-radius:6px;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Official Announcement Text</label>
+        <textarea name="content" rows="4" placeholder="Enter complete continental message..." required style="width:100%; padding:8px 12px; border:1px solid #D1D5DB; border-radius:6px;"></textarea>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="dash-btn-secondary" onclick="document.getElementById('announcement-modal').style.display='none';">Cancel</button>
+        <button type="submit" class="dash-btn-primary">Publish Continental Announcement</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

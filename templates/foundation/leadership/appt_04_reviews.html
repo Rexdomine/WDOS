@@ -1,0 +1,157 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}First 30 / 60 / 90 day reviews · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">First 30 / 60 / 90 day reviews</h1>
+      <p class="dash-subtitle">Use the information and next action for this role only.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Review Outcome:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+  <!-- Appointments & Continuity Sub-Navigation -->
+  <div class="stage6-subnav">
+    <a href="/foundation/appointments/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment processing</a>
+    <a href="/foundation/appointments/offer/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment offer</a>
+    <a href="/foundation/appointments/onboarding/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Leader onboarding</a>
+    <a href="/foundation/appointments/first-90-days/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">First 90 days</a>
+    <a href="/foundation/appointments/reviews/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link active">30 / 60 / 90 day reviews</a>
+    <a href="/foundation/appointments/identity/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment &amp; identity</a>
+    <a href="/foundation/appointments/status-change/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Status change</a>
+    <a href="/foundation/appointments/transition/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Plan transition</a>
+    <a href="/foundation/appointments/handover/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Handover workspace</a>
+  </div>
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <form method="post" action="/foundation/appointments/reviews/">
+        {% csrf_token %}
+        <input type="hidden" name="appointment_code" value="{{ appointment.appointment_code|default:'APPT-NG-002' }}">
+
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">Appointment and onboarding</h2>
+
+        <!-- Stepper -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; max-width:440px;">
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:var(--wdos-magenta, #D4006A); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span>
+            <div style="font-size:11.5px; font-weight:700; color:var(--wdos-magenta, #D4006A); margin-top:4px;">30 days</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 12px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">60 days</div>
+          </div>
+          <div style="flex:1; height:1px; background:#E5E7EB; margin:0 12px;"></div>
+          <div>
+            <span style="width:28px; height:28px; border-radius:50%; background:#F3F4F6; color:#6B7280; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span>
+            <div style="font-size:11.5px; color:#6B7280; margin-top:4px;">90 days</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+          <div class="stage6-field-group">
+            <label class="stage6-label" for="id_review_point">Review point</label>
+            <select id="id_review_point" name="review_point" class="stage6-input">
+              <option value="30 days">30 days</option>
+              <option value="60 days">60 days</option>
+              <option value="90 days">90 days</option>
+            </select>
+          </div>
+
+          <div class="stage6-field-group">
+            <label class="stage6-label" for="id_outcome">Outcome</label>
+            <select id="id_outcome" name="outcome" class="stage6-input">
+              <option value="On track">Select outcome</option>
+              <option value="On track">On track</option>
+              <option value="Support needed">Support needed</option>
+              <option value="Action plan required">Action plan required</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="stage6-field-group">
+          <label class="stage6-label" for="id_evidence_notes">Evidence / notes</label>
+          <textarea id="id_evidence_notes" name="evidence_notes" class="stage6-input" rows="4" required>Record evidence and agreed support.</textarea>
+        </div>
+
+        <div class="stage6-checkbox-row" style="margin-bottom:20px;">
+          <input type="checkbox" id="id_reviewer_confirmation" name="reviewer_confirmation" class="stage6-checkbox" value="true" checked>
+          <label for="id_reviewer_confirmation" class="stage6-checkbox-label">
+            Reviewer confirmation
+            <span style="display:block; font-size:12.5px; font-weight:400; color:#4B5563; margin-top:2px;">Review completed by authorised reviewer.</span>
+          </label>
+        </div>
+
+        <hr style="border:none; border-top:1px solid #E5E7EB; margin:20px 0;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <span style="font-size:12.5px; color:#6B7280;">Your information stays within your authorized scope.</span>
+          <div style="display:flex; gap:10px;">
+            <a href="/foundation/appointments/first-90-days/" class="dash-btn-secondary">Back to dashboard</a>
+            <button type="submit" class="dash-btn-primary">&rarr; Record review outcome</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:10px;">At a glance</h3>
+        <span class="dash-pill dash-pill-amber" style="margin-bottom:16px; display:inline-block;">&bull; Ready for review</span>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">30 days &middot; settle in</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Check orientation, access, first activity and support needs.</p>
+          <span class="stage6-sidebar-badge">Approved checklist required</span>
+        </div>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">60 days &middot; follow through</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Review participation, reporting and agreed support actions.</p>
+          <span class="stage6-sidebar-badge">Review due alerts</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">90 days &middot; agree next steps</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Record verified outcomes and remaining support or escalation.</p>
+          <span class="stage6-sidebar-badge">Human review</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shield Notice -->
+  <div class="stage6-shield-notice" style="margin-top:20px;">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Changing an appointment does not create a new person or erase prior service.</div>
+  </div>
+</div>
+{% endblock %}

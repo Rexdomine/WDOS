@@ -1,0 +1,166 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}{{ selected_seat.unit_name|default:"Lagos" }} · {{ selected_seat.position_title|default:"State Coordinator" }} · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">{{ selected_seat.unit_name|default:"Lagos" }} &middot; {{ selected_seat.position_title|default:"State Coordinator" }}</h1>
+      <p class="dash-subtitle">See the relevant leadership and seats records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/leadership/register/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      <a href="/foundation/appointments/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Open appointment</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <!-- Seat Metadata Card -->
+      <div class="dash-card" style="margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:20px;">
+          <div style="width:48px; height:48px; border-radius:50%; background:#FCE7F3; color:var(--wdos-magenta, #D4006A); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px;">L</div>
+          <div>
+            <h2 style="font-size:18px; font-weight:700; color:#111827; margin:0;">{{ selected_seat.unit_name|default:"Lagos" }} &middot; {{ selected_seat.position_title|default:"State Coordinator" }}</h2>
+            <div style="font-size:13px; color:#6B7280;">{{ target_network }} / {{ target_country_name }}</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px;">
+          <div style="background:#FAF8F6; border:1px solid #E5E7EB; border-radius:10px; padding:14px;">
+            <div style="font-size:12px; color:#6B7280; margin-bottom:4px;">Position code</div>
+            <div style="font-size:14px; font-weight:700; color:#111827;">{{ selected_seat.position.position_code|default:"STATE_COORDINATOR" }}</div>
+          </div>
+          <div style="background:#FAF8F6; border:1px solid #E5E7EB; border-radius:10px; padding:14px;">
+            <div style="font-size:12px; color:#6B7280; margin-bottom:4px;">Unit</div>
+            <div style="font-size:14px; font-weight:700; color:#111827;">{{ selected_seat.unit_name|default:"Lagos" }}</div>
+          </div>
+          <div style="background:#FAF8F6; border:1px solid #E5E7EB; border-radius:10px; padding:14px;">
+            <div style="font-size:12px; color:#6B7280; margin-bottom:4px;">Current holder</div>
+            <div style="font-size:14px; font-weight:700; color:#111827;">{{ selected_seat.holder_name|default:"Lina Mensah" }}</div>
+          </div>
+          <div style="background:#FAF8F6; border:1px solid #E5E7EB; border-radius:10px; padding:14px;">
+            <div style="font-size:12px; color:#6B7280; margin-bottom:4px;">Reports to</div>
+            <div style="font-size:14px; font-weight:700; color:#111827;">{{ selected_seat.reports_to_label|default:"Country Representative · Nigeria" }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subordinate / Related Seats Table -->
+      <div class="dash-card" style="margin-bottom:20px;">
+        <table class="dash-table dash-desktop-table" aria-label="Seat Reporting Structure">
+          <thead>
+            <tr>
+              <th scope="col">POSITION</th>
+              <th scope="col">UNIT</th>
+              <th scope="col">HOLDER</th>
+              <th scope="col">STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for seat in seats %}
+            <tr>
+              <td style="font-weight:600; color:#111827;">
+                <a href="/foundation/leadership/seats/{{ seat.seat_code }}/" style="color:#111827; text-decoration:none;">{{ seat.position_title }}</a>
+              </td>
+              <td>{{ seat.unit_name }}</td>
+              <td>{{ seat.holder_name }}</td>
+              <td>
+                <span class="dash-pill {% if seat.status == 'Active' %}dash-pill-green{% elif seat.status == 'Onboarding' %}dash-pill-amber{% endif %}">{{ seat.status }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="dash-pagination">
+          <span>Showing {{ seats|length }} records in this view</span>
+          <div class="dash-page-arrows">
+            <span class="dash-arrow" aria-hidden="true">&larr;</span>
+            <span class="dash-current-page">1</span>
+            <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+          </div>
+        </div>
+      </div>
+
+      {% if seat_specific_history %}
+      <div class="dash-card" style="margin-bottom:20px;">
+        <div class="dash-card-header">
+          <h3 class="dash-card-title">Former seat holders &amp; continuity record</h3>
+        </div>
+        <table class="dash-table" aria-label="Former Seat Holders">
+          <thead>
+            <tr>
+              <th scope="col">FORMER HOLDER</th>
+              <th scope="col">SERVICE PERIOD</th>
+              <th scope="col">OUTCOME</th>
+              <th scope="col">NOTES</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in seat_specific_history %}
+            <tr>
+              <td style="font-weight:600; color:#111827;">{{ h.holder_name }}</td>
+              <td>{{ h.service_period }}</td>
+              <td><span class="dash-pill">{{ h.outcome_or_stage }}</span></td>
+              <td>{{ h.transition_reason }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <div class="stage6-shield-notice">
+        <div class="stage6-shield-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>A vacancy exists only for an approved seat. Former holders remain in history.</div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:14px;">Related information</h3>
+
+        <div style="padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Lagos State</div>
+          <div style="font-size:12.5px; color:#6B7280; margin:4px 0;">Lina Mensah &middot; State Coordinator.</div>
+          <a href="/foundation/leadership/seats/SEAT-NG-LAG-SC/" style="font-size:12px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Active</a>
+        </div>
+
+        <div style="padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Ikeja LGA</div>
+          <div style="font-size:12.5px; color:#6B7280; margin:4px 0;">Kemi Bello &middot; LGA Coordinator.</div>
+          <a href="/foundation/leadership/seats/SEAT-NG-IKJ-LC/" style="font-size:12px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Onboarding</a>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Chapter support</div>
+          <div style="font-size:12.5px; color:#6B7280; margin:4px 0;">An approved deputy seat needs a candidate referral.</div>
+          <a href="/foundation/leadership/vacancies/" style="font-size:12px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Vacant</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

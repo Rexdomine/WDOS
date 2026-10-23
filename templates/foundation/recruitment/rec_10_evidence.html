@@ -1,0 +1,144 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Review candidate evidence · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Review candidate evidence</h1>
+      <p class="dash-subtitle">Check the evidence and the impact of this decision before confirming.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Candidate Evidence Review:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <!-- Details to check summary header -->
+      <div style="margin-bottom:20px; padding:16px; border:1px solid #E5E7EB; border-radius:10px; background:#FAFAFA;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h2 style="font-size:16px; font-weight:700; color:#111827; margin:0;">Details to check</h2>
+          <span class="dash-pill">&bull; In progress</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+          <div>
+            <div style="font-size:13px; font-weight:700; color:#111827;">Before you continue</div>
+            <p style="font-size:12px; color:#4B5563; margin:4px 0;">Candidate evidence is visible only within your authorized review scope.</p>
+            <span class="stage6-sidebar-badge">Please review</span>
+          </div>
+          <div>
+            <div style="font-size:13px; font-weight:700; color:#111827;">Your information is protected</div>
+            <p style="font-size:12px; color:#4B5563; margin:4px 0;">Only the people authorized for this record can review the submission.</p>
+            <span class="stage6-sidebar-badge">Scoped access</span>
+          </div>
+        </div>
+      </div>
+
+      <form method="post" action="/foundation/recruitment/evidence/">
+        {% csrf_token %}
+        <input type="hidden" name="application_code" value="{{ application.application_code|default:'CAND-NG-002' }}">
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+        {% if application and application.updated_at %}
+        <input type="hidden" name="expected_updated_at" value="{{ application.updated_at|date:'Y-m-d\TH:i:s' }}">
+        {% endif %}
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div class="stage6-field-group">
+            <label class="stage6-label">Candidate</label>
+            <div class="stage6-readonly-field">{{ application.candidate_name|default:"Lina Mensah" }}</div>
+          </div>
+
+          <div class="stage6-field-group">
+            <label class="stage6-label">Route</label>
+            <div class="stage6-readonly-field">{{ application.route_detail|default:"3-day referral · Pack completed" }}</div>
+          </div>
+        </div>
+
+        <div class="stage6-field-group" style="margin-bottom:16px;">
+          <label for="id_evidence_assessment" class="stage6-label">Evidence assessment</label>
+          <select id="id_evidence_assessment" name="evidence_assessment" class="stage6-select">
+            <option value="Request human decision" {% if application.evidence_assessment == 'Request human decision' or not application.evidence_assessment %}selected{% endif %}>Request human decision</option>
+            <option value="Request clarification" {% if application.evidence_assessment == 'Request clarification' %}selected{% endif %}>Request clarification</option>
+            <option value="Further Review required" {% if application.evidence_assessment == 'Further Review required' %}selected{% endif %}>Further Review required</option>
+          </select>
+        </div>
+
+        <div class="stage6-field-group" style="margin-bottom:16px;">
+          <label for="id_reviewer_notes" class="stage6-label">Reviewer notes</label>
+          <textarea id="id_reviewer_notes" name="reviewer_notes" rows="3" class="stage6-textarea" placeholder="Record the evidence supporting your recommendation.">{{ application.reviewer_notes|default:"" }}</textarea>
+        </div>
+
+        {% if application and application.deadline_reached %}
+        <div class="stage6-checkbox-row" style="margin-bottom:16px;">
+          <input type="checkbox" id="id_reopen_deadline" name="reopen_deadline" class="stage6-checkbox" value="true">
+          <label for="id_reopen_deadline" class="stage6-checkbox-label">Reopen candidate submission window</label>
+        </div>
+        {% endif %}
+
+        <!-- Shield Notice -->
+        <div class="stage6-shield-notice" style="margin-bottom:16px;">
+          <div class="stage6-shield-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>Candidate evidence is visible only within your authorized review scope.</div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <span style="font-size:12.5px; color:#6B7280;">A decision requires the appropriate authority.</span>
+          <div style="display:flex; gap:10px;">
+            <a href="/foundation/recruitment/pipeline/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+            <button type="submit" name="action" value="submit" class="dash-btn-primary">&rarr; Request decision</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:14px;">Decision context</h3>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Before you continue</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Candidate evidence is visible only within your authorized review scope.</p>
+          <span class="stage6-sidebar-badge">Please review</span>
+        </div>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your information is protected</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Only the people authorized for this record can review the submission.</p>
+          <span class="stage6-sidebar-badge">Scoped access</span>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <a href="/foundation/recruitment/rubric/?candidate={{ application.application_code|default:'CAND-NG-001' }}&country={{ target_country }}&network={{ target_network }}" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Score candidate against approved criteria &rarr;</a>
+        </div>
+        <p style="font-size:12px; color:#6B7280; margin:0;">Ask your support team if you need guidance.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

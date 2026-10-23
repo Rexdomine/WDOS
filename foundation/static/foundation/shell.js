@@ -203,4 +203,27 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
   }
+
+  // Identity & Scope Context Block collapse / expand toggle
+  const contextBlocks = document.querySelectorAll('[data-identity-context-block]');
+  contextBlocks.forEach(function (block) {
+    const toggleBtn = block.querySelector('[data-context-collapse-toggle]');
+    if (!toggleBtn) return;
+
+    try {
+      if (sessionStorage.getItem('wdos_identity_scope_expanded') === '1') {
+        block.classList.remove('is-collapsed');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+      }
+    } catch (e) {}
+
+    toggleBtn.addEventListener('click', function () {
+      const collapsed = block.classList.toggle('is-collapsed');
+      const expanded = !collapsed;
+      toggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      try {
+        sessionStorage.setItem('wdos_identity_scope_expanded', expanded ? '1' : '0');
+      } catch (e) {}
+    });
+  });
 });

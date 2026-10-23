@@ -1,0 +1,153 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Appointment processing · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Appointment processing</h1>
+      <p class="dash-subtitle">See the relevant appointments and continuity records, linked evidence and next actions for your scope.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="/foundation/leadership/structure/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+      <a href="/foundation/appointments/offer/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-primary">&rarr; Open appointment</a>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Appointment Decision:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+
+  <!-- Appointments & Continuity Sub-Navigation -->
+  <div class="stage6-subnav">
+    <a href="/foundation/appointments/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link active">Appointment processing</a>
+    <a href="/foundation/appointments/offer/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment offer</a>
+    <a href="/foundation/appointments/onboarding/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Leader onboarding</a>
+    <a href="/foundation/appointments/first-90-days/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">First 90 days</a>
+    <a href="/foundation/appointments/reviews/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">30 / 60 / 90 day reviews</a>
+    <a href="/foundation/appointments/identity/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Appointment &amp; identity</a>
+    <a href="/foundation/appointments/status-change/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Status change</a>
+    <a href="/foundation/appointments/transition/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Plan transition</a>
+    <a href="/foundation/appointments/handover/?country={{ target_country }}&network={{ target_network }}" class="stage6-subnav-link">Handover workspace</a>
+  </div>
+
+  <!-- Appointment Processing Card -->
+  <div class="dash-card" style="margin-bottom:20px;">
+    <div class="dash-card-header" style="margin-bottom:16px;">
+      <h2 class="dash-card-title">Appointment processing</h2>
+    </div>
+
+    <div class="dash-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+      <form method="get" action="/foundation/appointments/" class="dash-search-box" style="min-width:240px; display:flex; align-items:center; gap:6px;">
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search these records" aria-label="Search these records">
+      </form>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="/foundation/appointments/?country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if not status_filter %}dash-pill-magenta{% endif %}" style="text-decoration:none;">Current view</a>
+        <a href="/foundation/appointments/?status=Onboarding&country={{ target_country }}&network={{ target_network }}" class="dash-pill {% if status_filter == 'Onboarding' %}dash-pill-magenta{% endif %}" style="text-decoration:none; background:#F3F4F6; color:#374151;">Status &darr;</a>
+        <a href="/foundation/appointments/handover/?country={{ target_country }}&network={{ target_network }}" class="dash-pill" style="text-decoration:none; background:#F3F4F6; color:#374151;">More filters</a>
+      </div>
+    </div>
+
+    <table class="dash-table dash-desktop-table" aria-label="Appointment Processing">
+      <thead>
+        <tr>
+          <th scope="col">APPOINTEE</th>
+          <th scope="col">POSITION</th>
+          <th scope="col">STAGE</th>
+          <th scope="col">NEXT ACTION</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for appt in appointments %}
+        <tr>
+          <td style="font-weight:600; color:#111827;">
+            <a href="/foundation/appointments/identity/?appointment={{ appt.appointment_code }}" style="color:#111827; text-decoration:none;">{{ appt.appointee_name }}</a>
+          </td>
+          <td>{{ appt.position_title }}</td>
+          <td>{{ appt.stage }}</td>
+          <td>
+            {% if appt.next_action == 'View offer' %}
+            <a href="/foundation/appointments/offer/?appointment={{ appt.appointment_code }}" class="dash-pill" style="text-decoration:none;">&bull; {{ appt.next_action }}</a>
+            {% elif appt.next_action == 'Review checklist' %}
+            <a href="/foundation/appointments/onboarding/?appointment={{ appt.appointment_code }}" class="dash-pill dash-pill-amber" style="text-decoration:none;">&bull; {{ appt.next_action }}</a>
+            {% elif appt.next_action == 'Check access removal' %}
+            <a href="/foundation/appointments/handover/assets/" class="dash-pill" style="text-decoration:none;">&bull; {{ appt.next_action }}</a>
+            {% else %}
+            <a href="/foundation/appointments/reviews/?appointment={{ appt.appointment_code }}" class="dash-pill dash-pill-green" style="text-decoration:none;">&bull; {{ appt.next_action }}</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center; padding:32px; color:#6B7280;">No appointments match the selected filter.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="dash-mobile-list">
+      {% for appt in appointments %}
+      <div class="dash-mobile-item">
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Appointee</span><span class="dash-mobile-val" style="font-weight:700;">{{ appt.appointee_name }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Position</span><span class="dash-mobile-val">{{ appt.position_title }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Stage</span><span class="dash-mobile-val">{{ appt.stage }}</span></div>
+        <div class="dash-mobile-row"><span class="dash-mobile-label">Next action</span><span class="dash-pill">{{ appt.next_action }}</span></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="dash-pagination">
+      <span>Showing {{ appointments|length }} records in this view</span>
+      <div class="dash-page-arrows">
+        <span class="dash-arrow" aria-hidden="true">&larr;</span>
+        <span class="dash-current-page">1</span>
+        <span class="dash-arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shield Notice -->
+  <div class="stage6-shield-notice" style="margin-bottom:20px;">
+    <div class="stage6-shield-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div>Changing an appointment does not create a new person or erase prior service.</div>
+  </div>
+
+  <!-- Bottom Cards -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+    <div class="dash-card">
+      <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 6px 0;">A clear start</h3>
+      <p style="font-size:13px; color:#4B5563; margin:0 0 12px 0;">Acceptance, declarations and required onboarding precede full role access.</p>
+      <a href="/foundation/appointments/onboarding/" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Appointment gates &rarr;</a>
+    </div>
+    <div class="dash-card">
+      <h3 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 6px 0;">History stays with WODDI</h3>
+      <p style="font-size:13px; color:#4B5563; margin:0 0 12px 0;">Official records transfer safely; private conversations do not.</p>
+      <a href="/foundation/appointments/handover/" style="font-size:13px; font-weight:600; color:var(--wdos-magenta, #D4006A); text-decoration:none;">Institutional continuity &rarr;</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

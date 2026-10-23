@@ -1,6 +1,6 @@
 {% load static %}
 <!-- Persistent Identity and Scope Context Block (16 October Review / Rebuild Master Specification v1.2) -->
-<section class="identity-context-block {{ identity_context.network_brand_class }}" role="region" aria-label="Active Identity and Operational Scope">
+<section class="identity-context-block is-collapsed {{ identity_context.network_brand_class }}" data-identity-context-block role="region" aria-label="Active Identity and Operational Scope">
   
   <!-- Identity & Role Ribbon -->
   <div class="context-identity-row">
@@ -26,16 +26,21 @@
           {% if identity_context.scope_badge %}
             <span class="context-scope-pill">{{ identity_context.scope_badge }}</span>
           {% endif %}
-        </div>
-
-        <!-- Network Name and Logo Indicator -->
-        <div class="context-network-line">
-          <span class="context-network-icon" aria-hidden="true">
-            {{ identity_context.network_logo_svg|safe }}
+          <span class="context-inline-sep" aria-hidden="true">·</span>
+          <!-- Network Name and Logo Indicator -->
+          <span class="context-network-line">
+            <span class="context-network-icon" aria-hidden="true">
+              {{ identity_context.network_logo_svg|safe }}
+            </span>
+            <span class="context-network-title">
+              <strong class="network-brand-accent" style="color: {{ identity_context.network_brand_color }};">{{ identity_context.network_short_name }}</strong>
+              <span class="network-full-name">· {{ identity_context.network_name }}</span>
+            </span>
           </span>
-          <span class="context-network-title">
-            <strong class="network-brand-accent" style="color: {{ identity_context.network_brand_color }};">{{ identity_context.network_short_name }}</strong>
-            <span class="network-full-name">· {{ identity_context.network_name }}</span>
+          <span class="context-compact-summary" title="{{ identity_context.context_breadcrumb_text }}">
+            <span>{{ identity_context.country_flag_emoji }} {{ identity_context.country_name }}</span>
+            <span aria-hidden="true">·</span>
+            <span>{{ identity_context.chapter_name }}</span>
           </span>
         </div>
       </div>
@@ -43,16 +48,22 @@
 
     <!-- Quick Role & Scope Controls -->
     <div class="context-actions">
+      <button type="button" class="context-collapse-btn" data-context-collapse-toggle aria-expanded="false" aria-controls="identity-hierarchy-row" title="Show or hide full assigned scope trail">
+        <span class="collapse-label" data-collapse-label>Assigned scope</span>
+        <span class="collapse-chevron" aria-hidden="true">▾</span>
+      </button>
+      {% if identity_context.has_multiple_roles %}
       <a href="/foundation/dashboard/switch-role/" class="context-switch-btn" title="Switch active network, role, or country scope" aria-label="Switch active network, role, or country scope">
         <span class="switch-icon" aria-hidden="true">⇋</span>
         <span class="switch-label">Switch Scope / Role</span>
       </a>
+      {% endif %}
     </div>
   </div>
 
   {# Operational Hierarchy Pipeline Trail #}
   {# Pipeline pattern: Network -> Country -> Level 1 -> Level 2 -> Cluster -> Chapter #}
-  <div class="context-hierarchy-row" aria-label="Organizational and Geographic Assignment Hierarchy">
+  <div id="identity-hierarchy-row" class="context-hierarchy-row" data-context-hierarchy-row aria-label="Organizational and Geographic Assignment Hierarchy">
     <div class="hierarchy-label">
       <span class="hierarchy-badge">ASSIGNED SCOPE</span>
     </div>

@@ -1,0 +1,120 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Recruitment route settings · WDOS{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <!-- Page Head -->
+  <div class="dash-pagehead">
+    <div>
+      <div class="dash-eyebrow">{{ screen.eyebrow|default:"W G M N / N I G E R I A" }}</div>
+      <h1 class="dash-title">Recruitment route settings</h1>
+      <p class="dash-subtitle">Prepare a controlled change. Current settings remain effective until the required approval.</p>
+    </div>
+  </div>
+
+  <!-- State Interaction Feedback Card -->
+  {% if state_card %}
+  <div class="dash-state-card" role="alert">
+    <div class="dash-state-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h3 class="dash-state-title">{{ state_card.title }}</h3>
+    <p class="dash-state-msg">{{ state_card.message }}</p>
+    <a href="{{ state_card.action_url }}" class="dash-state-btn">{{ state_card.action_label }}</a>
+  </div>
+  {% endif %}
+
+  {% if result_message %}
+  <div style="margin-bottom: 20px; padding: 14px 18px; border-radius: 8px; background: {% if result_success %}#DCFCE7; color: #166534; border: 1px solid #86EFAC;{% else %}#FEE2E2; color: #991B1B; border: 1px solid #FCA5A5;{% endif %}">
+    <strong>Route Revision:</strong> {{ result_message }}
+  </div>
+  {% endif %}
+
+
+  <!-- 2-Column Layout -->
+  <div class="stage6-form-layout">
+    <div class="stage6-form-main">
+      <form method="post" action="/foundation/recruitment/route-settings/">
+        {% csrf_token %}
+        <input type="hidden" name="country" value="{{ target_country }}">
+        <input type="hidden" name="network" value="{{ target_network }}">
+        {% if route_config and route_config.updated_at %}
+        <input type="hidden" name="expected_updated_at" value="{{ route_config.updated_at|date:'Y-m-d\TH:i:s' }}">
+        {% endif %}
+
+        <h2 style="font-size:18px; font-weight:700; color:#111827; margin-bottom:20px;">Recruitment route settings</h2>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:16px;">
+          <div class="stage6-field-group">
+            <label for="id_route_name" class="stage6-label">Recruitment route</label>
+            <input type="text" id="id_route_name" name="route_name" class="stage6-input" value="{{ route_config.route_name|default:'Open call · Activation' }}">
+          </div>
+
+          <div class="stage6-field-group">
+            <label for="id_duration_label" class="stage6-label">Duration</label>
+            <input type="text" id="id_duration_label" name="duration_label" class="stage6-input" value="{{ route_config.duration_label|default:'7 days' }}">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
+          <div class="stage6-field-group">
+            <label for="id_route_timezone" class="stage6-label">Route timezone</label>
+            <input type="text" id="id_route_timezone" name="route_timezone" class="stage6-input" value="{{ route_config.route_timezone|default:'Africa/Lagos' }}">
+          </div>
+
+          <div class="stage6-field-group">
+            <label for="id_content_version" class="stage6-label">Content version</label>
+            <input type="text" id="id_content_version" name="content_version" class="stage6-input" value="{{ route_config.content_version|default:'Activation pack v2' }}">
+          </div>
+        </div>
+
+        <hr style="border:none; border-top:1px solid #E5E7EB; margin:20px 0;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+          <span style="font-size:12.5px; color:#6B7280;">Changes are recorded in the activity history.</span>
+          <div style="display:flex; gap:10px;">
+            <a href="/foundation/recruitment/pipeline/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">Back</a>
+            <button type="submit" name="action" value="submit" class="dash-btn-primary">&rarr; Save route revision</button>
+          </div>
+        </div>
+
+        <!-- Bottom Info Cards inside form main -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px;">
+          <div style="padding:14px; border:1px solid #E5E7EB; border-radius:8px; background:#FAFAFA;">
+            <div style="font-size:13.5px; font-weight:700; color:#111827;">Before you continue</div>
+            <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Candidate evidence is visible only within your authorized review scope.</p>
+            <span class="stage6-sidebar-badge">Please review</span>
+          </div>
+          <div style="padding:14px; border:1px solid #E5E7EB; border-radius:8px; background:#FAFAFA;">
+            <div style="font-size:13.5px; font-weight:700; color:#111827;">Your information is protected</div>
+            <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Only the people authorized for this record can review the submission.</p>
+            <span class="stage6-sidebar-badge">Scoped access</span>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="stage6-form-sidebar">
+      <div class="stage6-sidebar-box">
+        <h3 class="stage6-sidebar-box-title" style="font-size:17px; margin-bottom:10px;">At a glance</h3>
+        <span class="dash-pill" style="margin-bottom:16px; display:inline-block;">&bull; In progress</span>
+
+        <div style="padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Before you continue</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Candidate evidence is visible only within your authorized review scope.</p>
+          <span class="stage6-sidebar-badge">Please review</span>
+        </div>
+
+        <div>
+          <div style="font-size:13.5px; font-weight:700; color:#111827;">Your information is protected</div>
+          <p style="font-size:12.5px; color:#4B5563; margin:6px 0;">Only the people authorized for this record can review the submission.</p>
+          <span class="stage6-sidebar-badge">Scoped access</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

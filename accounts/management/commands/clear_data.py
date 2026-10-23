@@ -146,7 +146,7 @@ class Command(BaseCommand):
         from django.utils import timezone
 
         User = get_user_model()
-        keep_emails = ["admin@example.org", "founder@example.org"]
+        keep_emails = ["admin@example.org"]
         keep_accs = list(Account.objects.filter(email__in=keep_emails))
         keep_person_ids = [a.person_id for a in keep_accs if a.person_id]
 
@@ -157,15 +157,16 @@ class Command(BaseCommand):
         else:
             Person.objects.all().delete()
 
-        # Ensure single admin superuser exists
+        # Ensure single admin superuser exists with requested credentials
         admin_user = User.objects.filter(email="admin@example.org").first()
         if not admin_user:
-            admin_user = User.objects.create_superuser("admin@example.org", "admin@example.org", "WDOSPassphrase2026!")
+            admin_user = User.objects.create_superuser("admin@example.org", "admin@example.org", "DevAdmin@2026!Wdos")
             admin_user.first_name = "Dev"
             admin_user.last_name = "Admin"
             admin_user.save()
         else:
-            admin_user.set_password("WDOSPassphrase2026!")
+            admin_user.username = "admin@example.org"
+            admin_user.set_password("DevAdmin@2026!Wdos")
             admin_user.is_staff = True
             admin_user.is_superuser = True
             admin_user.is_active = True
@@ -187,46 +188,4 @@ class Command(BaseCommand):
         admin_acc.status = "active"
         admin_acc.save()
 
-        # Ensure Tier 1 Founder account exists cleanly
-        founder_user = User.objects.filter(email="founder@example.org").first()
-        if not founder_user:
-            founder_user = User.objects.create_superuser("founder", "founder@example.org", "WDOSPassphrase2026!")
-            founder_user.first_name = "Founder"
-            founder_user.last_name = "Executive Director"
-            founder_user.save()
-        else:
-            founder_user.set_password("WDOSPassphrase2026!")
-            founder_user.is_staff = True
-            founder_user.is_superuser = True
-            founder_user.is_active = True
-            founder_user.save()
-
-        founder_person, _ = Person.objects.get_or_create(display_name="Founder & Executive Director")
-        founder_acc, _ = Account.objects.get_or_create(
-            email="founder@example.org",
-            defaults={
-                "user": founder_user,
-                "person": founder_person,
-                "display_name": "Founder & Executive Director",
-                "status": "active",
-                "security_version": 1,
-            },
-        )
-        founder_acc.user = founder_user
-        founder_acc.person = founder_person
-        founder_acc.status = "active"
-        founder_acc.save()
-
-        AccessGrant.objects.update_or_create(
-            account=founder_acc,
-            role="founder",
-            defaults={
-                "network": "*",
-                "geography": "*",
-                "function": "governance",
-                "expires_at": timezone.now() + timedelta(days=365),
-                "revoked_at": None,
-            },
-        )
-
-        self.stdout.write(self.style.SUCCESS("All operational and test data cleared. Onboarding catalogues preserved."))
+        self.stdout.write(self.style.SUCCESS("All operational and test data cleared. Only admin@example.org and onboarding catalogues preserved."))

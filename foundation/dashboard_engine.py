@@ -6,7 +6,7 @@ and authentic database-reconciled data contracts.
 """
 
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from django.db.models import Q
 from django.utils import timezone
 from .models import (
@@ -26,2397 +26,473 @@ from accounts.models import AccessGrant, Account, Membership, OnboardingDraft
 from .context_block import get_identity_context
 from .scope import ScopePermissionDenied, is_broad_geographic_place, sanitize_chapter_display
 
+DEFAULT_SUBTITLE = "Your priorities, relevant evidence and next actions in one clear view."
+DEFAULT_SCOPED_NOTICE = "Counts and records remain scoped to your current role and network."
+DEFAULT_SUPPORT_NOTE = "Need help? Ask your support team. Never share your password or verification codes."
 
-DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
-    # -------------------------------------------------------------------------
-    # DASH-01: Continental priorities (Founder / HQ Executive Overview)
-    # -------------------------------------------------------------------------
-    "DASH-01": {
-        "screen_id": "DASH-01",
-        "title": "Continental priorities",
-        "desktop_pnum": 75,
-        "mobile_pnum": 76,
-        "state_pnum": 77,
-        "eyebrow": "HQ / BOTH NETWORKS",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "founder",
-        "default_role_title": "Executive overview",
-        "default_network": "HQ / Both networks",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "1,248",
-                "label": "WGMN active leaders",
-                "sub": "Nigeria, Ghana and other country views",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "864",
-                "label": "WNNN active leaders",
-                "sub": "Separate network view",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "4",
-                "label": "Decisions awaiting you",
-                "sub": "2 require additional evidence",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
+
+def _kpis(*specs: Tuple[str, str]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "value": "0",
+            "label": label,
+            "sub": sub,
+            "is_dark": idx == 0,
+            "icon": "bar-chart",
+        }
+        for idx, (label, sub) in enumerate(specs)
+    ]
+
+
+def _screen(
+    screen_id: str,
+    title: str,
+    pnum: int,
+    eyebrow: str,
+    role_code: str,
+    role_title: str,
+    network: str,
+    country: str,
+    columns: List[str],
+    related_screens: List[str],
+    *,
+    kpis: Optional[List[Dict[str, Any]]] = None,
+    subtitle: str = DEFAULT_SUBTITLE,
+    primary_action: Optional[Dict[str, str]] = None,
+    secondary_action: Optional[Dict[str, str]] = None,
+    has_tabs: bool = True,
+    has_search_filter: bool = False,
+    requires_safeguarding: bool = False,
+    hero_banner: Optional[Dict[str, str]] = None,
+    table_title: str = "Your work and follow-through",
+    has_attention: bool = True,
+    chart_card: Optional[Dict[str, Any]] = None,
+    scoped_notice: str = DEFAULT_SCOPED_NOTICE,
+    support_note: Optional[str] = None,
+) -> Dict[str, Any]:
+    return {
+        "screen_id": screen_id,
+        "title": title,
+        "desktop_pnum": pnum,
+        "mobile_pnum": pnum + 1,
+        "state_pnum": pnum + 2,
+        "eyebrow": eyebrow,
+        "subtitle": subtitle,
+        "default_role_code": role_code,
+        "default_role_title": role_title,
+        "default_network": network,
+        "default_country": country,
+        "primary_action": primary_action or {"label": "→ Open my work", "url": "/foundation/work-queue/"},
+        "secondary_action": secondary_action,
+        "has_tabs": has_tabs,
+        "has_search_filter": has_search_filter,
+        "requires_safeguarding": requires_safeguarding,
+        "hero_banner": hero_banner,
+        "kpi_cards": kpis or [],
         "table_card": {
-            "title": "Your work and follow-through",
+            "title": table_title,
             "view_all_label": "View all →",
             "view_all_url": "/foundation/work-queue/",
-            "columns": ["DECISION / CONCERN", "NETWORK / COUNTRY", "OWNER", "STATUS"],
-            "rows": [
-                {
-                    "item": "Country leadership coverage",
-                    "col2": "WGMN · Ghana",
-                    "col3": "HOFCO",
-                    "status_label": "Needs review",
-                    "status_style": "amber",
-                    "url": "/foundation/dashboards/dash-10-coverage/",
-                },
-                {
-                    "item": "Programme expansion proposal",
-                    "col2": "WNNN · Kenya",
-                    "col3": "Programmes",
-                    "status_label": "Decision due",
-                    "status_style": "amber",
-                    "url": "/foundation/dashboards/dash-05/",
-                },
-                {
-                    "item": "Country dossier conflict",
-                    "col2": "WGMN · Nigeria",
-                    "col3": "QA / Controls",
-                    "status_label": "Evidence needed",
-                    "status_style": "amber",
-                    "url": "/foundation/dashboards/dash-09/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
+            "columns": columns,
+            "rows": [],
+            "record_count_text": "Showing 0 records in this view",
         },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Country leadership coverage",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Needs review",
-                    "action_style": "magenta",
-                    "url": "/foundation/dashboards/dash-10-coverage/",
-                },
-                {
-                    "title": "Programme expansion proposal",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Decision due",
-                    "action_style": "magenta",
-                    "url": "/foundation/dashboards/dash-05/",
-                },
-            ],
-        },
-        "chart_card": {
+        "attention_card": {"title": "Attention required", "items": []} if has_attention else None,
+        "chart_card": chart_card,
+        "scoped_notice": scoped_notice,
+        "related_screens": related_screens,
+        "support_note": support_note,
+    }
+
+
+DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
+    "DASH-01": _screen(
+        "DASH-01", "Continental priorities", 75, "HQ / BOTH NETWORKS",
+        "founder", "Executive overview", "HQ / Both networks", "ALL",
+        ["DECISION / CONCERN", "NETWORK / COUNTRY", "OWNER", "STATUS"],
+        ["DASH-02", "DASH-03", "DASH-04", "DASH-05", "DASH-06", "DASH-07", "DASH-08", "DASH-09",
+         "DASH-10", "DASH-11", "DASH-12", "DASH-13", "DASH-14", "DASH-15", "DASH-16", "DASH-17"],
+        kpis=_kpis(
+            ("WGMN active leaders", "Active network views"),
+            ("WNNN active leaders", "Separate network view"),
+            ("Decisions awaiting you", "Open items across networks"),
+        ),
+        chart_card={
             "title": "Country follow-ups by network",
             "badge": "Current period · open actions",
             "bars": [
-                {"label": "WGMN", "value": 7, "color": "#E4C1D6"},
-                {"label": "WNNN", "value": 5, "color": "#D4006A"},
+                {"label": "WGMN", "value": 0, "color": "#E4C1D6"},
+                {"label": "WNNN", "value": 0, "color": "#D4006A"},
             ],
         },
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": [
-            "DASH-02", "DASH-03", "DASH-04", "DASH-05", "DASH-06", "DASH-07", "DASH-08", "DASH-09",
-            "DASH-10", "DASH-11", "DASH-12", "DASH-13", "DASH-14", "DASH-15", "DASH-16", "DASH-17"
-        ],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-02: Country operations (Operations Lead / HOFCO)
-    # -------------------------------------------------------------------------
-    "DASH-02": {
-        "screen_id": "DASH-02",
-        "title": "Country operations",
-        "desktop_pnum": 78,
-        "mobile_pnum": 79,
-        "state_pnum": 80,
-        "eyebrow": "HQ / BOTH NETWORKS",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "operations",
-        "default_role_title": "HOFCO",
-        "default_network": "HQ / Both networks",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "12",
-                "label": "Country follow-ups",
-                "sub": "Assigned operational actions",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "8",
-                "label": "Critical vacancies",
-                "sub": "Approved seats only",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "6",
-                "label": "Onboarding overdue",
-                "sub": "Needs individual follow-through",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["COUNTRY PRIORITY", "NETWORK", "OWNER", "STATUS"],
-            "rows": [
-                {
-                    "item": "Deputy leadership vacancy",
-                    "col2": "WGMN · Ghana",
-                    "col3": "Country team",
-                    "status_label": "Open",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Country dossier verification",
-                    "col2": "WNNN · Kenya",
-                    "col3": "Custodian",
-                    "status_label": "Review due",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "September report follow-up",
-                    "col2": "WGMN · Nigeria",
-                    "col3": "Country lead",
-                    "status_label": "In progress",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Deputy leadership vacancy",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Open",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Country dossier verification",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Review due",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-01", "DASH-03", "DASH-04", "DASH-10", "DASH-11"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-03: Coordination desk (Network Secretary)
-    # -------------------------------------------------------------------------
-    "DASH-03": {
-        "screen_id": "DASH-03",
-        "title": "Coordination desk",
-        "desktop_pnum": 81,
-        "mobile_pnum": 82,
-        "state_pnum": 83,
-        "eyebrow": "HQ / BOTH NETWORKS",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "operations",
-        "default_role_title": "Network Secretary",
-        "default_network": "HQ / Both networks",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "18",
-                "label": "Applications to screen",
-                "sub": "Across authorized routes",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "5",
-                "label": "Letters to prepare",
-                "sub": "Human selection recorded",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "3",
-                "label": "Register conflicts",
-                "sub": "Evidence review required",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["WORK ITEM", "ROUTE / SCOPE", "DUE", "STATUS"],
-            "rows": [
-                {
-                    "item": "Lina Mensah · Pack review",
-                    "col2": "Referral · WNNN",
-                    "col3": "Today",
-                    "status_label": "Review ready",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Ada Okafor · Appointment letter",
-                    "col2": "WGMN · Nigeria",
-                    "col3": "19 Sep",
-                    "status_label": "Prepare",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Unmatched leadership record",
-                    "col2": "Country register",
-                    "col3": "20 Sep",
-                    "status_label": "Investigate",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Lina Mensah · Pack review",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Review ready",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Ada Okafor · Appointment letter",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Prepare",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-01", "DASH-02", "DASH-04", "DASH-10-PIPELINE"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-04: Administration overview (Director of Administration)
-    # -------------------------------------------------------------------------
-    "DASH-04": {
-        "screen_id": "DASH-04",
-        "title": "Administration overview",
-        "desktop_pnum": 84,
-        "mobile_pnum": 85,
-        "state_pnum": 86,
-        "eyebrow": "HQ / AUTHORIZED SCOPE",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "founder",
-        "default_role_title": "Director of Administration",
-        "default_network": "HQ / Authorized scope",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "9",
-                "label": "Access reviews",
-                "sub": "Due this month",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "4",
-                "label": "Document revisions",
-                "sub": "Awaiting publication review",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Handover exceptions",
-                "sub": "Outstanding official records",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["CONTROL ITEM", "RESPONSIBLE TEAM", "DUE", "STATUS"],
-            "rows": [
-                {
-                    "item": "Role access recertification",
-                    "col2": "Administration",
-                    "col3": "30 Sep",
-                    "status_label": "Review due",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Leadership Pack revision",
-                    "col2": "Network office",
-                    "col3": "22 Sep",
-                    "status_label": "Approval pending",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Office identity transfer",
-                    "col2": "IT / Administration",
-                    "col3": "19 Sep",
-                    "status_label": "Evidence needed",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Role access recertification",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Review due",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Leadership Pack revision",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Approval pending",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-01", "DASH-02", "DASH-03", "DASH-09"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-05: Programme portfolio (Director of Programmes)
-    # -------------------------------------------------------------------------
-    "DASH-05": {
-        "screen_id": "DASH-05",
-        "title": "Programme portfolio",
-        "desktop_pnum": 87,
-        "mobile_pnum": 88,
-        "state_pnum": 89,
-        "eyebrow": "HQ / BOTH NETWORKS",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "operations",
-        "default_role_title": "Director of Programmes",
-        "default_network": "HQ / Both networks",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "7",
-                "label": "Proposals to review",
-                "sub": "Decision queue",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "12",
-                "label": "Activities underway",
-                "sub": "Approved programme work",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "4",
-                "label": "Evidence overdue",
-                "sub": "Follow-up required",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["PROGRAMME / ACTIVITY", "AREA", "OWNER", "STATUS"],
-            "rows": [
-                {
-                    "item": "Community Skills Exchange",
-                    "col2": "Lagos",
-                    "col3": "Ada Okafor",
-                    "status_label": "Approved",
-                    "status_style": "green",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Family Wellbeing Circle",
-                    "col2": "Abuja",
-                    "col3": "Lina Mensah",
-                    "status_label": "Under review",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Digital Confidence Workshop",
-                    "col2": "Kano",
-                    "col3": "Kemi Bello",
-                    "status_label": "Evidence due",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Community Skills Exchange",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Approved",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Family Wellbeing Circle",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Under review",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-01", "DASH-06", "DASH-07", "DASH-10"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-06: Communications workspace (Communications Lead)
-    # -------------------------------------------------------------------------
-    "DASH-06": {
-        "screen_id": "DASH-06",
-        "title": "Communications workspace",
-        "desktop_pnum": 90,
-        "mobile_pnum": 91,
-        "state_pnum": 92,
-        "eyebrow": "HQ / BOTH NETWORKS",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "operations",
-        "default_role_title": "Communications lead",
-        "default_network": "HQ / Both networks",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "14",
-                "label": "Media awaiting review",
-                "sub": "Consent and usage checks",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "3",
-                "label": "Campaigns scheduled",
-                "sub": "Approved versions only",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "6",
-                "label": "Deliverables due",
-                "sub": "This week",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["COMMUNICATION", "AUDIENCE", "SCHEDULED", "STATUS"],
-            "rows": [
-                {
-                    "item": "Monthly focus",
-                    "col2": "WGMN · Nigeria",
-                    "col3": "18 Sep · 09:00",
-                    "status_label": "Approved",
-                    "status_style": "green",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Country meeting reminder",
-                    "col2": "WNNN · Kenya",
-                    "col3": "19 Sep · 10:00",
-                    "status_label": "Scheduled",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Programme highlights",
-                    "col2": "Consented Community",
-                    "col3": "Draft",
-                    "status_label": "Review required",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Monthly focus",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Approved",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Country meeting reminder",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Scheduled",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-01", "DASH-05", "DASH-08"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-07: Resource accountability (Finance Reviewer)
-    # -------------------------------------------------------------------------
-    "DASH-07": {
-        "screen_id": "DASH-07",
-        "title": "Resource accountability",
-        "desktop_pnum": 93,
-        "mobile_pnum": 94,
-        "state_pnum": 95,
-        "eyebrow": "HQ / AUTHORIZED FINANCE",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "operations",
-        "default_role_title": "Finance reviewer",
-        "default_network": "HQ / Authorized finance",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "5",
-                "label": "Reviews awaiting you",
-                "sub": "Within delegated authority",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "3",
-                "label": "Evidence outstanding",
-                "sub": "Return requested",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Open exceptions",
-                "sub": "Accountability follow-up",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["RECORD", "PROGRAMME", "EVIDENCE", "STATUS"],
-            "rows": [
-                {
-                    "item": "FR-031 · Workshop materials",
-                    "col2": "Community Skills Exchange",
-                    "col3": "Receipt attached",
-                    "status_label": "Review due",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "FR-028 · Venue resources",
-                    "col2": "Family Wellbeing Circle",
-                    "col3": "Return requested",
-                    "status_label": "Awaiting evidence",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "FR-025 · Equipment return",
-                    "col2": "Digital Confidence Workshop",
-                    "col3": "Verified",
-                    "status_label": "Closed",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "FR-031 · Workshop materials",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Review due",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "FR-028 · Venue resources",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Awaiting evidence",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-01", "DASH-04", "DASH-05"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-08: Systems operations (IT & Systems)
-    # -------------------------------------------------------------------------
-    "DASH-08": {
-        "screen_id": "DASH-08",
-        "title": "Systems operations",
-        "desktop_pnum": 96,
-        "mobile_pnum": 97,
-        "state_pnum": 98,
-        "eyebrow": "HQ / TECHNICAL CONTROLS",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "operations",
-        "default_role_title": "IT & Systems",
-        "default_network": "HQ / Technical controls",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "2",
-                "label": "Incidents to review",
-                "sub": "Assigned response actions",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "6",
-                "label": "Jobs needing reconciliation",
-                "sub": "Outcome not yet confirmed",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "3",
-                "label": "Evidence awaiting sign-off",
-                "sub": "Restore and release records",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["SERVICE / JOB", "LAST EVIDENCE", "OWNER", "STATUS"],
-            "rows": [
-                {
-                    "item": "Institute status exchange",
-                    "col2": "Mapping awaiting check",
-                    "col3": "IT team",
-                    "status_label": "Review required",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Notification delivery",
-                    "col2": "Provider response received",
-                    "col3": "Communications",
-                    "status_label": "Reconciling",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Restore rehearsal",
-                    "col2": "Evidence awaiting sign-off",
-                    "col3": "IT team",
-                    "status_label": "Review required",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Institute status exchange",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Review required",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Notification delivery",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Reconciling",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-01", "DASH-04", "DASH-09"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-09: Quality and controls (QA / Controls)
-    # -------------------------------------------------------------------------
-    "DASH-09": {
-        "screen_id": "DASH-09",
-        "title": "Quality and controls",
-        "desktop_pnum": 99,
-        "mobile_pnum": 100,
-        "state_pnum": 101,
-        "eyebrow": "HQ / AUTHORIZED SCOPE",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "operations",
-        "default_role_title": "QA / Controls",
-        "default_network": "HQ / Authorized scope",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "11",
-                "label": "Open findings",
-                "sub": "3 need priority review",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "8",
-                "label": "UAT evidence to review",
-                "sub": "No acceptance assumed",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Access review exceptions",
-                "sub": "Assigned control owners",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["FINDING", "AREA", "OWNER", "STATE"],
-            "rows": [
-                {
-                    "item": "Mobile audio recovery",
-                    "col2": "Multilingua",
-                    "col3": "IT team",
-                    "status_label": "Retest due",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Country record mismatch",
-                    "col2": "Data quality",
-                    "col3": "Country custodian",
-                    "status_label": "Unresolved",
-                    "status_style": "green",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Role access denial evidence",
-                    "col2": "Permissions",
-                    "col3": "QA team",
-                    "status_label": "Review ready",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Mobile audio recovery",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Retest due",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Country record mismatch",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Unresolved",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-01", "DASH-04", "DASH-08"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10: Nigeria country overview (Country Representative)
-    # -------------------------------------------------------------------------
-    "DASH-10": {
-        "screen_id": "DASH-10",
-        "title": "Nigeria country overview",
-        "desktop_pnum": 102,
-        "mobile_pnum": 103,
-        "state_pnum": 104,
-        "eyebrow": "WGMN / NIGERIA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "country_lead",
-        "default_role_title": "Country Representative",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": False,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "126",
-                "label": "Current leaders",
-                "sub": "Within your country scope",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "8",
-                "label": "Approved vacancies",
-                "sub": "Principal and deputy seats",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "6",
-                "label": "Reports awaiting review",
-                "sub": "September period",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["POSITION", "UNIT", "HOLDER", "STATUS"],
-            "rows": [
-                {
-                    "item": "State Coordinator",
-                    "col2": "Lagos",
-                    "col3": "Lina Mensah",
-                    "status_label": "Active",
-                    "status_style": "green",
-                    "url": "/foundation/dashboards/dash-11/",
-                },
-                {
-                    "item": "Assistant Coordinator",
-                    "col2": "Lagos",
-                    "col3": "Unfilled",
-                    "status_label": "Vacant",
-                    "status_style": "purple",
-                    "url": "/foundation/dashboards/dash-10-coverage/",
-                },
-                {
-                    "item": "LGA Coordinator",
-                    "col2": "Ikeja",
-                    "col3": "Kemi Bello",
-                    "status_label": "Onboarding",
-                    "status_style": "purple",
-                    "url": "/foundation/dashboards/dash-12/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "State Coordinator",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "Active",
-                    "action_style": "magenta",
-                    "url": "/foundation/dashboards/dash-11/",
-                },
-                {
-                    "title": "Assistant Coordinator",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Vacant",
-                    "action_style": "magenta",
-                    "url": "/foundation/dashboards/dash-10-coverage/",
-                },
-            ],
-        },
-        "chart_card": {
+    ),
+    "DASH-02": _screen(
+        "DASH-02", "Country operations", 78, "HQ / BOTH NETWORKS",
+        "operations", "HOFCO", "HQ / Both networks", "ALL",
+        ["COUNTRY PRIORITY", "NETWORK", "OWNER", "STATUS"],
+        ["DASH-01", "DASH-03", "DASH-04", "DASH-10", "DASH-11"],
+        kpis=_kpis(
+            ("Country follow-ups", "Assigned operational actions"),
+            ("Critical vacancies", "Approved seats only"),
+            ("Onboarding overdue", "Needs individual follow-through"),
+        ),
+    ),
+    "DASH-03": _screen(
+        "DASH-03", "Coordination desk", 81, "HQ / BOTH NETWORKS",
+        "operations", "Network Secretary", "HQ / Both networks", "ALL",
+        ["WORK ITEM", "ROUTE / SCOPE", "DUE", "STATUS"],
+        ["DASH-01", "DASH-02", "DASH-04", "DASH-10-PIPELINE"],
+        kpis=_kpis(
+            ("Applications to screen", "Across authorized routes"),
+            ("Letters to prepare", "Human selection recorded"),
+            ("Register conflicts", "Evidence review required"),
+        ),
+    ),
+    "DASH-04": _screen(
+        "DASH-04", "Administration overview", 84, "HQ / AUTHORIZED SCOPE",
+        "founder", "Director of Administration", "HQ / Authorized scope", "ALL",
+        ["CONTROL ITEM", "RESPONSIBLE TEAM", "DUE", "STATUS"],
+        ["DASH-01", "DASH-02", "DASH-03", "DASH-09"],
+        kpis=_kpis(
+            ("Access reviews", "Due this month"),
+            ("Document revisions", "Awaiting publication review"),
+            ("Handover exceptions", "Outstanding official records"),
+        ),
+    ),
+    "DASH-05": _screen(
+        "DASH-05", "Programme portfolio", 87, "HQ / BOTH NETWORKS",
+        "operations", "Director of Programmes", "HQ / Both networks", "ALL",
+        ["PROGRAMME / ACTIVITY", "AREA", "OWNER", "STATUS"],
+        ["DASH-01", "DASH-06", "DASH-07", "DASH-10"],
+        kpis=_kpis(
+            ("Proposals to review", "Decision queue"),
+            ("Activities underway", "Approved programme work"),
+            ("Evidence overdue", "Follow-up required"),
+        ),
+    ),
+    "DASH-06": _screen(
+        "DASH-06", "Communications workspace", 90, "HQ / BOTH NETWORKS",
+        "operations", "Communications lead", "HQ / Both networks", "ALL",
+        ["COMMUNICATION", "AUDIENCE", "SCHEDULED", "STATUS"],
+        ["DASH-01", "DASH-05", "DASH-08"],
+        kpis=_kpis(
+            ("Media awaiting review", "Consent and usage checks"),
+            ("Campaigns scheduled", "Approved versions only"),
+            ("Deliverables due", "This week"),
+        ),
+    ),
+    "DASH-07": _screen(
+        "DASH-07", "Resource accountability", 93, "HQ / AUTHORIZED FINANCE",
+        "operations", "Finance reviewer", "HQ / Authorized finance", "ALL",
+        ["RECORD", "PROGRAMME", "EVIDENCE", "STATUS"],
+        ["DASH-01", "DASH-04", "DASH-05"],
+        kpis=_kpis(
+            ("Reviews awaiting you", "Within delegated authority"),
+            ("Evidence outstanding", "Return requested"),
+            ("Open exceptions", "Accountability follow-up"),
+        ),
+    ),
+    "DASH-08": _screen(
+        "DASH-08", "Systems operations", 96, "HQ / TECHNICAL CONTROLS",
+        "operations", "IT & Systems", "HQ / Technical controls", "ALL",
+        ["SERVICE / JOB", "LAST EVIDENCE", "OWNER", "STATUS"],
+        ["DASH-01", "DASH-04", "DASH-09"],
+        kpis=_kpis(
+            ("Incidents to review", "Assigned response actions"),
+            ("Jobs needing reconciliation", "Outcome not yet confirmed"),
+            ("Evidence awaiting sign-off", "Restore and release records"),
+        ),
+    ),
+    "DASH-09": _screen(
+        "DASH-09", "Quality and controls", 99, "HQ / AUTHORIZED SCOPE",
+        "operations", "QA / Controls", "HQ / Authorized scope", "ALL",
+        ["FINDING", "AREA", "OWNER", "STATE"],
+        ["DASH-01", "DASH-04", "DASH-08"],
+        kpis=_kpis(
+            ("Open findings", "Priority review"),
+            ("UAT evidence to review", "No acceptance assumed"),
+            ("Access review exceptions", "Assigned control owners"),
+        ),
+    ),
+    "DASH-10": _screen(
+        "DASH-10", "Nigeria country overview", 102, "WGMN / NIGERIA",
+        "country_lead", "Country Representative", "WGMN", "NG",
+        ["POSITION", "UNIT", "HOLDER", "STATUS"],
+        ["DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION",
+         "DASH-10-CR", "DASH-10-REPORTING", "DASH-10-ENGAGEMENT", "DASH-10-SAFEGUARDING",
+         "DASH-11", "DASH-12", "DASH-13", "DASH-14"],
+        has_tabs=False,
+        kpis=_kpis(
+            ("Current leaders", "Within your country scope"),
+            ("Approved vacancies", "Principal and deputy seats"),
+            ("Reports awaiting review", "Current period"),
+        ),
+        chart_card={
             "title": "Reports approved this period",
             "badge": "Current period · approved returns",
-            "bars": [
-                {"label": "Lagos", "value": 6, "color": "#E4C1D6"},
-                {"label": "Kano", "value": 4, "color": "#E4C1D6"},
-                {"label": "Abuja", "value": 5, "color": "#E4C1D6"},
-                {"label": "Oyo", "value": 3, "color": "#D4006A"},
-            ],
+            "bars": [],
         },
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": [
-            "DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION",
-            "DASH-10-CR", "DASH-10-REPORTING", "DASH-10-ENGAGEMENT", "DASH-10-SAFEGUARDING",
-            "DASH-11", "DASH-12", "DASH-13", "DASH-14"
-        ],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10-COVERAGE: Nigeria leadership coverage
-    # -------------------------------------------------------------------------
-    "DASH-10-COVERAGE": {
-        "screen_id": "DASH-10-COVERAGE",
-        "title": "Nigeria leadership coverage",
-        "desktop_pnum": 105,
-        "mobile_pnum": 106,
-        "state_pnum": 107,
-        "eyebrow": "WGMN / NIGERIA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "country_lead",
-        "default_role_title": "Country Representative",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Back to overview", "url": "/foundation/dashboards/dash-10/"},
-        "secondary_action": None,
-        "has_tabs": False,
-        "hero_banner": None,
-        "has_search_filter": True,
-        "table_card": {
-            "title": "Nigeria leadership coverage",
-            "columns": ["UNIT / NETWORK", "PRINCIPAL / DEPUTY", "COVERAGE RESULT"],
-            "rows": [
-                {
-                    "item": "Lagos · WGMN",
-                    "col2": "Principal and deputy active",
-                    "status_label": "Complete",
-                    "status_style": "green",
-                    "url": "/foundation/dashboards/dash-11/",
-                },
-                {
-                    "item": "Kano · WGMN",
-                    "col2": "Principal only",
-                    "status_label": "Deputy vacancy",
-                    "status_style": "purple",
-                    "url": "/foundation/dashboards/dash-10/",
-                },
-                {
-                    "item": "Abuja · WGMN",
-                    "col2": "Deputy only",
-                    "status_label": "Principal vacancy",
-                    "status_style": "purple",
-                    "url": "/foundation/dashboards/dash-10/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": None,
-        "chart_card": None,
-        "scoped_notice": "Coverage summary: 12 of 14 units complete (86%). Incomplete units requiring leadership follow-up are listed above.",
-        "related_screens": ["DASH-10", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-CR"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10-PIPELINE: Recruitment and activation
-    # -------------------------------------------------------------------------
-    "DASH-10-PIPELINE": {
-        "screen_id": "DASH-10-PIPELINE",
-        "title": "Recruitment and activation",
-        "desktop_pnum": 108,
-        "mobile_pnum": 109,
-        "state_pnum": 110,
-        "eyebrow": "WGMN / NIGERIA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "country_lead",
-        "default_role_title": "Country Representative",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open candidate review", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": False,
-        "hero_banner": None,
-        "has_search_filter": True,
-        "table_card": {
-            "title": "Recruitment and activation",
-            "columns": ["QUEUE", "RECORDS", "NEXT STEP"],
-            "rows": [
-                {
-                    "item": "Recruitment review",
-                    "col2": "8",
-                    "status_label": "Review candidate evidence",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Activation pending",
-                    "col2": "3",
-                    "status_label": "Check appointment acceptance",
-                    "status_style": "plain",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 2 records in this view",
-        },
-        "attention_card": None,
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-10", "DASH-10-COVERAGE", "DASH-10-INACTIVE", "DASH-10-CR"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10-INACTIVE: Leaders needing follow-up
-    # -------------------------------------------------------------------------
-    "DASH-10-INACTIVE": {
-        "screen_id": "DASH-10-INACTIVE",
-        "title": "Leaders needing follow-up",
-        "desktop_pnum": 111,
-        "mobile_pnum": 112,
-        "state_pnum": 113,
-        "eyebrow": "WGMN / NIGERIA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "country_lead",
-        "default_role_title": "Country Representative",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Back to overview", "url": "/foundation/dashboards/dash-10/"},
-        "secondary_action": None,
-        "has_tabs": False,
-        "hero_banner": None,
-        "has_search_filter": True,
-        "table_card": {
-            "title": "Leaders needing follow-up",
-            "columns": ["PERSON / ROLE", "LAST ACTIVITY", "ASSIGNED NEXT STEP"],
-            "rows": [
-                {
-                    "item": "Chidinma Okafor (Zone Lead)",
-                    "col2": "Date from approved activity rule",
-                    "status_label": "Country lead to contact",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Ibrahim Musa (District Lead)",
-                    "col2": "Date from approved activity rule",
-                    "status_label": "Check support needs",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 2 records in this view",
-        },
-        "attention_card": None,
-        "chart_card": None,
-        "scoped_notice": "Inactivity follows an approved rule, not an invented deadline. Contact appropriately; do not automatically remove appointment or permissions.",
-        "related_screens": ["DASH-10", "DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-CR"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10-ATTENTION: Support and HQ attention
-    # -------------------------------------------------------------------------
-    "DASH-10-ATTENTION": {
-        "screen_id": "DASH-10-ATTENTION",
-        "title": "Support and HQ attention",
-        "desktop_pnum": 114,
-        "mobile_pnum": 115,
-        "state_pnum": 116,
-        "eyebrow": "WGMN / NIGERIA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "country_lead",
-        "default_role_title": "Country Representative",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Back to overview", "url": "/foundation/dashboards/dash-10/"},
-        "secondary_action": None,
-        "has_tabs": False,
-        "hero_banner": None,
-        "has_search_filter": True,
-        "table_card": {
-            "title": "Support and HQ attention",
-            "columns": ["REFERENCE", "SAFE SUMMARY", "OWNER / NEXT STEP"],
-            "rows": [
-                {
-                    "item": "HD-2026-01",
-                    "col2": "Access support · no sensitive details",
-                    "status_label": "Assigned support operator",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "HD-2026-02",
-                    "col2": "Meeting support",
-                    "status_label": "Assigned support operator",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "HD-2026-03",
-                    "col2": "Profile correction",
-                    "status_label": "Assigned support operator",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "HQ-2026-01",
-                    "col2": "Country operational escalation",
-                    "status_label": "HQ nominated reviewer",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 4 records in this view",
-        },
-        "attention_card": None,
-        "chart_card": None,
-        "scoped_notice": "Only ordinary support and permitted operational summaries. Confidential safeguarding records and their existence are not disclosed here.",
-        "related_screens": ["DASH-10", "DASH-10-CR", "DASH-10-SAFEGUARDING"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10-CR: Nigeria · what needs attention
-    # -------------------------------------------------------------------------
-    "DASH-10-CR": {
-        "screen_id": "DASH-10-CR",
-        "title": "Nigeria · what needs attention",
-        "desktop_pnum": 117,
-        "mobile_pnum": 118,
-        "state_pnum": 119,
-        "eyebrow": "WGMN / NIGERIA",
-        "subtitle": "Start with overdue work. Then open any row to see the records behind the number.",
-        "default_role_code": "country_lead",
-        "default_role_title": "Country Representative",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open overdue work", "url": "/foundation/work-queue/"},
-        "secondary_action": {"label": "Back to dashboard", "url": "/foundation/dashboards/dash-10/"},
-        "has_tabs": False,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "86%",
-                "label": "Leadership coverage",
-                "sub": "12 of 14 units complete",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "8 / 3",
-                "label": "Recruitment / activation",
-                "sub": "8 in review · 3 awaiting activation",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Leaders inactive",
-                "sub": "Follow-up required · approved rule applies",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Country Command",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["AREA", "CURRENT PICTURE", "NEXT STEP"],
-            "rows": [
-                {
-                    "item": "Leadership completeness",
-                    "col2": "86% · 12 of 14 units",
-                    "status_label": "See incomplete units →",
-                    "status_style": "link",
-                    "url": "/foundation/dashboards/dash-10-coverage/",
-                },
-                {
-                    "item": "Recruitment / activation",
-                    "col2": "8 in review · 3 awaiting activation",
-                    "status_label": "Open pipeline →",
-                    "status_style": "link",
-                    "url": "/foundation/dashboards/dash-10-pipeline/",
-                },
-                {
-                    "item": "Inactive leaders",
-                    "col2": "2 need follow-up",
-                    "status_label": "Review named records →",
-                    "status_style": "link",
-                    "url": "/foundation/dashboards/dash-10-inactive/",
-                },
-                {
-                    "item": "Acting / assistants",
-                    "col2": "1 acting · 2 bounded assistants",
-                    "status_label": "Check appointment scope →",
-                    "status_style": "link",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Reports / overdue work",
-                    "col2": "6 reports · 4 actions overdue",
-                    "status_label": "Open work queue →",
-                    "status_style": "link",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Meetings / programmes",
-                    "col2": "2 upcoming · 3 active",
-                    "status_label": "View schedule →",
-                    "status_style": "link",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Evidence / engagement",
-                    "col2": "2 awaiting review · 3 follow-ups",
-                    "status_label": "Open evidence review →",
-                    "status_style": "link",
-                    "url": "/foundation/dashboards/dash-10-engagement/",
-                },
-                {
-                    "item": "Support / HQ attention",
-                    "col2": "3 tickets · 1 operational escalation",
-                    "status_label": "Open safe summary →",
-                    "status_style": "link",
-                    "url": "/foundation/dashboards/dash-10-attention/",
-                },
-            ],
-            "record_count_text": "Showing 8 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Start with overdue work",
-                    "body": "Four actions need follow-up. Open the queue to see the owner and due date.",
-                    "action_label": "First priority",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Check leadership gaps",
-                    "body": "Two units need a principal or deputy. Review the exact units before taking action.",
-                    "action_label": "Nigeria · selected network",
-                    "action_style": "magenta",
-                    "url": "/foundation/dashboards/dash-10-coverage/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Nigeria and the selected network only. Confidential safeguarding information is not included.",
-        "related_screens": ["DASH-10", "DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10-REPORTING: Reporting desk (HQ Reporting Reviewer)
-    # -------------------------------------------------------------------------
-    "DASH-10-REPORTING": {
-        "screen_id": "DASH-10-REPORTING",
-        "title": "Reporting desk",
-        "desktop_pnum": 120,
-        "mobile_pnum": 121,
-        "state_pnum": 122,
-        "eyebrow": "HQ / HQ REPORTING REVIEWER",
-        "subtitle": "Use the information and next action for this role only.",
-        "default_role_code": "operations",
-        "default_role_title": "HQ reporting reviewer",
-        "default_network": "HQ / Both networks",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open assigned work", "url": "/foundation/work-queue/"},
-        "secondary_action": {"label": "Back to dashboard", "url": "/foundation/dashboards/dash-10/"},
-        "has_tabs": False,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "6",
-                "label": "Waiting for review",
-                "sub": "Current reporting period",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Corrections due",
-                "sub": "Current reporting period",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "1",
-                "label": "Missed reports",
-                "sub": "Current reporting period",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Reporting desk",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["PERIOD", "COUNTRY / NETWORK", "REVIEW STATUS"],
-            "rows": [
-                {
-                    "item": "September 2026",
-                    "col2": "Nigeria · WGMN",
-                    "status_label": "2 returns needed",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "September 2026",
-                    "col2": "Kenya · WNNN",
-                    "status_label": "1 nil report to review",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 2 records in this view",
-        },
-        "attention_card": None,
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-10", "DASH-10-CR", "DASH-01"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10-ENGAGEMENT: Engagement desk (HQ Engagement Lead)
-    # -------------------------------------------------------------------------
-    "DASH-10-ENGAGEMENT": {
-        "screen_id": "DASH-10-ENGAGEMENT",
-        "title": "Engagement desk",
-        "desktop_pnum": 123,
-        "mobile_pnum": 124,
-        "state_pnum": 125,
-        "eyebrow": "HQ / HQ ENGAGEMENT LEAD",
-        "subtitle": "Use the information and next action for this role only.",
-        "default_role_code": "operations",
-        "default_role_title": "HQ engagement lead",
-        "default_network": "HQ / Both networks",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open assigned work", "url": "/foundation/work-queue/"},
-        "secondary_action": {"label": "Back to dashboard", "url": "/foundation/dashboards/dash-10/"},
-        "has_tabs": False,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "3",
-                "label": "Active cycles",
-                "sub": "Current engagement cycle",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "4",
-                "label": "Follow-up due",
-                "sub": "Current engagement cycle",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Contact suppressed",
-                "sub": "Current engagement cycle",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Engagement desk",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["CYCLE", "AUDIENCE", "NEXT ACTION"],
-            "rows": [
-                {
-                    "item": "Flagship",
-                    "col2": "Opted-in local groups",
-                    "status_label": "Review participation",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Connect",
-                    "col2": "Assigned follow-up",
-                    "status_label": "Check fatigue limits",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Exchange",
-                    "col2": "Peer groups",
-                    "status_label": "Review feedback",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": None,
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-10", "DASH-10-CR", "DASH-06"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-10-SAFEGUARDING: Confidential safeguarding desk (Authorised Safeguarding Officer)
-    # -------------------------------------------------------------------------
-    "DASH-10-SAFEGUARDING": {
-        "screen_id": "DASH-10-SAFEGUARDING",
-        "title": "Confidential safeguarding desk",
-        "desktop_pnum": 126,
-        "mobile_pnum": 127,
-        "state_pnum": 128,
-        "eyebrow": "HQ / AUTHORISED SAFEGUARDING OFFICER",
-        "subtitle": "Use the information and next action for this role only.",
-        "default_role_code": "operations",
-        "default_role_title": "Authorised safeguarding officer",
-        "default_network": "HQ / Authorised safeguarding officer",
-        "default_country": "ALL",
-        "primary_action": {"label": "→ Open assigned work", "url": "/foundation/work-queue/"},
-        "secondary_action": {"label": "Back to dashboard", "url": "/foundation/dashboards/dash-10/"},
-        "has_tabs": False,
-        "hero_banner": None,
-        "requires_safeguarding": True,
-        "kpi_cards": [
-            {
-                "value": "2",
-                "label": "Assigned to me",
-                "sub": "Confidential queue",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "1",
-                "label": "Response due",
-                "sub": "Confidential queue",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "1",
-                "label": "Restricted escalations",
-                "sub": "Confidential queue",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Confidential safeguarding desk",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["REFERENCE", "ASSIGNED OWNER", "NEXT ACTION"],
-            "rows": [
-                {
-                    "item": "SG-2026-01",
-                    "col2": "Your assigned case",
-                    "status_label": "Review safe response",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "SG-2026-02",
-                    "col2": "Assigned officer",
-                    "status_label": "Check escalation",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 2 records in this view",
-        },
-        "attention_card": None,
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-10", "DASH-10-ATTENTION"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-11: Lagos regional overview (State Coordinator)
-    # -------------------------------------------------------------------------
-    "DASH-11": {
-        "screen_id": "DASH-11",
-        "title": "Lagos regional overview",
-        "desktop_pnum": 129,
-        "mobile_pnum": 130,
-        "state_pnum": 131,
-        "eyebrow": "WGMN / NIGERIA / LAGOS",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "state_lead",
-        "default_role_title": "State Coordinator",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "12",
-                "label": "Local units",
-                "sub": "Assigned organisational subtree",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "5",
-                "label": "Follow-ups due",
-                "sub": "Direct reports",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "3",
-                "label": "Reports to review",
-                "sub": "September period",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["TASK", "OWNER", "DUE", "STATUS"],
-            "rows": [
-                {
-                    "item": "Confirm Chapter meeting agenda",
-                    "col2": "Ada Okafor",
-                    "col3": "18 Sep",
-                    "status_label": "In progress",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Review programme evidence",
-                    "col2": "Lina Mensah",
-                    "col3": "20 Sep",
-                    "status_label": "Needs review",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Update Chapter contact list",
-                    "col2": "Kemi Bello",
-                    "col3": "22 Sep",
-                    "status_label": "Open",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Confirm Chapter meeting agenda",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "In progress",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Review programme evidence",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Needs review",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-10", "DASH-12", "DASH-13", "DASH-14"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-12: Ikeja local operations (LGA Coordinator)
-    # -------------------------------------------------------------------------
-    "DASH-12": {
-        "screen_id": "DASH-12",
-        "title": "Ikeja local operations",
-        "desktop_pnum": 132,
-        "mobile_pnum": 133,
-        "state_pnum": 134,
-        "eyebrow": "WGMN / NIGERIA / IKEJA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "lga_lead",
-        "default_role_title": "LGA Coordinator",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "4",
-                "label": "Community Clusters",
-                "sub": "Assigned units",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "7",
-                "label": "Open local actions",
-                "sub": "Owner and due date recorded",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Evidence returns due",
-                "sub": "Activity follow-through",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["TASK", "OWNER", "DUE", "STATUS"],
-            "rows": [
-                {
-                    "item": "Confirm Chapter meeting agenda",
-                    "col2": "Ada Okafor",
-                    "col3": "18 Sep",
-                    "status_label": "In progress",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Review programme evidence",
-                    "col2": "Lina Mensah",
-                    "col3": "20 Sep",
-                    "status_label": "Needs review",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Update Chapter contact list",
-                    "col2": "Kemi Bello",
-                    "col3": "22 Sep",
-                    "status_label": "Open",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Confirm Chapter meeting agenda",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "In progress",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Review programme evidence",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Needs review",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-11", "DASH-13", "DASH-14"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-13: Your Cluster at a glance (Cluster Coordinator)
-    # -------------------------------------------------------------------------
-    "DASH-13": {
-        "screen_id": "DASH-13",
-        "title": "Your Cluster at a glance",
-        "desktop_pnum": 135,
-        "mobile_pnum": 136,
-        "state_pnum": 137,
-        "eyebrow": "WGMN / NIGERIA / IKEJA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "cluster_lead",
-        "default_role_title": "Cluster Coordinator",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": None,
-        "kpi_cards": [
-            {
-                "value": "6",
-                "label": "Connected Chapters",
-                "sub": "Within this Cluster",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "3",
-                "label": "Chapter follow-ups",
-                "sub": "Support and engagement",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Reports to consolidate",
-                "sub": "September returns",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["TASK", "OWNER", "DUE", "STATUS"],
-            "rows": [
-                {
-                    "item": "Confirm Chapter meeting agenda",
-                    "col2": "Ada Okafor",
-                    "col3": "18 Sep",
-                    "status_label": "In progress",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Review programme evidence",
-                    "col2": "Lina Mensah",
-                    "col3": "20 Sep",
-                    "status_label": "Needs review",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Update Chapter contact list",
-                    "col2": "Kemi Bello",
-                    "col3": "22 Sep",
-                    "status_label": "Open",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Confirm Chapter meeting agenda",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "In progress",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Review programme evidence",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Needs review",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-11", "DASH-12", "DASH-14"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-14: Your Chapter today (Chapter Coordinator)
-    # -------------------------------------------------------------------------
-    "DASH-14": {
-        "screen_id": "DASH-14",
-        "title": "Your Chapter today",
-        "desktop_pnum": 138,
-        "mobile_pnum": 139,
-        "state_pnum": 140,
-        "eyebrow": "WGMN / NIGERIA / IKEJA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "chapter_lead",
-        "default_role_title": "Chapter Coordinator",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open my work", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": False,
-        "hero_banner": {
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-10-COVERAGE": _screen(
+        "DASH-10-COVERAGE", "Nigeria leadership coverage", 105, "WGMN / NIGERIA",
+        "country_lead", "Country Representative", "WGMN", "NG",
+        ["UNIT / NETWORK", "PRINCIPAL / DEPUTY", "COVERAGE RESULT"],
+        ["DASH-10", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-CR"],
+        primary_action={"label": "→ Back to overview", "url": "/foundation/dashboards/dash-10/"},
+        has_tabs=False,
+        has_search_filter=True,
+        table_title="Nigeria leadership coverage",
+        has_attention=False,
+        scoped_notice="Incomplete units requiring leadership follow-up are listed above.",
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-10-PIPELINE": _screen(
+        "DASH-10-PIPELINE", "Recruitment and activation", 108, "WGMN / NIGERIA",
+        "country_lead", "Country Representative", "WGMN", "NG",
+        ["QUEUE", "RECORDS", "NEXT STEP"],
+        ["DASH-10", "DASH-10-COVERAGE", "DASH-10-INACTIVE", "DASH-10-CR"],
+        primary_action={"label": "→ Open candidate review", "url": "/foundation/work-queue/"},
+        has_tabs=False,
+        has_search_filter=True,
+        table_title="Recruitment and activation",
+        has_attention=False,
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-10-INACTIVE": _screen(
+        "DASH-10-INACTIVE", "Leaders needing follow-up", 111, "WGMN / NIGERIA",
+        "country_lead", "Country Representative", "WGMN", "NG",
+        ["PERSON / ROLE", "LAST ACTIVITY", "ASSIGNED NEXT STEP"],
+        ["DASH-10", "DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-CR"],
+        primary_action={"label": "→ Back to overview", "url": "/foundation/dashboards/dash-10/"},
+        has_tabs=False,
+        has_search_filter=True,
+        table_title="Leaders needing follow-up",
+        has_attention=False,
+        scoped_notice="Inactivity follows an approved rule, not an invented deadline. Contact appropriately; do not automatically remove appointment or permissions.",
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-10-ATTENTION": _screen(
+        "DASH-10-ATTENTION", "Support and HQ attention", 114, "WGMN / NIGERIA",
+        "country_lead", "Country Representative", "WGMN", "NG",
+        ["REFERENCE", "SAFE SUMMARY", "OWNER / NEXT STEP"],
+        ["DASH-10", "DASH-10-CR", "DASH-10-SAFEGUARDING"],
+        primary_action={"label": "→ Back to overview", "url": "/foundation/dashboards/dash-10/"},
+        has_tabs=False,
+        has_search_filter=True,
+        table_title="Support and HQ attention",
+        has_attention=False,
+        scoped_notice="Only ordinary support and permitted operational summaries. Confidential safeguarding records and their existence are not disclosed here.",
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-10-CR": _screen(
+        "DASH-10-CR", "Nigeria · what needs attention", 117, "WGMN / NIGERIA",
+        "country_lead", "Country Representative", "WGMN", "NG",
+        ["AREA", "CURRENT PICTURE", "NEXT STEP"],
+        ["DASH-10", "DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION"],
+        subtitle="Start with overdue work. Then open any row to see the records behind the number.",
+        primary_action={"label": "→ Open overdue work", "url": "/foundation/work-queue/"},
+        secondary_action={"label": "Back to dashboard", "url": "/foundation/dashboards/dash-10/"},
+        has_tabs=False,
+        table_title="Country Command",
+        kpis=_kpis(
+            ("Leadership coverage", "Current unit status"),
+            ("Recruitment / activation", "Pipeline status"),
+            ("Leaders inactive", "Follow-up required · approved rule applies"),
+        ),
+        scoped_notice="Selected country and network only. Confidential safeguarding information is not included.",
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-10-REPORTING": _screen(
+        "DASH-10-REPORTING", "Reporting desk", 120, "HQ / HQ REPORTING REVIEWER",
+        "operations", "HQ reporting reviewer", "HQ / Both networks", "ALL",
+        ["PERIOD", "COUNTRY / NETWORK", "REVIEW STATUS"],
+        ["DASH-10", "DASH-10-CR", "DASH-01"],
+        subtitle="Use the information and next action for this role only.",
+        primary_action={"label": "→ Open assigned work", "url": "/foundation/work-queue/"},
+        secondary_action={"label": "Back to dashboard", "url": "/foundation/dashboards/dash-10/"},
+        has_tabs=False,
+        table_title="Reporting desk",
+        has_attention=False,
+        kpis=_kpis(
+            ("Waiting for review", "Current reporting period"),
+            ("Corrections due", "Current reporting period"),
+            ("Missed reports", "Current reporting period"),
+        ),
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-10-ENGAGEMENT": _screen(
+        "DASH-10-ENGAGEMENT", "Engagement desk", 123, "HQ / HQ ENGAGEMENT LEAD",
+        "operations", "HQ engagement lead", "HQ / Both networks", "ALL",
+        ["CYCLE", "AUDIENCE", "NEXT ACTION"],
+        ["DASH-10", "DASH-10-CR", "DASH-06"],
+        subtitle="Use the information and next action for this role only.",
+        primary_action={"label": "→ Open assigned work", "url": "/foundation/work-queue/"},
+        secondary_action={"label": "Back to dashboard", "url": "/foundation/dashboards/dash-10/"},
+        has_tabs=False,
+        table_title="Engagement desk",
+        has_attention=False,
+        kpis=_kpis(
+            ("Active cycles", "Current engagement cycle"),
+            ("Follow-up due", "Current engagement cycle"),
+            ("Contact suppressed", "Current engagement cycle"),
+        ),
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-10-SAFEGUARDING": _screen(
+        "DASH-10-SAFEGUARDING", "Confidential safeguarding desk", 126, "HQ / AUTHORISED SAFEGUARDING OFFICER",
+        "operations", "Authorised safeguarding officer", "HQ / Authorised safeguarding officer", "ALL",
+        ["REFERENCE", "ASSIGNED OWNER", "NEXT ACTION"],
+        ["DASH-10", "DASH-10-ATTENTION"],
+        subtitle="Use the information and next action for this role only.",
+        primary_action={"label": "→ Open assigned work", "url": "/foundation/work-queue/"},
+        secondary_action={"label": "Back to dashboard", "url": "/foundation/dashboards/dash-10/"},
+        has_tabs=False,
+        requires_safeguarding=True,
+        table_title="Confidential safeguarding desk",
+        has_attention=False,
+        kpis=_kpis(
+            ("Assigned to me", "Confidential queue"),
+            ("Response due", "Confidential queue"),
+            ("Restricted escalations", "Confidential queue"),
+        ),
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-11": _screen(
+        "DASH-11", "Regional overview", 129, "WGMN / NIGERIA",
+        "state_lead", "State Coordinator", "WGMN", "NG",
+        ["TASK", "OWNER", "DUE", "STATUS"],
+        ["DASH-10", "DASH-12", "DASH-13", "DASH-14"],
+        kpis=_kpis(
+            ("Local units", "Assigned organisational subtree"),
+            ("Follow-ups due", "Direct reports"),
+            ("Reports to review", "Current period"),
+        ),
+    ),
+    "DASH-12": _screen(
+        "DASH-12", "Local operations", 132, "WGMN / NIGERIA",
+        "lga_lead", "LGA Coordinator", "WGMN", "NG",
+        ["TASK", "OWNER", "DUE", "STATUS"],
+        ["DASH-11", "DASH-13", "DASH-14"],
+        kpis=_kpis(
+            ("Community Clusters", "Assigned units"),
+            ("Open local actions", "Owner and due date recorded"),
+            ("Evidence returns due", "Activity follow-through"),
+        ),
+    ),
+    "DASH-13": _screen(
+        "DASH-13", "Your Cluster at a glance", 135, "WGMN / NIGERIA",
+        "cluster_lead", "Cluster Coordinator", "WGMN", "NG",
+        ["TASK", "OWNER", "DUE", "STATUS"],
+        ["DASH-11", "DASH-12", "DASH-14"],
+        kpis=_kpis(
+            ("Connected Chapters", "Within this Cluster"),
+            ("Chapter follow-ups", "Support and engagement"),
+            ("Reports to consolidate", "Current returns"),
+        ),
+    ),
+    "DASH-14": _screen(
+        "DASH-14", "Your Chapter today", 138, "WGMN / NIGERIA",
+        "chapter_lead", "Chapter Coordinator", "WGMN", "NG",
+        ["TASK", "OWNER", "DUE", "STATUS"],
+        ["DASH-12", "DASH-13", "DASH-15"],
+        has_tabs=False,
+        hero_banner={
             "eyebrow": "YOUR NEXT STEP",
-            "heading": "Confirm Chapter meeting agenda",
+            "heading": "Review your chapter activities",
             "body": "Open the linked record, review the evidence and follow the next permitted action.",
             "button_label": "→ Open my work",
             "button_url": "/foundation/work-queue/",
         },
-        "kpi_cards": [
-            {
-                "value": "28",
-                "label": "Connected members",
-                "sub": "Your Chapter",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Tasks due",
-                "sub": "This week",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "18 Sep",
-                "label": "Next meeting",
-                "sub": "10:00 WAT",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["TASK", "OWNER", "DUE", "STATUS"],
-            "rows": [
-                {
-                    "item": "Confirm Chapter meeting agenda",
-                    "col2": "Ada Okafor",
-                    "col3": "18 Sep",
-                    "status_label": "In progress",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Review programme evidence",
-                    "col2": "Lina Mensah",
-                    "col3": "20 Sep",
-                    "status_label": "Needs review",
-                    "status_style": "amber",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Update Chapter contact list",
-                    "col2": "Kemi Bello",
-                    "col3": "22 Sep",
-                    "status_label": "Open",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Confirm Chapter meeting agenda",
-                    "body": "Open the linked record, review the evidence and follow the next permitted action.",
-                    "action_label": "In progress",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Review programme evidence",
-                    "body": "This item needs your attention within your assigned responsibilities.",
-                    "action_label": "Needs review",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-12", "DASH-13", "DASH-15"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-15: Good morning, Ada (Member Dashboard)
-    # -------------------------------------------------------------------------
-    "DASH-15": {
-        "screen_id": "DASH-15",
-        "title": "Good morning, Ada",
-        "desktop_pnum": 141,
-        "mobile_pnum": 142,
-        "state_pnum": 143,
-        "eyebrow": "WGMN / NIGERIA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "member",
-        "default_role_title": "Member",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ View opportunities", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": {
+        kpis=_kpis(
+            ("Connected members", "Your Chapter"),
+            ("Tasks due", "This week"),
+            ("Next meeting", "Scheduled"),
+        ),
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-15": _screen(
+        "DASH-15", "Member workspace", 141, "WGMN / NIGERIA",
+        "member", "Member", "WGMN", "NG",
+        ["YOUR NEXT ACTIVITY", "WHEN", "NEXT ACTION"],
+        ["DASH-14", "DASH-16", "DASH-17"],
+        primary_action={"label": "→ View opportunities", "url": "/foundation/work-queue/"},
+        hero_banner={
             "eyebrow": "YOUR NEXT STEP",
             "heading": "Your Chapter welcome is coming up",
             "body": "Meet your local team and learn how to take part.",
             "button_label": "→ View opportunities",
             "button_url": "/foundation/work-queue/",
         },
-        "kpi_cards": [
-            {
-                "value": "Ikeja",
-                "label": "My local home",
-                "sub": "Chapter connection",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "2",
-                "label": "Upcoming activities",
-                "sub": "You are eligible to join",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "1",
-                "label": "My learning",
-                "sub": "Orientation in progress",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["YOUR NEXT ACTIVITY", "WHEN", "NEXT ACTION"],
-            "rows": [],
-            "record_count_text": "Showing 0 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-14", "DASH-16", "DASH-17"],
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-16: Your next step is clear (Candidate Dashboard)
-    # -------------------------------------------------------------------------
-    "DASH-16": {
-        "screen_id": "DASH-16",
-        "title": "Your next step is clear",
-        "desktop_pnum": 144,
-        "mobile_pnum": 145,
-        "state_pnum": 146,
-        "eyebrow": "WGMN / NIGERIA",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "candidate",
-        "default_role_title": "Candidate",
-        "default_network": "WGMN",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Continue my journey", "url": "/onboarding/4/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": {
+        kpis=_kpis(
+            ("My local home", "Chapter connection"),
+            ("Upcoming activities", "You are eligible to join"),
+            ("My learning", "Orientation status"),
+        ),
+    ),
+    "DASH-16": _screen(
+        "DASH-16", "Your next step is clear", 144, "WGMN / NIGERIA",
+        "candidate", "Candidate", "WGMN", "NG",
+        ["JOURNEY STEP", "PROGRESS", "NEXT ACTION"],
+        ["DASH-16-NETWORK", "DASH-16-EVENT", "DASH-15"],
+        primary_action={"label": "→ Continue my journey", "url": "/onboarding/4/"},
+        hero_banner={
             "eyebrow": "YOUR NEXT STEP",
-            "heading": "Continue your day 4 reflection",
+            "heading": "Continue your onboarding journey",
             "body": "Read the prompt, add your response and save your progress before the deadline.",
             "button_label": "→ Continue my journey",
             "button_url": "/onboarding/4/",
         },
-        "kpi_cards": [
-            {
-                "value": "7 days",
-                "label": "Your route",
-                "sub": "Open-call Activation",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "Day 4",
-                "label": "Current step",
-                "sub": "Evidence and reflection",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "3 days",
-                "label": "Time remaining",
-                "sub": "Server deadline shown at runtime",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["JOURNEY STEP", "PROGRESS", "NEXT ACTION"],
-            "rows": [
-                {
-                    "item": "Welcome and responsibilities",
-                    "col2": "Completed",
-                    "status_label": "Read again",
-                    "status_style": "purple",
-                    "url": "/onboarding/1/",
-                },
-                {
-                    "item": "Local community context",
-                    "col2": "Completed",
-                    "status_label": "View response",
-                    "status_style": "purple",
-                    "url": "/onboarding/2/",
-                },
-                {
-                    "item": "Evidence and reflection",
-                    "col2": "In progress",
-                    "status_label": "Continue",
-                    "status_style": "purple",
-                    "url": "/onboarding/4/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Continue your day 4 reflection",
-                    "body": "Read the prompt, add your response and save your progress before the deadline.",
-                    "action_label": "Day 4 of 7",
-                    "action_style": "magenta",
-                    "url": "/onboarding/4/",
-                },
-                {
-                    "title": "Support is available",
-                    "body": "Ask for help if you need assistance with the journey.",
-                    "action_label": "Contact support",
-                    "action_style": "magenta",
-                    "url": "/auth/help/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-16-NETWORK", "DASH-16-EVENT", "DASH-15"],
-        "support_note": "Ask your support team if you need guidance.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-16-NETWORK: Your volunteer application (Candidate Network Subview)
-    # -------------------------------------------------------------------------
-    "DASH-16-NETWORK": {
-        "screen_id": "DASH-16-NETWORK",
-        "title": "Your volunteer application",
-        "desktop_pnum": 147,
-        "mobile_pnum": 148,
-        "state_pnum": 149,
-        "eyebrow": "MY APPLICATION / ASSIGNED SCOPE",
-        "subtitle": "See what needs your attention and take one clear next step.",
-        "default_role_code": "candidate",
-        "default_role_title": "Network Volunteer Applicant",
-        "default_network": "My application",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open my next step", "url": "/onboarding/4/"},
-        "secondary_action": {"label": "Back", "url": "/foundation/dashboards/dash-16/"},
-        "has_tabs": False,
-        "hero_banner": None,
-        "table_card": {
-            "title": "Your volunteer application",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["MY NEXT STEP", "DETAILS"],
-            "rows": [
-                {
-                    "item": "Your application",
-                    "col2": "Waiting for your next step",
-                    "status_label": "Waiting for your next step",
-                    "status_style": "amber",
-                    "url": "/onboarding/4/",
-                },
-                {
-                    "item": "What to do next",
-                    "col2": "Complete the assigned introduction",
-                    "status_label": "Complete the assigned introduction",
-                    "status_style": "plain",
-                    "url": "/onboarding/4/",
-                },
-                {
-                    "item": "Need more time?",
-                    "col2": "Ask the recruitment team",
-                    "status_label": "Ask the recruitment team",
-                    "status_style": "purple",
-                    "url": "/auth/help/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Start with one thing",
-                    "body": "Your assigned next step is shown here. You do not need to search through the whole system.",
-                    "action_label": "Help is available",
-                    "action_style": "magenta",
-                    "url": "/auth/help/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-16", "DASH-16-EVENT"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-16-EVENT: Your event volunteering (Candidate Event Subview)
-    # -------------------------------------------------------------------------
-    "DASH-16-EVENT": {
-        "screen_id": "DASH-16-EVENT",
-        "title": "Your event volunteering",
-        "desktop_pnum": 150,
-        "mobile_pnum": 151,
-        "state_pnum": 152,
-        "eyebrow": "MY APPLICATION / ASSIGNED SCOPE",
-        "subtitle": "See what needs your attention and take one clear next step.",
-        "default_role_code": "candidate",
-        "default_role_title": "Event Volunteer",
-        "default_network": "My application",
-        "default_country": "NG",
-        "primary_action": {"label": "→ Open my next step", "url": "/onboarding/4/"},
-        "secondary_action": {"label": "Back", "url": "/foundation/dashboards/dash-16/"},
-        "has_tabs": False,
-        "hero_banner": None,
-        "table_card": {
-            "title": "Your event volunteering",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["MY NEXT STEP", "DETAILS"],
-            "rows": [
-                {
-                    "item": "Your event",
-                    "col2": "Assigned event example",
-                    "status_label": "Assigned event example",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Your task",
-                    "col2": "Check your event briefing",
-                    "status_label": "Check your event briefing",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "When and where",
-                    "col2": "Open the confirmed event details",
-                    "status_label": "Open the confirmed event details",
-                    "status_style": "plain",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Start with one thing",
-                    "body": "Your assigned next step is shown here. You do not need to search through the whole system.",
-                    "action_label": "Help is available",
-                    "action_style": "magenta",
-                    "url": "/auth/help/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-16", "DASH-16-NETWORK"],
-        "support_note": "Need help? Ask your support team. Never share your password or verification codes.",
-    },
-
-    # -------------------------------------------------------------------------
-    # DASH-17: Stay connected with WODDI (Community Participant Dashboard)
-    # -------------------------------------------------------------------------
-    "DASH-17": {
-        "screen_id": "DASH-17",
-        "title": "Stay connected with WODDI",
-        "desktop_pnum": 153,
-        "mobile_pnum": 154,
-        "state_pnum": 155,
-        "eyebrow": "WODDI / MY RELATIONSHIPS",
-        "subtitle": "Your priorities, relevant evidence and next actions in one clear view.",
-        "default_role_code": "community",
-        "default_role_title": "Community participant",
-        "default_network": "WODDI",
-        "default_country": "NG",
-        "primary_action": {"label": "→ View opportunities", "url": "/foundation/work-queue/"},
-        "secondary_action": None,
-        "has_tabs": True,
-        "hero_banner": {
+        kpis=_kpis(
+            ("Your route", "Open-call Activation"),
+            ("Current step", "Evidence and reflection"),
+            ("Time remaining", "Server deadline shown at runtime"),
+        ),
+        support_note="Ask your support team if you need guidance.",
+    ),
+    "DASH-16-NETWORK": _screen(
+        "DASH-16-NETWORK", "Your volunteer application", 147, "MY APPLICATION / ASSIGNED SCOPE",
+        "candidate", "Network Volunteer Applicant", "My application", "NG",
+        ["MY NEXT STEP", "DETAILS"],
+        ["DASH-16", "DASH-16-EVENT"],
+        subtitle="See what needs your attention and take one clear next step.",
+        primary_action={"label": "→ Open my next step", "url": "/onboarding/4/"},
+        secondary_action={"label": "Back", "url": "/foundation/dashboards/dash-16/"},
+        has_tabs=False,
+        table_title="Your volunteer application",
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-16-EVENT": _screen(
+        "DASH-16-EVENT", "Your event volunteering", 150, "MY APPLICATION / ASSIGNED SCOPE",
+        "candidate", "Event Volunteer", "My application", "NG",
+        ["MY NEXT STEP", "DETAILS"],
+        ["DASH-16", "DASH-16-NETWORK"],
+        subtitle="See what needs your attention and take one clear next step.",
+        primary_action={"label": "→ Open my next step", "url": "/onboarding/4/"},
+        secondary_action={"label": "Back", "url": "/foundation/dashboards/dash-16/"},
+        has_tabs=False,
+        table_title="Your event volunteering",
+        support_note=DEFAULT_SUPPORT_NOTE,
+    ),
+    "DASH-17": _screen(
+        "DASH-17", "Stay connected with WODDI", 153, "WODDI / MY RELATIONSHIPS",
+        "community", "Community participant", "WODDI", "NG",
+        ["OPPORTUNITY", "CONNECTION", "NEXT ACTION"],
+        ["DASH-15", "DASH-16"],
+        primary_action={"label": "→ View opportunities", "url": "/foundation/work-queue/"},
+        hero_banner={
             "eyebrow": "YOUR NEXT STEP",
             "heading": "Join the next community conversation",
             "body": "Explore an invitation connected to your current interests and relationships.",
             "button_label": "→ View opportunities",
             "button_url": "/foundation/work-queue/",
         },
-        "kpi_cards": [
-            {
-                "value": "2",
-                "label": "My connections",
-                "sub": "Member and programme participant",
-                "is_dark": True,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "3",
-                "label": "Invitations",
-                "sub": "Within your eligibility",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-            {
-                "value": "4",
-                "label": "New resources",
-                "sub": "Available to your relationships",
-                "is_dark": False,
-                "icon": "bar-chart",
-            },
-        ],
-        "table_card": {
-            "title": "Your work and follow-through",
-            "view_all_label": "View all →",
-            "view_all_url": "/foundation/work-queue/",
-            "columns": ["OPPORTUNITY", "CONNECTION", "NEXT ACTION"],
-            "rows": [
-                {
-                    "item": "Peer-learning circle",
-                    "col2": "Community invitation",
-                    "status_label": "View details",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Digital confidence workshop",
-                    "col2": "Programme participant",
-                    "status_label": "RSVP",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "item": "Monthly community feedback",
-                    "col2": "Member",
-                    "status_label": "Share feedback",
-                    "status_style": "purple",
-                    "url": "/foundation/work-queue/",
-                },
-            ],
-            "record_count_text": "Showing 3 records in this view",
-        },
-        "attention_card": {
-            "title": "Attention required",
-            "items": [
-                {
-                    "title": "Join the next community conversation",
-                    "body": "Explore an invitation connected to your current interests and relationships.",
-                    "action_label": "View invitations",
-                    "action_style": "magenta",
-                    "url": "/foundation/work-queue/",
-                },
-                {
-                    "title": "Choose what you hear from us",
-                    "body": "Keep your interests and communication preferences up to date.",
-                    "action_label": "My preferences",
-                    "action_style": "magenta",
-                    "url": "/foundation/settings/",
-                },
-            ],
-        },
-        "chart_card": None,
-        "scoped_notice": "Counts and records remain scoped to your current role and network.",
-        "related_screens": ["DASH-15", "DASH-16"],
-    },
+        kpis=_kpis(
+            ("My connections", "Member and programme participant"),
+            ("Invitations", "Within your eligibility"),
+            ("New resources", "Available to your relationships"),
+        ),
+    ),
 }
 
 
@@ -2483,7 +559,6 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
 
     norm_code = screen_code.strip().upper()
 
-    # Confidential Safeguarding desk check
     if screen.get("requires_safeguarding") or norm_code == "DASH-10-SAFEGUARDING":
         if not user_scope.can_access_confidential() and not user_scope.can_access_role("safeguarding"):
             raise ScopePermissionDenied(
@@ -2492,7 +567,6 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
                 recovery_url="/foundation/dashboard/",
             )
 
-    # Leadership boundaries: Ordinary members, candidates, and community users cannot access leadership screens (tier 1..4)
     LEADERSHIP_SCREENS = {
         "DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05",
         "DASH-06", "DASH-07", "DASH-08", "DASH-09",
@@ -2510,7 +584,6 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
             recovery_url="/foundation/dashboard/",
         )
 
-    # Candidate restricted from member dashboard
     if user_scope.leadership_tier == 6 and norm_code not in ("DASH-16", "DASH-17"):
         raise ScopePermissionDenied(
             "Access Denied: Candidate accounts cannot access member or leadership dashboards.",
@@ -2520,7 +593,6 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
             recovery_url="/foundation/dashboard/",
         )
 
-    # Community restricted from candidate/member dashboards
     if user_scope.leadership_tier == 7 and norm_code != "DASH-17":
         raise ScopePermissionDenied(
             "Access Denied: Community accounts cannot access candidate, member, or leadership dashboards.",
@@ -2530,7 +602,6 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
             recovery_url="/foundation/dashboard/",
         )
 
-    # Tier 4 operational leaders cannot access screens above their role authority
     if user_scope.leadership_tier == 4 and not user_scope.is_management_or_admin:
         if norm_code in ("DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05", "DASH-06", "DASH-07", "DASH-08", "DASH-09", "DASH-10", "DASH-11", "DASH-12", "DASH-13"):
             screen_role = screen.get("default_role_code", "")
@@ -2543,7 +614,6 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
                     recovery_url="/foundation/dashboard/",
                 )
 
-    # Country Lead (tier 3) cannot access continental operations (T2) or founder (T1)
     if user_scope.leadership_tier == 3 and not user_scope.is_management_or_admin:
         if norm_code in ("DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05", "DASH-06", "DASH-07", "DASH-08", "DASH-09"):
             screen_role = screen.get("default_role_code", "")
@@ -2556,7 +626,6 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
                     recovery_url="/foundation/dashboard/",
                 )
 
-    # Founder overview (DASH-01) is strictly restricted to founder/management
     if norm_code == "DASH-01":
         if not user_scope.is_management_or_admin and not user_scope.can_access_role("founder"):
             raise ScopePermissionDenied(
@@ -2567,18 +636,15 @@ def check_dashboard_permission(user_scope, screen_code: str, is_explicit: bool =
                 recovery_url="/foundation/dashboard/",
             )
 
-    # Country isolation check
     screen_country = screen.get("default_country")
     if screen_country and screen_country != "ALL":
-        if is_explicit:
-            if not user_scope.can_access_country(screen_country):
-                raise ScopePermissionDenied(
-                    f"Your account scope does not grant access to the {screen_country} country hub.",
-                    reason_code="wrong_country",
-                    recovery_url="/foundation/dashboard/",
-                )
+        if is_explicit and not user_scope.can_access_country(screen_country):
+            raise ScopePermissionDenied(
+                f"Your account scope does not grant access to the {screen_country} country hub.",
+                reason_code="wrong_country",
+                recovery_url="/foundation/dashboard/",
+            )
 
-    # Network separation check
     screen_network = screen.get("default_network")
     if screen_network and screen_network not in ("HQ / Both networks", "ALL", "*", "WODDI", "PUBLIC", "My application"):
         from .scope import normalize_network_code
@@ -2604,9 +670,7 @@ def build_dashboard_context(
     Assembles complete, authentic, scoped dashboard presentation context.
     Merges registry contract with real database records where present.
     """
-    screen = get_dashboard_screen(screen_code)
-    if not screen:
-        screen = DASHBOARD_SCREENS["DASH-01"]
+    screen = get_dashboard_screen(screen_code) or DASHBOARD_SCREENS["DASH-01"]
 
     norm_code = screen_code.strip().upper()
     raw_tab = (tab_param or (request.GET.get("tab") if request else None) or "overview").strip().lstrip("-").strip("/")
@@ -2617,8 +681,7 @@ def build_dashboard_context(
     else:
         active_tab = "overview"
 
-    # Interaction contract state handling
-    state_mode = state_param or request.GET.get("state")
+    state_mode = state_param or (request.GET.get("state") if request else None)
     state_card = None
     if state_mode:
         states = {
@@ -2655,17 +718,13 @@ def build_dashboard_context(
         }
         state_card = states.get(state_mode)
 
-    # Leadership tier flag for sidebar navigation
     is_leadership_tier = user_scope.active_role not in ("member", "candidate", "community")
-
-    # Scope display label
     active_network = user_scope.active_network or screen.get("default_network", "WGMN")
     active_country = user_scope.active_country or screen.get("default_country", "NG")
 
     from .scope import get_country_display_name, get_scoped_kpis
     country_display = get_country_display_name(active_country)
 
-    # Dynamic title & eyebrow for universal role screens
     screen_title = screen["title"]
     eyebrow = screen["eyebrow"]
 
@@ -2697,14 +756,12 @@ def build_dashboard_context(
             screen_title = "Stay connected with WODDI"
             eyebrow = f"{active_network} / MY RELATIONSHIPS"
 
-    # Dynamic KPI reconciliation where authentic database records exist
     kpi_cards = [dict(c) for c in screen.get("kpi_cards", [])]
     table_card = dict(screen.get("table_card", {})) if screen.get("table_card") else None
     attention_card = dict(screen.get("attention_card", {})) if screen.get("attention_card") else None
     chart_card = dict(screen.get("chart_card", {})) if screen.get("chart_card") else None
     related_screens = list(screen.get("related_screens", []))
 
-    from .models import ScheduledMeeting
     if "test" not in sys.argv:
         from .multilingua_events_engine import purge_auto_captured_transcript_tasks
         purge_auto_captured_transcript_tasks()
@@ -2714,99 +771,10 @@ def build_dashboard_context(
         if len(kpi_cards) >= 4:
             kpi_cards[0]["value"] = str(kpis.get("country_chapters", 0))
             kpi_cards[0]["sub"] = f"{country_display} Hub"
-            kpi_cards[1]["value"] = f"{int(kpis.get('country_leadership_coverage', 85))}%"
+            kpi_cards[1]["value"] = f"{int(kpis.get('country_leadership_coverage', 0))}%"
             kpi_cards[2]["value"] = f"{kpis.get('country_members', 0):,}"
             kpi_cards[2]["sub"] = f"{active_network} {country_display}"
             kpi_cards[3]["value"] = str(kpis.get("country_verifications", 0))
-
-        if active_country != "NG":
-            country_profiles = {
-                "KE": {
-                    "rows": [
-                        {"item": "County Coordinator", "col2": "Nairobi", "col3": "Grace Waweru", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
-                        {"item": "Assistant Coordinator", "col2": "Mombasa", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
-                        {"item": "Sub-County Coordinator", "col2": "Westlands", "col3": "David Ochieng", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
-                    ],
-                    "attention": [
-                        {"title": "County Coordinator (Nairobi)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
-                        {"title": "Assistant Coordinator (Mombasa)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
-                    ],
-                    "bars": [
-                        {"label": "Nairobi", "value": 7, "color": "#E4C1D6"},
-                        {"label": "Mombasa", "value": 5, "color": "#E4C1D6"},
-                        {"label": "Kisumu", "value": 4, "color": "#E4C1D6"},
-                        {"label": "Nakuru", "value": 3, "color": "#D4006A"},
-                    ],
-                },
-                "GH": {
-                    "rows": [
-                        {"item": "Regional Coordinator", "col2": "Accra", "col3": "Kwesi Mensah", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
-                        {"item": "Assistant Coordinator", "col2": "Kumasi", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
-                        {"item": "District Lead", "col2": "Tamale", "col3": "Abena Osei", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
-                    ],
-                    "attention": [
-                        {"title": "Regional Coordinator (Accra)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
-                        {"title": "Assistant Coordinator (Kumasi)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
-                    ],
-                    "bars": [
-                        {"label": "Accra", "value": 6, "color": "#E4C1D6"},
-                        {"label": "Kumasi", "value": 5, "color": "#E4C1D6"},
-                        {"label": "Takoradi", "value": 3, "color": "#E4C1D6"},
-                        {"label": "Tamale", "value": 2, "color": "#D4006A"},
-                    ],
-                },
-                "AO": {
-                    "rows": [
-                        {"item": "Provincial Coordinator", "col2": "Luanda", "col3": "Manuel David", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
-                        {"item": "Assistant Coordinator", "col2": "Benguela", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
-                        {"item": "Municipal Lead", "col2": "Huambo", "col3": "Rosa Santos", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
-                    ],
-                    "attention": [
-                        {"title": "Provincial Coordinator (Luanda)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
-                        {"title": "Assistant Coordinator (Benguela)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
-                    ],
-                    "bars": [
-                        {"label": "Luanda", "value": 5, "color": "#E4C1D6"},
-                        {"label": "Benguela", "value": 3, "color": "#E4C1D6"},
-                        {"label": "Huambo", "value": 2, "color": "#E4C1D6"},
-                        {"label": "Lobito", "value": 1, "color": "#D4006A"},
-                    ],
-                },
-                "ET": {
-                    "rows": [
-                        {"item": "Regional Director", "col2": "Addis Ababa", "col3": "Tigist Bekele", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
-                        {"item": "Assistant Director", "col2": "Dire Dawa", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
-                        {"item": "Zonal Coordinator", "col2": "Hawassa", "col3": "Abebe Haile", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
-                    ],
-                    "attention": [
-                        {"title": "Regional Director (Addis Ababa)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
-                        {"title": "Assistant Director (Dire Dawa)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
-                    ],
-                    "bars": [
-                        {"label": "Addis Ababa", "value": 6, "color": "#E4C1D6"},
-                        {"label": "Dire Dawa", "value": 4, "color": "#E4C1D6"},
-                        {"label": "Hawassa", "value": 3, "color": "#E4C1D6"},
-                        {"label": "Adama", "value": 2, "color": "#D4006A"},
-                    ],
-                },
-            }
-            prof = country_profiles.get(active_country)
-            if prof:
-                if table_card:
-                    table_card["rows"] = prof["rows"]
-                if attention_card:
-                    attention_card["items"] = prof["attention"]
-                if chart_card:
-                    chart_card["bars"] = prof["bars"]
-                related_screens = ["DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION"]
-    elif norm_code == "DASH-10-COVERAGE" and active_country == "KE":
-        if table_card:
-            table_card["title"] = "Kenya leadership coverage"
-            table_card["rows"] = [
-                {"item": "Nairobi · WGMN", "col2": "Principal and deputy active", "status_label": "Complete", "status_style": "green", "url": "/foundation/dashboard/"},
-                {"item": "Mombasa · WGMN", "col2": "Principal only", "status_label": "Deputy vacancy", "status_style": "purple", "url": "/foundation/dashboard/"},
-                {"item": "Kisumu · WGMN", "col2": "Deputy only", "status_label": "Principal vacancy", "status_style": "purple", "url": "/foundation/dashboard/"},
-            ]
     elif norm_code == "DASH-13":
         c_name = user_scope.community_cluster or user_scope.cluster_name
         c_unit = None
@@ -2847,7 +815,7 @@ def build_dashboard_context(
             disp_cluster = f"{disp_cluster} Cluster"
 
         if len(kpi_cards) >= 1:
-            kpi_cards[0]["value"] = str(connected_chapters_count if "test" not in sys.argv else (connected_chapters_count or 6))
+            kpi_cards[0]["value"] = str(connected_chapters_count)
             kpi_cards[0]["sub"] = f"Within {disp_cluster}"
 
         if table_card and connected_chapter_names:
@@ -2855,7 +823,7 @@ def build_dashboard_context(
                 {
                     "item": f"{name} membership & returns",
                     "col2": "Chapter Lead",
-                    "col3": "25 Sep",
+                    "col3": "Active",
                     "status_label": "Active",
                     "status_style": "green",
                     "url": "/foundation/work-queue/",
@@ -2882,7 +850,6 @@ def build_dashboard_context(
         user_account = account if account and getattr(account, "pk", None) and getattr(account, "is_authenticated", True) else None
         now_dt = timezone.now()
 
-        # 1. Scheduled meetings from database (upcoming only + chapter scoped for chapter meetups)
         m_filter = Q(
             network__in=[active_network, "ALL"],
             country__in=[active_country, "ALL"],
@@ -2900,18 +867,15 @@ def build_dashboard_context(
         meetings = ScheduledMeeting.objects.filter(m_filter).order_by("scheduled_at")
         meet_count = meetings.count()
 
-        # 2. Member WorkItems from database
         wi_filter = Q(network__in=[active_network, "ALL"], country__in=[active_country, "ALL"])
         if user_account:
             wi_filter &= (Q(assigned_to=user_account) | Q(assigned_to__isnull=True, required_role__in=["member", "all"]))
         else:
             wi_filter &= Q(required_role__in=["member", "all"])
-        # Ordinary members (tier > 4) must never see confidential compliance/audit records
         if user_scope.leadership_tier > 4:
             wi_filter &= Q(confidential=False)
         work_items = WorkItem.objects.filter(wi_filter, status__in=["pending", "in_progress"]).order_by("-priority", "-created_at")
 
-        # 3. MissionControlTasks from database
         task_filter = Q(network__in=[active_network, "ALL"], country__in=[active_country, "ALL"])
         if user_scope.leadership_tier > 4:
             if user_account:
@@ -2929,14 +893,12 @@ def build_dashboard_context(
                 task_filter &= Q(board_column__in=["To do", "In progress"])
         tasks = MissionControlTask.objects.filter(task_filter).exclude(status__in=["Closed", "Verified"]).order_by("due_date", "-created_at")
 
-        # 4. Volunteer Opportunities from database
         opps = VolunteerOpportunity.objects.filter(
             network__in=[active_network, "ALL"],
             country__in=[active_country, "ALL"],
             status__iexact="Open",
         ).order_by("-created_at")
 
-        # 1. Reconcile table_card strictly from database records based on active_tab
         db_rows = []
         if active_tab == "my_work":
             if table_card:
@@ -3023,9 +985,7 @@ def build_dashboard_context(
                     "status_style": "purple",
                     "url": f"/foundation/meetings/{m.id}/",
                 })
-
         else:
-            # overview tab: balanced summary
             if table_card:
                 table_card["title"] = "Your work and follow-through"
             for m in meetings[:2]:
@@ -3036,7 +996,6 @@ def build_dashboard_context(
                     "status_style": "purple",
                     "url": f"/foundation/meetings/{m.id}/",
                 })
-
             for wi in work_items[:2]:
                 if any(r["item"].lower() == wi.title.lower() for r in db_rows):
                     continue
@@ -3047,7 +1006,6 @@ def build_dashboard_context(
                     "status_style": "amber" if wi.priority in ("urgent", "high", "critical") else "purple",
                     "url": wi.target_url or f"/foundation/work-item/{wi.id}/",
                 })
-
             for t in tasks[:1]:
                 if any(r["item"].lower() == t.title.lower() for r in db_rows):
                     continue
@@ -3058,7 +1016,6 @@ def build_dashboard_context(
                     "status_style": "purple",
                     "url": f"/foundation/tasks/{t.task_code}/" if hasattr(t, "task_code") and t.task_code else "/foundation/work-queue/",
                 })
-
             for opp in opps[:1]:
                 if any(r["item"].lower() == opp.title.lower() for r in db_rows):
                     continue
@@ -3074,56 +1031,29 @@ def build_dashboard_context(
             table_card["rows"] = db_rows
             table_card["record_count_text"] = f"Showing {len(db_rows)} records in this view"
 
-        # 2. Reconcile KPI cards based on active_tab
         if len(kpi_cards) >= 3:
             if active_tab == "my_work":
                 open_count = len(db_rows)
                 pending_count = sum(1 for r in db_rows if r.get("status_key") == "pending")
                 progress_count = sum(1 for r in db_rows if r.get("status_key") == "in_progress")
 
-                kpi_cards[0]["value"] = str(open_count)
-                kpi_cards[0]["label"] = "Open tasks"
-                kpi_cards[0]["sub"] = "In your scope"
-
-                kpi_cards[1]["value"] = str(pending_count)
-                kpi_cards[1]["label"] = "Pending action"
-                kpi_cards[1]["sub"] = "Ready to claim" if pending_count > 0 else "None pending"
-
-                kpi_cards[2]["value"] = str(progress_count)
-                kpi_cards[2]["label"] = "In progress"
-                kpi_cards[2]["sub"] = "Under review" if progress_count > 0 else "None active"
+                kpi_cards[0].update({"value": str(open_count), "label": "Open tasks", "sub": "In your scope"})
+                kpi_cards[1].update({"value": str(pending_count), "label": "Pending action", "sub": "Ready to claim" if pending_count > 0 else "None pending"})
+                kpi_cards[2].update({"value": str(progress_count), "label": "In progress", "sub": "Under review" if progress_count > 0 else "None active"})
             elif active_tab == "history":
                 resolved_count = len([r for r in db_rows if r.get("status_label") in ("Completed", "Closed")])
                 concluded_count = len([r for r in db_rows if r.get("status_label") == "Attended"])
 
-                kpi_cards[0]["value"] = str(resolved_count)
-                kpi_cards[0]["label"] = "Resolved records"
-                kpi_cards[0]["sub"] = "Tasks completed"
-
-                kpi_cards[1]["value"] = str(concluded_count)
-                kpi_cards[1]["label"] = "Past activities"
-                kpi_cards[1]["sub"] = "Concluded events"
-
-                kpi_cards[2]["value"] = "100%"
-                kpi_cards[2]["label"] = "Audit standing"
-                kpi_cards[2]["sub"] = "All logs verified"
+                kpi_cards[0].update({"value": str(resolved_count), "label": "Resolved records", "sub": "Tasks completed"})
+                kpi_cards[1].update({"value": str(concluded_count), "label": "Past activities", "sub": "Concluded events"})
+                kpi_cards[2].update({"value": "100%", "label": "Audit standing", "sub": "All logs verified"})
             else:
-                # overview: standard member summary
-                kpi_cards[0]["value"] = local_home
-                kpi_cards[0]["label"] = "My local home"
-                kpi_cards[0]["sub"] = f"{active_network} {country_display}"
-
-                kpi_cards[1]["value"] = str(meet_count)
-                kpi_cards[1]["label"] = "Upcoming activities"
-                kpi_cards[1]["sub"] = "Confirmed & open" if meet_count > 0 else "None scheduled"
-
+                kpi_cards[0].update({"value": local_home, "label": "My local home", "sub": f"{active_network} {country_display}"})
+                kpi_cards[1].update({"value": str(meet_count), "label": "Upcoming activities", "sub": "Confirmed & open" if meet_count > 0 else "None scheduled"})
                 user_status = account.status.title() if account and hasattr(account, "status") else "Active"
                 standing_sub = "Good standing" if user_status.lower() == "active" else "Review required"
-                kpi_cards[2]["value"] = user_status
-                kpi_cards[2]["label"] = "Membership status"
-                kpi_cards[2]["sub"] = standing_sub
+                kpi_cards[2].update({"value": user_status, "label": "Membership status", "sub": standing_sub})
 
-        # Reconcile attention_card strictly from database records
         if attention_card:
             db_attention_items = []
             is_leadership = user_scope.leadership_tier <= 4
@@ -3133,7 +1063,6 @@ def build_dashboard_context(
                 is_active=True,
             )
             if not is_leadership:
-                # Ordinary members should only see community/chapter/event notices, not management SLA or governance audits
                 alerts_qs = alerts_qs.filter(category__in=["chapter", "event", "member", "program", "general"])
             if user_account:
                 alerts_qs = alerts_qs.exclude(acknowledged_by=user_account)
@@ -3172,59 +1101,70 @@ def build_dashboard_context(
             else:
                 attention_card = None
 
-        # Reconcile hero_banner strictly from database records based on active_tab
         if screen.get("hero_banner"):
             hb = dict(screen["hero_banner"])
             if active_tab == "my_work":
-                hb["eyebrow"] = "OPERATIONAL WORK"
-                hb["heading"] = "Focus on your active tasks and follow-through"
-                hb["body"] = "You have operational items requiring review, continuation, or verification in your scope."
-                hb["button_label"] = "→ Open priority task"
-                hb["button_url"] = "/foundation/work-queue/priority/"
+                hb.update({
+                    "eyebrow": "OPERATIONAL WORK",
+                    "heading": "Focus on your active tasks and follow-through",
+                    "body": "You have operational items requiring review, continuation, or verification in your scope.",
+                    "button_label": "→ Open priority task",
+                    "button_url": "/foundation/work-queue/priority/",
+                })
             elif active_tab == "history":
-                hb["eyebrow"] = "RESOLUTION AUDIT TRAIL"
-                hb["heading"] = "Completed records and past activity"
-                hb["body"] = "Review the archive of resolved work items, closed tasks, and concluded chapter meetings."
-                hb["button_label"] = "→ View full audit queue"
-                hb["button_url"] = "/foundation/work-queue/?tab=history"
+                hb.update({
+                    "eyebrow": "RESOLUTION AUDIT TRAIL",
+                    "heading": "Completed records and past activity",
+                    "body": "Review the archive of resolved work items, closed tasks, and concluded chapter meetings.",
+                    "button_label": "→ View full audit queue",
+                    "button_url": "/foundation/work-queue/?tab=history",
+                })
             else:
                 if meetings.exists():
                     first_m = meetings.first()
-                    hb["eyebrow"] = "YOUR NEXT STEP"
-                    hb["heading"] = f"{first_m.title} is coming up"
                     loc_suffix = f" at {first_m.location}" if first_m.location else ""
-                    if first_m.meeting_type == "chapter_meetup":
-                        hb["body"] = f"Meet your local team on {first_m.scheduled_at.strftime('%d %b at %H:%M WAT')}{loc_suffix}."
-                    else:
-                        hb["body"] = f"Scheduled for {first_m.scheduled_at.strftime('%d %b at %H:%M WAT')}{loc_suffix}."
-                    hb["button_label"] = "→ View invitation"
-                    hb["button_url"] = f"/foundation/meetings/{first_m.id}/"
+                    body_txt = (
+                        f"Meet your local team on {first_m.scheduled_at.strftime('%d %b at %H:%M WAT')}{loc_suffix}."
+                        if first_m.meeting_type == "chapter_meetup"
+                        else f"Scheduled for {first_m.scheduled_at.strftime('%d %b at %H:%M WAT')}{loc_suffix}."
+                    )
+                    hb.update({
+                        "eyebrow": "YOUR NEXT STEP",
+                        "heading": f"{first_m.title} is coming up",
+                        "body": body_txt,
+                        "button_label": "→ View invitation",
+                        "button_url": f"/foundation/meetings/{first_m.id}/",
+                    })
                 elif work_items.exists():
                     first_wi = work_items.first()
-                    hb["eyebrow"] = "YOUR NEXT STEP"
-                    hb["heading"] = first_wi.title
-                    hb["body"] = first_wi.summary or "Action required on your account."
-                    hb["button_label"] = "→ View activity"
-                    hb["button_url"] = first_wi.target_url or "/foundation/work-queue/"
+                    hb.update({
+                        "eyebrow": "YOUR NEXT STEP",
+                        "heading": first_wi.title,
+                        "body": first_wi.summary or "Action required on your account.",
+                        "button_label": "→ View activity",
+                        "button_url": first_wi.target_url or "/foundation/work-queue/",
+                    })
                 elif opps.exists():
                     first_opp = opps.first()
-                    hb["eyebrow"] = "YOUR NEXT STEP"
-                    hb["heading"] = first_opp.title
-                    hb["body"] = first_opp.description or "Explore volunteer and leadership opportunities."
-                    hb["button_label"] = "→ View opportunities"
-                    hb["button_url"] = "/foundation/recruitment/"
+                    hb.update({
+                        "eyebrow": "YOUR NEXT STEP",
+                        "heading": first_opp.title,
+                        "body": first_opp.description or "Explore volunteer and leadership opportunities.",
+                        "button_label": "→ View opportunities",
+                        "button_url": "/foundation/recruitment/",
+                    })
                 else:
                     first_name = (account.display_name or (account.person.display_name if account.person else account.email)).split()[0] if account else "Member"
-                    hb["eyebrow"] = "YOUR WORKSPACE"
-                    hb["heading"] = f"Welcome, {first_name}"
-                    hb["body"] = f"You are connected to {local_home}. Upcoming activities and chapter notices will appear here."
-                    hb["button_label"] = "→ Browse activities"
-                    hb["button_url"] = "/foundation/work-queue/"
+                    hb.update({
+                        "eyebrow": "YOUR WORKSPACE",
+                        "heading": f"Welcome, {first_name}",
+                        "body": f"You are connected to {local_home}. Upcoming activities and chapter notices will appear here.",
+                        "button_label": "→ Browse activities",
+                        "button_url": "/foundation/work-queue/",
+                    })
             screen["hero_banner"] = hb
 
-    if "test" not in sys.argv and norm_code != "DASH-15":
-        # Live runtime reconciliation for all leadership/operational dashboards (DASH-01..DASH-14, DASH-16, DASH-17)
-        # Ensures zero hardcoded/synthetic rows or inflated numbers when database is clean.
+    if norm_code != "DASH-15":
         is_global_screen = norm_code.startswith(("DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05", "DASH-06", "DASH-07", "DASH-08", "DASH-09")) or user_scope.can_cross_network
         net_q = Q() if is_global_screen else Q(network__in=[active_network, "ALL"])
         ctry_q = Q() if (is_global_screen or user_scope.allowed_countries == ["*"]) else Q(country__in=[active_country, "ALL"])
@@ -3246,7 +1186,6 @@ def build_dashboard_context(
             )
             live_tasks = live_tasks.filter(unit_name__icontains=chap_clean)
 
-        # Build authentic rows based on active_tab
         db_rows = []
         if active_tab == "history":
             for wi in live_wis.filter(status="completed")[:10]:
@@ -3297,21 +1236,11 @@ def build_dashboard_context(
                     "status_style": "purple",
                     "url": f"/foundation/tasks/{t.task_code}/",
                 })
-            for m in live_meetings[:5]:
-                db_rows.append({
-                    "item": m.title,
-                    "col2": m.location or f"{m.network} · {m.country}",
-                    "col3": m.scheduled_at.strftime("%d %b · %H:%M") if m.scheduled_at else "Scheduled",
-                    "status_label": "View meeting",
-                    "status_style": "purple",
-                    "url": f"/foundation/meetings/{m.id}/",
-                })
 
-        if table_card:
+        if table_card and (norm_code != "DASH-13" or not table_card.get("rows")):
             table_card["rows"] = db_rows
             table_card["record_count_text"] = f"Showing {len(db_rows)} records in this view"
 
-        # Reconcile attention_card from live database alerts & urgent items
         if attention_card:
             att_items = []
             for al in live_alerts[:2]:
@@ -3337,7 +1266,6 @@ def build_dashboard_context(
             else:
                 attention_card = None
 
-        # Reconcile chart_card to real live database counts
         if chart_card and "bars" in chart_card:
             live_bars = []
             for bar in chart_card["bars"]:
@@ -3362,7 +1290,6 @@ def build_dashboard_context(
                 live_bars.append(b_copy)
             chart_card["bars"] = live_bars
 
-        # Reconcile KPI cards to real live database counts
         open_work_count = live_wis.exclude(status="completed").count() + live_tasks.exclude(status__in=["Closed", "Verified"]).count() + pending_drafts.count()
         if norm_code.startswith("DASH-01") and len(kpi_cards) >= 3:
             wgmn_cnt = Membership.objects.filter(network="WGMN").count()
@@ -3383,12 +1310,9 @@ def build_dashboard_context(
         elif norm_code.startswith("DASH-10") and len(kpi_cards) >= 3:
             ctry_members = Membership.objects.filter(home__country=active_country).count()
             ctry_chaps = Chapter.objects.filter(country=active_country, status="active").count()
-            kpi_cards[0]["value"] = str(ctry_members)
-            kpi_cards[0]["label"] = "Active members"
-            kpi_cards[1]["value"] = str(ctry_chaps)
-            kpi_cards[1]["label"] = "Active chapters"
-            kpi_cards[2]["value"] = str(open_work_count)
-            kpi_cards[2]["label"] = "Open actions"
+            kpi_cards[0].update({"value": str(ctry_members), "label": "Active members"})
+            kpi_cards[1].update({"value": str(ctry_chaps), "label": "Active chapters"})
+            kpi_cards[2].update({"value": str(open_work_count), "label": "Open actions"})
         elif norm_code.startswith("DASH-14") and len(kpi_cards) >= 3:
             chap_code = user_scope.chapter_code or ""
             chap_members = Membership.objects.filter(home__code=chap_code).count() if chap_code else 0
@@ -3404,57 +1328,34 @@ def build_dashboard_context(
                     card["value"] = str(live_meetings.count())
                 else:
                     card["value"] = str(live_alerts.count())
-    # Enforce network and geography data boundaries in table_card and attention_card
-    # Founder / Management can have an authorized cross-network overview.
-    # Non-founder/lower-level users must remain strictly scoped to their permitted network and geography.
+
     if not user_scope.can_cross_network:
-        # 1. Adapt eyebrow if it says HQ / BOTH NETWORKS
         if eyebrow == "HQ / BOTH NETWORKS":
             if active_country and active_country != "ALL":
                 eyebrow = f"{active_network} / {country_display.upper()}"
             else:
                 eyebrow = f"{active_network} / CONTINENTAL OPERATIONS"
 
-        # 2. Filter table_card rows
         if table_card and "rows" in table_card:
-            raw_rows = table_card["rows"]
             filtered_rows = []
-            for row in raw_rows:
+            for row in table_card["rows"]:
                 row_text = " ".join([str(v) for v in row.values() if v])
-                # Check forbidden network
                 if active_network in ("WGMN",) and ("WNNN" in row_text or "WNN" in row_text):
                     continue
                 if active_network in ("WNN", "WNNN") and ("WGMN" in row_text):
                     continue
-                # Check geography boundary for single-country users
-                if user_scope.allowed_countries != ["*"] and active_country != "ALL":
-                    if active_country == "NG" and any(k in row_text for k in ("Kenya", "Nairobi", "Mombasa", "Ghana", "Accra")):
-                        continue
-                    elif active_country == "KE" and any(k in row_text for k in ("Nigeria", "Lagos", "Ikeja", "Kano", "Abuja", "Ghana")):
-                        continue
-                    elif active_country == "GH" and any(k in row_text for k in ("Nigeria", "Lagos", "Kenya", "Nairobi")):
-                        continue
                 filtered_rows.append(row)
             table_card["rows"] = filtered_rows
             table_card["record_count_text"] = f"Showing {len(filtered_rows)} records in this view"
 
-        # 3. Filter attention_card items
         if attention_card and "items" in attention_card:
-            raw_items = attention_card["items"]
             filtered_items = []
-            for item in raw_items:
+            for item in attention_card["items"]:
                 item_text = " ".join([str(v) for v in item.values() if v])
                 if active_network in ("WGMN",) and ("WNNN" in item_text or "WNN" in item_text):
                     continue
                 if active_network in ("WNN", "WNNN") and ("WGMN" in item_text):
                     continue
-                if user_scope.allowed_countries != ["*"] and active_country != "ALL":
-                    if active_country == "NG" and any(k in item_text for k in ("Kenya", "Nairobi", "Mombasa", "Ghana", "Accra")):
-                        continue
-                    elif active_country == "KE" and any(k in item_text for k in ("Nigeria", "Lagos", "Ikeja", "Kano", "Abuja", "Ghana")):
-                        continue
-                    elif active_country == "GH" and any(k in item_text for k in ("Nigeria", "Lagos", "Kenya", "Nairobi")):
-                        continue
                 filtered_items.append(item)
             attention_card["items"] = filtered_items
 
@@ -3488,7 +1389,6 @@ def build_dashboard_context(
         ]
         related_views = exec_extras + related_views
 
-    # Clone screen dict to preserve immutability of registry while providing dynamic context
     screen = dict(screen)
     screen["title"] = screen_title
     screen["eyebrow"] = eyebrow

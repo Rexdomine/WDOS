@@ -2347,42 +2347,16 @@ class EventModerationQuestion(models.Model):
 
 
 def _resolve_user_person_profile(user_obj):
-    import sys
     if not user_obj or not getattr(user_obj, "is_authenticated", False):
         return None
     direct = PersonProfile.objects.filter(user=user_obj).first()
     if direct:
         return direct
-    from accounts.models import Account, AccessGrant
+    from accounts.models import Account
     acc = Account.objects.filter(user=user_obj).first()
     if acc:
-        prof = PersonProfile.objects.filter(account=acc).first()
-        if prof:
-            return prof
-        if "test" not in sys.argv:
-            return None
-        grant = AccessGrant.objects.filter(account=acc, revoked_at__isnull=True).first()
-        net = grant.network if (grant and grant.network in ("WGMN", "WNNN")) else "WGMN"
-        country = (grant.geography[:2].upper() if (grant and grant.geography) else "NG")
-        if country not in ("NG", "KE", "GH", "ZA", "SN", "EG"):
-            country = "NG"
-        return PersonProfile.objects.create(
-            user=user_obj,
-            account=acc,
-            full_name=acc.display_name or user_obj.get_full_name() or user_obj.username or "Ada Okafor",
-            email=acc.email or user_obj.email or "",
-            network=net,
-            country=country,
-        )
-    if "test" not in sys.argv:
-        return None
-    return PersonProfile.objects.create(
-        user=user_obj,
-        full_name=user_obj.get_full_name() or user_obj.username or "Ada Okafor",
-        email=user_obj.email or "",
-        network="WGMN",
-        country="NG",
-    )
+        return PersonProfile.objects.filter(account=acc).first()
+    return None
 
 
 from django.contrib.auth import get_user_model as _get_user_model

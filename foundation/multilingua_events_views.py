@@ -769,7 +769,7 @@ def _ensure_participant_session(
         if updated_fields:
             participant.save(update_fields=updated_fields)
 
-    if is_host and room_session and display_name != "Ada Okafor" and "test" not in sys.argv:
+    if is_host and room_session and display_name != "Ada Okafor":
         room_updates = []
         if room_session.host_name == "Ada Okafor":
             room_session.host_name = display_name
@@ -794,9 +794,6 @@ def _prune_stale_waiting_participants(room_session: Optional[MeetingRoomSession]
     Throttled in production so 100+ concurrent participants polling do not run redundant DB writes.
     """
     if not room_session:
-        return
-    if "test" in sys.argv:
-        room_session.participants.filter(participant_name="").delete()
         return
     now_ts = timezone.now().timestamp()
     room_k = str(room_session.id)

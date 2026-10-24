@@ -71,10 +71,8 @@ def _build_stage9_common_context(request, ctx: Dict[str, Any], screen_code: str)
     target_country = scope_info["target_country"]
     target_country_name = scope_info["target_country_name"]
 
-    import sys
-    if "test" not in sys.argv:
-        from .multilingua_events_engine import purge_auto_captured_transcript_tasks
-        purge_auto_captured_transcript_tasks()
+    from .multilingua_events_engine import purge_auto_captured_transcript_tasks
+    purge_auto_captured_transcript_tasks()
 
     seeded = seed_stage9_fixtures(network=target_network, country=target_country, actor_account=account)
     screen = dict(STAGE9_SCREENS[screen_code])
@@ -301,16 +299,12 @@ def create_task_view(request):
     result_success = True
     created_task = None
 
-    is_test_run = "test" in sys.argv
     form_values = {
-        "title": request.POST.get("title", "Confirm Chapter meeting agenda" if is_test_run else ""),
-        "assign_to": request.POST.get("assign_to", "Ada Okafor" if is_test_run else ""),
-        "due_date_label": request.POST.get("due_date_label", "18 September 2026" if is_test_run else ""),
+        "title": request.POST.get("title", ""),
+        "assign_to": request.POST.get("assign_to", ""),
+        "due_date_label": request.POST.get("due_date_label", ""),
         "priority": request.POST.get("priority", "High"),
-        "required_evidence": request.POST.get(
-            "required_evidence",
-            "Attach the agreed agenda and note any unresolved questions." if is_test_run else "",
-        ),
+        "required_evidence": request.POST.get("required_evidence", ""),
     }
 
     if request.method == "POST":
@@ -348,8 +342,6 @@ def create_task_view(request):
     people_options = list(
         PersonProfile.objects.filter(country=s9_ctx["target_country"]).values_list("full_name", flat=True)[:12]
     )
-    if is_test_run and "Ada Okafor" not in people_options:
-        people_options.insert(0, "Ada Okafor")
 
     ctx.update(s9_ctx)
     ctx.update({
@@ -807,16 +799,14 @@ def schedule_meeting_view(request):
     result_success = True
     scheduled_meeting = None
 
-    is_test_run = "test" in sys.argv
-    default_invitees = f"{s9_ctx['target_network']} · {s9_ctx['target_country_name']} country team"
     form_values = {
-        "title": request.POST.get("title", "Country coordination" if is_test_run else ""),
-        "date_and_start_time": request.POST.get("date_and_start_time", "18 September 2026 · 10:00" if is_test_run else ""),
+        "title": request.POST.get("title", ""),
+        "date_and_start_time": request.POST.get("date_and_start_time", ""),
         "timezone_name": request.POST.get("timezone_name", "Africa/Lagos (WAT)"),
-        "invitees_label": request.POST.get("invitees_label", default_invitees if is_test_run else ""),
-        "agenda": request.POST.get("agenda", "Country updates, reporting follow-through and support needs." if is_test_run else ""),
+        "invitees_label": request.POST.get("invitees_label", ""),
+        "agenda": request.POST.get("agenda", ""),
         "repeats_frequency": request.POST.get("repeats_frequency", "Weekly"),
-        "ends_date_label": request.POST.get("ends_date_label", "31 December 2026" if is_test_run else ""),
+        "ends_date_label": request.POST.get("ends_date_label", ""),
         "series_action": request.POST.get("series_action", "Edit this and future meetings"),
         "meeting_format": request.POST.get("meeting_format", "online"),
         "physical_location": request.POST.get("physical_location", ""),

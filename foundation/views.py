@@ -409,39 +409,6 @@ def _get_stage4_state_context(request, screen_name):
     return state_map.get(state, {})
 
 
-def _get_standard_stage4_items(account, user_scope):
-    """
-    Standard records matching the Stage 04 PDF Artboard review examples
-    with deep links to authorized records.
-    """
-    meeting = ScheduledMeeting.objects.filter(network__in=[user_scope.active_network, "ALL"]).first()
-    meeting_url = f"/foundation/dashboard/meetings/{meeting.id}/" if meeting else "/foundation/workspace/"
-    
-    return [
-        {
-            "title": "Local welcome meeting",
-            "when": "18 Sep · 10:00 WAT",
-            "action_label": "View invitation",
-            "action_url": meeting_url,
-            "pill_style": "magenta",
-        },
-        {
-            "title": "Communication preferences",
-            "when": "Updated today",
-            "action_label": "Review settings",
-            "action_url": "/foundation/settings/",
-            "pill_style": "amber",
-        },
-        {
-            "title": "Membership profile",
-            "when": "Contact verified",
-            "action_label": "Open profile",
-            "action_url": "/foundation/profile/",
-            "pill_style": "",
-        },
-    ]
-
-
 # -----------------------------------------------------------------------------
 # Main Shell & Personal Workspace Overview
 # -----------------------------------------------------------------------------
@@ -1196,55 +1163,7 @@ def switch_scope(request):
 # -----------------------------------------------------------------------------
 
 def _ensure_default_work_items_for_scope(account, user_scope):
-    """
-    Ensure the user has realistic, database-backed WorkItems in their scope
-    so the work queue is functional, stateful, and interactive during tests.
-    """
-    import sys
-    if "test" not in sys.argv:
-        return
-    net = user_scope.active_network or "WGMN"
-    ctry = user_scope.active_country or "NG"
-    if ctry == "*":
-        ctry = "NG"
-
-    existing_count = WorkItem.objects.filter(
-        network=net,
-        country=ctry,
-    ).count()
-
-    if existing_count == 0:
-        WorkItem.objects.create(
-            title="Local welcome meeting",
-            summary="Welcome to WGMN. Attend the orientation meeting and connect with your local chapter leadership.",
-            category="membership",
-            network=net,
-            country=ctry,
-            priority="urgent",
-            status="pending",
-            created_by=account,
-        )
-        WorkItem.objects.create(
-            title="Communication preferences",
-            summary="Review and confirm your notification channels, language, and accessibility preferences.",
-            category="general",
-            network=net,
-            country=ctry,
-            priority="high",
-            status="pending",
-            created_by=account,
-        )
-        WorkItem.objects.create(
-            title="Membership profile",
-            summary="Confirm contact verification and member directory visibility details.",
-            category="membership",
-            network=net,
-            country=ctry,
-            priority="normal",
-            status="in_progress",
-            assigned_to=account,
-            created_by=account,
-        )
+    return
 
 
 def priority_work_item_view(request):
@@ -1258,9 +1177,8 @@ def priority_work_item_view(request):
     user_scope = ctx["user_scope"]
     account = ctx["account"]
 
-    if "test" not in sys.argv:
-        from .multilingua_events_engine import purge_auto_captured_transcript_tasks
-        purge_auto_captured_transcript_tasks()
+    from .multilingua_events_engine import purge_auto_captured_transcript_tasks
+    purge_auto_captured_transcript_tasks()
 
     _ensure_default_work_items_for_scope(account, user_scope)
 
@@ -1300,9 +1218,8 @@ def work_queue_view(request):
     user_scope = ctx["user_scope"]
     account = ctx["account"]
 
-    if "test" not in sys.argv:
-        from .multilingua_events_engine import purge_auto_captured_transcript_tasks
-        purge_auto_captured_transcript_tasks()
+    from .multilingua_events_engine import purge_auto_captured_transcript_tasks
+    purge_auto_captured_transcript_tasks()
 
     _ensure_default_work_items_for_scope(account, user_scope)
 
@@ -1932,58 +1849,7 @@ def models_q_search(query: str, fields: list):
 # -----------------------------------------------------------------------------
 
 def _ensure_default_notifications_for_scope(account, user_scope):
-    """
-    Ensure the user has realistic, database-backed Notifications in their scope
-    so the notification center is functional, stateful, and interactive during tests.
-    """
-    import sys
-    if "test" not in sys.argv:
-        return
-    if not account:
-        return
-    net = user_scope.active_network or "WGMN"
-    ctry = user_scope.active_country or "NG"
-    if ctry == "*":
-        ctry = "NG"
-
-    existing_count = Notification.objects.filter(account=account).count()
-    if existing_count == 0:
-        meeting = ScheduledMeeting.objects.filter(network__in=[net, "ALL"]).first()
-        meeting_url = f"/foundation/dashboard/meetings/{meeting.id}/" if meeting else "/foundation/workspace/"
-
-        Notification.objects.create(
-            account=account,
-            network=net,
-            country=ctry,
-            title="Local welcome meeting",
-            message="Welcome orientation meeting with your local chapter leadership.",
-            category="activity",
-            target_url=meeting_url,
-            is_read=False,
-            delivery_status="delivered",
-        )
-        Notification.objects.create(
-            account=account,
-            network=net,
-            country=ctry,
-            title="Communication preferences",
-            message="Review and confirm your notification channels, language, and accessibility preferences.",
-            category="system",
-            target_url="/foundation/settings/",
-            is_read=False,
-            delivery_status="delivered",
-        )
-        Notification.objects.create(
-            account=account,
-            network=net,
-            country=ctry,
-            title="Membership profile",
-            message="Confirm contact verification and member directory visibility details.",
-            category="security",
-            target_url="/foundation/profile/",
-            is_read=True,
-            delivery_status="delivered",
-        )
+    return
 
 
 def notifications_view(request):
@@ -2273,18 +2139,6 @@ def account_sessions_view(request):
         current_sess.browser_info = browser_info
         current_sess.last_active = timezone.now()
         current_sess.save(update_fields=["device_name", "browser_info", "last_active"])
-
-    # If this account has only this single session in test mode, seed an auxiliary device session so tests can review/manage signouts
-    import sys
-    if "test" in sys.argv and DeviceSession.objects.filter(account=account).count() == 1:
-        DeviceSession.objects.create(
-            account=account,
-            device_name="Mobile device",
-            browser_info=f"Mobile Safari · {local_conn}",
-            ip_address="102.89.44.12",
-            is_current=False,
-            last_active=timezone.now() - timedelta(days=1),
-        )
 
     sessions_qs = DeviceSession.objects.filter(account=account).order_by("-is_current", "-last_active")
     sessions_list = []
@@ -4323,8 +4177,8 @@ def add_or_link_person_view(request):
     result_success = True
     duplicate_preview = None
     form_data = {
-        "full_name": "Ada Okafor" if default_country_name == "Nigeria" else "Wanjiru Kariuki",
-        "email": "ada@example.org" if default_country_name == "Nigeria" else "country.ke@example.org",
+        "full_name": "",
+        "email": "",
         "country": default_country_name,
         "relationship_to_add": f"{default_net} membership",
         "local_home": "",
@@ -4514,9 +4368,9 @@ def manage_relationships_view(request):
     result_message = None
     result_success = True
     form_data = {
-        "relationship_category": "Programme participant",
-        "related_programme": "Community Skills Exchange",
-        "effective_date": "18 September 2026",
+        "relationship_category": "",
+        "related_programme": "",
+        "effective_date": "",
     }
 
     if request.method == "POST":

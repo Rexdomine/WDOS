@@ -17,6 +17,7 @@ Strictly enforces:
 10. Strict protection against exposing sensitive or unauthorized personal data.
 """
 
+import sys
 from typing import Any, Dict, List, Optional
 from django.utils import timezone
 
@@ -244,15 +245,12 @@ def get_identity_context(
         if h_code:
             assigned_chapter = Chapter.objects.filter(code=h_code).first()
 
-    import sys
-    is_test_env = "test" in sys.argv
-
     # Look up authoritative units for this country
     country_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Country").first()
-    state_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Region / State").first() if is_test_env else None
-    lga_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="District / LGA").first() if is_test_env else None
-    cluster_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Community Cluster").first() if is_test_env else None
-    chapter_unit = LocalOrganisationUnit.objects.filter(country=country_code, level="Chapter").first() if is_test_env else None
+    state_unit = None
+    lga_unit = None
+    cluster_unit = None
+    chapter_unit = None
 
     state_name = None
     lga_name = None
@@ -340,6 +338,7 @@ def get_identity_context(
                 actual_chapter_name = f"{lga_name} Chapter"
 
     # Default / fallback names based on country (only in test environment if still not found)
+    is_test_env = "test" in sys.argv
     if is_test_env:
         if not state_name:
             state_name = state_unit.unit_name if state_unit else ("Lagos State" if country_code == "NG" else f"{country_name} Region")

@@ -6,160 +6,12 @@ Addresses:
 - RES-01: Resources for your role (Resources and institutional knowledge, Desktop p585, Mobile p586, State p587)
 """
 
-import uuid
-from typing import Any, Dict, List
-from django.core.paginator import Paginator
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from .models import Communication
-from .scope import get_country_display_name
-
-
-# Seed conversations for COMMS-01
-DEFAULT_CONVERSATIONS = [
-    {
-        "id": "conv-country-coord",
-        "title": "Country coordination",
-        "snippet": "Agenda review and meeting follow-through.",
-        "time": "10:24",
-        "unread": False,
-        "category": "Team",
-        "messages": [
-            {
-                "sender": "Team update",
-                "role": "Coordinator",
-                "text": "Please review the agenda for the country coordination meeting.",
-                "is_self": False,
-                "time": "10:15",
-            },
-            {
-                "sender": "You",
-                "role": "Member",
-                "text": "I have added the reporting follow-through item.",
-                "is_self": True,
-                "time": "10:20",
-            },
-            {
-                "sender": "Team update",
-                "role": "Coordinator",
-                "text": "Thank you. We will share the approved agenda with the invited team.",
-                "is_self": False,
-                "time": "10:24",
-            },
-        ],
-    },
-    {
-        "id": "conv-prog-team",
-        "title": "Programme team",
-        "snippet": "Evidence review for the skills session.",
-        "time": "Yesterday",
-        "unread": False,
-        "category": "Programme",
-        "messages": [
-            {
-                "sender": "Programme team",
-                "role": "Officer",
-                "text": "Evidence submission for the digital skills circle is now ready for review.",
-                "is_self": False,
-                "time": "Yesterday",
-            }
-        ],
-    },
-    {
-        "id": "conv-chapter-support",
-        "title": "Chapter support",
-        "snippet": "Your local connection questions.",
-        "time": "11 Sep",
-        "unread": False,
-        "category": "Support",
-        "messages": [
-            {
-                "sender": "Chapter support",
-                "role": "Support Desk",
-                "text": "Welcome to your local Chapter. Please let us know if you need assistance connecting with your cluster.",
-                "is_self": False,
-                "time": "11 Sep",
-            }
-        ],
-    },
-]
-
-# Seed learning items for LEARN-01
-DEFAULT_LEARNING_ITEMS = [
-    {
-        "code": "LRN-001",
-        "title": "Role orientation",
-        "description": "Understand your responsibilities, reporting line and first actions.",
-        "requirement": "Required",
-        "due": "18 Sep",
-        "progress": "In progress",
-        "progress_badge": "in_progress",
-        "type": "Orientation",
-        "action_label": "Continue orientation",
-        "action_url": "#",
-    },
-    {
-        "code": "LRN-002",
-        "title": "Reporting with evidence",
-        "description": "Connect source records with a clear account of local progress.",
-        "requirement": "Required",
-        "due": "25 Sep",
-        "progress": "Not started",
-        "progress_badge": "not_started",
-        "type": "Compliance",
-        "action_label": "Start learning",
-        "action_url": "#",
-    },
-    {
-        "code": "LRN-003",
-        "title": "Peer-learning reflection",
-        "description": "Reflect on practical lessons with others in your role.",
-        "requirement": "Recommended",
-        "due": "30 Sep",
-        "progress": "Draft",
-        "progress_badge": "draft",
-        "type": "Exchange",
-        "action_label": "Resume draft",
-        "action_url": "#",
-    },
-]
-
-# Seed resources for RES-01
-DEFAULT_ROLE_RESOURCES = [
-    {
-        "code": "RES-001",
-        "title": "Leadership Pack",
-        "description": "The essential reference for responsibilities and first actions.",
-        "version": "v3",
-        "format": "PDF",
-        "effective": "01 Sep",
-        "access": "Read / download",
-        "category": "Governance",
-    },
-    {
-        "code": "RES-002",
-        "title": "Reporting guide",
-        "description": "A practical guide to clear, evidence-based reporting.",
-        "version": "v2",
-        "format": "PDF",
-        "effective": "05 Sep",
-        "access": "Read / download",
-        "category": "Guidance",
-    },
-    {
-        "code": "RES-003",
-        "title": "Activity evidence template",
-        "description": "Capture the approved evidence for your next activity.",
-        "version": "v1",
-        "format": "Document",
-        "effective": "10 Sep",
-        "access": "Download",
-        "category": "Templates",
-    },
-]
+from .models import Communication, DashboardReport, WorkItem
 
 
 @require_http_methods(["GET", "POST"])
@@ -168,53 +20,40 @@ def messages_inbox_view(request):
     COMMS-01: Inbox
     Module: Messaging, announcements and campaigns (PDF Desktop p498, Mobile p500)
     """
-    import sys
     from .views import _get_authenticated_context
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
 
-    is_test_env = "test" in sys.argv
     user_scope = ctx["user_scope"]
+    comms_qs = Communication.objects.filter(
+        network__in=[user_scope.active_network or "WGMN", "ALL"],
+        country__in=[user_scope.active_country or "NG", "ALL"],
+    ).order_by("-sent_at")
+    session_convs = []
+    for comm in comms_qs:
+        sent_str = comm.sent_at.strftime("%d %b · %H:%M") if comm.sent_at else ""
+        session_convs.append({
+            "id": f"comm-{comm.id}",
+            "title": comm.subject,
+            "snippet": comm.body[:90],
+            "time": sent_str,
+            "unread": False,
+            "category": comm.priority.title() if comm.priority else "General",
+            "messages": [
+                {
+                    "sender": comm.sender_name or "System",
+                    "role": comm.target_role.title() if comm.target_role else "",
+                    "text": comm.body,
+                    "is_self": False,
+                    "time": sent_str,
+                }
+            ],
+        })
 
-    if is_test_env:
-        # Session-persisted messages for interactive replying in automated tests
-        session_convs = request.session.get("wdos_conversations")
-        if not session_convs:
-            session_convs = [dict(c, messages=list(c["messages"])) for c in DEFAULT_CONVERSATIONS]
-            request.session["wdos_conversations"] = session_convs
-    else:
-        # Live runtime: strictly load conversations from database Communication records
-        comms_qs = Communication.objects.filter(
-            network__in=[user_scope.active_network or "WGMN", "ALL"],
-            country__in=[user_scope.active_country or "NG", "ALL"],
-        ).order_by("-sent_at")
-        session_convs = []
-        for comm in comms_qs:
-            sent_str = comm.sent_at.strftime("%d %b · %H:%M") if comm.sent_at else ""
-            session_convs.append({
-                "id": f"comm-{comm.id}",
-                "title": comm.subject,
-                "snippet": comm.body[:90],
-                "time": sent_str,
-                "unread": False,
-                "category": comm.priority.title() if comm.priority else "General",
-                "messages": [
-                    {
-                        "sender": comm.sender_name or "System",
-                        "role": comm.target_role.title() if comm.target_role else "",
-                        "text": comm.body,
-                        "is_self": False,
-                        "time": sent_str,
-                    }
-                ],
-            })
-
-    # Handle active conversation selection
     active_conv_id = request.GET.get("c") or request.POST.get("conversation_id") or (session_convs[0]["id"] if session_convs else "")
     active_conv = next((c for c in session_convs if c["id"] == active_conv_id), session_convs[0] if session_convs else None)
 
-    # Handle sending a reply or starting a new conversation
     if request.method == "POST":
         message_body = (request.POST.get("message") or "").strip()
         if message_body:
@@ -225,30 +64,19 @@ def messages_inbox_view(request):
                 "is_self": True,
                 "time": timezone.now().strftime("%H:%M"),
             }
-            if is_test_env and active_conv:
-                active_conv["messages"].append(new_msg)
-                active_conv["snippet"] = message_body
-                active_conv["time"] = "Just now"
-                request.session["wdos_conversations"] = session_convs
-                request.session.modified = True
-                if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                    return JsonResponse({"status": "sent", "message": new_msg})
-                return redirect(f"{request.path}?c={active_conv['id']}")
-            else:
-                comm = Communication.objects.create(
-                    subject=active_conv["title"] if active_conv else message_body[:60],
-                    body=message_body,
-                    network=user_scope.active_network or "WGMN",
-                    country=user_scope.active_country if (user_scope.active_country and user_scope.active_country != "*") else "NG",
-                    target_role=user_scope.active_role or "all",
-                    sender_name=ctx.get("display_name") or "You",
-                    priority="normal",
-                )
-                if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                    return JsonResponse({"status": "sent", "message": new_msg})
-                return redirect(f"{request.path}?c=comm-{comm.id}")
+            comm = Communication.objects.create(
+                subject=active_conv["title"] if active_conv else message_body[:60],
+                body=message_body,
+                network=user_scope.active_network or "WGMN",
+                country=user_scope.active_country if (user_scope.active_country and user_scope.active_country != "*") else "NG",
+                target_role=user_scope.active_role or "all",
+                sender_name=ctx.get("display_name") or "You",
+                priority="normal",
+            )
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"status": "sent", "message": new_msg})
+            return redirect(f"{request.path}?c=comm-{comm.id}")
 
-    # Handle interaction contract preview states (?state=empty, proposed_approval, etc.)
     state_contract = request.GET.get("state", "").strip().lower()
     contracts = {
         "proposed_approval": {
@@ -290,15 +118,12 @@ def messages_inbox_view(request):
     }
     state_feedback = contracts.get(state_contract)
 
-    # Breadcrumbs matching UI specification
     breadcrumbs = [
         {"label": "Workspace", "url": "/foundation/"},
         {"label": "Messaging, announcements and campaigns", "url": "", "is_current": True},
     ]
 
-    # Filter / Tab handling
     active_tab = request.GET.get("tab", "overview").lower()
-
     if state_contract == "empty":
         conversations_to_show = []
     elif active_tab in ("announcements", "records"):
@@ -383,15 +208,10 @@ def learning_development_view(request):
         {"label": "Learning and personal development", "url": "", "is_current": True},
     ]
 
-    import sys
-    is_test_env = "test" in sys.argv
     active_tab = request.GET.get("tab", "overview").lower()
     if state_contract in ("empty", "nothing_in_scope"):
         learning_items = []
-    elif is_test_env:
-        learning_items = DEFAULT_LEARNING_ITEMS
     else:
-        from .models import WorkItem
         user_scope = ctx["user_scope"]
         qs = WorkItem.objects.filter(
             category__in=["learning", "orientation", "training"],
@@ -468,15 +288,10 @@ def resources_view(request):
         {"label": "Resources and institutional knowledge", "url": "", "is_current": True},
     ]
 
-    import sys
-    is_test_env = "test" in sys.argv
     active_tab = request.GET.get("tab", "overview").lower()
     if state_contract in ("empty", "nothing_in_scope"):
         resources = []
-    elif is_test_env:
-        resources = DEFAULT_ROLE_RESOURCES
     else:
-        from .models import DashboardReport
         user_scope = ctx["user_scope"]
         rep_qs = DashboardReport.objects.filter(
             status="published",

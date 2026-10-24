@@ -51,6 +51,8 @@ class Command(BaseCommand):
                         pass
 
         supervisor = TranslationAgentSupervisor()
+        if "test" not in sys.argv:
+            print("[WDOS Translation Agent] Background worker started. Monitoring active LiveKit rooms...", flush=True)
         try:
             while not stop_event.is_set():
                 try:

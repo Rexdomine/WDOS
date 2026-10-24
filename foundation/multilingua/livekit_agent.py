@@ -456,15 +456,16 @@ class RoomTranslationBot:
         if "test" in sys.argv:
             return True
         try:
+            bot_identity = f"{BOT_IDENTITY_PREFIX}-{self.room_code.lower()}"
             url = LiveKitAdapter.generate_session_payload(
                 session_name=self.session_name,
-                user_id=BOT_IDENTITY_PREFIX,
+                user_id=bot_identity,
                 participant_name="WDOS Translation Agent",
                 role_type=1,
             )["url"]
             token = LiveKitAdapter.generate_token(
                 session_name=self.session_name,
-                user_id=BOT_IDENTITY_PREFIX,
+                user_id=bot_identity,
                 participant_name="WDOS Translation Agent",
                 role_type=1,
                 metadata=json.dumps({"is_translation_bot": True}),
@@ -485,10 +486,13 @@ class RoomTranslationBot:
                     if pub.track and pub.track.kind == rtc.TrackKind.KIND_AUDIO:
                         self._attach_speaker_track(pub.track, pub, remote_p)
 
-            logger.info("WDOS LiveKit Translation Bot connected to room %s (%s)", self.room_code, self.session_name)
+            print(
+                f"[WDOS Translation Agent] Connected to room {self.room_code} (session={self.session_name}, participants={len(self.room.remote_participants)})",
+                flush=True,
+            )
             return True
         except Exception as exc:
-            logger.warning("WDOS LiveKit Translation Bot failed to connect to %s: %s", self.room_code, exc)
+            print(f"[WDOS Translation Agent] Failed to connect to {self.room_code}: {exc}", flush=True)
             await self.stop()
             return False
 
@@ -521,6 +525,12 @@ class RoomTranslationBot:
             return True
 
     def _bind_room_events(self, room: Any) -> None:
+        @room.on("disconnected")
+        def _on_disconnected(*_args: Any) -> None:
+            if not self.closed:
+                print(f"[WDOS Translation Agent] Disconnected from room {self.room_code}; scheduling reconnect.", flush=True)
+                self.closed = True
+
         @room.on("track_published")
         def _on_track_published(publication: Any, participant: Any) -> None:
             if self.closed or participant.identity.startswith(BOT_IDENTITY_PREFIX):
@@ -619,6 +629,10 @@ class RoomTranslationBot:
             pipeline.set_muted(True)
         self.pipelines[key] = pipeline
         pipeline.start()
+        print(
+            f"[WDOS Translation Agent] Subscribed to speaker '{pipeline.participant_name}' ({pipeline.speaking_lang}) in {self.room_code}",
+            flush=True,
+        )
 
     async def ensure_language_channel(self, short_lang: str) -> Optional[Any]:
         if self.closed or self.room is None or rtc is None:
@@ -931,6 +945,11 @@ class RoomTranslationBot:
             return
 
         # 3. Broadcast finalized segment immediately via LiveKit Data Packet
+        if "test" not in sys.argv:
+            print(
+                f"[WDOS Translation Agent] [{self.room_code}] {speaker_name} ({speaking_lang}): '{original_text[:80]}'",
+                flush=True,
+            )
         await self._publish_caption_packet(
             {
                 "type": "final_segment",

@@ -677,29 +677,12 @@ class WDOSMultilinguaMeeting {
                         this.stopBrowserSpeechRecognizers();
 
                         if (msg.type === "bot_tts_state" && msg.lang) {
-                            const isSelfSpeaker = Boolean(
-                                (msg.speaker_name && msg.speaker_name === this.userDisplayName) ||
-                                (msg.speaker_id && this.myParticipantId && String(msg.speaker_id) === String(this.myParticipantId))
+                            this.botActiveSpeakerByLang.set(
+                                String(msg.lang).toLowerCase(),
+                                msg.speaking
+                                    ? { speakerName: msg.speaker_name || "", speakerId: msg.speaker_id || "" }
+                                    : null
                             );
-                            if (msg.speaking) {
-                                this.currentBotSpeakerIsSelf = isSelfSpeaker;
-                                this.botActiveSpeakerByLang.set(
-                                    String(msg.lang).toLowerCase(),
-                                    { speakerName: msg.speaker_name || "", speakerId: msg.speaker_id || "", isSelf: isSelfSpeaker }
-                                );
-                            } else {
-                                // Keep self-mute active for 1.5s after playout ends so WebRTC jitter buffer tail never leaks
-                                if (isSelfSpeaker) {
-                                    setTimeout(() => {
-                                        const cur = this.botActiveSpeakerByLang.get(String(msg.lang).toLowerCase());
-                                        if (cur && cur.isSelf) {
-                                            this.botActiveSpeakerByLang.set(String(msg.lang).toLowerCase(), null);
-                                        }
-                                    }, 1500);
-                                } else {
-                                    this.botActiveSpeakerByLang.set(String(msg.lang).toLowerCase(), null);
-                                }
-                            }
                             this.updateRemoteWebRTCAudioVolumes();
                             return;
                         }
@@ -707,9 +690,6 @@ class WDOSMultilinguaMeeting {
                         const shortListen = this.getShortLang(this.listeningLang);
                         if (msg.type === "live_interim" && msg.original_text) {
                             this.lastServerCaptionAt = Date.now();
-                            const isSelfInterim = Boolean(msg.speaker_name && msg.speaker_name === this.userDisplayName);
-                            this.currentBotSpeakerIsSelf = isSelfInterim;
-                            this.updateRemoteWebRTCAudioVolumes();
                             this.triggerSpeakingPulse(msg.speaker_name || "Speaker", 1600);
                             const interimTrans = (msg.translations || {})[shortListen] || msg.original_text;
                             this.renderLiveCaption(msg.speaker_name || "Speaker", msg.original_text, interimTrans, false);
@@ -719,8 +699,6 @@ class WDOSMultilinguaMeeting {
                         if (msg.type === "final_segment" && msg.segment) {
                             const seg = msg.segment;
                             this.lastServerCaptionAt = Date.now();
-                            const isOtherSpeaker = Boolean(seg.speaker_name && seg.speaker_name !== this.userDisplayName);
-                            this.currentBotSpeakerIsSelf = !isOtherSpeaker;
                             const segKey = String(seg.id || seg.sequence_number);
                             const segTrans = (seg.translations || {})[shortListen] || seg.original_text;
                             this.lastSeenSequence = Math.max(this.lastSeenSequence, seg.sequence_number || 0);
@@ -732,16 +710,17 @@ class WDOSMultilinguaMeeting {
 
                             if (seg.speaker_name && seg.original_language) {
                                 this.participantLanguagesByName.set(String(seg.speaker_name), seg.original_language);
+                                this.updateRemoteWebRTCAudioVolumes();
                             }
-                            this.updateRemoteWebRTCAudioVolumes();
 
                             if (this.hasSubscribedBotTrack(shortListen)) {
                                 // The server-side LiveKit bot is already streaming neural audio on the `lang:<shortListen>` WebRTC track!
                                 this.spokenSegmentIds.add(segKey);
                             } else if (!this.spokenSegmentIds.has(segKey)) {
                                 this.spokenSegmentIds.add(segKey);
+                                const isOtherSpeaker = seg.speaker_name !== this.userDisplayName;
                                 const isDifferentLang = shortListen !== this.getShortLang(seg.original_language);
-                                if (this.isTranslationEnabled && isDifferentLang && isOtherSpeaker) {
+                                if (this.isTranslationEnabled && isDifferentLang && (isOtherSpeaker || this.participantCount <= 1)) {
                                     this.speakTranslation(segTrans, this.azureData, false, this.listeningLang);
                                 }
                             }
@@ -1029,13 +1008,13 @@ class WDOSMultilinguaMeeting {
                 }
                 const botLang = (audioEl.dataset.botLang || "").toLowerCase();
                 const activeState = this.botActiveSpeakerByLang.get(botLang) || null;
-                const isOwnEcho = Boolean(
-                    this.currentBotSpeakerIsSelf ||
-                    (activeState &&
-                     ((activeState.speakerName && activeState.speakerName === this.userDisplayName) ||
-                      (activeState.speakerId && this.myParticipantId && String(activeState.speakerId) === String(this.myParticipantId))))
+                const isOwnEchoInMultiRoom = Boolean(
+                    activeState &&
+                    this.participantCount > 1 &&
+                    ((activeState.speakerName && activeState.speakerName === this.userDisplayName) ||
+                     (activeState.speakerId && this.myParticipantId && String(activeState.speakerId) === String(this.myParticipantId)))
                 );
-                const shouldPlayBot = Boolean(botLang === shortListen && !isOwnEcho);
+                const shouldPlayBot = Boolean(botLang === shortListen && !isOwnEchoInMultiRoom);
                 applyTrackMuteState(audioEl, shouldPlayBot);
                 return;
             }
@@ -1831,8 +1810,6 @@ class WDOSMultilinguaMeeting {
 
         if (shouldUnmute) {
             this.isAudioMuted = false;
-            this.currentBotSpeakerIsSelf = true;
-            this.updateRemoteWebRTCAudioVolumes();
             this.azureRetryCount = 0;
             this.hadAzureRecognitionSinceUnmute = false;
             this.lastUnmuteAt = Date.now();
@@ -2366,6 +2343,10 @@ class WDOSMultilinguaMeeting {
                     this.lastOriginalLang = data.segment.original_language || this.speakingLang || "en-US";
                     this.triggerSpeakingPulse(data.segment.speaker_name, 2600);
                     this.renderLiveCaption(data.segment.speaker_name, data.segment.original_text, tText, true);
+                    // Only auto-speak your own statement if you are solo-testing in a 1-person room with different Speak/Hear languages
+                    if (isNewSeq && this.participantCount <= 1 && shortListen !== sourceShort && this.isTranslationEnabled) {
+                        this.speakTranslation(tText, this.azureData);
+                    }
                 }
                 return data;
             }
@@ -2575,10 +2556,10 @@ class WDOSMultilinguaMeeting {
                             const isLocallyPosted =
                                 this.locallyPostedSegmentIds.has(String(seg.id)) ||
                                 (subTs > 0 && Date.now() - subTs < 7500) ||
-                                (seg.speaker_name === this.userDisplayName);
+                                (seg.speaker_name === this.userDisplayName && this.participantCount > 1);
                             const isOtherSpeaker = !isLocallyPosted;
                             const isDifferentLang = this.getShortLang(this.listeningLang) !== this.getShortLang(seg.original_language);
-                            if (isOtherSpeaker) {
+                            if (isOtherSpeaker || (this.participantCount <= 1 && isDifferentLang)) {
                                 if (this.isTranslationEnabled && (isDifferentLang || !this.hasActiveRemoteWebRTCAudio())) {
                                     const segTrans = (seg.translations || {})[shortListen] || seg.translated_text || seg.original_text;
                                     this.speakTranslation(segTrans, this.azureData, false, this.listeningLang);

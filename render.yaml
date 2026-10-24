@@ -6,6 +6,7 @@ services:
   - type: web
     name: wdos-staging
     runtime: docker
+    region: frankfurt
     dockerfilePath: ./Dockerfile
     dockerContext: .
     plan: standard
@@ -37,6 +38,7 @@ services:
   - type: worker
     name: wdos-translation-agent
     runtime: docker
+    region: frankfurt
     dockerfilePath: ./Dockerfile
     dockerContext: .
     plan: standard

@@ -1995,6 +1995,7 @@ class WDOSMultilinguaMeeting {
 
     shutdownAllMedia() {
         if (this.pollTimer) {
+            clearTimeout(this.pollTimer);
             clearInterval(this.pollTimer);
             this.pollTimer = null;
         }
@@ -2356,11 +2357,20 @@ class WDOSMultilinguaMeeting {
     }
 
     startLivePolling() {
-        if (this.pollTimer) clearInterval(this.pollTimer);
+        if (this.pollTimer) clearTimeout(this.pollTimer);
         this.fetchLatestTranscript(false);
-        this.pollTimer = setInterval(() => {
-            this.fetchLatestTranscript(true);
-        }, 450);
+        const scheduleNextPoll = () => {
+            if (!this.transcriptUrl) return;
+            // When the LiveKit server translation bot is connected, captions & audio arrive in real time
+            // via WebRTC DataPackets/AudioTracks, so HTTP polling only syncs roster/lobby state every 2.5s
+            // (enabling 100+ concurrent participants without overloading Gunicorn).
+            const delayMs = this.hasServerTranslationBot() ? 2500 : 650;
+            this.pollTimer = setTimeout(async () => {
+                await this.fetchLatestTranscript(true);
+                scheduleNextPoll();
+            }, delayMs);
+        };
+        scheduleNextPoll();
     }
 
     async fetchLatestTranscript(speakNewSegments = true) {

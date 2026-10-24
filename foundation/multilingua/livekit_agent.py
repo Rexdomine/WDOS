@@ -100,6 +100,9 @@ class SpeakerAudioPipeline:
         self.loop = loop
         self.closed = False
         self.is_muted = False
+        self._unmuted_event = asyncio.Event()
+        self._unmuted_event.set()
+        self._audio_stream: Optional[Any] = None
         self._last_interim_sent_at = 0.0
         self._last_interim_text = ""
         self._last_flushed_utt_key = ""
@@ -147,14 +150,26 @@ class SpeakerAudioPipeline:
             return
         self.is_muted = muted
         if muted:
+            self._unmuted_event.clear()
             if self._silence_flush_handle:
                 self._silence_flush_handle.cancel()
                 self._silence_flush_handle = None
             if self._pending_interim_text:
                 self._flush_pending_interim_on_silence()
             self._stop_azure_recognizer()
+            if self._audio_stream is not None:
+                stream_to_close = self._audio_stream
+                self._audio_stream = None
+                self.loop.create_task(self._close_audio_stream_quietly(stream_to_close))
         else:
             self._needs_recognizer_restart = True
+            self._unmuted_event.set()
+
+    async def _close_audio_stream_quietly(self, stream: Any) -> None:
+        try:
+            await stream.aclose()
+        except Exception:
+            pass
 
     def start(self) -> None:
         if self._task is None:
@@ -375,27 +390,37 @@ class SpeakerAudioPipeline:
             return
         try:
             await self.bot.refresh_participant_db_info(self)
-            if not self.is_muted:
-                self._start_azure_recognizer()
-            audio_stream = rtc.AudioStream(self.track, sample_rate=16000, num_channels=1)
             last_db_refresh = time.monotonic()
 
-            async for frame_event in audio_stream:
+            while not self.closed:
+                await self._unmuted_event.wait()
                 if self.closed:
                     break
-                if self.is_muted:
-                    continue
-                now = time.monotonic()
-                if now - last_db_refresh > 2.5:
-                    last_db_refresh = now
-                    self.loop.create_task(self.bot.refresh_participant_db_info(self))
-                if self._needs_recognizer_restart or self._push_stream is None:
-                    self._start_azure_recognizer()
-                if self._push_stream is not None and frame_event and frame_event.frame:
-                    try:
-                        self._push_stream.write(bytes(frame_event.frame.data))
-                    except Exception:
-                        self._needs_recognizer_restart = True
+                self._start_azure_recognizer()
+                audio_stream = rtc.AudioStream(self.track, sample_rate=16000, num_channels=1)
+                self._audio_stream = audio_stream
+                try:
+                    async for frame_event in audio_stream:
+                        if self.closed or self.is_muted:
+                            break
+                        now = time.monotonic()
+                        if now - last_db_refresh > 2.5:
+                            last_db_refresh = now
+                            self.loop.create_task(self.bot.refresh_participant_db_info(self))
+                        if self._needs_recognizer_restart or self._push_stream is None:
+                            self._start_azure_recognizer()
+                        if self._push_stream is not None and frame_event and frame_event.frame:
+                            try:
+                                self._push_stream.write(bytes(frame_event.frame.data))
+                            except Exception:
+                                self._needs_recognizer_restart = True
+                finally:
+                    if self._audio_stream is audio_stream:
+                        self._audio_stream = None
+                    await self._close_audio_stream_quietly(audio_stream)
+                    self._stop_azure_recognizer()
+                if not self.closed and not self.is_muted:
+                    await asyncio.sleep(0.1)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -590,6 +615,8 @@ class RoomTranslationBot:
             track=track,
             loop=self.loop,
         )
+        if getattr(publication, "muted", False):
+            pipeline.set_muted(True)
         self.pipelines[key] = pipeline
         pipeline.start()
 

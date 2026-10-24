@@ -784,16 +784,26 @@ def _ensure_participant_session(
     return participant
 
 
+_LAST_LOBBY_PRUNE_TS: Dict[str, float] = {}
+
+
 def _prune_stale_waiting_participants(room_session: Optional[MeetingRoomSession]) -> None:
     """
     Removes blank-name preview records and marks abandoned WAITING_ROOM participants as LEFT
     only after 30 minutes of complete inactivity so background browser tabs are never dropped.
+    Throttled in production so 100+ concurrent participants polling do not run redundant DB writes.
     """
     if not room_session:
         return
-    room_session.participants.filter(participant_name="").delete()
     if "test" in sys.argv:
+        room_session.participants.filter(participant_name="").delete()
         return
+    now_ts = timezone.now().timestamp()
+    room_k = str(room_session.id)
+    if now_ts - _LAST_LOBBY_PRUNE_TS.get(room_k, 0.0) < 8.0:
+        return
+    _LAST_LOBBY_PRUNE_TS[room_k] = now_ts
+    room_session.participants.filter(participant_name="").delete()
     cutoff = timezone.now() - datetime.timedelta(minutes=30)
     for wp in room_session.participants.filter(admission_status="WAITING_ROOM"):
         if not (wp.participant_name or "").strip():
@@ -1455,7 +1465,9 @@ def room_transcript_api(request, meeting_id: str):
         my_p = _ensure_participant_session(auth_bundle, meeting, room_session)
         is_host = _is_user_room_host(auth_bundle, meeting, room_session)
         segments = []
-        for seg in room_session.transcript_segments.order_by("sequence_number", "timestamp"):
+        recent_segments = list(room_session.transcript_segments.order_by("-sequence_number", "-timestamp")[:60])
+        recent_segments.reverse()
+        for seg in recent_segments:
             tr = dict(seg.translations or {})
             curr_val = (tr.get(target_lang) or "").strip()
             if seg.original_text and not curr_val:

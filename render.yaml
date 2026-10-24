@@ -1,0 +1,62 @@
+# Render Blueprint for WDOS Enterprise Multilingua Deployment (100+ Participants)
+# Supports both automatic single-container Docker execution (via wdos_project.runtime)
+# and dedicated multi-service deployment (Web Service + Background Translation Worker).
+
+services:
+  - type: web
+    name: wdos-staging
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: standard
+    healthCheckPath: /health
+    envVars:
+      - key: WDOS_ENVIRONMENT
+        value: staging
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: WDOS_GUNICORN_THREADS
+        value: "16"
+      - key: WDOS_EXTERNAL_TRANSLATION_WORKER
+        value: "1"
+      - key: DATABASE_URL
+        sync: false
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        sync: false
+
+  - type: worker
+    name: wdos-translation-agent
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: standard
+    dockerCommand: python manage.py run_translation_agent
+    envVars:
+      - key: WDOS_ENVIRONMENT
+        value: staging
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DATABASE_URL
+        sync: false
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        sync: false

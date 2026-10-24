@@ -2705,6 +2705,10 @@ def build_dashboard_context(
     related_screens = list(screen.get("related_screens", []))
 
     from .models import ScheduledMeeting
+    if "test" not in sys.argv:
+        from .multilingua_events_engine import purge_auto_captured_transcript_tasks
+        purge_auto_captured_transcript_tasks()
+
     if norm_code == "DASH-10":
         kpis = get_scoped_kpis(user_scope, "country_lead", active_network, active_country)
         if len(kpi_cards) >= 4:

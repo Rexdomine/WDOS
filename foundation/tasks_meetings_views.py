@@ -71,6 +71,11 @@ def _build_stage9_common_context(request, ctx: Dict[str, Any], screen_code: str)
     target_country = scope_info["target_country"]
     target_country_name = scope_info["target_country_name"]
 
+    import sys
+    if "test" not in sys.argv:
+        from .multilingua_events_engine import purge_auto_captured_transcript_tasks
+        purge_auto_captured_transcript_tasks()
+
     seeded = seed_stage9_fixtures(network=target_network, country=target_country, actor_account=account)
     screen = dict(STAGE9_SCREENS[screen_code])
     screen["eyebrow"] = scope_info["eyebrow"]

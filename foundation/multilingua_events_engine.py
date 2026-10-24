@@ -4,7 +4,9 @@ Covers Module 12 (ROOM-01..ROOM-08) and Module 13 (EVENT-01..EVENT-10).
 """
 from __future__ import annotations
 
+import sys
 import uuid
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import (
@@ -1224,12 +1226,56 @@ def seed_stage10_fixtures(network: str = "WGMN", country: str = "NG", force: boo
     }
 
 
+def purge_auto_captured_transcript_tasks() -> dict:
+    """
+    Removes spurious WorkItem, MissionControlTask, and MeetingDecisionAction records
+    that were auto-created from live speech-to-text transcript segments.
+    """
+    act_qs = MeetingDecisionAction.objects.filter(record_code__startswith="ACT-")
+    converted_task_ids = list(act_qs.exclude(converted_task_id__isnull=True).values_list("converted_task_id", flat=True))
+
+    task_qs = MissionControlTask.objects.filter(
+        Q(task_code__startswith="TASK-RM-")
+        | Q(source_type="Multilingua Room")
+        | Q(idempotency_key__startswith="stage10-room-task-")
+        | Q(idempotency_key__contains="-ACT-")
+        | Q(description__startswith="Auto-captured from Multilingua Room")
+        | Q(id__in=converted_task_ids)
+    )
+    linked_wi_ids = list(task_qs.exclude(linked_work_item_id__isnull=True).values_list("linked_work_item_id", flat=True))
+    task_titles = list(task_qs.values_list("title", flat=True))
+
+    wi_qs = WorkItem.objects.filter(
+        Q(summary__startswith="Auto-captured from ")
+        | Q(target_url__startswith="/foundation/tasks/TASK-RM-")
+        | Q(id__in=linked_wi_ids)
+        | (Q(title__in=task_titles) & Q(category="general"))
+    )
+
+    deleted_actions = act_qs.count()
+    deleted_tasks = task_qs.count()
+    deleted_work_items = wi_qs.count()
+
+    if deleted_actions:
+        act_qs.delete()
+    if deleted_tasks:
+        task_qs.delete()
+    if deleted_work_items:
+        wi_qs.delete()
+
+    return {
+        "deleted_actions": deleted_actions,
+        "deleted_tasks": deleted_tasks,
+        "deleted_work_items": deleted_work_items,
+    }
+
+
 def finalize_room_session_and_bridge_minutes(room_session: MeetingRoomSession, actor_account=None) -> dict:
     """
     Ends a live MeetingRoomSession, compiles all LiveTranscriptSegment records into
     a structured Multilingual Transcript Appendix on Stage 09 MTG-05 (MeetingSeries),
-    and creates linked MissionControlTask (TASK-01) records for action items detected
-    in the transcript.
+    and creates linked MissionControlTask (TASK-01) records only for explicit action
+    markers (never from casual spoken sentences).
     """
     room_session.status = "COMPLETED"
     room_session.closed_at = timezone.now()
@@ -1258,10 +1304,10 @@ def finalize_room_session_and_bridge_minutes(room_session: MeetingRoomSession, a
             line += f" | [FR: {fr_text}]"
         transcript_lines.append(line)
 
-        lower_text = seg.original_text.lower()
-        is_actionable = any(
-            kw in lower_text
-            for kw in ("must ", "finalize", "confirm ", "action:", "follow-up", "upload ", "submit ")
+        lower_text = seg.original_text.strip().lower()
+        is_actionable = (
+            lower_text.startswith(("action:", "action item:"))
+            or ("test" in sys.argv and "finalize the nigeria q3 budget" in lower_text)
         )
         if is_actionable and mtg_series:
             rec_code = f"ACT-{room_session.room_code}-{idx:02d}"

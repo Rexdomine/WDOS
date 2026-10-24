@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from foundation.models import Role
+from foundation.multilingua_events_engine import purge_auto_captured_transcript_tasks
 
 
 ROLES = [
@@ -19,3 +20,6 @@ class Command(BaseCommand):
                 defaults={"name": name, "description": description, "is_system": True},
             )
             self.stdout.write(f"{code}: {'created' if created else 'present'}")
+        purged = purge_auto_captured_transcript_tasks()
+        if any(purged.values()):
+            self.stdout.write(f"purged_transcript_tasks: {purged}")

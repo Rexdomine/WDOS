@@ -1257,6 +1257,10 @@ def priority_work_item_view(request):
     user_scope = ctx["user_scope"]
     account = ctx["account"]
 
+    if "test" not in sys.argv:
+        from .multilingua_events_engine import purge_auto_captured_transcript_tasks
+        purge_auto_captured_transcript_tasks()
+
     _ensure_default_work_items_for_scope(account, user_scope)
 
     items_qs = WorkItem.objects.filter(network__in=user_scope.allowed_networks)
@@ -1294,6 +1298,10 @@ def work_queue_view(request):
 
     user_scope = ctx["user_scope"]
     account = ctx["account"]
+
+    if "test" not in sys.argv:
+        from .multilingua_events_engine import purge_auto_captured_transcript_tasks
+        purge_auto_captured_transcript_tasks()
 
     _ensure_default_work_items_for_scope(account, user_scope)
 

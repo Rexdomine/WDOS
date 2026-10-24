@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import uuid
 from datetime import timedelta
 from django.conf import settings
@@ -1181,7 +1182,7 @@ def switch_scope(request):
     if target_country:
         request.session["wdos_active_country"] = target_country
         if ctx["user_pref"]:
-            ctx["user_pref"].active_country = target_country
+            ctx["user_pref"].active_country = target_country[:8]
 
     if ctx["user_pref"]:
         ctx["user_pref"].save(update_fields=["active_network", "active_country"])
@@ -3904,7 +3905,7 @@ def test_approve_account_view(request, email=None):
                 account=account,
                 defaults={
                     "active_network": network,
-                    "active_country": country,
+                    "active_country": (country or "NG")[:8],
                     "language": data.get("language") or "en",
                     "font_size": data.get("reading") if data.get("reading") in ("standard", "large", "xlarge") else "standard",
                     "reduced_motion": bool(data.get("reduce_motion")),

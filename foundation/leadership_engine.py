@@ -1181,11 +1181,11 @@ def respond_to_appointment_offer(
     assert_stage7_authorized(user_scope, "APPT-02")
 
     with transaction.atomic():
-        appt = AppointmentRecord.objects.select_for_update().select_related("seat").filter(
+        appt = AppointmentRecord.objects.select_for_update().filter(
             appointment_code=appointment_code
         ).first()
         if not appt:
-            appt = AppointmentRecord.objects.select_for_update().select_related("seat").first()
+            appt = AppointmentRecord.objects.select_for_update().first()
 
         assert_appointment_scope_authorized(user_scope, appt)
 
@@ -1282,11 +1282,11 @@ def complete_leader_onboarding_steps(
     assert_stage7_authorized(user_scope, "APPT-03")
 
     with transaction.atomic():
-        appt = AppointmentRecord.objects.select_for_update().select_related("seat", "person", "account").filter(
+        appt = AppointmentRecord.objects.select_for_update().filter(
             appointment_code=appointment_code
         ).first()
         if not appt:
-            appt = AppointmentRecord.objects.select_for_update().select_related("seat", "person", "account").first()
+            appt = AppointmentRecord.objects.select_for_update().first()
 
         assert_appointment_scope_authorized(user_scope, appt)
 
@@ -1446,11 +1446,11 @@ def submit_leadership_status_change(
         raise ValueError("Requested status, effective period, and reason and cover plan are required.")
 
     with transaction.atomic():
-        appt = AppointmentRecord.objects.select_for_update().select_related("seat", "person", "account").filter(
+        appt = AppointmentRecord.objects.select_for_update().filter(
             appointment_code=appointment_code
         ).first()
         if not appt:
-            appt = AppointmentRecord.objects.select_for_update().select_related("seat", "person", "account").first()
+            appt = AppointmentRecord.objects.select_for_update().first()
 
         assert_appointment_scope_authorized(user_scope, appt)
 
@@ -1541,13 +1541,13 @@ def plan_leadership_transition(
         raise ValueError("Transition type, effective date, and access and handover review notes are required.")
 
     with transaction.atomic():
-        appt = AppointmentRecord.objects.select_for_update().select_related("seat", "person").filter(
+        appt = AppointmentRecord.objects.select_for_update().filter(
             appointment_code=appointment_code
         ).first()
         if not appt:
-            appt = AppointmentRecord.objects.select_for_update().select_related("seat", "person").filter(
+            appt = AppointmentRecord.objects.select_for_update().filter(
                 appointee_name__icontains="Kemi Bello"
-            ).first() or AppointmentRecord.objects.select_for_update().select_related("seat", "person").first()
+            ).first() or AppointmentRecord.objects.select_for_update().first()
 
         assert_appointment_scope_authorized(user_scope, appt)
 
@@ -1632,7 +1632,7 @@ def complete_handover_asset_task(
     assert_human_decision_authority(user_scope)
 
     with transaction.atomic():
-        task = HandoverAssetTask.objects.select_for_update().select_related("appointment", "transition_plan").filter(
+        task = HandoverAssetTask.objects.select_for_update().filter(
             id=task_id
         ).first()
         if not task:

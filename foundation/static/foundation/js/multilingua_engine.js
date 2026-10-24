@@ -559,20 +559,41 @@ class WDOSMultilinguaMeeting {
 
             const attachAudio = (track, participant, publication = null) => {
                 if (!track || track.kind !== "audio") return;
-                const key = track.sid || (publication && publication.trackSid) || (participant && participant.identity) || String(Math.random());
-                const existing = this.remoteAudioElements.get(key);
-                if (existing && existing.parentNode) {
-                    existing.parentNode.removeChild(existing);
-                }
                 const botTrack = isBotParticipant(participant);
                 const trackName = String((publication && (publication.trackName || publication.name)) || track.name || "");
                 const botLang = (botTrack && trackName.startsWith("lang:")) ? trackName.slice(5).toLowerCase() : "";
+                const pIdent = participant ? (participant.identity || "p") : "p";
+                const pubSid = (publication && (publication.trackSid || publication.sid)) || track.sid || trackName || "audio";
+                const key = botTrack ? `bot:${botLang || pubSid}` : `${pIdent}:${pubSid}`;
 
                 const metaLang = botTrack ? "" : syncParticipantMetadata(participant);
+                const existing = this.remoteAudioElements.get(key);
+                if (existing && existing._lkTrack === track && existing.parentNode === audioContainer) {
+                    existing._lkPub = publication || existing._lkPub;
+                    if (metaLang) {
+                        existing.dataset.speakingLang = metaLang;
+                    }
+                    this.updateRemoteWebRTCAudioVolumes();
+                    return;
+                }
+                if (existing) {
+                    try { if (existing._lkTrack) existing._lkTrack.detach(existing); } catch (_) {}
+                    try { track.detach(existing); } catch (_) {}
+                    existing.muted = true;
+                    existing.volume = 0;
+                    try { existing.pause(); } catch (_) {}
+                    existing.srcObject = null;
+                    if (existing.parentNode) {
+                        existing.parentNode.removeChild(existing);
+                    }
+                }
+
+                try { track.detach(); } catch (_) {}
                 const audioEl = track.attach();
+                audioEl._lkTrack = track;
+                audioEl._lkPub = publication;
                 audioEl.playsInline = true;
                 audioEl.autoplay = true;
-                audioEl.muted = false;
                 audioEl.dataset.trackSid = key;
                 audioEl.dataset.participantIdentity = participant ? (participant.identity || "") : "";
                 audioEl.dataset.participantName = participant ? (participant.name || participant.identity || "Speaker") : "Speaker";
@@ -587,15 +608,12 @@ class WDOSMultilinguaMeeting {
                     this.serverBotConnected = true;
                     this.stopBrowserSpeechRecognizers();
                     if (botLang) {
-                        this.botLanguageTracks.set(botLang, { track, audioEl, key });
+                        this.botLanguageTracks.set(botLang, { track, publication, audioEl, key });
                     }
                 }
                 this.updateRemoteWebRTCAudioVolumes();
                 if (typeof room.startAudio === "function") {
-                    room.startAudio().catch(() => {});
-                }
-                if (typeof audioEl.play === "function") {
-                    audioEl.play().catch(() => {});
+                    room.startAudio().then(() => this.updateRemoteWebRTCAudioVolumes()).catch(() => {});
                 }
             };
 
@@ -659,7 +677,12 @@ class WDOSMultilinguaMeeting {
                         this.stopBrowserSpeechRecognizers();
 
                         if (msg.type === "bot_tts_state" && msg.lang) {
-                            this.botActiveSpeakerByLang.set(String(msg.lang).toLowerCase(), msg.speaking ? (msg.speaker_name || "") : "");
+                            this.botActiveSpeakerByLang.set(
+                                String(msg.lang).toLowerCase(),
+                                msg.speaking
+                                    ? { speakerName: msg.speaker_name || "", speakerId: msg.speaker_id || "" }
+                                    : null
+                            );
                             this.updateRemoteWebRTCAudioVolumes();
                             return;
                         }
@@ -735,13 +758,22 @@ class WDOSMultilinguaMeeting {
             room.on(LK.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
                 if (!track) return;
                 try { track.detach(); } catch (_) {}
-                const key = track.sid || (publication && publication.trackSid) || (participant && participant.identity) || "";
+                const botTrack = isBotParticipant(participant);
+                const trackName = String((publication && (publication.trackName || publication.name)) || track.name || "");
+                const botLang = (botTrack && trackName.startsWith("lang:")) ? trackName.slice(5).toLowerCase() : "";
+                const pIdent = participant ? (participant.identity || "p") : "p";
+                const pubSid = (publication && (publication.trackSid || publication.sid)) || track.sid || trackName || "audio";
+                const key = botTrack ? `bot:${botLang || pubSid}` : `${pIdent}:${pubSid}`;
                 const el = this.remoteAudioElements.get(key);
                 if (el) {
                     const bLang = el.dataset.botLang || "";
                     if (bLang) {
                         this.botLanguageTracks.delete(bLang);
                     }
+                    el.muted = true;
+                    el.volume = 0;
+                    try { el.pause(); } catch (_) {}
+                    el.srcObject = null;
                     if (el.parentNode) {
                         el.parentNode.removeChild(el);
                     }
@@ -766,9 +798,6 @@ class WDOSMultilinguaMeeting {
                     this.triggerSpeakingPulse(name, 1600);
                     if (remoteSpeaker.identity !== localId) {
                         this.updateRemoteWebRTCAudioVolumes();
-                        if (typeof room.startAudio === "function") {
-                            room.startAudio().catch(() => {});
-                        }
                     }
                 }
             });
@@ -922,44 +951,78 @@ class WDOSMultilinguaMeeting {
     updateRemoteWebRTCAudioVolumes() {
         if (!this.remoteAudioElements || this.remoteAudioElements.size === 0) return;
         const shortListen = this.getShortLang(this.listeningLang);
+
+        const applyTrackMuteState = (audioEl, shouldPlay) => {
+            const trk = audioEl._lkTrack;
+            const pub = audioEl._lkPub;
+            const isBot = audioEl.dataset.isBotTrack === "1";
+            if (shouldPlay) {
+                if (isBot && pub && typeof pub.setEnabled === "function") {
+                    try { pub.setEnabled(true); } catch (_) {}
+                }
+                if (trk && typeof trk.setVolume === "function") {
+                    try { trk.setVolume(1.0); } catch (_) {}
+                }
+                if (trk && Array.isArray(trk.attachedElements)) {
+                    trk.attachedElements.forEach((el) => {
+                        el.muted = false;
+                        el.volume = 1.0;
+                    });
+                }
+                audioEl.muted = false;
+                audioEl.volume = 1.0;
+                if (audioEl.paused && typeof audioEl.play === "function") {
+                    audioEl.play().catch(() => {});
+                }
+            } else {
+                if (isBot && pub && typeof pub.setEnabled === "function") {
+                    try { pub.setEnabled(false); } catch (_) {}
+                }
+                if (trk && typeof trk.setVolume === "function") {
+                    try { trk.setVolume(0); } catch (_) {}
+                }
+                if (trk && Array.isArray(trk.attachedElements)) {
+                    trk.attachedElements.forEach((el) => {
+                        el.muted = true;
+                        el.volume = 0;
+                    });
+                }
+                audioEl.muted = true;
+                audioEl.volume = 0;
+            }
+        };
+
         this.remoteAudioElements.forEach((audioEl) => {
             if (!audioEl) return;
             if (this.isSpeakerAudioMuted) {
-                audioEl.muted = true;
-                audioEl.volume = 0;
+                applyTrackMuteState(audioEl, false);
                 return;
             }
 
             const isBotTrack = audioEl.dataset.isBotTrack === "1";
             if (isBotTrack) {
-                const botLang = (audioEl.dataset.botLang || "").toLowerCase();
-                const activeBotSpeaker = this.botActiveSpeakerByLang.get(botLang) || "";
-                const isOwnEchoInMultiRoom = Boolean(
-                    activeBotSpeaker &&
-                    activeBotSpeaker === this.userDisplayName &&
-                    this.participantCount > 1
-                );
-                if (this.isTranslationEnabled && botLang === shortListen && !isOwnEchoInMultiRoom) {
-                    audioEl.muted = false;
-                    audioEl.volume = 1.0;
-                    if (audioEl.paused && typeof audioEl.play === "function") {
-                        audioEl.play().catch(() => {});
-                    }
-                } else {
-                    audioEl.muted = true;
-                    audioEl.volume = 0;
+                // When Live Translation is OFF, strictly disable & mute all bot translation tracks!
+                if (!this.isTranslationEnabled) {
+                    applyTrackMuteState(audioEl, false);
+                    return;
                 }
+                const botLang = (audioEl.dataset.botLang || "").toLowerCase();
+                const activeState = this.botActiveSpeakerByLang.get(botLang) || null;
+                const isOwnEchoInMultiRoom = Boolean(
+                    activeState &&
+                    this.participantCount > 1 &&
+                    ((activeState.speakerName && activeState.speakerName === this.userDisplayName) ||
+                     (activeState.speakerId && this.myParticipantId && String(activeState.speakerId) === String(this.myParticipantId)))
+                );
+                const shouldPlayBot = Boolean(botLang === shortListen && !isOwnEchoInMultiRoom);
+                applyTrackMuteState(audioEl, shouldPlayBot);
                 return;
             }
 
             // Human Participant WebRTC Audio Track:
             if (!this.isTranslationEnabled) {
                 // Live Translation OFF: 100% real human voice over WebRTC for all participants
-                audioEl.muted = false;
-                audioEl.volume = 1.0;
-                if (audioEl.paused && typeof audioEl.play === "function") {
-                    audioEl.play().catch(() => {});
-                }
+                applyTrackMuteState(audioEl, true);
                 return;
             }
 
@@ -976,19 +1039,15 @@ class WDOSMultilinguaMeeting {
                 "";
             const shortSpeaker = speakerLang ? this.getShortLang(speakerLang) : "";
 
-            if (!shortSpeaker || shortSpeaker === shortListen) {
+            if (shortSpeaker && shortSpeaker === shortListen) {
                 // Same language (e.g., Speaker is English and Listener wants English) -> 100% real human voice!
-                audioEl.muted = false;
-                audioEl.volume = 1.0;
-                if (audioEl.paused && typeof audioEl.play === "function") {
-                    audioEl.play().catch(() => {});
-                }
+                applyTrackMuteState(audioEl, true);
+            } else if (!shortSpeaker && !this.hasServerTranslationBot()) {
+                applyTrackMuteState(audioEl, true);
             } else {
-                // Different language (e.g., Speaker is English and Listener wants French/Portuguese):
-                // Completely mute the speaker's raw original voice while Live Translation is ON so the listener
-                // ONLY hears the translated voice in their chosen language and NEVER hears both voices together!
-                audioEl.muted = true;
-                audioEl.volume = 0;
+                // Different language while Live Translation is ON:
+                // Completely mute the speaker's raw original voice so the listener ONLY hears the translated voice!
+                applyTrackMuteState(audioEl, false);
             }
         });
     }
@@ -2069,6 +2128,13 @@ class WDOSMultilinguaMeeting {
             } catch (_) {}
             this.currentAudioEl = null;
         }
+        if (this.ttsAudioPlayer) {
+            try {
+                this.ttsAudioPlayer.onended = null;
+                this.ttsAudioPlayer.onerror = null;
+                this.ttsAudioPlayer.pause();
+            } catch (_) {}
+        }
         if ("speechSynthesis" in window) {
             try { window.speechSynthesis.cancel(); } catch (_) {}
         }
@@ -2122,6 +2188,10 @@ class WDOSMultilinguaMeeting {
         }
         const item = this.audioPlaybackQueue.shift();
         if (!item) return;
+        if (item.type === "tts" && !this.isTranslationEnabled) {
+            this.processAudioQueue();
+            return;
+        }
 
         this.isPlayingQueueItem = true;
         this.updateRemoteWebRTCAudioVolumes();

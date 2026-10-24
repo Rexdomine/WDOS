@@ -99,6 +99,7 @@ class SpeakerAudioPipeline:
         self.track = track
         self.loop = loop
         self.closed = False
+        self.is_muted = False
         self._last_interim_sent_at = 0.0
         self._last_interim_text = ""
         self._last_flushed_utt_key = ""
@@ -140,6 +141,20 @@ class SpeakerAudioPipeline:
                 self.speaking_lang = norm
                 if self._active_recognizer_lang and self._active_recognizer_lang != norm:
                     self._needs_recognizer_restart = True
+
+    def set_muted(self, muted: bool) -> None:
+        if self.closed or self.is_muted == muted:
+            return
+        self.is_muted = muted
+        if muted:
+            if self._silence_flush_handle:
+                self._silence_flush_handle.cancel()
+                self._silence_flush_handle = None
+            if self._pending_interim_text:
+                self._flush_pending_interim_on_silence()
+            self._stop_azure_recognizer()
+        else:
+            self._needs_recognizer_restart = True
 
     def start(self) -> None:
         if self._task is None:
@@ -184,7 +199,12 @@ class SpeakerAudioPipeline:
                 for t_short in AZURE_TARGET_SHORT_LANGS:
                     speech_config.add_target_language(t_short)
                 try:
-                    speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "500")
+                    speech_config.set_profanity(speechsdk.ProfanityOption.Raw)
+                except Exception:
+                    pass
+                try:
+                    speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "650")
+                    speech_config.set_property_by_name("SpeechServiceResponse_PostProcessingOption", "TrueText")
                 except Exception:
                     pass
                 recognizer = TranslationRecognizer(translation_config=speech_config, audio_config=audio_config)
@@ -193,7 +213,12 @@ class SpeakerAudioPipeline:
                 speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=speech_region)
                 speech_config.speech_recognition_language = lang
                 try:
-                    speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "500")
+                    speech_config.set_profanity(speechsdk.ProfanityOption.Raw)
+                except Exception:
+                    pass
+                try:
+                    speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "650")
+                    speech_config.set_property_by_name("SpeechServiceResponse_PostProcessingOption", "TrueText")
                 except Exception:
                     pass
                 recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
@@ -350,13 +375,16 @@ class SpeakerAudioPipeline:
             return
         try:
             await self.bot.refresh_participant_db_info(self)
-            self._start_azure_recognizer()
+            if not self.is_muted:
+                self._start_azure_recognizer()
             audio_stream = rtc.AudioStream(self.track, sample_rate=16000, num_channels=1)
             last_db_refresh = time.monotonic()
 
             async for frame_event in audio_stream:
                 if self.closed:
                     break
+                if self.is_muted:
+                    continue
                 now = time.monotonic()
                 if now - last_db_refresh > 2.5:
                     last_db_refresh = now
@@ -468,12 +496,43 @@ class RoomTranslationBot:
             return True
 
     def _bind_room_events(self, room: Any) -> None:
+        @room.on("track_published")
+        def _on_track_published(publication: Any, participant: Any) -> None:
+            if self.closed or participant.identity.startswith(BOT_IDENTITY_PREFIX):
+                return
+            # Enterprise optimization for 100+ participants: never subscribe the server bot to video streams
+            if getattr(publication, "kind", None) == rtc.TrackKind.KIND_VIDEO:
+                try:
+                    publication.set_subscribed(False)
+                except Exception:
+                    pass
+
         @room.on("track_subscribed")
         def _on_track_subscribed(track: Any, publication: Any, participant: Any) -> None:
             if self.closed or participant.identity.startswith(BOT_IDENTITY_PREFIX):
                 return
+            if track.kind == rtc.TrackKind.KIND_VIDEO:
+                try:
+                    publication.set_subscribed(False)
+                except Exception:
+                    pass
+                return
             if track.kind == rtc.TrackKind.KIND_AUDIO:
                 self._attach_speaker_track(track, publication, participant)
+
+        @room.on("track_muted")
+        def _on_track_muted(participant: Any, publication: Any) -> None:
+            prefix = f"{participant.identity}:"
+            for key, pipeline in self.pipelines.items():
+                if key.startswith(prefix):
+                    pipeline.set_muted(True)
+
+        @room.on("track_unmuted")
+        def _on_track_unmuted(participant: Any, publication: Any) -> None:
+            prefix = f"{participant.identity}:"
+            for key, pipeline in self.pipelines.items():
+                if key.startswith(prefix):
+                    pipeline.set_muted(False)
 
         @room.on("track_unsubscribed")
         def _on_track_unsubscribed(track: Any, publication: Any, participant: Any) -> None:
@@ -573,7 +632,7 @@ class RoomTranslationBot:
                 item = await queue.get()
                 if item is None:
                     break
-                text, speaker_name = item
+                text, speaker_name, speaker_id = item if len(item) == 3 else (*item, "")
                 pcm_bytes = await self.loop.run_in_executor(
                     None,
                     AzureSpeechAdapter.synthesize_speech_pcm24k,
@@ -583,16 +642,18 @@ class RoomTranslationBot:
                 if not pcm_bytes:
                     continue
 
-                # Notify browsers which speaker's utterance is currently being spoken on this language track
+                # Notify browsers reliably which speaker's utterance is about to play on this language track
                 await self._publish_caption_packet(
                     {
                         "type": "bot_tts_state",
                         "lang": short_lang,
                         "speaker_name": speaker_name,
+                        "speaker_id": speaker_id,
                         "speaking": True,
                     },
-                    reliable=False,
+                    reliable=True,
                 )
+                await asyncio.sleep(0.03)
 
                 total_len = len(pcm_bytes)
                 offset = 0
@@ -619,9 +680,10 @@ class RoomTranslationBot:
                         "type": "bot_tts_state",
                         "lang": short_lang,
                         "speaker_name": speaker_name,
+                        "speaker_id": speaker_id,
                         "speaking": False,
                     },
-                    reliable=False,
+                    reliable=True,
                 )
             except asyncio.CancelledError:
                 break
@@ -868,7 +930,7 @@ class RoomTranslationBot:
                         q.get_nowait()
                     except Exception:
                         pass
-                await q.put((translated_text, speaker_name))
+                await q.put((translated_text, speaker_name, speaker_id))
 
 
 AZURE_TARGET_TRANSLATION_CHANNELS = ("en", "fr", "pt", "ar", "sw")

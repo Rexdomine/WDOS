@@ -1291,15 +1291,18 @@ def room_host_admit_api(request, meeting_id: str):
 
 _ROOM_LIVE_AUDIO_CHUNKS: Dict[str, list[Dict[str, Any]]] = {}
 _ROOM_LIVE_AUDIO_SEQ: Dict[str, int] = {}
+_ROOM_LIVE_INTERIM: Dict[str, Optional[Dict[str, Any]]] = {}
 
 
-def _get_room_audio_chunks(room_session: Optional[MeetingRoomSession], room_key: str, after_audio_seq: int, now_ts: float) -> tuple[int, list[Dict[str, Any]]]:
+def _get_room_audio_chunks(room_session: Optional[MeetingRoomSession], room_key: str, after_audio_seq: int, now_ts: float) -> tuple[int, list[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """
-    Reads live speaker voice chunks from shared PostgreSQL storage (so multi-worker Gunicorn
-    deployments on Render share real-time audio across all worker processes) with in-memory fallback.
+    Reads live speaker voice chunks and live interim captions from shared PostgreSQL storage
+    (so multi-worker Gunicorn deployments on Render share real-time state across all worker processes)
+    with in-memory fallback.
     """
     raw_chunks = list(_ROOM_LIVE_AUDIO_CHUNKS.get(room_key, []))
     latest_seq = _ROOM_LIVE_AUDIO_SEQ.get(room_key, 0)
+    live_interim = _ROOM_LIVE_INTERIM.get(room_key)
 
     if room_session:
         relay_lane = room_session.diagnostic_lanes.filter(lane_name="__live_audio_relay__").first()
@@ -1313,6 +1316,15 @@ def _get_room_audio_chunks(room_session: Optional[MeetingRoomSession], room_key:
                     raw_chunks = db_chunks
                     _ROOM_LIVE_AUDIO_SEQ[room_key] = latest_seq
                     _ROOM_LIVE_AUDIO_CHUNKS[room_key] = raw_chunks
+                db_interim = db_payload.get("live_interim")
+                if isinstance(db_interim, dict):
+                    curr_ts = float(live_interim.get("ts", 0)) if isinstance(live_interim, dict) else 0.0
+                    if float(db_interim.get("ts", 0)) >= curr_ts:
+                        live_interim = db_interim
+                        _ROOM_LIVE_INTERIM[room_key] = live_interim
+                elif db_interim is None and isinstance(live_interim, dict) and float(db_payload.get("interim_cleared_ts", 0)) > float(live_interim.get("ts", 0)):
+                    live_interim = None
+                    _ROOM_LIVE_INTERIM[room_key] = None
             except Exception:
                 pass
 
@@ -1323,7 +1335,50 @@ def _get_room_audio_chunks(room_session: Optional[MeetingRoomSession], room_key:
         if after_audio_seq >= 0
         else []
     )
-    return latest_seq, new_chunks
+    if isinstance(live_interim, dict) and now_ts - float(live_interim.get("ts", 0)) < 4.5:
+        active_interim = live_interim
+    else:
+        active_interim = None
+    return latest_seq, new_chunks, active_interim
+
+
+def _set_room_live_interim(room_session: Optional[MeetingRoomSession], room_key: str, interim_data: Optional[Dict[str, Any]], now_ts: float) -> None:
+    _ROOM_LIVE_INTERIM[room_key] = interim_data
+    if not room_session:
+        return
+    try:
+        latest_seq = _ROOM_LIVE_AUDIO_SEQ.get(room_key, 0)
+        chunks = _ROOM_LIVE_AUDIO_CHUNKS.get(room_key, [])
+        relay_lane = room_session.diagnostic_lanes.filter(lane_name="__live_audio_relay__").first()
+        if relay_lane and relay_lane.notes:
+            try:
+                db_payload = json.loads(relay_lane.notes)
+                if int(db_payload.get("latest_seq", 0)) >= latest_seq:
+                    latest_seq = int(db_payload.get("latest_seq", 0))
+                    chunks = db_payload.get("chunks", [])
+            except Exception:
+                pass
+        serialized = json.dumps({
+            "latest_seq": latest_seq,
+            "chunks": chunks[-6:] if isinstance(chunks, list) else [],
+            "live_interim": interim_data,
+            "interim_cleared_ts": now_ts if interim_data is None else 0.0,
+        })
+        if relay_lane:
+            relay_lane.notes = serialized
+            relay_lane.save(update_fields=["notes", "updated_at"])
+        else:
+            RoomDiagnosticLane.objects.create(
+                room_session=room_session,
+                lane_name="__live_audio_relay__",
+                language_label="Original Audio",
+                evidence_summary="Live voice relay buffer",
+                state_label="Verified",
+                notes=serialized,
+                sort_order=99,
+            )
+    except Exception:
+        pass
 
 
 def _append_room_audio_chunk(room_session: Optional[MeetingRoomSession], room_key: str, speaker_name: str, audio_data_url: str, now_ts: float) -> int:
@@ -1331,7 +1386,7 @@ def _append_room_audio_chunk(room_session: Optional[MeetingRoomSession], room_ke
     Appends a recorded human voice chunk to both in-memory state and shared PostgreSQL storage
     so any Gunicorn worker on Render can immediately stream the speaker's real voice to listeners.
     """
-    latest_seq, fresh_chunks = _get_room_audio_chunks(room_session, room_key, 0, now_ts)
+    latest_seq, fresh_chunks, active_interim = _get_room_audio_chunks(room_session, room_key, 0, now_ts)
     next_seq = latest_seq + 1
     fresh_chunks.append(
         {
@@ -1347,7 +1402,11 @@ def _append_room_audio_chunk(room_session: Optional[MeetingRoomSession], room_ke
 
     if room_session:
         try:
-            serialized = json.dumps({"latest_seq": next_seq, "chunks": trimmed_chunks})
+            serialized = json.dumps({
+                "latest_seq": next_seq,
+                "chunks": trimmed_chunks,
+                "live_interim": active_interim,
+            })
             relay_lane = room_session.diagnostic_lanes.filter(lane_name="__live_audio_relay__").first()
             if relay_lane:
                 relay_lane.notes = serialized
@@ -1417,7 +1476,26 @@ def room_transcript_api(request, meeting_id: str):
                 }
             )
         participants_list, waiting_list = _serialize_room_participants(room_session)
-        latest_audio_seq, new_audio_chunks = _get_room_audio_chunks(room_session, room_key, after_audio_seq, now_ts)
+        latest_audio_seq, new_audio_chunks, active_interim = _get_room_audio_chunks(room_session, room_key, after_audio_seq, now_ts)
+        live_interim_payload = None
+        if isinstance(active_interim, dict) and active_interim.get("original_text"):
+            interim_tr = dict(active_interim.get("translations") or {})
+            interim_val = (interim_tr.get(target_lang) or "").strip()
+            if not interim_val and active_interim.get("original_text"):
+                interim_tr = AzureSpeechAdapter.translate_segment(
+                    active_interim["original_text"],
+                    active_interim.get("original_language", "en-US"),
+                    existing_translations=interim_tr,
+                )
+                interim_tr.pop("_detected_source", None)
+                interim_val = (interim_tr.get(target_lang) or "").strip()
+            live_interim_payload = {
+                "speaker_name": active_interim.get("speaker_name", "Speaker"),
+                "original_language": active_interim.get("original_language", "en-US"),
+                "original_text": active_interim["original_text"],
+                "translated_text": interim_val or active_interim["original_text"],
+                "ts": active_interim.get("ts", now_ts),
+            }
         my_conn_status = my_p.connection_status if my_p else ""
         if my_p and my_p.is_muted and my_p.connection_status == "Muted by Host":
             my_p.connection_status = "Listening"
@@ -1445,6 +1523,7 @@ def room_transcript_api(request, meeting_id: str):
                 "participants": participants_list,
                 "waiting_participants": waiting_list,
                 "segments": segments,
+                "live_interim": live_interim_payload,
                 "latest_audio_seq": latest_audio_seq,
                 "audio_chunks": new_audio_chunks,
             }
@@ -1470,6 +1549,36 @@ def room_transcript_api(request, meeting_id: str):
         )
         next_audio_seq = _append_room_audio_chunk(room_session, room_key, speaker_name, audio_data_url, now_ts)
         return JsonResponse({"status": "audio_chunk_recorded", "seq": next_audio_seq}, status=200)
+
+    if req_action == "live_interim":
+        interim_text = (request.POST.get("original_text") or payload.get("original_text") or "").strip()
+        if not interim_text or AzureSpeechAdapter.is_system_echo_phrase(interim_text):
+            return JsonResponse({"status": "ignored_interim"}, status=200)
+        participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
+        speaker_name = (
+            request.POST.get("speaker_name")
+            or payload.get("speaker_name")
+            or (participant.participant_name if participant else "Speaker")
+        )
+        interim_lang = normalize_bcp47_language(
+            request.POST.get("original_language")
+            or payload.get("original_language")
+            or (participant.speaking_language if participant else "en-US")
+        )
+        interim_translations = payload.get("translations") if isinstance(payload.get("translations"), dict) else {}
+        _set_room_live_interim(
+            room_session,
+            room_key,
+            {
+                "speaker_name": speaker_name,
+                "original_language": interim_lang,
+                "original_text": interim_text[:500],
+                "translations": interim_translations,
+                "ts": now_ts,
+            },
+            now_ts,
+        )
+        return JsonResponse({"status": "interim_recorded"}, status=200)
 
     original_text = (request.POST.get("original_text") or payload.get("original_text") or "").strip()
     if not original_text:
@@ -1535,6 +1644,7 @@ def room_transcript_api(request, meeting_id: str):
         translations=translations,
         sequence_number=next_seq,
     )
+    _set_room_live_interim(room_session, room_key, None, now_ts)
     lang_meta = AzureSpeechAdapter.SUPPORTED_LANGUAGES.get(original_lang, {"name": "English"})
     role_prefix = participant.meeting_role if participant else "Speaker"
     room_session.active_speaker_name = speaker_name
@@ -1813,6 +1923,7 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                     return JsonResponse({"status": "left_lobby"})
                 if auth_bundle.get("is_guest") and room_session:
                     request.session.pop(f"wdos_guest_joined_{room_session.id}", None)
+                    request.session.pop(f"wdos_guest_pid_{room_session.id}", None)
                     auth_bundle["needs_guest_name"] = True
                     code = "ROOM-01"
                 action_message = "Your join request has been cancelled."
@@ -1878,6 +1989,7 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                 if auth_bundle.get("is_guest"):
                     if room_session:
                         request.session.pop(f"wdos_guest_joined_{room_session.id}", None)
+                        request.session.pop(f"wdos_guest_pid_{room_session.id}", None)
                     auth_bundle["needs_guest_name"] = True
                     target_id = room_session.room_code if room_session else meeting_id
                     return redirect(f"/foundation/rooms/{target_id}/live/")

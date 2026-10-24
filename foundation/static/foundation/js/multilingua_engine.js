@@ -630,6 +630,12 @@ class WDOSMultilinguaMeeting {
                 if (remoteSpeaker) {
                     const name = remoteSpeaker.name || remoteSpeaker.identity || this.userDisplayName;
                     this.triggerSpeakingPulse(name, 1600);
+                    if (remoteSpeaker.identity !== localId) {
+                        this.updateRemoteWebRTCAudioVolumes();
+                        if (typeof room.startAudio === "function") {
+                            room.startAudio().catch(() => {});
+                        }
+                    }
                 }
             });
 
@@ -733,8 +739,10 @@ class WDOSMultilinguaMeeting {
                 // Speaker is speaking the SAME language the listener is set to hear (or not yet known) -> 100% real human voice!
                 audioEl.volume = this.isPlayingQueueItem ? 0.2 : 1.0;
             } else {
-                // Speaker is speaking a DIFFERENT language -> mute original voice so listener hears only their chosen language
-                audioEl.volume = 0.0;
+                // Speaker is speaking a DIFFERENT language:
+                // Duck raw WebRTC voice while translated TTS voice is actively playing so the listener hears their language clearly,
+                // and keep WebRTC voice audible when TTS is not actively playing so no participant is ever muted into dead silence.
+                audioEl.volume = this.isPlayingQueueItem ? 0.05 : 1.0;
             }
             if (audioEl.volume > 0 && audioEl.paused && typeof audioEl.play === "function") {
                 audioEl.play().catch(() => {});
@@ -782,45 +790,31 @@ class WDOSMultilinguaMeeting {
         return Boolean(this.ttsSuppressionUntil && Date.now() < this.ttsSuppressionUntil);
     }
 
-    /**
-     * Streaming segmentation for continuous speech.
-     * Given the growing hypothesis of the current phrase, returns the next block of
-     * stable words to send (every ~5 words, holding back the last 2 words which the
-     * recognizer may still revise, or flushing immediately when forcePartial is true).
-     */
-    takeStreamingChunk(fullText, isFinal, utteranceKey = "default", forcePartial = false) {
-        const words = String(fullText || "").trim().split(/\s+/).filter(Boolean);
-        if (
-            this.streamUtteranceKey !== utteranceKey ||
-            words.length < (this.streamCommittedWords || 0)
-        ) {
-            this.streamUtteranceKey = utteranceKey;
-            this.streamCommittedWords = 0;
+    postLiveInterim(originalText, translations = null) {
+        if (!this.transcriptUrl || !originalText || this.isSystemEchoPhrase(originalText)) return;
+        const now = Date.now();
+        if (this.lastInterimPostAt && now - this.lastInterimPostAt < 480 && originalText === this.lastInterimPostedText) {
+            return;
         }
-        const committed = Math.min(this.streamCommittedWords || 0, words.length);
-        const pending = words.slice(committed);
-        if (isFinal) {
-            this.streamCommittedWords = 0;
-            return pending.join(" ").trim();
+        if (this.lastInterimPostAt && now - this.lastInterimPostAt < 380) {
+            return;
         }
-        if (forcePartial) {
-            const hold = pending.length > 4 ? 1 : 0;
-            const takeCount = pending.length - hold;
-            if (takeCount >= 1) {
-                const chunk = pending.slice(0, takeCount);
-                this.streamCommittedWords = committed + chunk.length;
-                return chunk.join(" ").trim();
-            }
-            return "";
-        }
-        const STREAM_WORDS = 5;
-        const HOLD_BACK = 2;
-        if (pending.length >= STREAM_WORDS + HOLD_BACK) {
-            const chunk = pending.slice(0, pending.length - HOLD_BACK);
-            this.streamCommittedWords = committed + chunk.length;
-            return chunk.join(" ").trim();
-        }
-        return "";
+        this.lastInterimPostAt = now;
+        this.lastInterimPostedText = originalText;
+        fetch(this.transcriptUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": this.getCsrfToken()
+            },
+            body: JSON.stringify({
+                action: "live_interim",
+                speaker_name: this.userDisplayName,
+                original_language: this.speakingLang,
+                original_text: originalText,
+                translations: translations || {}
+            })
+        }).catch(() => {});
     }
 
     async initAzureTranslation(azureData) {
@@ -853,9 +847,9 @@ class WDOSMultilinguaMeeting {
 
             if (window.SpeechSDK.PropertyId) {
                 try {
-                    speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "350");
+                    speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "450");
                     if (window.SpeechSDK.PropertyId.Speech_SegmentationMaximumTimeMs !== undefined) {
-                        speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationMaximumTimeMs, "12000");
+                        speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationMaximumTimeMs, "8000");
                     }
                 } catch (_) {}
             }
@@ -868,7 +862,7 @@ class WDOSMultilinguaMeeting {
             });
 
             let audioConfig = null;
-            const existingTrack = this.localAudioStream
+            const existingTrack = (!this.forceDefaultMicForAzure && this.localAudioStream)
                 ? this.localAudioStream.getAudioTracks().find((t) => t && t.readyState === "live")
                 : null;
             if (existingTrack && typeof window.SpeechSDK.AudioConfig.fromStreamInput === "function") {
@@ -884,6 +878,9 @@ class WDOSMultilinguaMeeting {
             }
 
             this.speechRecognizer = new window.SpeechSDK.TranslationRecognizer(speechConfig, audioConfig);
+            this.azurePendingInterimText = "";
+            this.azurePendingInterimTranslations = {};
+            this.azureFlushedUtteranceKey = "";
 
             this.speechRecognizer.recognizing = (s, e) => {
                 if (this.isSuppressedByTTS()) return;
@@ -892,30 +889,48 @@ class WDOSMultilinguaMeeting {
                 if (!interimClean || this.isSystemEchoPhrase(interimClean)) return;
 
                 this.azureRetryCount = 0;
+                this.hadAzureRecognitionSinceUnmute = true;
                 this.lastRecognizerActivityAt = Date.now();
+                this.lastLocalInterimAt = Date.now();
                 this.hadVoiceInCurrentChunk = true;
-                this.triggerSpeakingPulse(this.userDisplayName, 1200);
+                this.triggerSpeakingPulse(this.userDisplayName, 1400);
+
+                const interimTranslations = {};
+                Object.values(azureData.supported_languages || {}).forEach((lang) => {
+                    const tVal = e.result.translations ? e.result.translations.get(lang.short) : null;
+                    if (tVal && tVal.trim()) {
+                        interimTranslations[lang.short] = tVal.trim();
+                    }
+                });
                 const targetShort = this.getShortLang(this.listeningLang);
-                const liveTranslation = e.result.translations ? e.result.translations.get(targetShort) : null;
-                this.renderLiveCaption(this.userDisplayName, interimClean, liveTranslation || null, false);
+                const liveTranslation = interimTranslations[targetShort] || null;
+                this.renderLiveCaption(this.userDisplayName, interimClean, liveTranslation, false);
+                this.postLiveInterim(interimClean, interimTranslations);
 
                 const uttKey = "azure_" + String(e.result.offset ?? e.result.resultId ?? "0");
-                // Continuous speech without pauses: push stable words out every ~5 words while speaking
-                const streamChunk = this.takeStreamingChunk(interimClean, false, uttKey, false);
-                if (streamChunk) {
-                    this.postTranscriptSegment(streamChunk, null, null);
-                }
+                this.azurePendingInterimText = interimClean;
+                this.azurePendingInterimTranslations = interimTranslations;
+                this.azurePendingUttKey = uttKey;
+
                 if (this.azureInterimFlushTimer) {
                     clearTimeout(this.azureInterimFlushTimer);
                 }
+                // Safety fallback: only if Azure hasn't finalized the utterance after 1.3s of silence, commit the full utterance
                 this.azureInterimFlushTimer = setTimeout(() => {
                     this.azureInterimFlushTimer = null;
                     if (this.isAudioMuted) return;
-                    const flushChunk = this.takeStreamingChunk(interimClean, false, uttKey, true);
-                    if (flushChunk && !this.isSystemEchoPhrase(flushChunk)) {
-                        this.postTranscriptSegment(flushChunk, null, null);
+                    const fullPending = (this.azurePendingInterimText || "").trim();
+                    const pendingTranslations = this.azurePendingInterimTranslations || {};
+                    const pendingKey = this.azurePendingUttKey || "";
+                    if (fullPending && !this.isSystemEchoPhrase(fullPending) && this.azureFlushedUtteranceKey !== pendingKey) {
+                        this.azureFlushedUtteranceKey = pendingKey;
+                        this.azurePendingInterimText = "";
+                        const tShort = this.getShortLang(this.listeningLang);
+                        const sdkTrans = pendingTranslations[tShort] || null;
+                        this.renderLiveCaption(this.userDisplayName, fullPending, sdkTrans, true);
+                        this.postTranscriptSegment(fullPending, sdkTrans, tShort, pendingTranslations);
                     }
-                }, 650);
+                }, 1300);
             };
 
             this.speechRecognizer.recognized = async (s, e) => {
@@ -923,30 +938,26 @@ class WDOSMultilinguaMeeting {
                     clearTimeout(this.azureInterimFlushTimer);
                     this.azureInterimFlushTimer = null;
                 }
+                this.azurePendingInterimText = "";
                 if (this.isSuppressedByTTS()) return;
                 if (e.result && e.result.text && e.result.text.trim()) {
                     const cleanText = e.result.text.trim();
                     if (this.isSystemEchoPhrase(cleanText)) {
-                        this.streamCommittedWords = 0;
                         return;
                     }
                     this.azureRetryCount = 0;
+                    this.hadAzureRecognitionSinceUnmute = true;
                     this.lastRecognizerActivityAt = Date.now();
+                    this.lastLocalInterimAt = Date.now();
                     const uttKey = "azure_" + String(e.result.offset ?? e.result.resultId ?? "0");
-                    const alreadyStreamed = (this.streamCommittedWords || 0) > 0 && this.streamUtteranceKey === uttKey;
-                    const remainder = this.takeStreamingChunk(cleanText, true, uttKey, false);
-
-                    this.hadVoiceInCurrentChunk = true;
-                    this.triggerSpeakingPulse(this.userDisplayName, 1600);
-                    const targetShort = this.getShortLang(this.listeningLang);
-                    if (alreadyStreamed) {
-                        // Earlier words of this phrase were already sent; send only the unsent tail
-                        if (remainder && !this.isSystemEchoPhrase(remainder)) {
-                            this.renderLiveCaption(this.userDisplayName, cleanText, null, true);
-                            await this.postTranscriptSegment(remainder, null, null);
-                        }
+                    if (this.azureFlushedUtteranceKey && this.azureFlushedUtteranceKey === uttKey) {
                         return;
                     }
+                    this.azureFlushedUtteranceKey = uttKey;
+
+                    this.hadVoiceInCurrentChunk = true;
+                    this.triggerSpeakingPulse(this.userDisplayName, 1800);
+                    const targetShort = this.getShortLang(this.listeningLang);
                     const allTranslations = {};
                     Object.values(azureData.supported_languages || {}).forEach((lang) => {
                         const tVal = e.result.translations ? e.result.translations.get(lang.short) : null;
@@ -1297,12 +1308,16 @@ class WDOSMultilinguaMeeting {
         }
         const pendingFull = (this.pendingInterimText || "").trim();
         this.pendingInterimText = "";
-        if (typeof this.pendingInterimMaxIndex === "number" && this.pendingInterimMaxIndex > (this.webSpeechCommittedIndex ?? -1)) {
-            this.webSpeechCommittedIndex = this.pendingInterimMaxIndex;
-        }
-        // Only send the words that were not already streamed out mid-sentence
-        const pending = this.takeStreamingChunk(pendingFull, true, "webspeech");
+        if (!pendingFull || this.isSystemEchoPhrase(pendingFull)) return;
+
+        const words = pendingFull.split(/\s+/).filter(Boolean);
+        const alreadyFlushed = this.webSpeechFlushedWordsCount || 0;
+        const remainingWords = words.slice(alreadyFlushed);
+        this.webSpeechFlushedWordsCount = words.length;
+        const pending = remainingWords.join(" ").trim();
         if (!pending || this.isSystemEchoPhrase(pending)) return;
+
+        this.lastLocalInterimAt = Date.now();
         this.triggerSpeakingPulse(this.userDisplayName, 2000);
         this.renderLiveCaption(this.userDisplayName, pendingFull, null, false);
         await this.postTranscriptSegment(pending, null, null);
@@ -1310,16 +1325,40 @@ class WDOSMultilinguaMeeting {
 
     startSpeechWatchdog() {
         this.stopSpeechWatchdog();
-        this.speechWatchdogTimer = setInterval(() => {
+        this.speechWatchdogTimer = setInterval(async () => {
             if (this.isAudioMuted) return;
-            // Never kill an active Azure Speech SDK recognizer; only recover if both recognizers stopped
             if (this.speechRecognizer) {
+                // If Azure Speech SDK was attached to a cloned MediaStreamTrack (fromStreamInput)
+                // and the user has been speaking into the mic without Azure emitting any recognition events,
+                // automatically switch Azure to AudioConfig.fromDefaultMicrophoneInput().
+                const now = Date.now();
+                const recentlySpoke = this.lastVoiceDetectedAt && (now - this.lastVoiceDetectedAt < 1800);
+                const timeSinceStart = now - (this.lastRecognizerActivityAt || this.lastUnmuteAt || now);
+                if (
+                    recentlySpoke &&
+                    !this.hadAzureRecognitionSinceUnmute &&
+                    !this.forceDefaultMicForAzure &&
+                    timeSinceStart > 3500 &&
+                    this.azureData
+                ) {
+                    this.forceDefaultMicForAzure = true;
+                    await this.initAzureTranslation(this.azureData);
+                    if (this.speechRecognizer && !this.isAudioMuted) {
+                        this.speechRecognizer.startContinuousRecognitionAsync(
+                            () => { this.lastRecognizerActivityAt = Date.now(); },
+                            () => {
+                                this.speechRecognizer = null;
+                                this.startWebSpeechFallback();
+                            }
+                        );
+                    }
+                }
                 return;
             }
             if (!this.webSpeechRecognizer) {
                 this.startWebSpeechFallback();
             }
-        }, 3000);
+        }, 2500);
     }
 
     stopSpeechWatchdog() {
@@ -1330,10 +1369,8 @@ class WDOSMultilinguaMeeting {
     }
 
     startWebSpeechFallback() {
-        // On mobile browsers (iOS/Android), native SpeechRecognition steals hardware microphone focus from WebRTC (LiveKit).
-        // If LiveKit WebRTC is connected on mobile and Azure Speech SDK is available, prefer re-initializing Azure Speech SDK.
-        const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
-        if (isMobileDevice && this.livekitRoom && this.livekitRoom.state === "connected" && this.azureData && this.azureData.mode === "live") {
+        // Do not start Web Speech fallback if Azure Speech SDK recognizer is actively running
+        if (this.speechRecognizer) {
             return false;
         }
         const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1348,6 +1385,7 @@ class WDOSMultilinguaMeeting {
             this.webSpeechRecognizer = recognizer;
             this.webSpeechCommittedIndex = -1;
             this.pendingInterimMaxIndex = -1;
+            this.webSpeechFlushedWordsCount = 0;
             recognizer.lang = this.speakingLang || "en-US";
             recognizer.continuous = true;
             recognizer.interimResults = true;
@@ -1368,14 +1406,20 @@ class WDOSMultilinguaMeeting {
                 for (let i = startIdx; i < event.results.length; i++) {
                     const res = event.results[i];
                     if (res && res.isFinal) {
-                        // Collect all uncommitted results from startIdx up through i so earlier words are never dropped!
                         for (let j = (this.webSpeechCommittedIndex + 1); j <= i; j++) {
-                            const piece = (event.results[j] && event.results[j][0]) ? event.results[j][0].transcript : "";
+                            let piece = (event.results[j] && event.results[j][0]) ? event.results[j][0].transcript : "";
                             if (piece && piece.trim()) {
-                                finalPieces.push(piece.trim());
+                                if (j === (this.webSpeechCommittedIndex + 1) && (this.webSpeechFlushedWordsCount || 0) > 0) {
+                                    const pWords = piece.trim().split(/\s+/).filter(Boolean);
+                                    piece = pWords.slice(this.webSpeechFlushedWordsCount).join(" ");
+                                }
+                                if (piece && piece.trim()) {
+                                    finalPieces.push(piece.trim());
+                                }
                             }
                         }
                         this.webSpeechCommittedIndex = i;
+                        this.webSpeechFlushedWordsCount = 0;
                         interimPieces = [];
                     } else if (res && res[0] && res[0].transcript) {
                         const piece = res[0].transcript.trim();
@@ -1392,11 +1436,11 @@ class WDOSMultilinguaMeeting {
                     }
                     this.pendingInterimText = "";
                     const fullFinal = finalPieces.join(" ").trim();
-                    const fullClean = this.takeStreamingChunk(fullFinal, true, "webspeech");
-                    if (fullClean && !this.isSystemEchoPhrase(fullClean)) {
+                    if (fullFinal && !this.isSystemEchoPhrase(fullFinal)) {
+                        this.lastLocalInterimAt = Date.now();
                         this.triggerSpeakingPulse(this.userDisplayName, 2000);
                         this.renderLiveCaption(this.userDisplayName, fullFinal, null, false);
-                        this.postTranscriptSegment(fullClean, null, null);
+                        this.postTranscriptSegment(fullFinal, null, null);
                     }
                 }
 
@@ -1404,18 +1448,15 @@ class WDOSMultilinguaMeeting {
                 if (cleanInterim && !this.isSystemEchoPhrase(cleanInterim)) {
                     this.pendingInterimText = cleanInterim;
                     this.pendingInterimMaxIndex = event.results.length - 1;
+                    this.lastLocalInterimAt = Date.now();
                     this.triggerSpeakingPulse(this.userDisplayName, 1500);
                     this.renderLiveCaption(this.userDisplayName, cleanInterim, null, false);
-                    // Continuous speech: push stable words out every ~5 words instead of waiting for a pause
-                    const streamChunk = this.takeStreamingChunk(cleanInterim, false, "webspeech");
-                    if (streamChunk) {
-                        this.postTranscriptSegment(streamChunk, null, null);
-                    }
+                    this.postLiveInterim(cleanInterim, null);
                     if (this.interimFlushTimer) clearTimeout(this.interimFlushTimer);
-                    // If the speaker pauses for ~0.65s without Chrome firing isFinal, commit the rest immediately
+                    // Only commit interim words if the speaker pauses for 1.15s without the browser firing isFinal
                     this.interimFlushTimer = setTimeout(() => {
                         this.flushPendingInterimSpeech();
-                    }, 650);
+                    }, 1150);
                 }
             };
 
@@ -1430,9 +1471,9 @@ class WDOSMultilinguaMeeting {
                 if (this.pendingInterimText) {
                     this.flushPendingInterimSpeech();
                 }
-                this.streamCommittedWords = 0;
                 this.webSpeechCommittedIndex = -1;
                 this.pendingInterimMaxIndex = -1;
+                this.webSpeechFlushedWordsCount = 0;
                 if (!this.isAudioMuted && this.webSpeechRecognizer === recognizer) {
                     setTimeout(() => {
                         if (!this.isAudioMuted && this.webSpeechRecognizer === recognizer) {
@@ -1461,6 +1502,7 @@ class WDOSMultilinguaMeeting {
         if (shouldUnmute) {
             this.isAudioMuted = false;
             this.azureRetryCount = 0;
+            this.hadAzureRecognitionSinceUnmute = false;
             this.lastUnmuteAt = Date.now();
             this.lastRecognizerActivityAt = Date.now();
             this.isSyncingMedia = true;
@@ -1528,6 +1570,19 @@ class WDOSMultilinguaMeeting {
             if (this.azureInterimFlushTimer) {
                 clearTimeout(this.azureInterimFlushTimer);
                 this.azureInterimFlushTimer = null;
+            }
+            if (this.azurePendingInterimText) {
+                const fullPending = (this.azurePendingInterimText || "").trim();
+                const pendingTranslations = this.azurePendingInterimTranslations || {};
+                const pendingKey = this.azurePendingUttKey || "";
+                this.azurePendingInterimText = "";
+                if (fullPending && !this.isSystemEchoPhrase(fullPending) && this.azureFlushedUtteranceKey !== pendingKey) {
+                    this.azureFlushedUtteranceKey = pendingKey;
+                    const tShort = this.getShortLang(this.listeningLang);
+                    const sdkTrans = pendingTranslations[tShort] || null;
+                    this.renderLiveCaption(this.userDisplayName, fullPending, sdkTrans, true);
+                    this.postTranscriptSegment(fullPending, sdkTrans, tShort, pendingTranslations);
+                }
             }
             if (this.pendingInterimText) {
                 this.flushPendingInterimSpeech();
@@ -2118,18 +2173,39 @@ class WDOSMultilinguaMeeting {
             }
 
             const segments = data.segments || [];
+            const liveInterim = (data.live_interim && data.live_interim.original_text) ? data.live_interim : null;
+            const hasActiveLocalInterim = Boolean(this.lastLocalInterimAt && (Date.now() - this.lastLocalInterimAt < 2500));
+
             if (segments.length > 0) {
                 this.hasLiveSegments = true;
                 this.renderTranscriptFeed(segments);
                 const latest = segments[segments.length - 1];
                 const translated = (latest.translations || {})[shortListen] || latest.translated_text || latest.original_text;
-                this.lastTranslatedText = translated;
-                this.lastOriginalText = latest.original_text || "";
-                this.lastOriginalLang = latest.original_language || "en-US";
-                this.renderLiveCaption(latest.speaker_name, latest.original_text, translated, true);
 
                 const prevSeq = this.lastSeenSequence;
                 const newSegments = segments.filter((s) => s.sequence_number > prevSeq);
+
+                if (newSegments.length > 0) {
+                    // A new finalized segment arrived: update caption bar immediately with the committed segment
+                    this.lastTranslatedText = translated;
+                    this.lastOriginalText = latest.original_text || "";
+                    this.lastOriginalLang = latest.original_language || "en-US";
+                    this.renderLiveCaption(latest.speaker_name, latest.original_text, translated, true);
+                } else if (liveInterim) {
+                    // Someone is actively speaking mid-sentence right now: render their live growing caption & translation!
+                    if (liveInterim.speaker_name !== this.userDisplayName || !hasActiveLocalInterim) {
+                        this.triggerSpeakingPulse(liveInterim.speaker_name, 1600);
+                        const interimTrans = (liveInterim.translations || {})[shortListen] || liveInterim.translated_text || liveInterim.original_text;
+                        this.renderLiveCaption(liveInterim.speaker_name, liveInterim.original_text, interimTrans, false);
+                    }
+                } else if (!hasActiveLocalInterim) {
+                    // No active interim speech: keep latest committed segment displayed
+                    this.lastTranslatedText = translated;
+                    this.lastOriginalText = latest.original_text || "";
+                    this.lastOriginalLang = latest.original_language || "en-US";
+                    this.renderLiveCaption(latest.speaker_name, latest.original_text, translated, true);
+                }
+
                 if (newSegments.length > 0) {
                     this.lastSeenSequence = newSegments[newSegments.length - 1].sequence_number;
                     if (speakNewSegments && prevSeq >= 0) {
@@ -2163,7 +2239,13 @@ class WDOSMultilinguaMeeting {
                         }
                     }
                 }
-            } else {
+            } else if (liveInterim) {
+                if (liveInterim.speaker_name !== this.userDisplayName || !hasActiveLocalInterim) {
+                    this.triggerSpeakingPulse(liveInterim.speaker_name, 1600);
+                    const interimTrans = (liveInterim.translations || {})[shortListen] || liveInterim.translated_text || liveInterim.original_text;
+                    this.renderLiveCaption(liveInterim.speaker_name, liveInterim.original_text, interimTrans, false);
+                }
+            } else if (!hasActiveLocalInterim) {
                 this.hasLiveSegments = false;
                 const langName = this.langNames[this.listeningLang] || this.listeningLang;
                 const transLabelEl = document.getElementById("caption-translated-label");

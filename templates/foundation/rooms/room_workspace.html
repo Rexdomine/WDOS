@@ -1227,9 +1227,19 @@
 </div>
 
 {% if screen_code != "ROOM-02" and room_session.status != "COMPLETED" %}
-<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech-sdk.bundle-min.js" crossorigin="anonymous"></script>
-<script src="/static/foundation/js/multilingua_engine.js?v=21"></script>
+<script src="/static/foundation/vendor/livekit-client-2.5.7.umd.min.js"></script>
+<script>
+  if (!window.LivekitClient) {
+    document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js" crossorigin="anonymous"></scr' + 'ipt>');
+  }
+</script>
+<script src="/static/foundation/vendor/speech-sdk-1.53.0.min.js"></script>
+<script>
+  if (!window.SpeechSDK) {
+    document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.53.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js" crossorigin="anonymous"></scr' + 'ipt>');
+  }
+</script>
+<script src="/static/foundation/js/multilingua_engine.js?v=22"></script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function() {

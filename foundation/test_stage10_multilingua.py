@@ -687,5 +687,71 @@ class Stage10MultilinguaAndEventsTestSuite(TestCase):
             self.assertEqual(res_tts.status_code, 200)
             self.assertEqual(res_tts["Content-Type"], "audio/mpeg")
 
+    def test_live_interim_broadcast_and_vendored_sdks(self):
+        """
+        Verifies:
+        1. Vendored Speech SDK & LiveKit SDK exist and are served in room_workspace.html (no broken speech-sdk hyphen URL).
+        2. Posting action='live_interim' broadcasts the full growing sentence + translations across workers and clears on final segment save.
+        """
+        seed_stage10_fixtures()
+        room_session = MeetingRoomSession.objects.get(room_code="ROOM-NG-001")
+        self.client.force_login(self.host_user)
+
+        res_live = self.client.get(f"/foundation/rooms/{room_session.room_code}/live/")
+        self.assertEqual(res_live.status_code, 200)
+        html = res_live.content.decode("utf-8")
+        self.assertIn("/static/foundation/vendor/speech-sdk-1.53.0.min.js", html)
+        self.assertIn("/static/foundation/vendor/livekit-client-2.5.7.umd.min.js", html)
+        self.assertNotIn("speech-sdk.bundle-min.js", html)
+
+        # Post live interim phrase while speaker is mid-sentence
+        res_interim = self.client.post(
+            f"/api/rooms/{room_session.room_code}/transcript/",
+            data=json.dumps({
+                "action": "live_interim",
+                "speaker_name": "Dev Admin",
+                "original_language": "en-US",
+                "original_text": "Welcome everyone to our regional coordination",
+                "translations": {"fr": "Bienvenue à tous à notre coordination régionale"},
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(res_interim.status_code, 200)
+        self.assertEqual(res_interim.json()["status"], "interim_recorded")
+
+        # Polling client in French receives the live growing interim caption & translation immediately
+        res_poll = self.client.get(f"/api/rooms/{room_session.room_code}/transcript/?lang=fr")
+        self.assertEqual(res_poll.status_code, 200)
+        poll_data = res_poll.json()
+        self.assertIsNotNone(poll_data.get("live_interim"))
+        self.assertEqual(poll_data["live_interim"]["original_text"], "Welcome everyone to our regional coordination")
+        self.assertEqual(
+            poll_data["live_interim"]["translated_text"],
+            "Bienvenue à tous à notre coordination régionale",
+        )
+
+        # Finalize the full utterance -> saves complete sentence & clears live_interim
+        res_final = self.client.post(
+            f"/api/rooms/{room_session.room_code}/transcript/",
+            data=json.dumps({
+                "speaker_name": "Dev Admin",
+                "original_language": "en-US",
+                "original_text": "Welcome everyone to our regional coordination meeting today.",
+                "translations": {"fr": "Bienvenue à tous à notre réunion de coordination régionale aujourd'hui."},
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(res_final.status_code, 201)
+
+        res_poll_after = self.client.get(f"/api/rooms/{room_session.room_code}/transcript/?lang=fr")
+        self.assertEqual(res_poll_after.status_code, 200)
+        after_data = res_poll_after.json()
+        self.assertIsNone(after_data.get("live_interim"))
+        self.assertEqual(
+            after_data["segments"][-1]["original_text"],
+            "Welcome everyone to our regional coordination meeting today.",
+        )
+
+
 
 

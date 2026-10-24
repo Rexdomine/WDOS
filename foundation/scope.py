@@ -768,8 +768,8 @@ def get_user_scope(account: Account, session=None) -> UserScope:
 
     if not active_country or ("*" not in allowed_countries and active_country not in allowed_countries):
         active_country = "NG" if "*" in allowed_countries else sorted(list(allowed_countries))[0]
-        if pref and pref.active_country != active_country:
-            pref.active_country = active_country
+        if pref and pref.active_country != active_country[:8]:
+            pref.active_country = active_country[:8]
             pref.save(update_fields=["active_country"])
 
     # Active role determination

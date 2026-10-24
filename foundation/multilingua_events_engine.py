@@ -887,6 +887,15 @@ def seed_stage10_fixtures(network: str = "WGMN", country: str = "NG", force: boo
         )
 
     mtg_series = MeetingSeries.objects.filter(meeting_code="MTG-NG-001").first()
+    if not mtg_series:
+        mtg_series = MeetingSeries.objects.create(
+            meeting_code="MTG-NG-001",
+            title="Country coordination",
+            network="WGMN",
+            country="NG",
+            host_name="Ada Okafor",
+            scheduled_at=timezone.now(),
+        )
     sched_mtg = ScheduledMeeting.objects.filter(title="Country coordination", network="WGMN").first()
     if not sched_mtg:
         sched_mtg = ScheduledMeeting.objects.create(
@@ -1231,43 +1240,66 @@ def purge_auto_captured_transcript_tasks() -> dict:
     Removes spurious WorkItem, MissionControlTask, and MeetingDecisionAction records
     that were auto-created from live speech-to-text transcript segments.
     """
-    act_qs = MeetingDecisionAction.objects.filter(record_code__startswith="ACT-")
-    converted_task_ids = list(act_qs.exclude(converted_task_id__isnull=True).values_list("converted_task_id", flat=True))
+    from django.db import connection, transaction
+    from django.db.utils import OperationalError, ProgrammingError
+    try:
+        existing_tables = set(connection.introspection.table_names())
+        required_tables = {
+            MeetingDecisionAction._meta.db_table,
+            MissionControlTask._meta.db_table,
+            WorkItem._meta.db_table,
+        }
+        if not required_tables.issubset(existing_tables):
+            return {
+                "deleted_actions": 0,
+                "deleted_tasks": 0,
+                "deleted_work_items": 0,
+            }
 
-    task_qs = MissionControlTask.objects.filter(
-        Q(task_code__startswith="TASK-RM-")
-        | Q(source_type="Multilingua Room")
-        | Q(idempotency_key__startswith="stage10-room-task-")
-        | Q(idempotency_key__contains="-ACT-")
-        | Q(description__startswith="Auto-captured from Multilingua Room")
-        | Q(id__in=converted_task_ids)
-    )
-    linked_wi_ids = list(task_qs.exclude(linked_work_item_id__isnull=True).values_list("linked_work_item_id", flat=True))
-    task_titles = list(task_qs.values_list("title", flat=True))
+        with transaction.atomic():
+            act_qs = MeetingDecisionAction.objects.filter(record_code__startswith="ACT-")
+            converted_task_ids = list(act_qs.exclude(converted_task_id__isnull=True).values_list("converted_task_id", flat=True))
 
-    wi_qs = WorkItem.objects.filter(
-        Q(summary__startswith="Auto-captured from ")
-        | Q(target_url__startswith="/foundation/tasks/TASK-RM-")
-        | Q(id__in=linked_wi_ids)
-        | (Q(title__in=task_titles) & Q(category="general"))
-    )
+            task_qs = MissionControlTask.objects.filter(
+                Q(task_code__startswith="TASK-RM-")
+                | Q(source_type="Multilingua Room")
+                | Q(idempotency_key__startswith="stage10-room-task-")
+                | Q(idempotency_key__contains="-ACT-")
+                | Q(description__startswith="Auto-captured from Multilingua Room")
+                | Q(id__in=converted_task_ids)
+            )
+            linked_wi_ids = list(task_qs.exclude(linked_work_item_id__isnull=True).values_list("linked_work_item_id", flat=True))
+            task_titles = list(task_qs.values_list("title", flat=True))
 
-    deleted_actions = act_qs.count()
-    deleted_tasks = task_qs.count()
-    deleted_work_items = wi_qs.count()
+            wi_qs = WorkItem.objects.filter(
+                Q(summary__startswith="Auto-captured from ")
+                | Q(target_url__startswith="/foundation/tasks/TASK-RM-")
+                | Q(id__in=linked_wi_ids)
+                | (Q(title__in=task_titles) & Q(category="general"))
+            )
 
-    if deleted_actions:
-        act_qs.delete()
-    if deleted_tasks:
-        task_qs.delete()
-    if deleted_work_items:
-        wi_qs.delete()
+            deleted_actions = act_qs.count()
+            deleted_tasks = task_qs.count()
+            deleted_work_items = wi_qs.count()
 
-    return {
-        "deleted_actions": deleted_actions,
-        "deleted_tasks": deleted_tasks,
-        "deleted_work_items": deleted_work_items,
-    }
+            if deleted_actions:
+                act_qs.delete()
+            if deleted_tasks:
+                task_qs.delete()
+            if deleted_work_items:
+                wi_qs.delete()
+
+            return {
+                "deleted_actions": deleted_actions,
+                "deleted_tasks": deleted_tasks,
+                "deleted_work_items": deleted_work_items,
+            }
+    except (OperationalError, ProgrammingError):
+        return {
+            "deleted_actions": 0,
+            "deleted_tasks": 0,
+            "deleted_work_items": 0,
+        }
 
 
 def finalize_room_session_and_bridge_minutes(room_session: MeetingRoomSession, actor_account=None) -> dict:

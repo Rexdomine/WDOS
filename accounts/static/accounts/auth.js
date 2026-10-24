@@ -88,6 +88,7 @@ function handlePasswordToggle(button) {
   button.setAttribute("aria-label", newLabel);
   button.setAttribute("title", newLabel);
   button.setAttribute("aria-pressed", String(isCurrentlyPassword));
+  field.focus();
   try {
     const len = field.value.length;
     field.setSelectionRange(len, len);

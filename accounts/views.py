@@ -71,9 +71,14 @@ def _workspace_destination(account):
     """Route authenticated users without trusting a client-side destination."""
     from .models import OnboardingDraft
     draft = OnboardingDraft.objects.filter(account=account).first()
-    if (draft and draft.state == 'accepted') or account.user.is_staff or account.user.is_superuser or account.accessgrant_set.exists():
-        return '/foundation/dashboard/'
-    if draft and draft.state in ('review_needed', 'submitted'):
+    if draft and draft.state == 'accepted' and hasattr(draft, 'membership'):
+        return reverse('app-shell')
+    if (
+        (draft and draft.state in ('accepted', 'review_needed', 'submitted'))
+        or account.user.is_superuser
+        or account.accessgrant_set.exists()
+        or (account.user.is_staff and account.person_id is not None)
+    ):
         return '/foundation/dashboard/'
     return reverse('onboarding:step', args=[draft.next_step if draft else 1])
 

@@ -1135,13 +1135,23 @@ def get_room_tokens_api(request, meeting_id: str):
     role_type = 1 if is_host else 0
     profile = auth_bundle["profile"]
     user_identity = str(profile.id) if profile else str(participant.id)
+    client_cid = (request.GET.get("cid") or "").strip()[:16]
+    lk_identity = f"{participant.id}__{client_cid}" if client_cid else str(participant.id)
+    lk_metadata = json.dumps(
+        {
+            "participant_id": str(participant.id),
+            "speaking_lang": participant.speaking_language,
+            "listening_lang": participant.listening_language,
+        }
+    )
 
     try:
         livekit_data = LiveKitAdapter.generate_session_payload(
             session_name=room_session.session_name,
-            user_id=str(participant.id),
+            user_id=lk_identity,
             participant_name=participant.participant_name,
             role_type=role_type,
+            metadata=lk_metadata,
         )
         try:
             zoom_token = ZoomVideoSDKAdapter.generate_token(
@@ -1485,14 +1495,13 @@ def room_transcript_api(request, meeting_id: str):
     recent_segs = list(room_session.transcript_segments.order_by("-sequence_number")[:3])
     norm_incoming = original_text.lower().rstrip(".!?,")
     for r_seg in recent_segs:
-        if r_seg.timestamp and (timezone.now() - r_seg.timestamp).total_seconds() < 7.0:
+        if (
+            r_seg.speaker_name == speaker_name
+            and r_seg.timestamp
+            and (timezone.now() - r_seg.timestamp).total_seconds() < 2.2
+        ):
             r_orig = (r_seg.original_text or "").strip().lower().rstrip(".!?,")
-            r_trans_vals = [
-                str(v).strip().lower().rstrip(".!?,")
-                for k, v in (r_seg.translations or {}).items()
-                if not str(k).startswith("_") and isinstance(v, str)
-            ]
-            if norm_incoming == r_orig or norm_incoming in r_trans_vals:
+            if norm_incoming == r_orig:
                 return JsonResponse(
                     {
                         "status": "deduplicated",

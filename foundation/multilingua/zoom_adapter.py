@@ -99,6 +99,7 @@ class LiveKitAdapter:
         user_id: str,
         participant_name: str = "Participant",
         role_type: int = 0,
+        metadata: str = "",
     ) -> str:
         api_key = (getattr(settings, "LIVEKIT_API_KEY", "") or "").strip()
         api_secret = (getattr(settings, "LIVEKIT_API_SECRET", "") or "").strip()
@@ -126,6 +127,8 @@ class LiveKitAdapter:
                 "roomAdmin": bool(int(role_type) == 1),
             },
         }
+        if metadata:
+            payload["metadata"] = str(metadata)
         if jwt is not None:
             token = jwt.encode(payload, api_secret, algorithm="HS256")
             return token if isinstance(token, str) else token.decode("utf-8")
@@ -138,6 +141,7 @@ class LiveKitAdapter:
         user_id: str,
         participant_name: str = "Participant",
         role_type: int = 0,
+        metadata: str = "",
     ) -> dict:
         if not cls.is_configured():
             return {
@@ -153,6 +157,7 @@ class LiveKitAdapter:
             user_id=user_id,
             participant_name=participant_name,
             role_type=role_type,
+            metadata=metadata,
         )
         return {
             "enabled": True,

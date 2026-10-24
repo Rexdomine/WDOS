@@ -9,7 +9,7 @@ services:
     region: frankfurt
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    plan: standard
+    plan: starter
     healthCheckPath: /health
     envVars:
       - key: WDOS_ENVIRONMENT
@@ -41,7 +41,7 @@ services:
     region: frankfurt
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    plan: standard
+    plan: starter
     dockerCommand: python manage.py run_translation_agent
     envVars:
       - key: WDOS_ENVIRONMENT

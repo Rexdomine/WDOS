@@ -31,7 +31,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         once = bool(options.get("once"))
-        async_to_sync(self._run_async)(once=once)
+        if once or "test" in sys.argv:
+            async_to_sync(self._run_async)(once=once)
+        else:
+            asyncio.run(self._run_async(once=False))
 
     async def _run_async(self, once: bool = False) -> None:
         stop_event = asyncio.Event()
@@ -41,9 +44,11 @@ class Command(BaseCommand):
             for sig in (signal.SIGTERM, signal.SIGINT):
                 try:
                     loop.add_signal_handler(sig, stop_event.set)
-                except NotImplementedError:
-                    # Windows ProactorEventLoop fallback
-                    signal.signal(sig, lambda *_: stop_event.set())
+                except (NotImplementedError, RuntimeError, ValueError):
+                    try:
+                        signal.signal(sig, lambda *_: loop.call_soon_threadsafe(stop_event.set))
+                    except (ValueError, RuntimeError):
+                        pass
 
         supervisor = TranslationAgentSupervisor()
         try:

@@ -133,6 +133,7 @@ class AzureSpeechAdapter:
         "translation ashes turned off for what is",
     }
     _TTS_AUDIO_CACHE: dict[tuple[str, str], bytes] = {}
+    _TTS_PCM_CACHE: dict[tuple[str, str], bytes] = {}
     _SHORT_TO_BCP47 = {
         "en": "en-US",
         "fr": "fr-FR",
@@ -143,6 +144,19 @@ class AzureSpeechAdapter:
         "yo": "yo-NG",
         "ig": "ig-NG",
     }
+
+    @classmethod
+    def get_azure_credentials(cls) -> tuple[str, str] | None:
+        speech_key = (getattr(settings, "AZURE_SPEECH_KEY", "") or "").strip()
+        speech_key_2 = (getattr(settings, "AZURE_SPEECH_KEY_2", "") or "").strip()
+        speech_region = (getattr(settings, "AZURE_SPEECH_REGION", "eastus") or "eastus").strip()
+        provider_mode = getattr(settings, "MEETING_TRANSLATION_PROVIDER", "azure")
+        if provider_mode == "mock":
+            return None
+        for k in (speech_key, speech_key_2):
+            if k and not k.startswith("wdos-dev-") and not k.startswith("your_"):
+                return k, speech_region
+        return None
 
     @classmethod
     def is_system_echo_phrase(cls, text: str) -> bool:
@@ -411,6 +425,76 @@ class AzureSpeechAdapter:
                 if len(cls._TTS_AUDIO_CACHE) < 500:
                     cls._TTS_AUDIO_CACHE[cache_key] = final_bytes
                 return final_bytes
+        return None
+
+    @classmethod
+    def synthesize_speech_pcm24k(cls, text: str, target_language: str = "fr-FR") -> bytes | None:
+        """
+        Generates raw 24,000 Hz, 16-bit signed mono PCM audio bytes using Azure Neural TTS
+        so the server-side LiveKit Translation Bot can stream frames directly into an
+        rtc.AudioSource(sample_rate=24000, num_channels=1) track (`lang:<short>`).
+        """
+        clean_text = re.sub(r"^\[[^\]]+\]\s*", "", (text or "").strip()).strip()
+        if not clean_text or cls.is_system_echo_phrase(clean_text):
+            return None
+        short_lang = (target_language or "fr-FR").split("-")[0].lower()
+        if short_lang not in cls._SHORT_TO_BCP47:
+            short_lang = "fr"
+        bcp47_lang = cls._SHORT_TO_BCP47.get(short_lang, "fr-FR")
+        trimmed = clean_text[:450]
+        cache_key = (short_lang, trimmed.lower())
+        if cache_key in cls._TTS_PCM_CACHE:
+            return cls._TTS_PCM_CACHE[cache_key]
+
+        if "test" in sys.argv:
+            stub_pcm = b"\x00\x00" * 4800  # 200ms of 24kHz 16-bit mono PCM
+            cls._TTS_PCM_CACHE[cache_key] = stub_pcm
+            return stub_pcm
+
+        creds = cls.get_azure_credentials()
+        if not creds:
+            return None
+        _, speech_region = creds
+        speech_key = (getattr(settings, "AZURE_SPEECH_KEY", "") or "").strip()
+        speech_key_2 = (getattr(settings, "AZURE_SPEECH_KEY_2", "") or "").strip()
+        candidate_keys = [k for k in (speech_key, speech_key_2) if k and not k.startswith("wdos-dev-") and not k.startswith("your_")]
+
+        voice_meta = cls.SUPPORTED_LANGUAGES.get(bcp47_lang, cls.SUPPORTED_LANGUAGES["fr-FR"])
+        voice_name = voice_meta.get("voice", "fr-FR-DeniseNeural")
+        xml_safe_text = (
+            trimmed.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&apos;")
+        )
+        ssml = (
+            f"<speak version='1.0' xml:lang='{bcp47_lang}'>"
+            f"<voice xml:lang='{bcp47_lang}' name='{voice_name}'>"
+            f"<prosody rate='+4%'>{xml_safe_text}</prosody>"
+            f"</voice></speak>"
+        )
+        tts_url = f"https://{speech_region}.tts.speech.microsoft.com/cognitiveservices/v1"
+        session = cls._get_http_session()
+        for api_key in candidate_keys:
+            try:
+                resp = session.post(
+                    tts_url,
+                    headers={
+                        "Ocp-Apim-Subscription-Key": api_key,
+                        "Content-Type": "application/ssml+xml",
+                        "X-Microsoft-OutputFormat": "raw-24khz-16bit-mono-pcm",
+                        "User-Agent": "WDOS-LiveKit-Translation-Agent",
+                    },
+                    data=ssml.encode("utf-8"),
+                    timeout=3.5,
+                )
+                if resp.status_code == 200 and resp.content and len(resp.content) >= 960:
+                    if len(cls._TTS_PCM_CACHE) < 400:
+                        cls._TTS_PCM_CACHE[cache_key] = resp.content
+                    return resp.content
+            except Exception:
+                continue
         return None
 
     @classmethod

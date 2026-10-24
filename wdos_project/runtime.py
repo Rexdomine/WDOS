@@ -56,6 +56,7 @@ def main():
     return supervise([
         [sys.executable,'-m','gunicorn','wdos_project.wsgi:application','--bind','0.0.0.0:'+os.getenv('PORT','8000'),'--workers','2','--worker-class','gthread','--threads',os.getenv('WDOS_GUNICORN_THREADS','12'),'--timeout','60','--access-logfile','-'],
         [sys.executable,'manage.py','run_auth_mailer'],
+        [sys.executable,'manage.py','run_translation_agent'],
     ],stop)
 
 

@@ -7,4 +7,6 @@ pyotp>=2.9,<3
 Pillow>=11,<13
 PyJWT>=2.8,<3
 requests>=2.31,<3
+livekit>=1.1.21,<2
+azure-cognitiveservices-speech>=1.53.0,<2
 

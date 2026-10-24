@@ -752,6 +752,50 @@ class Stage10MultilinguaAndEventsTestSuite(TestCase):
             "Welcome everyone to our regional coordination meeting today.",
         )
 
+        # Verify server-side LiveKit translation agent (`RoomTranslationBot` + `synthesize_speech_pcm24k`)
+        import asyncio
+        from asgiref.sync import async_to_sync
+        from django.core.management import call_command
+        from foundation.multilingua.livekit_agent import RoomTranslationBot
+
+        pcm = AzureSpeechAdapter.synthesize_speech_pcm24k("Bonjour à tous", "fr-FR")
+        self.assertIsNotNone(pcm)
+        self.assertGreaterEqual(len(pcm), 960)
+
+        async def _test_bot_pipeline():
+            loop = asyncio.get_running_loop()
+            bot = RoomTranslationBot(
+                room_session_id=str(room_session.id),
+                room_code=room_session.room_code,
+                session_name=room_session.session_name,
+                loop=loop,
+            )
+            await bot.handle_interim_speech("Patrick", "en-US", "Testing server side translation", {"pt": "Testando tradução no servidor"})
+            await bot.handle_final_speech(
+                speaker_id="",
+                speaker_name="Patrick",
+                speaking_lang="en-US",
+                original_text="Testing server side translation agent from Android phone.",
+                raw_translations={"pt": "Testando agente de tradução do servidor pelo celular Android."},
+            )
+            await bot.stop()
+
+        async_to_sync(_test_bot_pipeline)()
+        call_command("run_translation_agent", once=True)
+
+        res_poll_bot = self.client.get(f"/api/rooms/{room_session.room_code}/transcript/?lang=pt")
+        self.assertEqual(res_poll_bot.status_code, 200)
+        bot_segs = res_poll_bot.json()["segments"]
+        self.assertEqual(
+            bot_segs[-1]["original_text"],
+            "Testing server side translation agent from Android phone.",
+        )
+        self.assertEqual(
+            bot_segs[-1]["translated_text"],
+            "Testando agente de tradução do servidor pelo celular Android.",
+        )
+
+
 
 
 

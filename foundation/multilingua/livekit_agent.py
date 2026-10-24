@@ -857,7 +857,12 @@ class RoomTranslationBot:
             room_session.save(update_fields=["active_speaker_name", "active_speaker_role"])
 
             active_listening_shorts: Set[str] = set()
-            for p_row in room_session.participants.filter(admission_status="ADMITTED"):
+            other_participants_qs = room_session.participants.filter(admission_status="ADMITTED")
+            if participant is not None:
+                other_participants_qs = other_participants_qs.exclude(id=participant.id)
+            elif speaker_name:
+                other_participants_qs = other_participants_qs.exclude(participant_name__iexact=speaker_name)
+            for p_row in other_participants_qs:
                 short_l = _normalize_bcp47(p_row.listening_language, "fr-FR").split("-")[0].lower()
                 if short_l in SHORT_TO_BCP47:
                     active_listening_shorts.add(short_l)
@@ -958,9 +963,9 @@ class RoomTranslationBot:
             reliable=True,
         )
 
-        # 4. Synthesize and stream neural voice over each active target language's LiveKit audio channel
+        # 4. Synthesize and stream neural voice only for target languages selected by OTHER participants in the room
         speaker_short = _normalize_bcp47(speaking_lang, "en-US").split("-")[0].lower()
-        target_channels = set(active_listening_shorts) | set(AZURE_TARGET_TRANSLATION_CHANNELS)
+        target_channels = set(active_listening_shorts)
         for target_short in target_channels:
             # Listeners whose listening language equals the speaker's spoken language hear the speaker's real human voice directly
             if target_short == speaker_short:

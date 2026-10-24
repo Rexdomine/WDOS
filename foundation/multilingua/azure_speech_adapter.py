@@ -162,6 +162,78 @@ class AzureSpeechAdapter:
     _LIVE_FOCUS_SHORT_LANGS = ("en", "fr", "pt", "ar", "sw")
 
     @classmethod
+    def _azure_translate_batch(cls, text: str, source_short: str, target_shorts: list[str]) -> tuple[dict[str, str], str] | None:
+        """
+        Translates text into all requested target languages in a single low-latency HTTP call
+        using the official Azure AI Translator V3 API.
+        """
+        if not text or not target_shorts or "test" in sys.argv:
+            return None
+
+        translator_key = (getattr(settings, "AZURE_TRANSLATOR_KEY", "") or "").strip()
+        translator_key_2 = (getattr(settings, "AZURE_TRANSLATOR_KEY_2", "") or "").strip()
+        translator_region = (
+            getattr(settings, "AZURE_TRANSLATOR_REGION", "")
+            or getattr(settings, "AZURE_SPEECH_REGION", "eastus")
+            or ""
+        ).strip()
+
+        candidate_keys = [
+            k for k in (translator_key, translator_key_2)
+            if k and not k.startswith("your_") and not k.startswith("wdos-dev-")
+        ]
+        if not candidate_keys:
+            return None
+
+        all_targets = list(dict.fromkeys(list(target_shorts) + ([source_short] if source_short else [])))
+        params = [("api-version", "3.0")] + [("to", t) for t in all_targets if t]
+        url = "https://api.cognitive.microsofttranslator.com/translate"
+        session = cls._get_http_session()
+
+        for api_key in candidate_keys:
+            region_variants = (
+                [translator_region, ""]
+                if (translator_region and translator_region.lower() != "global")
+                else [""]
+            )
+            for reg in region_variants:
+                headers = {
+                    "Ocp-Apim-Subscription-Key": api_key,
+                    "Content-Type": "application/json; charset=UTF-8",
+                }
+                if reg:
+                    headers["Ocp-Apim-Subscription-Region"] = reg
+                try:
+                    resp = session.post(
+                        url,
+                        params=params,
+                        headers=headers,
+                        json=[{"Text": text}],
+                        timeout=2.5,
+                    )
+                    if resp.status_code in (401, 403) and reg:
+                        continue
+                    if resp.status_code == 200:
+                        payload = resp.json()
+                        if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+                            item = payload[0]
+                            det_info = item.get("detectedLanguage") or {}
+                            detected_lang = (det_info.get("language") or source_short or "en").split("-")[0].lower()
+                            out: dict[str, str] = {}
+                            for tr_entry in item.get("translations") or []:
+                                if isinstance(tr_entry, dict) and tr_entry.get("to") and tr_entry.get("text"):
+                                    to_short = str(tr_entry["to"]).split("-")[0].lower()
+                                    tr_text = str(tr_entry["text"]).strip()
+                                    out[to_short] = tr_text
+                                    if len(cls._TRANSLATION_CACHE) < 2000:
+                                        cls._TRANSLATION_CACHE[(source_short or "auto", to_short, text)] = (tr_text, detected_lang)
+                            if out:
+                                return out, detected_lang
+                except Exception:
+                    break
+        return None
+
+    @classmethod
     def _live_translate_single(cls, text: str, source_short: str, target_short: str, fallback_name: str) -> tuple[str, str]:
         preset = cls.DEFAULT_TRANSLATION_PHRASES.get((text or "").strip(), {})
         if target_short in preset:
@@ -379,6 +451,21 @@ class AzureSpeechAdapter:
 
         detected_source_short = source_short
         if pending_targets:
+            azure_batch = cls._azure_translate_batch(
+                clean_text,
+                source_short,
+                [short for short, _ in pending_targets],
+            )
+            if azure_batch:
+                batch_translations, batch_det = azure_batch
+                if batch_det and batch_det in cls._SHORT_TO_BCP47:
+                    detected_source_short = batch_det
+                for short_code, tr_val in batch_translations.items():
+                    if tr_val:
+                        merged[short_code] = tr_val
+                pending_targets = [(s, n) for s, n in pending_targets if s not in merged or not merged[s]]
+
+        if pending_targets:
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(pending_targets)) as executor:
                 future_map = {
                     executor.submit(cls._live_translate_single, clean_text, source_short, short, name): (short, name)
@@ -392,7 +479,7 @@ class AzureSpeechAdapter:
                             detected_source_short = det_lang
                     except Exception:
                         merged[short] = clean_text
-            if detected_source_short != source_short and source_short in cls._LIVE_FOCUS_SHORT_LANGS:
+            if detected_source_short != source_short and source_short in cls._LIVE_FOCUS_SHORT_LANGS and merged.get(source_short) == clean_text:
                 # If auto-detection found the speaker actually spoke another language, translate into source_short too
                 try:
                     src_name = cls.SUPPORTED_LANGUAGES.get(cls._SHORT_TO_BCP47.get(source_short, "en-US"), {}).get("name", "English")

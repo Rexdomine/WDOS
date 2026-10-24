@@ -26,6 +26,18 @@ class WDOSMultilinguaMeeting {
 
         // Provider Clients & Media Streams
         this.azureData = null;
+        this.livekitData = null;
+        this.livekitRoom = null;
+        this.remoteAudioElements = new Map();
+        this.participantLanguagesById = new Map();
+        this.participantLanguagesByName = new Map();
+        this.myParticipantId = null;
+        this.locallyPostedSegmentIds = new Set();
+        this.spokenSegmentIds = new Set();
+        this.isFetchingTranscript = false;
+        this.tokenRefreshTimer = null;
+        this.lastRecognizerActivityAt = 0;
+        this.lastVoiceDetectedAt = 0;
         this.zoomData = null;
         this.zoomClient = null;
         this.mediaStream = null;
@@ -112,6 +124,18 @@ class WDOSMultilinguaMeeting {
     }
 
     unlockAudioPlayback() {
+        try {
+            if (this.livekitRoom && typeof this.livekitRoom.startAudio === "function") {
+                this.livekitRoom.startAudio().catch(() => {});
+            }
+            if (this.remoteAudioElements && this.remoteAudioElements.size > 0) {
+                this.remoteAudioElements.forEach((audioEl) => {
+                    if (audioEl && audioEl.paused) {
+                        audioEl.play().catch(() => {});
+                    }
+                });
+            }
+        } catch (_) {}
         if (this.isAudioUnlocked) return;
         try {
             if (!this.ttsAudioPlayer) {
@@ -177,6 +201,7 @@ class WDOSMultilinguaMeeting {
                 this.unlockAudioPlayback();
                 this.isTranslationEnabled = !this.isTranslationEnabled;
                 this.clearAudioQueue();
+                this.updateRemoteWebRTCAudioVolumes();
                 const modeLabelEl = document.getElementById("btn-toggle-translation-mode-label");
                 const headerLabelEl = document.getElementById("caption-header-label");
                 const replayLabelEl = document.getElementById("btn-play-translation-label");
@@ -207,6 +232,7 @@ class WDOSMultilinguaMeeting {
                 e.preventDefault();
                 this.unlockAudioPlayback();
                 this.isSpeakerAudioMuted = !this.isSpeakerAudioMuted;
+                this.updateRemoteWebRTCAudioVolumes();
                 const labelEl = document.getElementById("btn-toggle-tts-label");
                 if (this.isSpeakerAudioMuted) {
                     this.clearAudioQueue();
@@ -234,6 +260,7 @@ class WDOSMultilinguaMeeting {
                 e.preventDefault();
                 this.unlockAudioPlayback();
                 this.isSpeakerAudioMuted = false;
+                this.updateRemoteWebRTCAudioVolumes();
                 const labelEl = document.getElementById("btn-toggle-tts-label");
                 if (labelEl) labelEl.textContent = "Voice Output: ON";
                 const ttsBtn = document.getElementById("btn-toggle-tts-audio");
@@ -405,17 +432,21 @@ class WDOSMultilinguaMeeting {
             }
 
             this.azureData = data.azure;
+            this.livekitData = data.livekit || null;
             this.zoomData = data.zoom;
             if (data.participant) {
+                this.myParticipantId = data.participant.id || null;
                 this.userDisplayName = data.participant.name || this.userDisplayName;
                 this.speakingLang = this.normalizeLangCode(data.participant.speaking_lang || this.speakingLang, "en-US");
                 this.listeningLang = this.normalizeLangCode(data.participant.listening_lang || this.listeningLang, "fr-FR");
             }
             this.switchListeningLanguage(this.listeningLang);
 
+            await this.initLiveKitMedia(data.livekit);
             await this.initZoomMedia(data.zoom);
             await this.initAzureTranslation(data.azure);
-            this.updateDiagnosticsUI("Connected", 34);
+            this.startTokenRefreshTimer();
+            this.updateDiagnosticsUI("Connected", 28);
             this.setMicStatus(`Connected as ${this.userDisplayName} · Speaking ${this.langNames[this.speakingLang] || this.speakingLang} · Hearing ${this.langNames[this.listeningLang] || this.listeningLang}`);
             return data;
         } catch (err) {
@@ -425,8 +456,194 @@ class WDOSMultilinguaMeeting {
         }
     }
 
+    async initLiveKitMedia(livekitData) {
+        if (!window.LivekitClient || !livekitData || !livekitData.enabled || !livekitData.url || !livekitData.token) {
+            return false;
+        }
+        try {
+            if (this.livekitRoom) {
+                try { await this.livekitRoom.disconnect(); } catch (_) {}
+                this.livekitRoom = null;
+            }
+            let audioContainer = document.getElementById("livekit-remote-audio-container");
+            if (!audioContainer) {
+                audioContainer = document.createElement("div");
+                audioContainer.id = "livekit-remote-audio-container";
+                audioContainer.style.display = "none";
+                document.body.appendChild(audioContainer);
+            }
+
+            const LK = window.LivekitClient;
+            const room = new LK.Room({
+                adaptiveStream: true,
+                dynacast: true,
+                audioCaptureDefaults: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+            this.livekitRoom = room;
+
+            const attachAudio = (track, participant) => {
+                if (!track || track.kind !== "audio") return;
+                const key = track.sid || (participant && participant.identity) || String(Math.random());
+                const existing = this.remoteAudioElements.get(key);
+                if (existing && existing.parentNode) {
+                    existing.parentNode.removeChild(existing);
+                }
+                const audioEl = track.attach();
+                audioEl.playsInline = true;
+                audioEl.autoplay = true;
+                audioEl.dataset.trackSid = key;
+                audioEl.dataset.participantIdentity = participant ? (participant.identity || "") : "";
+                audioEl.dataset.participantName = participant ? (participant.name || participant.identity || "Speaker") : "Speaker";
+                audioContainer.appendChild(audioEl);
+                this.remoteAudioElements.set(key, audioEl);
+                this.updateRemoteWebRTCAudioVolumes();
+                if (typeof audioEl.play === "function") {
+                    audioEl.play().catch(() => {});
+                }
+            };
+
+            const attachVideo = (track) => {
+                if (!track || track.kind !== "video") return;
+                if (!this.isVideoOff) return;
+                const stageVideo = document.getElementById("live-stage-video");
+                const speakerAvatarBox = document.getElementById("stage-avatar-container");
+                if (stageVideo) {
+                    track.attach(stageVideo);
+                    stageVideo.style.display = "block";
+                    if (speakerAvatarBox) speakerAvatarBox.style.display = "none";
+                }
+            };
+
+            room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                if (track.kind === "audio") {
+                    attachAudio(track, participant);
+                } else if (track.kind === "video") {
+                    attachVideo(track);
+                }
+            });
+
+            room.on(LK.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+                if (!track) return;
+                try { track.detach(); } catch (_) {}
+                const key = track.sid || (participant && participant.identity) || "";
+                const el = this.remoteAudioElements.get(key);
+                if (el && el.parentNode) {
+                    el.parentNode.removeChild(el);
+                }
+                this.remoteAudioElements.delete(key);
+                if (track.kind === "video" && this.isVideoOff) {
+                    const stageVideo = document.getElementById("live-stage-video");
+                    const speakerAvatarBox = document.getElementById("stage-avatar-container");
+                    if (stageVideo) stageVideo.style.display = "none";
+                    if (speakerAvatarBox) speakerAvatarBox.style.display = "flex";
+                }
+            });
+
+            room.on(LK.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+                if (!Array.isArray(speakers) || speakers.length === 0) return;
+                const localId = room.localParticipant ? room.localParticipant.identity : "";
+                const remoteSpeaker = speakers.find((s) => s && s.identity !== localId) || speakers[0];
+                if (remoteSpeaker) {
+                    const name = remoteSpeaker.name || remoteSpeaker.identity || this.userDisplayName;
+                    this.triggerSpeakingPulse(name, 1600);
+                }
+            });
+
+            await room.connect(livekitData.url, livekitData.token);
+            if (typeof room.startAudio === "function") {
+                room.startAudio().catch(() => {});
+            }
+
+            if (room.remoteParticipants && typeof room.remoteParticipants.forEach === "function") {
+                room.remoteParticipants.forEach((participant) => {
+                    if (participant.trackPublications && typeof participant.trackPublications.forEach === "function") {
+                        participant.trackPublications.forEach((pub) => {
+                            if (pub && pub.isSubscribed && pub.track) {
+                                if (pub.track.kind === "audio") attachAudio(pub.track, participant);
+                                else if (pub.track.kind === "video") attachVideo(pub.track);
+                            }
+                        });
+                    }
+                });
+            }
+            return true;
+        } catch (err) {
+            console.warn("[WDOS Multilingua] LiveKit WebRTC connection warning:", err);
+            this.livekitRoom = null;
+            return false;
+        }
+    }
+
+    startTokenRefreshTimer() {
+        if (this.tokenRefreshTimer) clearInterval(this.tokenRefreshTimer);
+        // Refresh 10-minute Azure Speech ephemeral token every 7 minutes so long meetings never drop recognition
+        this.tokenRefreshTimer = setInterval(async () => {
+            if (!this.tokensUrl) return;
+            try {
+                const resp = await fetch(this.tokensUrl, { headers: { "Accept": "application/json" } });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data && data.azure && data.azure.token) {
+                    this.azureData = data.azure;
+                    if (this.speechRecognizer) {
+                        try {
+                            this.speechRecognizer.authorizationToken = data.azure.token;
+                        } catch (_) {}
+                    }
+                }
+            } catch (_) {}
+        }, 7 * 60 * 1000);
+    }
+
+    hasActiveRemoteWebRTCAudio() {
+        return Boolean(
+            this.livekitRoom &&
+            this.livekitRoom.state === "connected" &&
+            this.remoteAudioElements &&
+            this.remoteAudioElements.size > 0
+        );
+    }
+
+    updateRemoteWebRTCAudioVolumes() {
+        if (!this.remoteAudioElements || this.remoteAudioElements.size === 0) return;
+        const shortListen = this.getShortLang(this.listeningLang);
+        this.remoteAudioElements.forEach((audioEl) => {
+            if (!audioEl) return;
+            if (this.isSpeakerAudioMuted) {
+                audioEl.muted = true;
+                audioEl.volume = 0;
+                return;
+            }
+            audioEl.muted = false;
+            if (!this.isTranslationEnabled) {
+                // Live Translation OFF: 100% real human voice over WebRTC
+                audioEl.volume = 1.0;
+                return;
+            }
+            // Live Translation ON:
+            const pId = audioEl.dataset.participantIdentity || "";
+            const pName = audioEl.dataset.participantName || "";
+            const speakerLang = this.participantLanguagesById.get(pId) || this.participantLanguagesByName.get(pName) || "";
+            const shortSpeaker = speakerLang ? this.getShortLang(speakerLang) : "";
+            if (shortSpeaker && shortSpeaker === shortListen) {
+                // Speaker is speaking the SAME language the listener is set to hear -> 100% real human voice!
+                audioEl.volume = this.isPlayingQueueItem ? 0.25 : 1.0;
+            } else {
+                // Speaker is speaking a DIFFERENT language -> mute original voice so listener hears only their chosen language
+                audioEl.volume = 0.0;
+            }
+        });
+    }
+
     async initZoomMedia(zoomData) {
-        if (!window.ZoomVideo || !zoomData) {
+        if (this.livekitRoom && this.livekitRoom.state === "connected") {
+            return;
+        }
+        if (!window.ZoomVideo || !zoomData || !zoomData.token) {
             return;
         }
         try {
@@ -462,7 +679,39 @@ class WDOSMultilinguaMeeting {
         return Boolean(this.ttsSuppressionUntil && Date.now() < this.ttsSuppressionUntil);
     }
 
-    async initAzureTranslation(azureData, mediaStream = null) {
+    /**
+     * Streaming segmentation for continuous speech.
+     * Given the growing hypothesis of the current phrase, returns the next block of
+     * stable words to send (every ~8 words, holding back the last 2 words which the
+     * recognizer may still revise). Automatically resets if the recognizer starts a new
+     * shorter phrase buffer so earlier words are never swallowed.
+     */
+    takeStreamingChunk(fullText, isFinal, utteranceKey = "default") {
+        const words = String(fullText || "").trim().split(/\s+/).filter(Boolean);
+        if (
+            this.streamUtteranceKey !== utteranceKey ||
+            words.length < (this.streamCommittedWords || 0)
+        ) {
+            this.streamUtteranceKey = utteranceKey;
+            this.streamCommittedWords = 0;
+        }
+        const committed = Math.min(this.streamCommittedWords || 0, words.length);
+        const pending = words.slice(committed);
+        if (isFinal) {
+            this.streamCommittedWords = 0;
+            return pending.join(" ").trim();
+        }
+        const STREAM_WORDS = 14;
+        const HOLD_BACK = 3;
+        if (pending.length >= STREAM_WORDS + HOLD_BACK) {
+            const chunk = pending.slice(0, pending.length - HOLD_BACK);
+            this.streamCommittedWords = committed + chunk.length;
+            return chunk.join(" ").trim();
+        }
+        return "";
+    }
+
+    async initAzureTranslation(azureData) {
         if (!window.SpeechSDK || !azureData || !azureData.token || azureData.mode === "mock") {
             return;
         }
@@ -484,7 +733,10 @@ class WDOSMultilinguaMeeting {
 
             if (window.SpeechSDK.PropertyId) {
                 try {
-                    speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "800");
+                    speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "500");
+                    if (window.SpeechSDK.PropertyId.Speech_SegmentationMaximumTimeMs !== undefined) {
+                        speechConfig.setProperty(window.SpeechSDK.PropertyId.Speech_SegmentationMaximumTimeMs, "4500");
+                    }
                 } catch (_) {}
             }
 
@@ -495,17 +747,7 @@ class WDOSMultilinguaMeeting {
                 }
             });
 
-            let audioConfig = null;
-            if (mediaStream && typeof window.SpeechSDK.AudioConfig.fromStreamInput === "function") {
-                try {
-                    audioConfig = window.SpeechSDK.AudioConfig.fromStreamInput(mediaStream);
-                } catch (_) {
-                    audioConfig = null;
-                }
-            }
-            if (!audioConfig) {
-                audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-            }
+            const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
             this.speechRecognizer = new window.SpeechSDK.TranslationRecognizer(speechConfig, audioConfig);
 
             this.speechRecognizer.recognizing = (s, e) => {
@@ -514,21 +756,42 @@ class WDOSMultilinguaMeeting {
                 const interimClean = e.result.text.trim();
                 if (!interimClean || this.isSystemEchoPhrase(interimClean)) return;
 
+                this.lastRecognizerActivityAt = Date.now();
                 this.hadVoiceInCurrentChunk = true;
                 this.triggerSpeakingPulse(this.userDisplayName, 1200);
                 const targetShort = this.getShortLang(this.listeningLang);
                 const liveTranslation = e.result.translations ? e.result.translations.get(targetShort) : null;
                 this.renderLiveCaption(this.userDisplayName, interimClean, liveTranslation || null, false);
+                // Continuous speech without pauses: push stable words out every ~8 words instead of waiting for silence
+                const streamChunk = this.takeStreamingChunk(interimClean, false, "azure");
+                if (streamChunk) {
+                    this.postTranscriptSegment(streamChunk, null, null);
+                }
             };
 
             this.speechRecognizer.recognized = async (s, e) => {
                 if (this.isSuppressedByTTS()) return;
                 if (e.result && e.result.text && e.result.text.trim()) {
                     const cleanText = e.result.text.trim();
-                    if (this.isSystemEchoPhrase(cleanText)) return;
+                    if (this.isSystemEchoPhrase(cleanText)) {
+                        this.streamCommittedWords = 0;
+                        return;
+                    }
+                    this.lastRecognizerActivityAt = Date.now();
+                    const alreadyStreamed = (this.streamCommittedWords || 0) > 0 && this.streamUtteranceKey === "azure";
+                    const remainder = this.takeStreamingChunk(cleanText, true, "azure");
 
                     this.hadVoiceInCurrentChunk = true;
                     this.triggerSpeakingPulse(this.userDisplayName, 1600);
+                    const targetShort = this.getShortLang(this.listeningLang);
+                    if (alreadyStreamed) {
+                        // Earlier words of this phrase were already sent; send only the unsent tail
+                        if (remainder) {
+                            this.renderLiveCaption(this.userDisplayName, cleanText, null, true);
+                            await this.postTranscriptSegment(remainder, null, null);
+                        }
+                        return;
+                    }
                     const allTranslations = {};
                     Object.values(azureData.supported_languages || {}).forEach((lang) => {
                         const tVal = e.result.translations ? e.result.translations.get(lang.short) : null;
@@ -536,11 +799,9 @@ class WDOSMultilinguaMeeting {
                             allTranslations[lang.short] = tVal.trim();
                         }
                     });
-                    const targetShort = this.getShortLang(this.listeningLang);
                     const sdkTranslation = allTranslations[targetShort] || null;
                     this.renderLiveCaption(this.userDisplayName, cleanText, sdkTranslation, true);
                     await this.postTranscriptSegment(cleanText, sdkTranslation, targetShort, allTranslations);
-                    await this.fetchLatestTranscript(false);
                 }
             };
 
@@ -714,7 +975,9 @@ class WDOSMultilinguaMeeting {
                 },
                 video: false
             });
-            this.startLiveVoiceRecorder(this.localAudioStream);
+            if (!this.livekitRoom || this.livekitRoom.state !== "connected") {
+                this.startLiveVoiceRecorder(this.localAudioStream);
+            }
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (!AudioCtx) return;
             this.audioContext = new AudioCtx();
@@ -752,6 +1015,7 @@ class WDOSMultilinguaMeeting {
                 const voiceBinsAvg = (freqData[1] + freqData[2] + freqData[3] + freqData[4] + freqData[5]) / (5 * 255);
                 if (rms > 0.006 || voiceBinsAvg > 0.012) {
                     this.hadVoiceInCurrentChunk = true;
+                    this.lastVoiceDetectedAt = Date.now();
                 }
             }, 80);
 
@@ -773,6 +1037,7 @@ class WDOSMultilinguaMeeting {
 
                 if (isVoiceDetected) {
                     this.hadVoiceInCurrentChunk = true;
+                    this.lastVoiceDetectedAt = Date.now();
                     this.speechPulseUntil = Math.max(this.speechPulseUntil || 0, Date.now() + 380);
                     this.activeSpeakingPerson = this.userDisplayName;
                 }
@@ -851,26 +1116,39 @@ class WDOSMultilinguaMeeting {
             clearTimeout(this.interimFlushTimer);
             this.interimFlushTimer = null;
         }
-        const pending = (this.pendingInterimText || "").trim();
+        const pendingFull = (this.pendingInterimText || "").trim();
         this.pendingInterimText = "";
         if (typeof this.pendingInterimMaxIndex === "number" && this.pendingInterimMaxIndex > (this.webSpeechCommittedIndex ?? -1)) {
             this.webSpeechCommittedIndex = this.pendingInterimMaxIndex;
         }
+        // Only send the words that were not already streamed out mid-sentence
+        const pending = this.takeStreamingChunk(pendingFull, true, "webspeech");
         if (!pending || this.isSystemEchoPhrase(pending)) return;
         this.triggerSpeakingPulse(this.userDisplayName, 2000);
-        this.renderLiveCaption(this.userDisplayName, pending, null, false);
+        this.renderLiveCaption(this.userDisplayName, pendingFull, null, false);
         await this.postTranscriptSegment(pending, null, null);
-        await this.fetchLatestTranscript(false);
     }
 
     startSpeechWatchdog() {
         this.stopSpeechWatchdog();
         this.speechWatchdogTimer = setInterval(() => {
-            if (this.isAudioMuted || this.speechRecognizer) return;
+            if (this.isAudioMuted) return;
+            if (this.speechRecognizer) {
+                const now = Date.now();
+                const voiceRecent = this.lastVoiceDetectedAt && (now - this.lastVoiceDetectedAt < 1200);
+                const lastRec = Math.max(this.lastRecognizerActivityAt || 0, this.lastUnmuteAt || 0);
+                if (voiceRecent && lastRec > 0 && (now - lastRec > 4200)) {
+                    try { this.speechRecognizer.stopContinuousRecognitionAsync(); } catch (_) {}
+                    try { this.speechRecognizer.close(); } catch (_) {}
+                    this.speechRecognizer = null;
+                    this.startWebSpeechFallback();
+                }
+                return;
+            }
             if (!this.webSpeechRecognizer) {
                 this.startWebSpeechFallback();
             }
-        }, 2200);
+        }, 2000);
     }
 
     stopSpeechWatchdog() {
@@ -936,12 +1214,12 @@ class WDOSMultilinguaMeeting {
                         this.interimFlushTimer = null;
                     }
                     this.pendingInterimText = "";
-                    const fullClean = finalPieces.join(" ").trim();
+                    const fullFinal = finalPieces.join(" ").trim();
+                    const fullClean = this.takeStreamingChunk(fullFinal, true, "webspeech");
                     if (fullClean && !this.isSystemEchoPhrase(fullClean)) {
                         this.triggerSpeakingPulse(this.userDisplayName, 2000);
-                        this.renderLiveCaption(this.userDisplayName, fullClean, null, false);
-                        await this.postTranscriptSegment(fullClean, null, null);
-                        await this.fetchLatestTranscript(false);
+                        this.renderLiveCaption(this.userDisplayName, fullFinal, null, false);
+                        this.postTranscriptSegment(fullClean, null, null);
                     }
                 }
 
@@ -951,11 +1229,16 @@ class WDOSMultilinguaMeeting {
                     this.pendingInterimMaxIndex = event.results.length - 1;
                     this.triggerSpeakingPulse(this.userDisplayName, 1500);
                     this.renderLiveCaption(this.userDisplayName, cleanInterim, null, false);
+                    // Continuous speech: push stable words out every ~8 words instead of waiting for a pause
+                    const streamChunk = this.takeStreamingChunk(cleanInterim, false, "webspeech");
+                    if (streamChunk) {
+                        this.postTranscriptSegment(streamChunk, null, null);
+                    }
                     if (this.interimFlushTimer) clearTimeout(this.interimFlushTimer);
-                    // If the speaker pauses for 1.05s without Chrome firing isFinal, commit the full statement immediately
+                    // If the speaker pauses for ~0.9s without Chrome firing isFinal, commit the rest immediately
                     this.interimFlushTimer = setTimeout(() => {
                         this.flushPendingInterimSpeech();
-                    }, 1050);
+                    }, 900);
                 }
             };
 
@@ -970,6 +1253,7 @@ class WDOSMultilinguaMeeting {
                 if (this.pendingInterimText) {
                     this.flushPendingInterimSpeech();
                 }
+                this.streamCommittedWords = 0;
                 this.webSpeechCommittedIndex = -1;
                 this.pendingInterimMaxIndex = -1;
                 if (!this.isAudioMuted && this.webSpeechRecognizer === recognizer) {
@@ -1000,6 +1284,7 @@ class WDOSMultilinguaMeeting {
         if (shouldUnmute) {
             this.isAudioMuted = false;
             this.lastUnmuteAt = Date.now();
+            this.lastRecognizerActivityAt = Date.now();
             this.isSyncingMedia = true;
             micBtns.forEach((btn) => {
                 btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> <span>Mic On · Speak Now</span>`;
@@ -1011,6 +1296,13 @@ class WDOSMultilinguaMeeting {
 
             // Immediately notify backend that participant unmuted BEFORE awaiting hardware getUserMedia
             const syncPromise = this.syncMediaState(false);
+
+            if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
+                try {
+                    await this.livekitRoom.localParticipant.setMicrophoneEnabled(true);
+                } catch (_) {}
+            }
+
             await this.startMicAudioVisualizer();
             this.lastUnmuteAt = Date.now();
             await syncPromise;
@@ -1019,13 +1311,19 @@ class WDOSMultilinguaMeeting {
             if (this.mediaStream) {
                 try { await this.mediaStream.unmuteAudio(); } catch (_) {}
             }
-            if (this.localAudioStream && this.azureData) {
-                await this.initAzureTranslation(this.azureData, this.localAudioStream);
+            if (!this.speechRecognizer && this.azureData) {
+                await this.initAzureTranslation(this.azureData);
             }
             if (this.speechRecognizer) {
                 this.speechRecognizer.startContinuousRecognitionAsync(
-                    () => {},
-                    () => { this.startWebSpeechFallback(); }
+                    () => {
+                        this.lastRecognizerActivityAt = Date.now();
+                        this.startSpeechWatchdog();
+                    },
+                    () => {
+                        this.speechRecognizer = null;
+                        this.startWebSpeechFallback();
+                    }
                 );
             } else {
                 this.startWebSpeechFallback();
@@ -1035,6 +1333,11 @@ class WDOSMultilinguaMeeting {
             this.stopSpeechWatchdog();
             if (this.pendingInterimText) {
                 this.flushPendingInterimSpeech();
+            }
+            if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
+                try {
+                    await this.livekitRoom.localParticipant.setMicrophoneEnabled(false);
+                } catch (_) {}
             }
             this.stopMicAudioVisualizer();
             this.syncMediaState(true);
@@ -1126,6 +1429,10 @@ class WDOSMultilinguaMeeting {
             clearInterval(this.pollTimer);
             this.pollTimer = null;
         }
+        if (this.tokenRefreshTimer) {
+            clearInterval(this.tokenRefreshTimer);
+            this.tokenRefreshTimer = null;
+        }
         this.stopSpeechWatchdog();
         if (this.interimFlushTimer) {
             clearTimeout(this.interimFlushTimer);
@@ -1146,6 +1453,13 @@ class WDOSMultilinguaMeeting {
             try { this.webSpeechRecognizer.onend = null; this.webSpeechRecognizer.stop(); } catch (_) {}
             this.webSpeechRecognizer = null;
         }
+        if (this.livekitRoom) {
+            try { this.livekitRoom.disconnect(); } catch (_) {}
+            this.livekitRoom = null;
+        }
+        if (this.remoteAudioElements) {
+            this.remoteAudioElements.clear();
+        }
         this.clearAudioQueue();
     }
 
@@ -1162,6 +1476,9 @@ class WDOSMultilinguaMeeting {
             try {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     throw new Error("Camera API unavailable in this browser.");
+                }
+                if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
+                    try { await this.livekitRoom.localParticipant.setCameraEnabled(true); } catch (_) {}
                 }
                 this.localVideoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
                 if (stageVideo) {
@@ -1195,6 +1512,9 @@ class WDOSMultilinguaMeeting {
                 this.setMicStatus("Webcam unavailable or blocked by browser — continuing with Voice & Interpretation stage.");
             }
         } else {
+            if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
+                try { await this.livekitRoom.localParticipant.setCameraEnabled(false); } catch (_) {}
+            }
             if (this.localVideoStream) {
                 this.localVideoStream.getTracks().forEach((t) => t.stop());
                 this.localVideoStream = null;
@@ -1242,6 +1562,7 @@ class WDOSMultilinguaMeeting {
         if ("speechSynthesis" in window) {
             try { window.speechSynthesis.cancel(); } catch (_) {}
         }
+        this.updateRemoteWebRTCAudioVolumes();
     }
 
     enqueueRawAudioChunk(audioDataUrl, speakerName) {
@@ -1286,12 +1607,14 @@ class WDOSMultilinguaMeeting {
         if (this.isPlayingQueueItem) return;
         if (this.isSpeakerAudioMuted || this.audioPlaybackQueue.length === 0) {
             this.isPlayingQueueItem = false;
+            this.updateRemoteWebRTCAudioVolumes();
             return;
         }
         const item = this.audioPlaybackQueue.shift();
         if (!item) return;
 
         this.isPlayingQueueItem = true;
+        this.updateRemoteWebRTCAudioVolumes();
         let finished = false;
         const estTimeout = item.type === "raw"
             ? 3600
@@ -1307,6 +1630,7 @@ class WDOSMultilinguaMeeting {
             clearTimeout(safetyTimer);
             this.currentAudioEl = null;
             this.isPlayingQueueItem = false;
+            this.updateRemoteWebRTCAudioVolumes();
             this.notifyTTSState(false);
             setTimeout(() => this.processAudioQueue(), item.type === "raw" ? 15 : 55);
         };
@@ -1382,7 +1706,14 @@ class WDOSMultilinguaMeeting {
         }
     }
 
-    async postTranscriptSegment(originalText, translatedText, targetShort, allTranslations = null) {
+    postTranscriptSegment(originalText, translatedText, targetShort, allTranslations = null) {
+        // Serialize posts so streamed chunks of one sentence reach the server (and listeners) in spoken order
+        const run = () => this._postTranscriptSegmentNow(originalText, translatedText, targetShort, allTranslations);
+        this.transcriptPostChain = (this.transcriptPostChain || Promise.resolve()).then(run, run);
+        return this.transcriptPostChain;
+    }
+
+    async _postTranscriptSegmentNow(originalText, translatedText, targetShort, allTranslations = null) {
         if (!this.transcriptUrl || !originalText || this.isSystemEchoPhrase(originalText)) return null;
         const normText = originalText.trim().toLowerCase();
         if (this.lastSubmittedText === normText && this.lastSubmittedAt && Date.now() - this.lastSubmittedAt < 3000) {
@@ -1412,6 +1743,9 @@ class WDOSMultilinguaMeeting {
             if (resp.ok) {
                 const data = await resp.json();
                 if (data.segment) {
+                    if (data.segment.id) {
+                        this.locallyPostedSegmentIds.add(String(data.segment.id));
+                    }
                     this.hasLiveSegments = true;
                     const shortListen = this.getShortLang(this.listeningLang);
                     const tText = (data.segment.translations || {})[shortListen] || data.segment.original_text;
@@ -1443,7 +1777,8 @@ class WDOSMultilinguaMeeting {
     }
 
     async fetchLatestTranscript(speakNewSegments = true) {
-        if (!this.transcriptUrl) return;
+        if (!this.transcriptUrl || this.isFetchingTranscript) return;
+        this.isFetchingTranscript = true;
         try {
             const shortListen = this.getShortLang(this.listeningLang);
             const audioSeqParam = this.lastSeenAudioSeq >= 0 ? `&after_audio_seq=${this.lastSeenAudioSeq}` : "";
@@ -1485,11 +1820,11 @@ class WDOSMultilinguaMeeting {
                 }
             }
 
-            // 3. Process live original voice audio chunks when Real-Time Translation is turned OFF
+            // 3. Process fallback original voice audio chunks only if LiveKit WebRTC is not connected
             if (typeof data.latest_audio_seq === "number") {
                 if (this.lastSeenAudioSeq < 0) {
                     this.lastSeenAudioSeq = data.latest_audio_seq;
-                } else if (Array.isArray(data.audio_chunks) && data.audio_chunks.length > 0) {
+                } else if (!this.hasActiveRemoteWebRTCAudio() && Array.isArray(data.audio_chunks) && data.audio_chunks.length > 0) {
                     for (const chunk of data.audio_chunks) {
                         if (chunk.seq > this.lastSeenAudioSeq) {
                             this.lastSeenAudioSeq = chunk.seq;
@@ -1503,6 +1838,8 @@ class WDOSMultilinguaMeeting {
                             }
                         }
                     }
+                } else {
+                    this.lastSeenAudioSeq = Math.max(this.lastSeenAudioSeq, data.latest_audio_seq);
                 }
             }
 
@@ -1550,6 +1887,15 @@ class WDOSMultilinguaMeeting {
 
             if (Array.isArray(data.participants)) {
                 this.participantCount = data.participants.length;
+                data.participants.forEach((p) => {
+                    if (p && p.id && p.speaking_language) {
+                        this.participantLanguagesById.set(String(p.id), p.speaking_language);
+                    }
+                    if (p && p.participant_name && p.speaking_language) {
+                        this.participantLanguagesByName.set(String(p.participant_name), p.speaking_language);
+                    }
+                });
+                this.updateRemoteWebRTCAudioVolumes();
                 this.renderParticipantsList(data.participants);
             }
 
@@ -1570,13 +1916,27 @@ class WDOSMultilinguaMeeting {
                     this.lastSeenSequence = newSegments[newSegments.length - 1].sequence_number;
                     if (speakNewSegments && prevSeq >= 0) {
                         for (const seg of newSegments) {
+                            const segKey = String(seg.id || seg.sequence_number);
+                            if (this.spokenSegmentIds.has(segKey)) continue;
+                            this.spokenSegmentIds.add(segKey);
+
                             this.triggerSpeakingPulse(seg.speaker_name, 3200);
-                            const isOtherSpeaker = seg.speaker_name !== this.userDisplayName;
+                            if (seg.speaker_name && seg.original_language) {
+                                this.participantLanguagesByName.set(String(seg.speaker_name), seg.original_language);
+                                this.updateRemoteWebRTCAudioVolumes();
+                            }
+                            const isLocallyPosted = this.locallyPostedSegmentIds.has(String(seg.id));
+                            const isOtherSpeaker = !isLocallyPosted && (
+                                seg.speaker_name !== this.userDisplayName ||
+                                Date.now() - (this.lastSubmittedAt || 0) > 4500
+                            );
                             const isDifferentLang = this.getShortLang(this.listeningLang) !== this.getShortLang(seg.original_language);
                             if (isOtherSpeaker || (this.participantCount <= 1 && isDifferentLang)) {
                                 // Only synthesize AI translated voice when Real-Time Translation is ON.
-                                // When Real-Time Translation is OFF, listeners hear ONLY the speaker's real human voice (never a bot/AI voice).
-                                if (this.isTranslationEnabled) {
+                                // When Real-Time Translation is OFF, listeners hear ONLY the speaker's real human voice over WebRTC.
+                                // When Real-Time Translation is ON and the speaker speaks the SAME language as the listener while WebRTC audio is active,
+                                // the listener already hears their real human voice live via WebRTC.
+                                if (this.isTranslationEnabled && (isDifferentLang || !this.hasActiveRemoteWebRTCAudio())) {
                                     const segTrans = (seg.translations || {})[shortListen] || seg.translated_text || seg.original_text;
                                     this.speakTranslation(segTrans, this.azureData, false, this.listeningLang);
                                 }
@@ -1596,6 +1956,8 @@ class WDOSMultilinguaMeeting {
             }
         } catch (err) {
             // Ignore transient polling errors
+        } finally {
+            this.isFetchingTranscript = false;
         }
     }
 
@@ -1756,6 +2118,7 @@ class WDOSMultilinguaMeeting {
     switchListeningLanguage(newLangCode) {
         const normalized = this.normalizeLangCode(newLangCode, "fr-FR");
         this.listeningLang = normalized;
+        this.updateRemoteWebRTCAudioVolumes();
         const langName = this.langNames[normalized] || normalized;
         const headerLabel = document.getElementById("caption-header-label");
         if (headerLabel) headerLabel.textContent = `LIVE TRANSLATION (${langName.toUpperCase()})`;
@@ -1776,6 +2139,11 @@ class WDOSMultilinguaMeeting {
 
     async restoreAudio() {
         try {
+            if (this.livekitRoom && typeof this.livekitRoom.startAudio === "function") {
+                try { await this.livekitRoom.startAudio(); } catch (_) {}
+            } else if (this.livekitData && this.livekitData.enabled) {
+                await this.initLiveKitMedia(this.livekitData);
+            }
             if (this.mediaStream) {
                 await this.mediaStream.stopAudio();
                 await this.mediaStream.startAudio({ mute: this.isAudioMuted });

@@ -1227,8 +1227,9 @@
 </div>
 
 {% if screen_code != "ROOM-02" and room_session.status != "COMPLETED" %}
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech-sdk.bundle-min.js" crossorigin="anonymous"></script>
-<script src="/static/foundation/js/multilingua_engine.js?v=17"></script>
+<script src="/static/foundation/js/multilingua_engine.js?v=20"></script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function() {

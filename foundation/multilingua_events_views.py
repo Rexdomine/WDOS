@@ -33,7 +33,7 @@ from .models import (
     ScheduledMeeting,
 )
 from .multilingua.azure_speech_adapter import AzureSpeechAdapter
-from .multilingua.zoom_adapter import ZoomVideoSDKAdapter
+from .multilingua.zoom_adapter import LiveKitAdapter, ZoomVideoSDKAdapter
 from .multilingua_events_engine import (
     STAGE10_SCREENS,
     SUPPORTED_SPEAKING_CHOICES,
@@ -814,6 +814,8 @@ def _serialize_room_participants(room_session: Optional[MeetingRoomSession]) -> 
             "id": str(p.id),
             "participant_name": p.participant_name,
             "meeting_role": p.meeting_role,
+            "speaking_language": p.speaking_language,
+            "listening_language": p.listening_language,
             "speaking_language_display": p.speaking_language_display,
             "listening_language_display": p.listening_language_display,
             "connection_status": p.connection_status,
@@ -1135,11 +1137,23 @@ def get_room_tokens_api(request, meeting_id: str):
     user_identity = str(profile.id) if profile else str(participant.id)
 
     try:
-        zoom_token = ZoomVideoSDKAdapter.generate_token(
+        livekit_data = LiveKitAdapter.generate_session_payload(
             session_name=room_session.session_name,
-            user_id=user_identity,
+            user_id=str(participant.id),
+            participant_name=participant.participant_name,
             role_type=role_type,
         )
+        try:
+            zoom_token = ZoomVideoSDKAdapter.generate_token(
+                session_name=room_session.session_name,
+                user_id=user_identity,
+                role_type=role_type,
+            )
+        except ValueError:
+            if not livekit_data.get("enabled"):
+                raise
+            zoom_token = ""
+
         azure_data = AzureSpeechAdapter.get_ephemeral_token()
 
         if is_host and room_session.status == "WAITING":
@@ -1152,6 +1166,7 @@ def get_room_tokens_api(request, meeting_id: str):
                 "status": "admitted",
                 "room_session_id": str(room_session.id),
                 "room_code": room_session.room_code,
+                "livekit": livekit_data,
                 "zoom": {
                     "session_name": room_session.session_name,
                     "token": zoom_token,

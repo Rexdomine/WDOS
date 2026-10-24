@@ -172,12 +172,18 @@ CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Stage 10 Multilingua & Event Provider Configuration
-MEETING_VIDEO_PROVIDER = os.getenv("MEETING_VIDEO_PROVIDER", "zoom")
+MEETING_VIDEO_PROVIDER = os.getenv("MEETING_VIDEO_PROVIDER", "livekit")
 MEETING_TRANSLATION_PROVIDER = os.getenv("MEETING_TRANSLATION_PROVIDER", "azure")
+LIVEKIT_URL = os.getenv("LIVEKIT_URL", "").strip()
+LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "").strip()
+LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "").strip()
 ZOOM_SDK_KEY = os.getenv("ZOOM_SDK_KEY", "wdos-dev-zoom-sdk-key")
 ZOOM_SDK_SECRET = os.getenv("ZOOM_SDK_SECRET", "wdos-dev-zoom-sdk-secret-hs256-min-32-bytes")
-AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "wdos-dev-azure-speech-key")
-AZURE_SPEECH_KEY_2 = os.getenv("AZURE_SPEECH_KEY_2", "")
-AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
+AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "wdos-dev-azure-speech-key").strip()
+AZURE_SPEECH_KEY_2 = os.getenv("AZURE_SPEECH_KEY_2", "").strip()
+AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus").strip()
+AZURE_TRANSLATOR_KEY = (os.getenv("AZURE_TRANSLATOR_KEY") or os.getenv("AZURE_TRANSLATION_KEY") or "").strip()
+AZURE_TRANSLATOR_KEY_2 = (os.getenv("AZURE_TRANSLATOR_KEY_2") or os.getenv("AZURE_TRANSLATION_KEY_2") or "").strip()
+AZURE_TRANSLATOR_REGION = (os.getenv("AZURE_TRANSLATOR_REGION") or os.getenv("AZURE_TRANSLATION_REGION") or "").strip()
 
 

@@ -70,3 +70,97 @@ class ZoomVideoSDKAdapter:
             raise ValueError("Malformed JWT token.")
         padded = parts[1] + "=" * (-len(parts[1]) % 4)
         return json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+
+
+class LiveKitAdapter:
+    """
+    Provider Adapter for LiveKit Cloud WebRTC (Real-Time Bidirectional Audio & Video).
+    Generates short-lived HS256 room access tokens for admitted WDOS participants.
+    """
+
+    @staticmethod
+    def is_configured() -> bool:
+        url = (getattr(settings, "LIVEKIT_URL", "") or "").strip()
+        api_key = (getattr(settings, "LIVEKIT_API_KEY", "") or "").strip()
+        api_secret = (getattr(settings, "LIVEKIT_API_SECRET", "") or "").strip()
+        return bool(
+            url
+            and api_key
+            and api_secret
+            and not api_key.startswith("your_")
+            and not api_secret.startswith("your_")
+            and not url.startswith("wss://your-")
+        )
+
+    @classmethod
+    def generate_token(
+        cls,
+        session_name: str,
+        user_id: str,
+        participant_name: str = "Participant",
+        role_type: int = 0,
+    ) -> str:
+        api_key = (getattr(settings, "LIVEKIT_API_KEY", "") or "").strip()
+        api_secret = (getattr(settings, "LIVEKIT_API_SECRET", "") or "").strip()
+        if not api_key or not api_secret:
+            raise ValueError("LiveKit Cloud credentials are not configured in settings.")
+
+        now = int(time.time())
+        iat = now - 30
+        exp = now + (60 * 60 * 4)  # 4 hours
+
+        payload = {
+            "iss": api_key,
+            "sub": str(user_id),
+            "name": str(participant_name or user_id),
+            "nbf": iat,
+            "iat": iat,
+            "exp": exp,
+            "video": {
+                "roomCreate": True,
+                "roomJoin": True,
+                "room": str(session_name),
+                "canPublish": True,
+                "canSubscribe": True,
+                "canPublishData": True,
+                "roomAdmin": bool(int(role_type) == 1),
+            },
+        }
+        if jwt is not None:
+            token = jwt.encode(payload, api_secret, algorithm="HS256")
+            return token if isinstance(token, str) else token.decode("utf-8")
+        return _encode_hs256_fallback(payload, api_secret)
+
+    @classmethod
+    def generate_session_payload(
+        cls,
+        session_name: str,
+        user_id: str,
+        participant_name: str = "Participant",
+        role_type: int = 0,
+    ) -> dict:
+        if not cls.is_configured():
+            return {
+                "enabled": False,
+                "url": "",
+                "room_name": session_name,
+                "token": "",
+                "role_type": int(role_type),
+            }
+        url = (getattr(settings, "LIVEKIT_URL", "") or "").strip()
+        token = cls.generate_token(
+            session_name=session_name,
+            user_id=user_id,
+            participant_name=participant_name,
+            role_type=role_type,
+        )
+        return {
+            "enabled": True,
+            "url": url,
+            "room_name": session_name,
+            "token": token,
+            "participant_identity": str(user_id),
+            "participant_name": str(participant_name or user_id),
+            "role_type": int(role_type),
+        }
+

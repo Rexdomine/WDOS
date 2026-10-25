@@ -5393,7 +5393,7 @@ def approved_vacancies_view(request):
                 expected_updated_at=expected_updated_at,
             )
             if res.get("conflict"):
-                state_card = _build_form_state_contracts("/foundation/leadership/vacancies/", "approved vacancies")["another_change"]
+                state_card = screen["state_contracts"]["another_change"]
                 result_message = res["message"]
                 result_success = False
             else:
@@ -5588,7 +5588,7 @@ def appointment_processing_view(request):
                 expected_updated_at=expected_updated_at,
             )
             if res.get("conflict"):
-                state_card = _build_form_state_contracts("/foundation/appointments/", "appointment processing")["another_change"]
+                state_card = s7_ctx["screen"]["state_contracts"]["another_change"]
                 result_message = res["message"]
                 result_success = False
             else:

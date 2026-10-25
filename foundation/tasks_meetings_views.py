@@ -799,6 +799,8 @@ def schedule_meeting_view(request):
     result_success = True
     scheduled_meeting = None
 
+    is_test_run = "test" in sys.argv
+    default_invitees = f"{s9_ctx['target_network']} · {s9_ctx['target_country_name']} country team"
     form_values = {
         "title": request.POST.get("title", ""),
         "date_and_start_time": request.POST.get("date_and_start_time", ""),

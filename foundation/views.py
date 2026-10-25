@@ -3512,8 +3512,8 @@ def test_approve_account_view(request, email=None):
     auto_login = request.POST.get("auto_login") == "1" or request.GET.get("auto_login") == "1"
     seed_requested = request.POST.get("seed_all") == "1" or request.GET.get("seed_all") == "1"
 
-    # Only provision test accounts if explicitly requested with seed_all=1
-    if seed_requested:
+    # Auto-provision Stage 05 role accounts if requested or if missing in test environment
+    if seed_requested or not Account.objects.filter(email="coordinator@example.org").exists():
         call_command("seed_test_accounts", stdout=io.StringIO())
  
     success_info = None

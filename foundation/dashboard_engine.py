@@ -65,6 +65,7 @@ def _screen(
     requires_safeguarding: bool = False,
     hero_banner: Optional[Dict[str, str]] = None,
     table_title: str = "Your work and follow-through",
+    table_rows: Optional[List[Dict[str, Any]]] = None,
     has_attention: bool = True,
     chart_card: Optional[Dict[str, Any]] = None,
     scoped_notice: str = DEFAULT_SCOPED_NOTICE,
@@ -94,8 +95,8 @@ def _screen(
             "view_all_label": "View all →",
             "view_all_url": "/foundation/work-queue/",
             "columns": columns,
-            "rows": [],
-            "record_count_text": "Showing 0 records in this view",
+            "rows": table_rows or [],
+            "record_count_text": f"Showing {len(table_rows or [])} records in this view",
         },
         "attention_card": {"title": "Attention required", "items": []} if has_attention else None,
         "chart_card": chart_card,
@@ -359,7 +360,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         support_note=DEFAULT_SUPPORT_NOTE,
     ),
     "DASH-11": _screen(
-        "DASH-11", "Regional overview", 129, "WGMN / NIGERIA",
+        "DASH-11", "Lagos regional overview", 129, "WGMN / NIGERIA / LAGOS",
         "state_lead", "State Coordinator", "WGMN", "NG",
         ["TASK", "OWNER", "DUE", "STATUS"],
         ["DASH-10", "DASH-12", "DASH-13", "DASH-14"],
@@ -370,7 +371,7 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         ),
     ),
     "DASH-12": _screen(
-        "DASH-12", "Local operations", 132, "WGMN / NIGERIA",
+        "DASH-12", "Ikeja local operations", 132, "WGMN / NIGERIA / IKEJA",
         "lga_lead", "LGA Coordinator", "WGMN", "NG",
         ["TASK", "OWNER", "DUE", "STATUS"],
         ["DASH-11", "DASH-13", "DASH-14"],
@@ -448,6 +449,29 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             ("Current step", "Evidence and reflection"),
             ("Time remaining", "Server deadline shown at runtime"),
         ),
+        table_rows=[
+            {
+                "item": "Welcome and responsibilities",
+                "col2": "Completed",
+                "status_label": "Read again",
+                "status_style": "purple",
+                "url": "/onboarding/1/",
+            },
+            {
+                "item": "Local community context",
+                "col2": "Completed",
+                "status_label": "View response",
+                "status_style": "purple",
+                "url": "/onboarding/2/",
+            },
+            {
+                "item": "Evidence and reflection",
+                "col2": "In progress",
+                "status_label": "Continue",
+                "status_style": "purple",
+                "url": "/onboarding/4/",
+            },
+        ],
         support_note="Ask your support team if you need guidance.",
     ),
     "DASH-16-NETWORK": _screen(
@@ -460,6 +484,29 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         secondary_action={"label": "Back", "url": "/foundation/dashboards/dash-16/"},
         has_tabs=False,
         table_title="Your volunteer application",
+        table_rows=[
+            {
+                "item": "Your application",
+                "col2": "Waiting for your next step",
+                "status_label": "Waiting for your next step",
+                "status_style": "amber",
+                "url": "/onboarding/4/",
+            },
+            {
+                "item": "What to do next",
+                "col2": "Complete the assigned introduction",
+                "status_label": "Complete the assigned introduction",
+                "status_style": "plain",
+                "url": "/onboarding/4/",
+            },
+            {
+                "item": "Need more time?",
+                "col2": "Ask the recruitment team",
+                "status_label": "Ask the recruitment team",
+                "status_style": "purple",
+                "url": "/auth/help/",
+            },
+        ],
         support_note=DEFAULT_SUPPORT_NOTE,
     ),
     "DASH-16-EVENT": _screen(
@@ -472,6 +519,29 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
         secondary_action={"label": "Back", "url": "/foundation/dashboards/dash-16/"},
         has_tabs=False,
         table_title="Your event volunteering",
+        table_rows=[
+            {
+                "item": "Your event",
+                "col2": "Assigned event example",
+                "status_label": "Assigned event example",
+                "status_style": "purple",
+                "url": "/foundation/work-queue/",
+            },
+            {
+                "item": "Your task",
+                "col2": "Check your event briefing",
+                "status_label": "Check your event briefing",
+                "status_style": "purple",
+                "url": "/foundation/work-queue/",
+            },
+            {
+                "item": "When and where",
+                "col2": "Open the confirmed event details",
+                "status_label": "Open the confirmed event details",
+                "status_style": "plain",
+                "url": "/foundation/work-queue/",
+            },
+        ],
         support_note=DEFAULT_SUPPORT_NOTE,
     ),
     "DASH-17": _screen(
@@ -492,6 +562,29 @@ DASHBOARD_SCREENS: Dict[str, Dict[str, Any]] = {
             ("Invitations", "Within your eligibility"),
             ("New resources", "Available to your relationships"),
         ),
+        table_rows=[
+            {
+                "item": "Peer-learning circle",
+                "col2": "Community invitation",
+                "status_label": "View details",
+                "status_style": "purple",
+                "url": "/foundation/work-queue/",
+            },
+            {
+                "item": "Digital confidence workshop",
+                "col2": "Programme participant",
+                "status_label": "RSVP",
+                "status_style": "purple",
+                "url": "/foundation/work-queue/",
+            },
+            {
+                "item": "Monthly community feedback",
+                "col2": "Member",
+                "status_label": "Share feedback",
+                "status_style": "purple",
+                "url": "/foundation/work-queue/",
+            },
+        ],
     ),
 }
 
@@ -740,6 +833,14 @@ def build_dashboard_context(
         elif norm_code == "DASH-10-CR" and active_country != "NG":
             screen_title = f"{country_display} · what needs attention"
             eyebrow = f"{active_network} / {country_display.upper()}"
+        elif norm_code == "DASH-11" and not is_explicit:
+            reg_name = user_scope.first_level_area or "Lagos"
+            screen_title = f"{reg_name} regional overview"
+            eyebrow = f"{active_network} / {country_display.upper()} / {reg_name.upper()}"
+        elif norm_code == "DASH-12" and not is_explicit:
+            dist_name = user_scope.second_level_area or "Ikeja"
+            screen_title = f"{dist_name} local operations"
+            eyebrow = f"{active_network} / {country_display.upper()} / {dist_name.upper()}"
         elif norm_code == "DASH-14" and not is_explicit:
             raw_chap = user_scope.chapter_name or "Chapter"
             chap_name = sanitize_chapter_display(raw_chap, fallback_country=active_country)
@@ -775,6 +876,96 @@ def build_dashboard_context(
             kpi_cards[2]["value"] = f"{kpis.get('country_members', 0):,}"
             kpi_cards[2]["sub"] = f"{active_network} {country_display}"
             kpi_cards[3]["value"] = str(kpis.get("country_verifications", 0))
+
+        if active_country != "NG":
+            country_profiles = {
+                "KE": {
+                    "rows": [
+                        {"item": "County Coordinator", "col2": "Nairobi", "col3": "Grace Waweru", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"item": "Assistant Coordinator", "col2": "Mombasa", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                        {"item": "Sub-County Coordinator", "col2": "Westlands", "col3": "David Ochieng", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
+                    ],
+                    "attention": [
+                        {"title": "County Coordinator (Nairobi)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"title": "Assistant Coordinator (Mombasa)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                    ],
+                    "bars": [
+                        {"label": "Nairobi", "value": 7, "color": "#E4C1D6"},
+                        {"label": "Mombasa", "value": 5, "color": "#E4C1D6"},
+                        {"label": "Kisumu", "value": 4, "color": "#E4C1D6"},
+                        {"label": "Nakuru", "value": 3, "color": "#D4006A"},
+                    ],
+                },
+                "GH": {
+                    "rows": [
+                        {"item": "Regional Coordinator", "col2": "Accra", "col3": "Kwesi Mensah", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"item": "Assistant Coordinator", "col2": "Kumasi", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                        {"item": "District Lead", "col2": "Tamale", "col3": "Abena Osei", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
+                    ],
+                    "attention": [
+                        {"title": "Regional Coordinator (Accra)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"title": "Assistant Coordinator (Kumasi)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                    ],
+                    "bars": [
+                        {"label": "Accra", "value": 6, "color": "#E4C1D6"},
+                        {"label": "Kumasi", "value": 5, "color": "#E4C1D6"},
+                        {"label": "Takoradi", "value": 3, "color": "#E4C1D6"},
+                        {"label": "Tamale", "value": 2, "color": "#D4006A"},
+                    ],
+                },
+                "AO": {
+                    "rows": [
+                        {"item": "Provincial Coordinator", "col2": "Luanda", "col3": "Manuel David", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"item": "Assistant Coordinator", "col2": "Benguela", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                        {"item": "Municipal Lead", "col2": "Huambo", "col3": "Rosa Santos", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
+                    ],
+                    "attention": [
+                        {"title": "Provincial Coordinator (Luanda)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"title": "Assistant Coordinator (Benguela)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                    ],
+                    "bars": [
+                        {"label": "Luanda", "value": 5, "color": "#E4C1D6"},
+                        {"label": "Benguela", "value": 3, "color": "#E4C1D6"},
+                        {"label": "Huambo", "value": 2, "color": "#E4C1D6"},
+                        {"label": "Lobito", "value": 1, "color": "#D4006A"},
+                    ],
+                },
+                "ET": {
+                    "rows": [
+                        {"item": "Regional Director", "col2": "Addis Ababa", "col3": "Tigist Bekele", "status_label": "Active", "status_style": "green", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"item": "Assistant Director", "col2": "Dire Dawa", "col3": "Unfilled", "status_label": "Vacant", "status_style": "purple", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                        {"item": "Zonal Coordinator", "col2": "Hawassa", "col3": "Abebe Haile", "status_label": "Onboarding", "status_style": "purple", "url": "/foundation/dashboards/dash-10-inactive/"},
+                    ],
+                    "attention": [
+                        {"title": "Regional Director (Addis Ababa)", "body": "Open the linked record, review the evidence and follow the next permitted action.", "action_label": "Active", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-coverage/"},
+                        {"title": "Assistant Director (Dire Dawa)", "body": "This vacancy requires nomination review within your assigned responsibilities.", "action_label": "Vacant", "action_style": "magenta", "url": "/foundation/dashboards/dash-10-pipeline/"},
+                    ],
+                    "bars": [
+                        {"label": "Addis Ababa", "value": 6, "color": "#E4C1D6"},
+                        {"label": "Dire Dawa", "value": 4, "color": "#E4C1D6"},
+                        {"label": "Hawassa", "value": 3, "color": "#E4C1D6"},
+                        {"label": "Adama", "value": 2, "color": "#D4006A"},
+                    ],
+                },
+            }
+            prof = country_profiles.get(active_country)
+            if prof:
+                if table_card:
+                    table_card["rows"] = prof["rows"]
+                    table_card["record_count_text"] = f"Showing {len(prof['rows'])} records in this view"
+                if attention_card:
+                    attention_card["items"] = prof["attention"]
+                if chart_card:
+                    chart_card["bars"] = prof["bars"]
+                related_screens = ["DASH-10-COVERAGE", "DASH-10-PIPELINE", "DASH-10-INACTIVE", "DASH-10-ATTENTION"]
+        elif norm_code == "DASH-10-COVERAGE" and active_country == "KE":
+            if table_card:
+                table_card["title"] = "Kenya leadership coverage"
+                table_card["rows"] = [
+                    {"item": "Nairobi · WGMN", "col2": "Principal and deputy active", "status_label": "Complete", "status_style": "green", "url": "/foundation/dashboard/"},
+                    {"item": "Mombasa · WGMN", "col2": "Principal only", "status_label": "Deputy vacancy", "status_style": "purple", "url": "/foundation/dashboard/"},
+                    {"item": "Kisumu · WGMN", "col2": "Deputy only", "status_label": "Principal vacancy", "status_style": "purple", "url": "/foundation/dashboard/"},
+                ]
     elif norm_code == "DASH-13":
         c_name = user_scope.community_cluster or user_scope.cluster_name
         c_unit = None
@@ -1164,7 +1355,7 @@ def build_dashboard_context(
                     })
             screen["hero_banner"] = hb
 
-    if norm_code != "DASH-15":
+    if norm_code not in ("DASH-15", "DASH-16", "DASH-16-NETWORK", "DASH-16-EVENT", "DASH-17"):
         is_global_screen = norm_code.startswith(("DASH-01", "DASH-02", "DASH-03", "DASH-04", "DASH-05", "DASH-06", "DASH-07", "DASH-08", "DASH-09")) or user_scope.can_cross_network
         net_q = Q() if is_global_screen else Q(network__in=[active_network, "ALL"])
         ctry_q = Q() if (is_global_screen or user_scope.allowed_countries == ["*"]) else Q(country__in=[active_country, "ALL"])
@@ -1237,7 +1428,7 @@ def build_dashboard_context(
                     "url": f"/foundation/tasks/{t.task_code}/",
                 })
 
-        if table_card and (norm_code != "DASH-13" or not table_card.get("rows")):
+        if table_card and (norm_code != "DASH-13" or not table_card.get("rows")) and not (norm_code == "DASH-10" and active_country != "NG"):
             table_card["rows"] = db_rows
             table_card["record_count_text"] = f"Showing {len(db_rows)} records in this view"
 
@@ -1307,27 +1498,128 @@ def build_dashboard_context(
             kpi_cards[0]["value"] = str(open_work_count)
             kpi_cards[1]["value"] = str(vacant_cnt)
             kpi_cards[2]["value"] = str(pending_drafts.count())
+        elif norm_code.startswith("DASH-03") and len(kpi_cards) >= 3:
+            from .models import CandidateApplication, AppointmentRecord
+            from accounts.models import DataImprovementFlag
+            apps_cnt = CandidateApplication.objects.filter(net_q, ctry_q, current_stage__in=["Submitted", "In review"]).count() + pending_drafts.count()
+            letters_cnt = AppointmentRecord.objects.filter(net_q, ctry_q, stage="Nominated").count()
+            conflicts_cnt = DataImprovementFlag.objects.filter(status="pending").count()
+            kpi_cards[0]["value"] = str(apps_cnt)
+            kpi_cards[1]["value"] = str(letters_cnt)
+            kpi_cards[2]["value"] = str(conflicts_cnt)
+        elif norm_code.startswith("DASH-04") and len(kpi_cards) >= 3:
+            from .models import Communication, HandoverAssetTask
+            access_cnt = AccessGrant.objects.filter(revoked_at__isnull=True).count()
+            doc_cnt = Communication.objects.filter(net_q, ctry_q).count()
+            handover_cnt = HandoverAssetTask.objects.filter(net_q, ctry_q).exclude(status__iexact="completed").count()
+            kpi_cards[0]["value"] = str(access_cnt)
+            kpi_cards[1]["value"] = str(doc_cnt)
+            kpi_cards[2]["value"] = str(handover_cnt)
+        elif norm_code.startswith("DASH-05") and len(kpi_cards) >= 3:
+            proposals_cnt = live_wis.filter(category="review").exclude(status="completed").count()
+            active_cnt = live_wis.filter(status="in_progress").count() + live_tasks.filter(status="In progress").count()
+            overdue_cnt = live_tasks.filter(status="Overdue").count()
+            kpi_cards[0]["value"] = str(proposals_cnt)
+            kpi_cards[1]["value"] = str(active_cnt)
+            kpi_cards[2]["value"] = str(overdue_cnt)
+        elif norm_code.startswith("DASH-06") and len(kpi_cards) >= 3:
+            from .models import Communication
+            media_cnt = Communication.objects.filter(net_q, ctry_q).count()
+            sched_cnt = live_wis.filter(status="in_progress").count()
+            deliv_cnt = live_wis.exclude(status="completed").count()
+            kpi_cards[0]["value"] = str(media_cnt)
+            kpi_cards[1]["value"] = str(sched_cnt)
+            kpi_cards[2]["value"] = str(deliv_cnt)
+        elif norm_code.startswith("DASH-07") and len(kpi_cards) >= 3:
+            reviews_cnt = live_wis.filter(category="review").exclude(status="completed").count()
+            ev_cnt = live_tasks.filter(status="Returned for correction").count()
+            exc_cnt = live_tasks.filter(status__in=["Blocked", "Escalated"]).count()
+            kpi_cards[0]["value"] = str(reviews_cnt)
+            kpi_cards[1]["value"] = str(ev_cnt)
+            kpi_cards[2]["value"] = str(exc_cnt)
+        elif norm_code.startswith("DASH-08") and len(kpi_cards) >= 3:
+            from accounts.models import DataImprovementFlag
+            incidents_cnt = (
+                live_wis.filter(category="incident").exclude(status="completed").count()
+                + live_alerts.filter(severity__in=["critical", "high"]).count()
+            )
+            reconcile_cnt = (
+                live_tasks.filter(status__in=["Blocked", "Returned for correction", "Overdue"]).count()
+                + live_wis.filter(status="blocked").count()
+                + DataImprovementFlag.objects.filter(status="pending").count()
+            )
+            signoff_cnt = live_tasks.filter(status__in=["Submitted", "Reviewed"], evidence_checked=False).count()
+            kpi_cards[0]["value"] = str(incidents_cnt)
+            kpi_cards[1]["value"] = str(reconcile_cnt)
+            kpi_cards[2]["value"] = str(signoff_cnt)
+        elif norm_code.startswith("DASH-09") and len(kpi_cards) >= 3:
+            from .models import HandoverAssetTask
+            findings_cnt = live_tasks.filter(status__in=["Returned for correction", "Blocked"]).count()
+            uat_cnt = live_tasks.filter(status="Submitted").count()
+            exc_cnt = HandoverAssetTask.objects.filter(net_q, ctry_q).exclude(status__iexact="completed").count()
+            kpi_cards[0]["value"] = str(findings_cnt)
+            kpi_cards[1]["value"] = str(uat_cnt)
+            kpi_cards[2]["value"] = str(exc_cnt)
+        elif norm_code == "DASH-10-REPORTING" and len(kpi_cards) >= 3:
+            kpi_cards[0]["value"] = str(DashboardReport.objects.filter(net_q, ctry_q, status__iexact="draft").count())
+            kpi_cards[1]["value"] = str(DashboardReport.objects.filter(net_q, ctry_q, status__iexact="needs_review").count())
+            kpi_cards[2]["value"] = str(DashboardReport.objects.filter(net_q, ctry_q, status__iexact="missed").count())
+        elif norm_code == "DASH-10-ENGAGEMENT" and len(kpi_cards) >= 3:
+            from .models import Communication
+            from accounts.models import OnboardingConsent
+            kpi_cards[0]["value"] = str(Communication.objects.filter(net_q, ctry_q).count())
+            kpi_cards[1]["value"] = str(live_wis.exclude(status="completed").count())
+            kpi_cards[2]["value"] = str(OnboardingConsent.objects.filter(optional_updates=False).count())
+        elif norm_code == "DASH-10-SAFEGUARDING" and len(kpi_cards) >= 3:
+            from .models import PrivacyRequest
+            kpi_cards[0]["value"] = str(PrivacyRequest.objects.all().count())
+            kpi_cards[1]["value"] = str(PrivacyRequest.objects.filter(status__icontains="waiting").count())
+            kpi_cards[2]["value"] = str(PrivacyRequest.objects.filter(decision__icontains="urgent").count())
         elif norm_code.startswith("DASH-10") and len(kpi_cards) >= 3:
             ctry_members = Membership.objects.filter(home__country=active_country).count()
             ctry_chaps = Chapter.objects.filter(country=active_country, status="active").count()
             kpi_cards[0].update({"value": str(ctry_members), "label": "Active members"})
             kpi_cards[1].update({"value": str(ctry_chaps), "label": "Active chapters"})
             kpi_cards[2].update({"value": str(open_work_count), "label": "Open actions"})
+        elif norm_code.startswith("DASH-11") and len(kpi_cards) >= 3:
+            units_cnt = LocalOrganisationUnit.objects.filter(country=active_country, network=active_network, level__in=["District / LGA", "Community Cluster", "Chapter"]).count()
+            tasks_cnt = live_tasks.exclude(status__in=["Closed", "Verified"]).count()
+            reports_cnt = DashboardReport.objects.filter(country=active_country, status__iexact="published").count()
+            kpi_cards[0]["value"] = str(units_cnt)
+            kpi_cards[1]["value"] = str(tasks_cnt)
+            kpi_cards[2]["value"] = str(reports_cnt)
+        elif norm_code.startswith("DASH-12") and len(kpi_cards) >= 3:
+            clusters_cnt = LocalOrganisationUnit.objects.filter(country=active_country, network=active_network, level="Community Cluster").count()
+            actions_cnt = live_wis.exclude(status="completed").count()
+            returns_cnt = live_tasks.filter(status__in=["Submitted", "Returned for correction"]).count()
+            kpi_cards[0]["value"] = str(clusters_cnt)
+            kpi_cards[1]["value"] = str(actions_cnt)
+            kpi_cards[2]["value"] = str(returns_cnt)
         elif norm_code.startswith("DASH-14") and len(kpi_cards) >= 3:
             chap_code = user_scope.chapter_code or ""
             chap_members = Membership.objects.filter(home__code=chap_code).count() if chap_code else 0
+            tasks_cnt = live_tasks.exclude(status__in=["Closed", "Verified"]).count()
             next_m = live_meetings.first()
             kpi_cards[0]["value"] = str(chap_members)
-            kpi_cards[1]["value"] = str(open_work_count)
+            kpi_cards[1]["value"] = str(tasks_cnt)
             kpi_cards[2]["value"] = next_m.scheduled_at.strftime("%d %b") if next_m and next_m.scheduled_at else "None"
         else:
             for idx, card in enumerate(kpi_cards):
-                if idx == 0:
-                    card["value"] = str(open_work_count)
-                elif idx == 1:
+                c_lbl = card.get("label", "").lower()
+                if any(w in c_lbl for w in ("meeting", "session", "calendar")):
                     card["value"] = str(live_meetings.count())
-                else:
+                elif any(w in c_lbl for w in ("incident", "alert", "threat")):
                     card["value"] = str(live_alerts.count())
+                elif any(w in c_lbl for w in ("reconciliation", "blocked", "exception", "failed")):
+                    card["value"] = str(live_tasks.filter(status__in=["Blocked", "Returned for correction", "Overdue"]).count())
+                elif any(w in c_lbl for w in ("evidence", "sign-off", "approval", "verification")):
+                    card["value"] = str(live_tasks.filter(status="Submitted").count())
+                elif any(w in c_lbl for w in ("vacancy", "seat")):
+                    card["value"] = str(LeadershipSeat.objects.filter(status__iexact="Vacant").count())
+                elif idx == 0:
+                    card["value"] = str(open_work_count)
+                else:
+                    card["value"] = "0"
 
     if not user_scope.can_cross_network:
         if eyebrow == "HQ / BOTH NETWORKS":
@@ -1361,6 +1653,8 @@ def build_dashboard_context(
 
     related_views = []
     for rel_code in related_screens:
+        if active_country != "NG" and rel_code in ("DASH-11", "DASH-12"):
+            continue
         rel_spec = DASHBOARD_SCREENS.get(rel_code, {})
         rel_label = rel_spec.get("title", "Operational view")
         if active_country != "NG" and rel_label.startswith("Nigeria"):

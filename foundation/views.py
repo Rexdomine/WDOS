@@ -301,6 +301,7 @@ def _get_authenticated_context(request):
         "font_size": user_pref.font_size if user_pref else "standard",
         "current_timezone": current_tz,
         "timezone": current_tz,
+        "can_access_wgmn": user_scope.can_access_network("WGMN") if user_scope else False,
     }
     return context, None
 
@@ -317,9 +318,9 @@ def _render_scope_error(request, context, exception):
     context["reason_code"] = raw_reason
     context["reason_label"] = raw_reason.replace("_", " ").title()
     context["leadership_level_label"] = raw_level.replace("_", " ").title()
-    context["recovery_url"] = getattr(exception, "recovery_url", "/foundation/")
+    context["recovery_url"] = getattr(exception, "recovery_url", "/foundation/dashboard/")
     context["breadcrumbs"] = [
-        {"label": "WDOS", "url": "/foundation/", "is_current": False},
+        {"label": "Home", "url": "/foundation/dashboard/", "is_current": False},
         {"label": "Access Restricted", "url": None, "is_current": True},
     ]
     return render(request, "foundation/error_scope.html", context, status=403)
@@ -417,6 +418,12 @@ def app_shell(request):
     ctx, redirect_response = _get_authenticated_context(request)
     if redirect_response:
         return redirect_response
+
+    # Workspace page at /foundation/ is removed in favor of Home (/foundation/dashboard/)
+    if request.GET.get("legacy") != "1":
+        qs = request.META.get("QUERY_STRING")
+        target = f"/foundation/dashboard/?{qs}" if qs else "/foundation/dashboard/"
+        return redirect(target)
 
     # Route to dashboard if explicitly requested via ?view=dashboard
     if request.GET.get("view") == "dashboard":
@@ -760,6 +767,7 @@ def network_workspace_view(request, network):
         "work_items": work_items,
         "breadcrumbs": breadcrumbs,
         "scope_label": f"{network} Network Workspace",
+        "active_nav": "wgmn_workspace" if network == "WGMN" else "network",
     })
     return render(request, "foundation/network_workspace.html", ctx)
 
@@ -814,6 +822,7 @@ def country_hub_view(request, network, country):
         "work_items": work_items,
         "breadcrumbs": breadcrumbs,
         "scope_label": f"{network} / {hub.name} Hub",
+        "active_nav": "wgmn_workspace" if network == "WGMN" else "network",
     })
     return render(request, "foundation/country_hub.html", ctx)
 
@@ -3480,8 +3489,7 @@ def dashboard_screen_view(request, screen_code=None):
     )
     ctx["active_nav"] = "workspace"
     ctx["breadcrumbs"] = [
-        {"label": "Workspace", "url": "/foundation/", "is_current": False},
-        {"label": dash_ctx.get("screen_title", "Dashboard"), "url": None, "is_current": True},
+        {"label": "Home", "url": "/foundation/dashboard/", "is_current": True},
     ]
 
     return render(request, "foundation/dashboards/dash_screen.html", ctx)
@@ -6271,11 +6279,11 @@ def _build_stage8_common_context(request, ctx: dict, screen_id: str) -> dict:
         "audit_history": audit_history,
         "is_recruitment_reviewer": is_stage8_reviewer(user_scope),
         "custom_breadcrumbs": [
-            {"label": "Workspace", "url": "/foundation/"},
+            {"label": "Home", "url": "/foundation/dashboard/"},
             {"label": "Recruitment, referrals and candidate journeys", "is_current": True},
         ],
         "breadcrumbs": [
-            {"label": "Workspace", "url": "/foundation/"},
+            {"label": "Home", "url": "/foundation/dashboard/"},
             {"label": "Recruitment, referrals and candidate journeys", "is_current": True},
         ],
         "active_nav": "people" if screen_id in {"REC-09", "REC-10", "REC-10-RUBRIC", "REC-11", "REC-12", "REC-12-DECISION", "REC-13", "REC-14"} else "workspace",

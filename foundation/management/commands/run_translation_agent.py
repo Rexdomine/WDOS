@@ -28,15 +28,29 @@ class Command(BaseCommand):
             action="store_true",
             help="Run a single reconciliation pass and exit.",
         )
+        parser.add_argument(
+            "--worker-id",
+            type=str,
+            default="",
+            help="Explicit worker identifier for distributed Redis lease ownership.",
+        )
+        parser.add_argument(
+            "--max-rooms",
+            type=int,
+            default=25,
+            help="Maximum number of active rooms this worker instance will lease.",
+        )
 
     def handle(self, *args, **options):
         once = bool(options.get("once"))
+        worker_id = str(options.get("worker_id") or "")
+        max_rooms = int(options.get("max_rooms") or 25)
         if once or "test" in sys.argv:
-            async_to_sync(self._run_async)(once=once)
+            async_to_sync(self._run_async)(once=once, worker_id=worker_id, max_rooms=max_rooms)
         else:
-            asyncio.run(self._run_async(once=False))
+            asyncio.run(self._run_async(once=False, worker_id=worker_id, max_rooms=max_rooms))
 
-    async def _run_async(self, once: bool = False) -> None:
+    async def _run_async(self, once: bool = False, worker_id: str = "", max_rooms: int = 25) -> None:
         stop_event = asyncio.Event()
 
         if not once:
@@ -50,7 +64,11 @@ class Command(BaseCommand):
                     except (ValueError, RuntimeError):
                         pass
 
-        supervisor = TranslationAgentSupervisor()
+        supervisor = TranslationAgentSupervisor(
+            worker_id=worker_id,
+            max_rooms=max_rooms,
+            is_standalone_worker=True,
+        )
         if "test" not in sys.argv:
             print("[WDOS Translation Agent] Background worker started. Monitoring active LiveKit rooms...", flush=True)
         try:

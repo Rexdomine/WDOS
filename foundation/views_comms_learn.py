@@ -119,7 +119,7 @@ def messages_inbox_view(request):
     state_feedback = contracts.get(state_contract)
 
     breadcrumbs = [
-        {"label": "Workspace", "url": "/foundation/"},
+        {"label": "Home", "url": "/foundation/dashboard/"},
         {"label": "Messaging, announcements and campaigns", "url": "", "is_current": True},
     ]
 
@@ -204,7 +204,7 @@ def learning_development_view(request):
     state_feedback = contracts.get(state_contract)
 
     breadcrumbs = [
-        {"label": "Workspace", "url": "/foundation/"},
+        {"label": "Home", "url": "/foundation/dashboard/"},
         {"label": "Learning and personal development", "url": "", "is_current": True},
     ]
 
@@ -284,7 +284,7 @@ def resources_view(request):
     state_feedback = contracts.get(state_contract)
 
     breadcrumbs = [
-        {"label": "Workspace", "url": "/foundation/"},
+        {"label": "Home", "url": "/foundation/dashboard/"},
         {"label": "Resources and institutional knowledge", "url": "", "is_current": True},
     ]
 

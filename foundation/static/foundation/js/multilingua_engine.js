@@ -19,6 +19,15 @@ class WDOSMultilinguaMeeting {
         this.userDisplayName = config.userDisplayName || "Participant";
         this.isHost = Boolean(config.isHost);
         this.isGuest = Boolean(config.isGuest);
+        this.canShareScreen = Boolean(config.canShareScreen ?? config.isHost);
+        this.allowParticipantScreenShare = Boolean(config.allowParticipantScreenShare);
+        this.activeScreensharePresenter = config.activeScreensharePresenter || "";
+        this.isScreenSharing = false;
+        this.localScreenStream = null;
+        this.activeScreenTrack = null;
+        this.chatUrl = config.chatUrl || `/api/rooms/${this.roomCode}/chat/`;
+        this.seenChatIds = new Set();
+        this.unreadChatCount = 0;
 
         // Language State
         this.speakingLang = config.speakingLang || "en-US";
@@ -34,6 +43,8 @@ class WDOSMultilinguaMeeting {
         this.botActiveSpeakerByLang = new Map();
         this.lastServerCaptionAt = 0;
         this.remoteAudioElements = new Map();
+        this.remoteCameraTracks = new Map();
+        this.localCameraTrack = null;
         this.participantLanguagesById = new Map();
         this.participantLanguagesByName = new Map();
         this.myParticipantId = null;
@@ -58,6 +69,17 @@ class WDOSMultilinguaMeeting {
         this.visualizerFrame = null;
         this.speechRecognizer = null;
         this.webSpeechRecognizer = null;
+
+        // Multi-Participant Video Grid & Delta Reconciliation State
+        this.stageLayout = "grid"; // "grid" | "speaker"
+        this.pinnedParticipantId = null;
+        this.gridPage = 0;
+        this.gridPageSize = 12;
+        this.cachedParticipants = [];
+        this.cachedSegments = [];
+        this.speakingParticipantIds = new Set();
+        this.lastStateVersion = "";
+        this.unchangedPollStreak = 0;
 
         // Media & Sync Flags
         this.isAudioMuted = true;
@@ -180,7 +202,195 @@ class WDOSMultilinguaMeeting {
         this.startLivePolling();
     }
 
+    initPrejoinStudio() {
+        const camBtn = document.getElementById("btn-toggle-cam");
+        const micBtn = document.getElementById("btn-toggle-mic");
+        const previewVideo = document.getElementById("prejoin-preview");
+        const avatarBox = document.getElementById("stage-avatar-container");
+        const micMeter = document.getElementById("prejoin-mic-meter");
+        const micLabel = document.getElementById("prejoin-mic-label");
+        const camBadge = document.getElementById("prejoin-cam-badge");
+        const prejoinForm = document.getElementById("room-01-form");
+
+        let prejoinVideoStream = null;
+        let prejoinAudioStream = null;
+        let prejoinAudioCtx = null;
+        let prejoinAnalyser = null;
+        let prejoinAnimFrame = null;
+
+        const stopAudioTest = () => {
+            if (prejoinAnimFrame) cancelAnimationFrame(prejoinAnimFrame);
+            prejoinAnimFrame = null;
+            if (prejoinAudioStream) {
+                prejoinAudioStream.getTracks().forEach((t) => t.stop());
+                prejoinAudioStream = null;
+            }
+            if (prejoinAudioCtx) {
+                try { prejoinAudioCtx.close(); } catch (_) {}
+                prejoinAudioCtx = null;
+            }
+            if (micMeter) micMeter.style.display = "none";
+            if (micBtn) {
+                micBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> <span>Test Mic</span>`;
+                micBtn.style.background = "";
+                micBtn.style.borderColor = "";
+                micBtn.style.color = "";
+            }
+        };
+
+        const stopVideoTest = () => {
+            if (prejoinVideoStream) {
+                prejoinVideoStream.getTracks().forEach((t) => t.stop());
+                prejoinVideoStream = null;
+            }
+            if (previewVideo) {
+                previewVideo.srcObject = null;
+                previewVideo.style.display = "none";
+            }
+            if (avatarBox) avatarBox.style.display = "flex";
+            if (camBadge) {
+                camBadge.textContent = "📷 Camera Off";
+                camBadge.style.background = "rgba(0,0,0,0.5)";
+                camBadge.style.color = "#D8CBD9";
+            }
+            if (camBtn) {
+                camBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> <span>Turn Camera On</span>`;
+                camBtn.style.background = "";
+                camBtn.style.borderColor = "";
+                camBtn.style.color = "";
+            }
+        };
+
+        // Camera Toggle
+        if (camBtn) {
+            camBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                if (prejoinVideoStream) {
+                    stopVideoTest();
+                } else {
+                    try {
+                        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                            alert("Camera access is not supported by your browser.");
+                            return;
+                        }
+                        camBtn.textContent = "Starting Camera...";
+                        prejoinVideoStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false });
+                        if (previewVideo) {
+                            previewVideo.srcObject = prejoinVideoStream;
+                            previewVideo.style.display = "block";
+                            previewVideo.play().catch(() => {});
+                        }
+                        if (avatarBox) avatarBox.style.display = "none";
+                        if (camBadge) {
+                            camBadge.textContent = "🟢 Camera Active";
+                            camBadge.style.background = "rgba(22,163,74,0.3)";
+                            camBadge.style.color = "#86EFAC";
+                        }
+                        camBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> <span>Turn Camera Off</span>`;
+                        camBtn.style.background = "#1F2937";
+                        camBtn.style.borderColor = "#4B5563";
+                        camBtn.style.color = "#FFFFFF";
+                    } catch (err) {
+                        console.warn("Prejoin camera access error:", err);
+                        stopVideoTest();
+                        alert("Camera unavailable or permission denied. You can still join the room with audio.");
+                    }
+                }
+            });
+        }
+
+        // Mic Test Toggle
+        if (micBtn) {
+            micBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                this.unlockAudioPlayback();
+                if (prejoinAudioStream) {
+                    stopAudioTest();
+                } else {
+                    try {
+                        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                            alert("Microphone access is not supported by your browser.");
+                            return;
+                        }
+                        micBtn.textContent = "Connecting Mic...";
+                        prejoinAudioStream = await navigator.mediaDevices.getUserMedia({
+                            audio: { echoCancellation: true, noiseSuppression: true },
+                            video: false
+                        });
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (AudioCtx) {
+                            prejoinAudioCtx = new AudioCtx();
+                            if (prejoinAudioCtx.state === "suspended") {
+                                await prejoinAudioCtx.resume();
+                            }
+                            const source = prejoinAudioCtx.createMediaStreamSource(prejoinAudioStream);
+                            prejoinAnalyser = prejoinAudioCtx.createAnalyser();
+                            prejoinAnalyser.fftSize = 128;
+                            source.connect(prejoinAnalyser);
+
+                            const bars = document.querySelectorAll(".prejoin-eq-bar");
+                            const dataArray = new Uint8Array(prejoinAnalyser.frequencyBinCount);
+
+                            if (micMeter) micMeter.style.display = "inline-flex";
+                            if (micLabel) micLabel.textContent = "Testing mic... Speak now";
+
+                            const drawMeter = () => {
+                                if (!prejoinAudioStream || !prejoinAnalyser) return;
+                                prejoinAnalyser.getByteFrequencyData(dataArray);
+                                let sum = 0;
+                                for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                                const avg = sum / dataArray.length;
+
+                                bars.forEach((b, idx) => {
+                                    const val = dataArray[idx * 3] || avg;
+                                    const height = Math.max(4, Math.min(22, Math.round((val / 255) * 22)));
+                                    b.style.height = `${height}px`;
+                                    if (avg > 14) {
+                                        b.style.background = "#22C55E";
+                                    } else {
+                                        b.style.background = "#4ADE80";
+                                    }
+                                });
+
+                                if (avg > 16 && micLabel) {
+                                    micLabel.textContent = "✅ Mic is working! Audio detected.";
+                                    micLabel.style.color = "#86EFAC";
+                                }
+                                prejoinAnimFrame = requestAnimationFrame(drawMeter);
+                            };
+                            drawMeter();
+                        }
+                        micBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> <span>Stop Mic Test</span>`;
+                        micBtn.style.background = "#15803D";
+                        micBtn.style.borderColor = "#22C55E";
+                        micBtn.style.color = "#FFFFFF";
+                    } catch (err) {
+                        console.warn("Prejoin mic access error:", err);
+                        stopAudioTest();
+                        alert("Microphone unavailable or permission denied. Check your browser permissions.");
+                    }
+                }
+            });
+        }
+
+        // Clean up test media when submitting the form to enter the meeting
+        if (prejoinForm) {
+            prejoinForm.addEventListener("submit", () => {
+                stopVideoTest();
+                stopAudioTest();
+            });
+        }
+        window.addEventListener("beforeunload", () => {
+            stopVideoTest();
+            stopAudioTest();
+        });
+    }
+
     bindUIControls() {
+        if (document.getElementById("prejoin-screen")) {
+            this.initPrejoinStudio();
+            return;
+        }
         const micBtns = document.querySelectorAll("#btn-toggle-mic, #btn-start-speaking");
         micBtns.forEach((btn) => {
             btn.addEventListener("click", async (e) => {
@@ -196,6 +406,93 @@ class WDOSMultilinguaMeeting {
                 e.preventDefault();
                 await this.toggleCamera();
             });
+        });
+
+        const screenShareBtns = document.querySelectorAll("#btn-toggle-screenshare");
+        screenShareBtns.forEach((btn) => {
+            btn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                await this.toggleScreenShare();
+            });
+        });
+        this.updateScreenShareButtonVisibility();
+
+        const stopOverlayBtn = document.getElementById("btn-stop-screenshare-overlay");
+        if (stopOverlayBtn) {
+            stopOverlayBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                await this.stopScreenShare();
+            });
+        }
+
+        // Layout switcher & Fullscreen & Grid Pagination controls
+        const gridLayoutBtn = document.getElementById("btn-layout-grid");
+        const speakerLayoutBtn = document.getElementById("btn-layout-speaker");
+        if (gridLayoutBtn) {
+            gridLayoutBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.setStageLayout("grid");
+            });
+        }
+        if (speakerLayoutBtn) {
+            speakerLayoutBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.setStageLayout("speaker");
+            });
+        }
+        const fullscreenBtn = document.getElementById("btn-stage-fullscreen");
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.toggleStageFullscreen();
+            });
+        }
+        const gridPrevBtn = document.getElementById("btn-grid-prev");
+        const gridNextBtn = document.getElementById("btn-grid-next");
+        if (gridPrevBtn) {
+            gridPrevBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.changeGridPage(-1);
+            });
+        }
+        if (gridNextBtn) {
+            gridNextBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.changeGridPage(1);
+            });
+        }
+
+        // Live Emoji Reactions via LiveKit WebRTC DataChannel
+        document.querySelectorAll(".zm-reaction-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+                e.preventDefault();
+                const emoji = btn.getAttribute("data-reaction");
+                if (emoji) {
+                    this.sendReaction(emoji);
+                }
+            });
+        });
+
+        // Hardware Audio/Video Device Selectors
+        this.initHardwareDeviceSelectors();
+
+        window.addEventListener("pagehide", () => {
+            if (this.myParticipantId && this.switchLangUrl) {
+                const data = new URLSearchParams();
+                data.append("action", "leave_room");
+                data.append("participant_id", this.myParticipantId);
+                data.append("is_beacon", "1");
+                data.append("csrfmiddlewaretoken", this.getCsrfToken());
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon(this.switchLangUrl, data);
+                }
+            }
+        });
+
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden && this.transcriptUrl) {
+                this.fetchLatestTranscript(false);
+            }
         });
 
         const handBtn = document.getElementById("btn-raise-hand");
@@ -259,8 +556,6 @@ class WDOSMultilinguaMeeting {
                     if (labelEl) labelEl.textContent = "Voice Output: ON";
                     if (this.isTranslationEnabled && this.lastTranslatedText) {
                         this.speakTranslation(this.lastTranslatedText, this.azureData, true);
-                    } else if (!this.isTranslationEnabled && this.lastRawAudioDataUrl) {
-                        this.enqueueRawAudioChunk(this.lastRawAudioDataUrl, "Speaker");
                     }
                 }
             });
@@ -282,10 +577,6 @@ class WDOSMultilinguaMeeting {
                     ttsBtn.style.borderColor = "rgba(134,239,172,0.35)";
                 }
                 if (!this.isTranslationEnabled) {
-                    if (this.lastRawAudioDataUrl) {
-                        this.clearAudioQueue();
-                        this.enqueueRawAudioChunk(this.lastRawAudioDataUrl, "Speaker");
-                    }
                     return;
                 }
                 const textToSpeak = this.lastTranslatedText || document.getElementById("caption-translated-text")?.textContent || document.getElementById("caption-text")?.textContent;
@@ -294,6 +585,65 @@ class WDOSMultilinguaMeeting {
                 }
             });
         }
+
+        const recBtn = document.getElementById("btn-toggle-cloud-recording");
+        if (recBtn) {
+            recBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.toggleCloudRecording();
+            });
+        }
+
+        const webModeBtn = document.getElementById("btn-toggle-webinar-mode");
+        if (webModeBtn) {
+            webModeBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.toggleWebinarMode();
+            });
+        }
+
+        const bgBlurBtn = document.getElementById("btn-toggle-bg-blur");
+        if (bgBlurBtn) {
+            bgBlurBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.toggleBackgroundBlur();
+            });
+        }
+
+        document.addEventListener("click", async (e) => {
+            const voteBtn = e.target.closest(".js-vote-poll-btn");
+            if (voteBtn && this.switchLangUrl) {
+                const pollId = voteBtn.getAttribute("data-poll-id");
+                const optIdx = voteBtn.getAttribute("data-opt-idx");
+                if (pollId && optIdx !== null) {
+                    const formData = new URLSearchParams();
+                    formData.append("action", "vote_poll");
+                    formData.append("poll_id", pollId);
+                    formData.append("option_index", optIdx);
+                    try {
+                        const resp = await fetch(this.switchLangUrl, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/x-www-form-urlencoded",
+                                "X-CSRFToken": this.getCsrfToken(),
+                                "X-Requested-With": "XMLHttpRequest"
+                            },
+                            body: formData.toString()
+                        });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            if (data.poll) {
+                                this.cachedPolls = this.cachedPolls || [];
+                                const idx = this.cachedPolls.findIndex((p) => p.id === data.poll.id);
+                                if (idx >= 0) this.cachedPolls[idx] = data.poll;
+                                else this.cachedPolls.push(data.poll);
+                                this.renderPolls(this.cachedPolls);
+                            }
+                        }
+                    } catch (_) {}
+                }
+            }
+        });
 
         const speakForms = document.querySelectorAll("#live-speech-form, #room-04-speak-form");
         speakForms.forEach((form) => {
@@ -317,6 +667,49 @@ class WDOSMultilinguaMeeting {
                 await this.fetchLatestTranscript(true);
             });
         });
+
+        const chatForm = document.getElementById("room-chat-form");
+        const chatInput = document.getElementById("room-chat-input");
+        if (chatForm) {
+            chatForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                await this.submitChatMessage(chatForm);
+            });
+        }
+        if (chatInput) {
+            chatInput.addEventListener("keydown", async (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (chatForm) await this.submitChatMessage(chatForm);
+                }
+            });
+        }
+
+        const existingMsgEls = document.querySelectorAll("#room-chat-feed .zm-chat-msg");
+        existingMsgEls.forEach((el) => {
+            const id = el.getAttribute("data-chat-id");
+            if (id) {
+                this.seenChatIds.add(String(id));
+            }
+        });
+
+        let alreadyRead = false;
+        try {
+            if (this.roomCode && sessionStorage.getItem(`wdos_chat_read_${this.roomCode}`) === "1") {
+                alreadyRead = true;
+            }
+        } catch (_) {}
+
+        if (this.isChatTabActive() || alreadyRead) {
+            this.clearUnreadChatCount();
+        } else {
+            const dockBadge = document.getElementById("dock-chat-badge");
+            if (dockBadge && dockBadge.style.display !== "none") {
+                this.unreadChatCount = parseInt(dockBadge.textContent, 10) || 0;
+            } else {
+                this.unreadChatCount = 0;
+            }
+        }
 
         const quickLangSelect = document.getElementById("quick-switch-lang");
         if (quickLangSelect) {
@@ -370,6 +763,13 @@ class WDOSMultilinguaMeeting {
         });
 
         document.addEventListener("click", async (e) => {
+            const pinBtn = e.target && e.target.closest ? e.target.closest(".js-pin-tile-btn") : null;
+            if (pinBtn) {
+                e.preventDefault();
+                const pid = pinBtn.getAttribute("data-participant-id");
+                if (pid) this.togglePinParticipant(pid);
+                return;
+            }
             const btn = e.target && e.target.closest ? e.target.closest(".js-host-ajax-form button[type='submit']") : null;
             if (btn && btn.form) {
                 e.preventDefault();
@@ -417,13 +817,33 @@ class WDOSMultilinguaMeeting {
                 if (data && data.message) {
                     this.setMicStatus(data.message);
                 }
+                if (data && typeof data.allow_participant_screen_share === "boolean") {
+                    this.allowParticipantScreenShare = data.allow_participant_screen_share;
+                    const policyBtn = document.getElementById("btn-toggle-screenshare-policy");
+                    const policyInput = document.getElementById("input-screenshare-policy-action");
+                    const policyLabel = document.getElementById("screenshare-policy-btn-label");
+                    if (policyLabel) {
+                        policyLabel.textContent = data.allow_participant_screen_share ? "Screen Share: All Allowed" : "Screen Share: Host Only";
+                    }
+                    if (policyBtn) {
+                        policyBtn.style.background = data.allow_participant_screen_share ? "#DCFCE7" : "#F3F4F6";
+                        policyBtn.style.color = data.allow_participant_screen_share ? "#166534" : "#4B5563";
+                        policyBtn.style.borderColor = data.allow_participant_screen_share ? "#86EFAC" : "#E5E7EB";
+                    }
+                    if (policyInput) {
+                        policyInput.value = data.allow_participant_screen_share ? "host_only" : "all_participants";
+                    }
+                }
                 if (data && Array.isArray(data.waiting_participants)) {
                     this.renderWaitingRoomQueue(data.waiting_participants, true);
                 }
                 if (data && Array.isArray(data.participants)) {
                     this.participantCount = data.participants.length;
+                    this.cachedParticipants = data.participants;
                     this.renderParticipantsList(data.participants, true);
+                    this.renderVideoGrid(data.participants);
                 }
+                this.lastStateVersion = "";
                 await this.fetchLatestTranscript(false);
             }
         } catch (_) {
@@ -472,11 +892,27 @@ class WDOSMultilinguaMeeting {
             }
             this.switchListeningLanguage(this.listeningLang);
 
-            await this.initLiveKitMedia(data.livekit);
+            const lkConnected = await this.initLiveKitMedia(data.livekit);
             await this.initZoomMedia(data.zoom);
             this.startTokenRefreshTimer();
-            this.updateDiagnosticsUI("Connected", 28);
-            this.setMicStatus(`Connected as ${this.userDisplayName} · Speaking ${this.langNames[this.speakingLang] || this.speakingLang} · Hearing ${this.langNames[this.listeningLang] || this.listeningLang}`);
+            if (lkConnected) {
+                this.lkReconnectAttempt = 0;
+                if (this.lkReconnectTimer) {
+                    clearTimeout(this.lkReconnectTimer);
+                    this.lkReconnectTimer = null;
+                }
+                this.updateDiagnosticsUI("Connected", 28);
+                this.setMicStatus(`Connected as ${this.userDisplayName} · Speaking ${this.langNames[this.speakingLang] || this.speakingLang} · Hearing ${this.langNames[this.listeningLang] || this.listeningLang}`);
+            } else if (data.livekit && data.livekit.enabled) {
+                this.updateConnectionQualityPill("poor");
+                const qText = document.getElementById("webrtc-quality-text");
+                if (qText) qText.textContent = "LiveKit SFU Reconnecting";
+                this.setMicStatus("LiveKit WebRTC SFU connection unavailable (check LiveKit Cloud plan quota or network) — retrying automatically...");
+                this.scheduleLiveKitReconnect();
+            } else {
+                this.updateDiagnosticsUI("Connected", 28);
+                this.setMicStatus(`Connected as ${this.userDisplayName} · Speaking ${this.langNames[this.speakingLang] || this.speakingLang} · Hearing ${this.langNames[this.listeningLang] || this.listeningLang}`);
+            }
             return data;
         } catch (err) {
             console.warn("[WDOS Multilingua] Operating in degraded caption fallback:", err);
@@ -506,6 +942,12 @@ class WDOSMultilinguaMeeting {
             const room = new LK.Room({
                 adaptiveStream: true,
                 dynacast: true,
+                videoCaptureDefaults: {
+                    resolution: { width: 1280, height: 720, frameRate: 30 }
+                },
+                publishDefaults: {
+                    simulcast: true
+                },
                 audioCaptureDefaults: {
                     echoCancellation: true,
                     noiseSuppression: true,
@@ -513,6 +955,20 @@ class WDOSMultilinguaMeeting {
                 }
             });
             this.livekitRoom = room;
+
+            const getParticipantBaseId = (participant) => {
+                if (!participant) return "";
+                if (participant.metadata) {
+                    try {
+                        const parsed = JSON.parse(participant.metadata);
+                        if (parsed && parsed.participant_id) {
+                            return String(parsed.participant_id);
+                        }
+                    } catch (_) {}
+                }
+                const rawIdentity = String(participant.identity || "");
+                return rawIdentity.split("__")[0];
+            };
 
             const syncParticipantMetadata = (participant) => {
                 if (!participant) return "";
@@ -542,6 +998,14 @@ class WDOSMultilinguaMeeting {
             const isBotParticipant = (participant) => {
                 const ident = participant ? String(participant.identity || "") : "";
                 return ident.startsWith("wdos-translator-bot");
+            };
+
+            const isScreenShareTrack = (track, publication) => {
+                const screenSrc = (LK.Track && LK.Track.Source) ? LK.Track.Source.ScreenShare : "screen_share";
+                return Boolean(
+                    (publication && (publication.source === "screen_share" || publication.source === screenSrc || (publication.trackName && publication.trackName.includes("screen")))) ||
+                    (track && (track.source === "screen_share" || track.source === screenSrc))
+                );
             };
 
             const checkBotPresence = () => {
@@ -617,16 +1081,27 @@ class WDOSMultilinguaMeeting {
                 }
             };
 
-            const attachVideo = (track) => {
+            const attachVideo = (track, participant, publication = null) => {
                 if (!track || track.kind !== "video") return;
-                if (!this.isVideoOff) return;
-                const stageVideo = document.getElementById("live-stage-video");
-                const speakerAvatarBox = document.getElementById("stage-avatar-container");
-                if (stageVideo) {
-                    track.attach(stageVideo);
-                    stageVideo.style.display = "block";
-                    if (speakerAvatarBox) speakerAvatarBox.style.display = "none";
+                if (isScreenShareTrack(track, publication)) {
+                    this.attachRemoteScreenTrack(track, participant);
+                    return;
                 }
+                const baseId = getParticipantBaseId(participant) || (participant && participant.identity) || "remote";
+                this.remoteCameraTracks.set(String(baseId), { track, publication, participant });
+                this.attachCameraTrackToTile(String(baseId), track, false, participant);
+                this.updateStageViewMode();
+            };
+
+            const detachVideo = (track, participant, publication = null) => {
+                if (isScreenShareTrack(track, publication)) {
+                    this.detachScreenTrack();
+                    return;
+                }
+                const baseId = getParticipantBaseId(participant) || (participant && participant.identity) || "remote";
+                this.remoteCameraTracks.delete(String(baseId));
+                this.detachCameraTrackFromTile(String(baseId));
+                this.updateStageViewMode();
             };
 
             if (LK.RoomEvent.ParticipantConnected) {
@@ -637,6 +1112,8 @@ class WDOSMultilinguaMeeting {
                         this.publishLangChangeToBot();
                     } else {
                         syncParticipantMetadata(participant);
+                        this.lastStateVersion = "";
+                        this.fetchLatestTranscript(false);
                     }
                     this.updateRemoteWebRTCAudioVolumes();
                 });
@@ -647,6 +1124,14 @@ class WDOSMultilinguaMeeting {
                     if (isBotParticipant(participant)) {
                         this.botLanguageTracks.clear();
                         this.botActiveSpeakerByLang.clear();
+                    } else {
+                        const baseId = getParticipantBaseId(participant);
+                        if (baseId) {
+                            this.remoteCameraTracks.delete(String(baseId));
+                            this.detachCameraTrackFromTile(String(baseId));
+                        }
+                        this.lastStateVersion = "";
+                        this.fetchLatestTranscript(false);
                     }
                     checkBotPresence();
                     this.updateRemoteWebRTCAudioVolumes();
@@ -657,15 +1142,38 @@ class WDOSMultilinguaMeeting {
                 if (track.kind === "audio") {
                     attachAudio(track, participant, publication);
                 } else if (track.kind === "video") {
-                    attachVideo(track);
+                    attachVideo(track, participant, publication);
                 }
             });
 
+            if (LK.RoomEvent.TrackMuted) {
+                room.on(LK.RoomEvent.TrackMuted, (publication, participant) => {
+                    if (isScreenShareTrack(null, publication)) {
+                        this.detachScreenTrack();
+                    } else if (publication && publication.kind === "video") {
+                        const baseId = getParticipantBaseId(participant);
+                        if (baseId) this.detachCameraTrackFromTile(String(baseId));
+                    }
+                });
+            }
+
             room.on(LK.RoomEvent.TrackUnmuted, (publication, participant) => {
-                if (publication && publication.track && publication.track.kind === "audio") {
-                    attachAudio(publication.track, participant, publication);
+                if (publication && publication.track) {
+                    if (publication.track.kind === "audio") {
+                        attachAudio(publication.track, participant, publication);
+                    } else if (publication.track.kind === "video") {
+                        attachVideo(publication.track, participant, publication);
+                    }
                 }
             });
+
+            if (LK.RoomEvent.ConnectionQualityChanged) {
+                room.on(LK.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+                    if (participant && room.localParticipant && participant.identity === room.localParticipant.identity) {
+                        this.updateConnectionQualityPill(quality);
+                    }
+                });
+            }
 
             if (LK.RoomEvent.DataReceived) {
                 room.on(LK.RoomEvent.DataReceived, (payload, participant, kind, topic) => {
@@ -673,8 +1181,43 @@ class WDOSMultilinguaMeeting {
                         const rawStr = new TextDecoder().decode(payload);
                         const msg = JSON.parse(rawStr);
                         if (!msg || typeof msg !== "object") return;
-                        this.serverBotConnected = true;
-                        this.stopBrowserSpeechRecognizers();
+
+                        // 1. Live Chat Message (`wdos_chat`)
+                        if (topic === "wdos_chat" || (msg.type === "chat_message" && msg.message)) {
+                            if (msg.message) {
+                                this.appendChatMessage(msg.message, false);
+                            }
+                            return;
+                        }
+
+                        // 2. Live Floating Emoji Reaction (`wdos_reaction`)
+                        if (topic === "wdos_reaction" || msg.type === "reaction") {
+                            if (msg.emoji) {
+                                this.renderFloatingReaction(msg.emoji, msg.sender_name || (participant && participant.name) || "Participant");
+                            }
+                            return;
+                        }
+
+                        // 3. Real-Time Control & Governance Events (`wdos_control`)
+                        if (
+                            topic === "wdos_control" ||
+                            msg.type === "participant_joined" ||
+                            msg.type === "participant_updated" ||
+                            msg.type === "host_admitted" ||
+                            msg.type === "host_action" ||
+                            msg.type === "policy_updated" ||
+                            msg.type === "screenshare_state" ||
+                            msg.type === "meeting_ended"
+                        ) {
+                            this.handleRealtimeControlPacket(msg);
+                            return;
+                        }
+
+                        // 4. Server Translation Bot & Live Captions (`wdos_caption`)
+                        if (isBotParticipant(participant) || msg.type === "bot_tts_state") {
+                            this.serverBotConnected = true;
+                            this.stopBrowserSpeechRecognizers();
+                        }
 
                         if (msg.type === "bot_tts_state" && msg.lang) {
                             this.botActiveSpeakerByLang.set(
@@ -707,6 +1250,7 @@ class WDOSMultilinguaMeeting {
                             this.lastOriginalLang = seg.original_language || "en-US";
                             this.triggerSpeakingPulse(seg.speaker_name || "Speaker", 2800);
                             this.renderLiveCaption(seg.speaker_name || "Speaker", seg.original_text, segTrans, true);
+                            this.appendRealtimeSegmentToFeed(seg);
 
                             if (seg.speaker_name && seg.original_language) {
                                 this.participantLanguagesByName.set(String(seg.speaker_name), seg.original_language);
@@ -714,7 +1258,6 @@ class WDOSMultilinguaMeeting {
                             }
 
                             if (this.hasSubscribedBotTrack(shortListen)) {
-                                // The server-side LiveKit bot is already streaming neural audio on the `lang:<shortListen>` WebRTC track!
                                 this.spokenSegmentIds.add(segKey);
                             } else if (!this.spokenSegmentIds.has(segKey)) {
                                 this.spokenSegmentIds.add(segKey);
@@ -744,6 +1287,13 @@ class WDOSMultilinguaMeeting {
                 });
             }
 
+            if (LK.RoomEvent.Reconnecting) {
+                room.on(LK.RoomEvent.Reconnecting, () => {
+                    this.updateConnectionQualityPill("poor");
+                    this.setMicStatus("Reconnecting to LiveKit WebRTC SFU...");
+                });
+            }
+
             if (LK.RoomEvent.Reconnected) {
                 room.on(LK.RoomEvent.Reconnected, async () => {
                     if (!this.isAudioMuted && room.localParticipant) {
@@ -751,12 +1301,31 @@ class WDOSMultilinguaMeeting {
                             await room.localParticipant.setMicrophoneEnabled(true);
                         } catch (_) {}
                     }
+                    this.updateConnectionQualityPill("excellent");
                     this.updateRemoteWebRTCAudioVolumes();
+                    this.lastStateVersion = "";
+                    this.fetchLatestTranscript(false);
+                });
+            }
+
+            if (LK.RoomEvent.ParticipantPermissionsChanged) {
+                room.on(LK.RoomEvent.ParticipantPermissionsChanged, (prevPermissions, participant) => {
+                    if (participant && room.localParticipant && participant.identity === room.localParticipant.identity) {
+                        const canPub = Boolean(participant.permissions && participant.permissions.canPublish);
+                        if (canPub) {
+                            this.setMicStatus("Floor granted — you can now unmute and share video.");
+                        }
+                    }
                 });
             }
 
             room.on(LK.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
                 if (!track) return;
+                if (track.kind === "video") {
+                    detachVideo(track, participant, publication);
+                    try { track.detach(); } catch (_) {}
+                    return;
+                }
                 try { track.detach(); } catch (_) {}
                 const botTrack = isBotParticipant(participant);
                 const trackName = String((publication && (publication.trackName || publication.name)) || track.name || "");
@@ -779,15 +1348,19 @@ class WDOSMultilinguaMeeting {
                     }
                 }
                 this.remoteAudioElements.delete(key);
-                if (track.kind === "video" && this.isVideoOff) {
-                    const stageVideo = document.getElementById("live-stage-video");
-                    const speakerAvatarBox = document.getElementById("stage-avatar-container");
-                    if (stageVideo) stageVideo.style.display = "none";
-                    if (speakerAvatarBox) speakerAvatarBox.style.display = "flex";
-                }
             });
 
             room.on(LK.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+                this.speakingParticipantIds.clear();
+                if (Array.isArray(speakers)) {
+                    speakers.forEach((s) => {
+                        if (s && !isBotParticipant(s)) {
+                            const bid = getParticipantBaseId(s);
+                            if (bid) this.speakingParticipantIds.add(String(bid));
+                        }
+                    });
+                }
+                this.highlightSpeakingTiles();
                 if (!Array.isArray(speakers) || speakers.length === 0) return;
                 const localId = room.localParticipant ? room.localParticipant.identity : "";
                 const humanSpeakers = speakers.filter((s) => s && !isBotParticipant(s));
@@ -803,6 +1376,7 @@ class WDOSMultilinguaMeeting {
             });
 
             await room.connect(livekitData.url, livekitData.token);
+            this.updateConnectionQualityPill("excellent");
             if (typeof room.startAudio === "function") {
                 room.startAudio().catch(() => {});
             }
@@ -825,7 +1399,7 @@ class WDOSMultilinguaMeeting {
                         participant.trackPublications.forEach((pub) => {
                             if (pub && pub.isSubscribed && pub.track) {
                                 if (pub.track.kind === "audio") attachAudio(pub.track, participant, pub);
-                                else if (pub.track.kind === "video") attachVideo(pub.track);
+                                else if (pub.track.kind === "video") attachVideo(pub.track, participant, pub);
                             }
                         });
                     }
@@ -838,6 +1412,24 @@ class WDOSMultilinguaMeeting {
             this.livekitRoom = null;
             return false;
         }
+    }
+
+    scheduleLiveKitReconnect() {
+        if (this.lkReconnectTimer) clearTimeout(this.lkReconnectTimer);
+        if (!this.livekitData || !this.livekitData.enabled) return;
+        this.lkReconnectAttempt = (this.lkReconnectAttempt || 0) + 1;
+        const delayMs = Math.min(60000, 10000 * Math.pow(2, this.lkReconnectAttempt - 1));
+        this.lkReconnectTimer = setTimeout(async () => {
+            if (this.livekitRoom && this.livekitRoom.state === "connected") return;
+            const ok = await this.initLiveKitMedia(this.livekitData);
+            if (ok) {
+                this.lkReconnectAttempt = 0;
+                this.updateConnectionQualityPill("excellent");
+                this.setMicStatus(`Connected as ${this.userDisplayName} · Speaking ${this.langNames[this.speakingLang] || this.speakingLang} · Hearing ${this.langNames[this.listeningLang] || this.listeningLang}`);
+            } else {
+                this.scheduleLiveKitReconnect();
+            }
+        }, delayMs);
     }
 
     hasServerTranslationBot() {
@@ -1362,89 +1954,8 @@ class WDOSMultilinguaMeeting {
         }
     }
 
-    startLiveVoiceRecorder(stream) {
-        this.stopLiveVoiceRecorder();
-        if (!stream || typeof window.MediaRecorder === "undefined") return;
-        try {
-            let mimeType = "";
-            const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
-            for (const c of candidates) {
-                if (window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(c)) {
-                    mimeType = c;
-                    break;
-                }
-            }
-            const startCycle = () => {
-                if (this.isAudioMuted || !this.localAudioStream) return;
-                try {
-                    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-                    this.liveMediaRecorder = recorder;
-                    const chunks = [];
-                    this.hadVoiceInCurrentChunk = false;
-
-                    recorder.ondataavailable = (ev) => {
-                        if (ev.data && ev.data.size > 0) {
-                            chunks.push(ev.data);
-                        }
-                    };
-                    recorder.onstop = () => {
-                        const hadVoice = this.hadVoiceInCurrentChunk;
-                        if (hadVoice && chunks.length > 0 && this.transcriptUrl) {
-                            const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
-                            if (blob.size > 200 && blob.size < 220000) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                    const dataUrl = reader.result;
-                                    if (typeof dataUrl === "string" && dataUrl.startsWith("data:audio/")) {
-                                        fetch(this.transcriptUrl, {
-                                            method: "POST",
-                                            headers: {
-                                                "Content-Type": "application/json",
-                                                "X-CSRFToken": this.getCsrfToken()
-                                            },
-                                            body: JSON.stringify({
-                                                action: "audio_chunk",
-                                                speaker_name: this.userDisplayName,
-                                                audio_data_url: dataUrl
-                                            })
-                                        }).catch(() => {});
-                                    }
-                                };
-                                reader.readAsDataURL(blob);
-                            }
-                        }
-                    };
-                    recorder.start();
-                } catch (_) {}
-            };
-
-            startCycle();
-            this.liveRecorderInterval = setInterval(() => {
-                if (this.isAudioMuted || !this.localAudioStream) {
-                    this.stopLiveVoiceRecorder();
-                    return;
-                }
-                if (this.liveMediaRecorder && this.liveMediaRecorder.state === "recording") {
-                    try { this.liveMediaRecorder.stop(); } catch (_) {}
-                }
-                startCycle();
-            }, 1350);
-        } catch (_) {}
-    }
-
     stopLiveVoiceRecorder() {
-        if (this.liveRecorderInterval) {
-            clearInterval(this.liveRecorderInterval);
-            this.liveRecorderInterval = null;
-        }
-        if (this.liveMediaRecorder) {
-            try {
-                if (this.liveMediaRecorder.state === "recording") {
-                    this.liveMediaRecorder.stop();
-                }
-            } catch (_) {}
-            this.liveMediaRecorder = null;
-        }
+        // Legacy HTTP audio chunk recorder removed: all voice media streams over LiveKit WebRTC SFU tracks.
     }
 
     async startMicAudioVisualizer(sharedMicTrack = null) {
@@ -1469,9 +1980,6 @@ class WDOSMultilinguaMeeting {
                 });
             } else {
                 return;
-            }
-            if (!this.livekitRoom || this.livekitRoom.state !== "connected") {
-                this.startLiveVoiceRecorder(this.localAudioStream);
             }
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (!AudioCtx) return;
@@ -2010,6 +2518,7 @@ class WDOSMultilinguaMeeting {
         }
         this.isAudioMuted = true;
         this.stopMicAudioVisualizer();
+        this.stopScreenShare();
         if (this.localVideoStream) {
             this.localVideoStream.getTracks().forEach((t) => t.stop());
             this.localVideoStream = null;
@@ -2030,6 +2539,9 @@ class WDOSMultilinguaMeeting {
         if (this.remoteAudioElements) {
             this.remoteAudioElements.clear();
         }
+        if (this.remoteCameraTracks) {
+            this.remoteCameraTracks.clear();
+        }
         this.clearAudioQueue();
     }
 
@@ -2047,22 +2559,59 @@ class WDOSMultilinguaMeeting {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     throw new Error("Camera API unavailable in this browser.");
                 }
+                let lkCamTrack = null;
                 if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
-                    try { await this.livekitRoom.localParticipant.setCameraEnabled(true); } catch (_) {}
+                    try {
+                        const pub = await this.livekitRoom.localParticipant.setCameraEnabled(true);
+                        if (pub && pub.track) {
+                            lkCamTrack = pub.track;
+                        } else if (this.livekitRoom.localParticipant.videoTrackPublications) {
+                            this.livekitRoom.localParticipant.videoTrackPublications.forEach((p) => {
+                                if (!lkCamTrack && p && p.track && p.source !== "screen_share") {
+                                    lkCamTrack = p.track;
+                                }
+                            });
+                        }
+                    } catch (_) {}
                 }
-                this.localVideoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                if (stageVideo) {
-                    stageVideo.srcObject = this.localVideoStream;
-                    stageVideo.style.display = "block";
-                    try { await stageVideo.play(); } catch (_) {}
+
+                if (lkCamTrack) {
+                    this.localCameraTrack = lkCamTrack;
+                    if (this.isBackgroundBlurEnabled) {
+                        await this.applyCameraBlurProcessor(true);
+                    }
+                    if (stageVideo && typeof lkCamTrack.attach === "function") {
+                        lkCamTrack.attach(stageVideo);
+                        stageVideo.muted = true;
+                        if (this.stageLayout === "speaker") {
+                            stageVideo.style.display = "block";
+                        }
+                    }
+                    if (this.myParticipantId) {
+                        this.attachCameraTrackToTile(String(this.myParticipantId), lkCamTrack, true, this.livekitRoom.localParticipant);
+                    }
+                } else {
+                    this.localVideoStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false });
+                    if (stageVideo) {
+                        stageVideo.srcObject = this.localVideoStream;
+                        stageVideo.muted = true;
+                        if (this.stageLayout === "speaker" || !document.getElementById("live-video-grid")) {
+                            stageVideo.style.display = "block";
+                        }
+                        try { await stageVideo.play(); } catch (_) {}
+                    }
+                    if (this.myParticipantId) {
+                        this.attachCameraTrackToTile(String(this.myParticipantId), this.localVideoStream, true, null);
+                    }
                 }
-                if (speakerAvatarBox) {
+                if (speakerAvatarBox && this.stageLayout === "speaker") {
                     speakerAvatarBox.style.display = "none";
                 }
                 if (camNotice) {
                     camNotice.style.display = "none";
                 }
                 this.isVideoOff = false;
+                this.updateStageViewMode();
                 camBtns.forEach((btn) => {
                     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> <span>Camera On</span>`;
                     btn.style.background = "#16A34A";
@@ -2085,21 +2634,26 @@ class WDOSMultilinguaMeeting {
             if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
                 try { await this.livekitRoom.localParticipant.setCameraEnabled(false); } catch (_) {}
             }
+            if (this.localCameraTrack && typeof this.localCameraTrack.detach === "function") {
+                try { this.localCameraTrack.detach(); } catch (_) {}
+            }
+            this.localCameraTrack = null;
             if (this.localVideoStream) {
                 this.localVideoStream.getTracks().forEach((t) => t.stop());
                 this.localVideoStream = null;
             }
+            if (this.myParticipantId) {
+                this.detachCameraTrackFromTile(String(this.myParticipantId));
+            }
             if (stageVideo) {
                 stageVideo.srcObject = null;
-                if (stageVideo.id === "live-stage-video") stageVideo.style.display = "none";
-            }
-            if (speakerAvatarBox) {
-                speakerAvatarBox.style.display = "flex";
+                stageVideo.style.display = "none";
             }
             if (camNotice) {
                 camNotice.style.display = "none";
             }
             this.isVideoOff = true;
+            this.updateStageViewMode();
             camBtns.forEach((btn) => {
                 btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> <span>Turn Camera On</span>`;
                 btn.style.background = "";
@@ -2107,6 +2661,919 @@ class WDOSMultilinguaMeeting {
                 btn.style.color = "";
             });
             this.setMicStatus("Camera turned off.");
+        }
+    }
+
+    isUserPermittedToShareScreen() {
+        return Boolean(this.isHost || this.canShareScreen || this.allowParticipantScreenShare);
+    }
+
+    updateScreenShareButtonVisibility() {
+        const canShare = this.isUserPermittedToShareScreen();
+        const screenBtns = document.querySelectorAll("#btn-toggle-screenshare");
+        screenBtns.forEach((btn) => {
+            btn.style.display = canShare ? "inline-flex" : "none";
+        });
+        if (!canShare && this.isScreenSharing) {
+            this.stopScreenShare();
+            this.setMicStatus("Screen sharing permission was revoked by the host.");
+        }
+    }
+
+    async toggleScreenShare() {
+        if (this.isScreenSharing) {
+            await this.stopScreenShare();
+            return;
+        }
+        if (!this.isUserPermittedToShareScreen()) {
+            this.setMicStatus("Screen sharing is restricted by the host. Only authorized presenters can share.");
+            return;
+        }
+        await this.startScreenShare();
+    }
+
+    async startScreenShare() {
+        const btns = document.querySelectorAll("#btn-toggle-screenshare");
+        btns.forEach((btn) => {
+            btn.innerHTML = `<span>Starting Share...</span>`;
+        });
+
+        try {
+            let screenTrack = null;
+
+            if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
+                try {
+                    const pub = await this.livekitRoom.localParticipant.setScreenShareEnabled(true, {
+                        audio: true,
+                        resolution: { width: 1920, height: 1080, frameRate: 15 },
+                        contentHint: "detail"
+                    });
+                    if (pub && pub.track) {
+                        screenTrack = pub.track;
+                    }
+                } catch (lkErr) {
+                    console.warn("LiveKit screen share publication error:", lkErr);
+                    if (lkErr && (lkErr.name === "NotAllowedError" || String(lkErr.message || "").includes("Permission denied"))) {
+                        throw lkErr;
+                    }
+                }
+            }
+
+            if (!screenTrack) {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                    throw new Error("Screen sharing is not supported in this browser.");
+                }
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 15 }, cursor: "always" },
+                    audio: true
+                });
+                this.localScreenStream = stream;
+                const videoTrack = stream.getVideoTracks()[0];
+                if (!videoTrack) throw new Error("No video track found in screen capture.");
+                try { videoTrack.contentHint = "detail"; } catch (_) {}
+
+                videoTrack.onended = () => {
+                    this.stopScreenShare();
+                };
+                this.attachLocalScreenTrack(stream);
+            } else {
+                if (screenTrack.mediaStreamTrack) {
+                    screenTrack.mediaStreamTrack.onended = () => {
+                        this.stopScreenShare();
+                    };
+                }
+                this.activeScreenTrack = screenTrack;
+                this.attachLocalScreenTrack(screenTrack);
+            }
+
+            this.isScreenSharing = true;
+            this.updateScreenShareButtons(true);
+            await this.notifyScreenshareState(true, this.userDisplayName);
+            this.setMicStatus("Presenting your screen to the meeting via WebRTC.");
+        } catch (err) {
+            this.isScreenSharing = false;
+            this.updateScreenShareButtons(false);
+            if (err.name === "NotAllowedError" || (err.message && err.message.includes("Permission denied"))) {
+                this.setMicStatus("Screen sharing cancelled.");
+            } else {
+                this.setMicStatus(`Screen sharing error: ${err.message || "Could not share screen"}`);
+            }
+        }
+    }
+
+    attachLocalScreenTrack(trackOrStream) {
+        const container = document.getElementById("stage-screenshare-container");
+        const video = document.getElementById("live-screenshare-video");
+        const img = document.getElementById("live-screenshare-img");
+        const badge = document.getElementById("screenshare-presenter-name") || document.getElementById("stage-screenshare-badge");
+        const stopOverlay = document.getElementById("btn-stop-screenshare-overlay");
+        const avatarBox = document.getElementById("stage-avatar-container");
+        const stageVideo = document.getElementById("live-stage-video");
+        const videoGrid = document.getElementById("live-video-grid");
+
+        if (container && video) {
+            if (trackOrStream && typeof trackOrStream.attach === "function") {
+                trackOrStream.attach(video);
+            } else if (trackOrStream instanceof MediaStream) {
+                video.srcObject = trackOrStream;
+            }
+            video.muted = true;
+            video.style.display = "block";
+            if (img) img.style.display = "none";
+            try { video.play().catch(() => {}); } catch (_) {}
+            container.style.display = "block";
+            if (badge) badge.textContent = `Presenting: ${this.userDisplayName} (You)`;
+            if (stopOverlay) stopOverlay.style.display = "inline-flex";
+            if (avatarBox) avatarBox.style.display = "none";
+            if (stageVideo) stageVideo.style.display = "none";
+            if (videoGrid) videoGrid.style.display = "none";
+        }
+    }
+
+    attachRemoteScreenTrack(track, participant) {
+        const container = document.getElementById("stage-screenshare-container");
+        const video = document.getElementById("live-screenshare-video");
+        const img = document.getElementById("live-screenshare-img");
+        const badge = document.getElementById("screenshare-presenter-name") || document.getElementById("stage-screenshare-badge");
+        const stopOverlay = document.getElementById("btn-stop-screenshare-overlay");
+        const avatarBox = document.getElementById("stage-avatar-container");
+        const stageVideo = document.getElementById("live-stage-video");
+        const videoGrid = document.getElementById("live-video-grid");
+
+        const presenterName = (participant && (participant.name || participant.identity)) || this.activeScreensharePresenter || "Presenter";
+        this.activeScreensharePresenter = presenterName;
+        this.activeScreenTrack = track;
+
+        if (container && video) {
+            if (track && typeof track.attach === "function") {
+                track.attach(video);
+            }
+            video.muted = false;
+            video.style.display = "block";
+            if (img) img.style.display = "none";
+            try { video.play().catch(() => {}); } catch (_) {}
+            container.style.display = "block";
+            if (badge) badge.textContent = `Presenting: ${presenterName}`;
+            if (stopOverlay) stopOverlay.style.display = "none";
+            if (avatarBox) avatarBox.style.display = "none";
+            if (stageVideo) stageVideo.style.display = "none";
+            if (videoGrid) videoGrid.style.display = "none";
+        }
+    }
+
+    detachScreenTrack() {
+        const container = document.getElementById("stage-screenshare-container");
+        const video = document.getElementById("live-screenshare-video");
+        const img = document.getElementById("live-screenshare-img");
+        const stopOverlay = document.getElementById("btn-stop-screenshare-overlay");
+
+        if (video) {
+            try {
+                if (this.activeScreenTrack && typeof this.activeScreenTrack.detach === "function") {
+                    this.activeScreenTrack.detach(video);
+                }
+            } catch (_) {}
+            video.srcObject = null;
+            video.style.display = "none";
+        }
+        if (img) {
+            img.src = "";
+            img.style.display = "none";
+        }
+        if (container) {
+            container.style.display = "none";
+        }
+        if (stopOverlay) {
+            stopOverlay.style.display = "none";
+        }
+        this.activeScreenTrack = null;
+        this.activeScreensharePresenter = "";
+        this.updateStageViewMode();
+    }
+
+    async stopScreenShare() {
+        if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
+            try {
+                await this.livekitRoom.localParticipant.setScreenShareEnabled(false);
+            } catch (_) {}
+        }
+        if (this.localScreenStream) {
+            try {
+                this.localScreenStream.getTracks().forEach((t) => t.stop());
+            } catch (_) {}
+            this.localScreenStream = null;
+        }
+        this.isScreenSharing = false;
+        this.detachScreenTrack();
+        this.updateScreenShareButtons(false);
+        await this.notifyScreenshareState(false, "");
+        this.setMicStatus("Screen sharing ended.");
+    }
+
+    updateScreenShareButtons(isActive) {
+        const btns = document.querySelectorAll("#btn-toggle-screenshare");
+        btns.forEach((btn) => {
+            if (isActive) {
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="2" y1="2" x2="22" y2="22"/></svg> <span>Stop Sharing</span>`;
+                btn.style.background = "#DC2626";
+                btn.style.borderColor = "#F87171";
+                btn.style.color = "#FFFFFF";
+            } else {
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> <span>Share Screen</span>`;
+                btn.style.background = "";
+                btn.style.borderColor = "";
+                btn.style.color = "";
+            }
+        });
+    }
+
+    async notifyScreenshareState(isSharing, presenterName) {
+        if (!this.switchLangUrl) return;
+        try {
+            const formData = new URLSearchParams();
+            formData.append("action", "set_screenshare_state");
+            formData.append("is_sharing", isSharing ? "true" : "false");
+            formData.append("presenter_name", presenterName || "");
+            await fetch(this.switchLangUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": this.getCsrfToken(),
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData.toString()
+            });
+        } catch (_) {}
+    }
+
+    setStageLayout(mode) {
+        this.stageLayout = mode === "speaker" ? "speaker" : "grid";
+        const gridBtn = document.getElementById("btn-layout-grid");
+        const speakerBtn = document.getElementById("btn-layout-speaker");
+        if (gridBtn) gridBtn.classList.toggle("active", this.stageLayout === "grid");
+        if (speakerBtn) speakerBtn.classList.toggle("active", this.stageLayout === "speaker");
+        this.updateStageViewMode();
+    }
+
+    togglePinParticipant(participantId) {
+        const pid = String(participantId || "");
+        if (!pid) return;
+        if (this.pinnedParticipantId === pid) {
+            this.pinnedParticipantId = null;
+        } else {
+            this.pinnedParticipantId = pid;
+        }
+        if (this.cachedParticipants && this.cachedParticipants.length > 0) {
+            this.renderVideoGrid(this.cachedParticipants);
+        }
+    }
+
+    changeGridPage(delta) {
+        const total = (this.cachedParticipants || []).length;
+        const maxPage = Math.max(0, Math.ceil(total / this.gridPageSize) - 1);
+        this.gridPage = Math.max(0, Math.min(maxPage, (this.gridPage || 0) + delta));
+        if (this.cachedParticipants && this.cachedParticipants.length > 0) {
+            this.renderVideoGrid(this.cachedParticipants);
+        }
+    }
+
+    toggleStageFullscreen() {
+        const stageEl = document.querySelector(".zm-stage-canvas");
+        if (!stageEl) return;
+        if (!document.fullscreenElement) {
+            if (stageEl.requestFullscreen) {
+                stageEl.requestFullscreen().catch(() => {});
+            }
+        } else if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+        }
+    }
+
+    updateStageViewMode() {
+        const screenContainer = document.getElementById("stage-screenshare-container");
+        if (screenContainer && screenContainer.style.display === "block") {
+            return;
+        }
+        const videoGrid = document.getElementById("live-video-grid");
+        const avatarBox = document.getElementById("stage-avatar-container");
+        const stageVideo = document.getElementById("live-stage-video");
+        const paginationBar = document.getElementById("video-grid-pagination");
+
+        if (!videoGrid) return;
+
+        if (this.stageLayout === "grid") {
+            videoGrid.style.display = "grid";
+            if (avatarBox) avatarBox.style.display = "none";
+            if (stageVideo) stageVideo.style.display = "none";
+        } else {
+            // Speaker View: show single stage speaker or active camera
+            videoGrid.style.display = "none";
+            if (paginationBar) paginationBar.style.display = "none";
+            let activeTrack = null;
+            if (!this.isVideoOff && this.localCameraTrack) {
+                activeTrack = this.localCameraTrack;
+            } else if (this.remoteCameraTracks && this.remoteCameraTracks.size > 0) {
+                const firstEntry = this.remoteCameraTracks.values().next().value;
+                if (firstEntry && firstEntry.track) activeTrack = firstEntry.track;
+            }
+            if (activeTrack && stageVideo && typeof activeTrack.attach === "function") {
+                activeTrack.attach(stageVideo);
+                stageVideo.style.display = "block";
+                if (avatarBox) avatarBox.style.display = "none";
+            } else if (!this.isVideoOff && this.localVideoStream && stageVideo) {
+                stageVideo.srcObject = this.localVideoStream;
+                stageVideo.style.display = "block";
+                if (avatarBox) avatarBox.style.display = "none";
+            } else {
+                if (stageVideo) stageVideo.style.display = "none";
+                if (avatarBox) avatarBox.style.display = "flex";
+            }
+        }
+    }
+
+    renderVideoGrid(participants) {
+        const gridEl = document.getElementById("live-video-grid");
+        if (!gridEl || !Array.isArray(participants)) return;
+
+        // Sort: pinned first, then active speakers, then Host/Co-Host, then others
+        const sorted = participants.slice().sort((a, b) => {
+            const aPin = String(a.id) === String(this.pinnedParticipantId) ? 1 : 0;
+            const bPin = String(b.id) === String(this.pinnedParticipantId) ? 1 : 0;
+            if (aPin !== bPin) return bPin - aPin;
+            const aSpeak = this.speakingParticipantIds.has(String(a.id)) ? 1 : 0;
+            const bSpeak = this.speakingParticipantIds.has(String(b.id)) ? 1 : 0;
+            if (aSpeak !== bSpeak) return bSpeak - aSpeak;
+            return 0;
+        });
+
+        const total = sorted.length;
+        const totalPages = Math.max(1, Math.ceil(total / this.gridPageSize));
+        if (this.gridPage >= totalPages) this.gridPage = totalPages - 1;
+        const startIdx = this.gridPage * this.gridPageSize;
+        const pageItems = sorted.slice(startIdx, startIdx + this.gridPageSize);
+
+        // Update pagination bar for large meetings (13 to 1,000+ participants)
+        const paginationEl = document.getElementById("video-grid-pagination");
+        const pageLabelEl = document.getElementById("grid-page-label");
+        if (paginationEl) {
+            if (total > this.gridPageSize && this.stageLayout === "grid") {
+                paginationEl.style.display = "flex";
+                if (pageLabelEl) pageLabelEl.textContent = `Page ${this.gridPage + 1} of ${totalPages} (${total} participants)`;
+            } else {
+                paginationEl.style.display = "none";
+            }
+        }
+
+        const countClass = `tiles-${Math.max(1, Math.min(12, pageItems.length))}`;
+        gridEl.className = `zm-video-grid ${countClass}`;
+
+        const keepIds = new Set(pageItems.map((p) => String(p.id)));
+        Array.from(gridEl.querySelectorAll(".zm-video-tile")).forEach((tile) => {
+            const tid = tile.getAttribute("data-participant-id");
+            if (!keepIds.has(String(tid))) {
+                tile.remove();
+            }
+        });
+
+        pageItems.forEach((p) => {
+            const pid = String(p.id);
+            const isLocal = Boolean(this.myParticipantId && pid === String(this.myParticipantId));
+            const parts = String(p.participant_name || "P").trim().split(/\s+/);
+            const initials = parts.slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "P";
+            const isPinned = String(this.pinnedParticipantId) === pid;
+            const isSpeaking = this.speakingParticipantIds.has(pid);
+
+            let tile = gridEl.querySelector(`.zm-video-tile[data-participant-id="${this.escapeHtml(pid)}"]`);
+            if (!tile) {
+                tile = document.createElement("div");
+                tile.className = "zm-video-tile";
+                tile.setAttribute("data-participant-id", pid);
+                tile.innerHTML = `
+                    <video playsinline autoplay muted style="display:none;"></video>
+                    <div class="zm-tile-avatar-wrap">
+                        <div class="zm-tile-avatar">${this.escapeHtml(initials)}</div>
+                    </div>
+                    <button type="button" class="zm-tile-pin-btn js-pin-tile-btn" data-participant-id="${this.escapeHtml(pid)}" title="Pin Participant">📌</button>
+                    <div class="zm-tile-footer">
+                        <div class="zm-tile-name-wrap">
+                            <span class="zm-tile-name"></span>
+                            <span class="zm-tile-lang-pill"></span>
+                        </div>
+                        <span class="zm-tile-mic-state"></span>
+                    </div>
+                `;
+                gridEl.appendChild(tile);
+            }
+
+            tile.classList.toggle("is-pinned", isPinned);
+            tile.classList.toggle("is-speaking", isSpeaking);
+
+            const avatarEl = tile.querySelector(".zm-tile-avatar");
+            if (avatarEl) avatarEl.textContent = initials;
+
+            const nameEl = tile.querySelector(".zm-tile-name");
+            if (nameEl) {
+                nameEl.textContent = `${p.participant_name || "Participant"}${isLocal ? " (You)" : ""}`;
+            }
+
+            const langPill = tile.querySelector(".zm-tile-lang-pill");
+            if (langPill) {
+                const shortSpk = this.getShortLang(p.speaking_language || "en-US").toUpperCase();
+                const shortLst = this.getShortLang(p.listening_language || "fr-FR").toUpperCase();
+                langPill.textContent = `${shortSpk}→${shortLst}`;
+            }
+
+            const micStateEl = tile.querySelector(".zm-tile-mic-state");
+            if (micStateEl) {
+                const muted = isLocal ? this.isAudioMuted : Boolean(p.is_muted);
+                const hand = p.hand_raised ? "✋ " : "";
+                micStateEl.innerHTML = `${hand}${muted ? '<span style="color:#FCA5A5;" title="Muted">🔇</span>' : '<span style="color:#4ADE80;" title="Mic Active">🎙️</span>'}`;
+            }
+
+            // Re-verify camera attachment if available
+            if (isLocal && !this.isVideoOff && (this.localCameraTrack || this.localVideoStream)) {
+                this.attachCameraTrackToTile(pid, this.localCameraTrack || this.localVideoStream, true, null);
+            } else if (!isLocal && this.remoteCameraTracks.has(pid)) {
+                const entry = this.remoteCameraTracks.get(pid);
+                if (entry && entry.track) {
+                    this.attachCameraTrackToTile(pid, entry.track, false, entry.participant);
+                }
+            }
+        });
+
+        this.updateStageViewMode();
+    }
+
+    attachCameraTrackToTile(participantId, trackOrStream, isLocal = false, participant = null) {
+        const gridEl = document.getElementById("live-video-grid");
+        if (!gridEl) return;
+        let tile = gridEl.querySelector(`.zm-video-tile[data-participant-id="${this.escapeHtml(participantId)}"]`);
+        if (!tile && participant) {
+            // Create tile on the fly if roster delta hasn't arrived yet
+            const pName = participant.name || participant.identity || "Participant";
+            this.cachedParticipants = this.cachedParticipants || [];
+            if (!this.cachedParticipants.some((p) => String(p.id) === String(participantId))) {
+                this.cachedParticipants.push({
+                    id: String(participantId),
+                    participant_name: pName,
+                    meeting_role: "Participant",
+                    speaking_language: "en-US",
+                    listening_language: "fr-FR",
+                    is_muted: false
+                });
+                this.renderVideoGrid(this.cachedParticipants);
+            }
+            tile = gridEl.querySelector(`.zm-video-tile[data-participant-id="${this.escapeHtml(participantId)}"]`);
+        }
+        if (!tile) return;
+
+        const videoEl = tile.querySelector("video");
+        const avatarWrap = tile.querySelector(".zm-tile-avatar-wrap");
+        if (!videoEl) return;
+
+        if (trackOrStream && typeof trackOrStream.attach === "function") {
+            trackOrStream.attach(videoEl);
+        } else if (trackOrStream instanceof MediaStream) {
+            videoEl.srcObject = trackOrStream;
+        }
+        videoEl.muted = true;
+        videoEl.style.display = "block";
+        if (isLocal) {
+            videoEl.style.transform = "scaleX(-1)";
+        } else {
+            videoEl.style.transform = "none";
+        }
+        try { videoEl.play().catch(() => {}); } catch (_) {}
+        if (avatarWrap) avatarWrap.style.display = "none";
+    }
+
+    detachCameraTrackFromTile(participantId) {
+        const gridEl = document.getElementById("live-video-grid");
+        if (!gridEl) return;
+        const tile = gridEl.querySelector(`.zm-video-tile[data-participant-id="${this.escapeHtml(participantId)}"]`);
+        if (!tile) return;
+        const videoEl = tile.querySelector("video");
+        const avatarWrap = tile.querySelector(".zm-tile-avatar-wrap");
+        if (videoEl) {
+            videoEl.srcObject = null;
+            videoEl.style.display = "none";
+        }
+        if (avatarWrap) {
+            avatarWrap.style.display = "flex";
+        }
+    }
+
+    highlightSpeakingTiles() {
+        const gridEl = document.getElementById("live-video-grid");
+        if (!gridEl) return;
+        gridEl.querySelectorAll(".zm-video-tile").forEach((tile) => {
+            const pid = tile.getAttribute("data-participant-id");
+            tile.classList.toggle("is-speaking", Boolean(pid && this.speakingParticipantIds.has(String(pid))));
+        });
+    }
+
+    updateConnectionQualityPill(quality) {
+        const pill = document.getElementById("webrtc-quality-pill");
+        const label = document.getElementById("webrtc-quality-label");
+        if (!pill || !label) return;
+        const qStr = String(quality || "excellent").toLowerCase();
+        const dot = pill.querySelector(".zm-quality-dot");
+        if (qStr === "poor" || qStr === "lost") {
+            label.textContent = "WebRTC SFU · Weak Signal";
+            if (dot) dot.style.background = "#EF4444";
+        } else if (qStr === "good") {
+            label.textContent = "WebRTC SFU · Good";
+            if (dot) dot.style.background = "#F59E0B";
+        } else {
+            label.textContent = "WebRTC SFU · HD";
+            if (dot) dot.style.background = "#4ADE80";
+        }
+    }
+
+    sendReaction(emoji) {
+        if (!emoji) return;
+        this.renderFloatingReaction(emoji, `${this.userDisplayName} (You)`);
+        if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
+            try {
+                const payload = new TextEncoder().encode(
+                    JSON.stringify({
+                        type: "reaction",
+                        emoji: emoji,
+                        sender_name: this.userDisplayName,
+                        participant_id: this.myParticipantId || ""
+                    })
+                );
+                this.livekitRoom.localParticipant.publishData(payload, { reliable: false, topic: "wdos_reaction" }).catch(() => {});
+            } catch (_) {}
+        }
+    }
+
+    renderFloatingReaction(emoji, senderName = "") {
+        const layer = document.getElementById("reaction-float-layer");
+        if (!layer || !emoji) return;
+        const item = document.createElement("div");
+        item.className = "zm-floating-reaction";
+        const offsetPx = Math.floor((Math.random() - 0.5) * 140);
+        item.style.left = `calc(50% + ${offsetPx}px)`;
+        item.innerHTML = `${this.escapeHtml(emoji)}${senderName ? `<span style="display:block;font-size:10px;color:#FFF;background:rgba(0,0,0,0.65);padding:1px 6px;border-radius:999px;font-weight:700;white-space:nowrap;">${this.escapeHtml(senderName)}</span>` : ""}`;
+        layer.appendChild(item);
+        setTimeout(() => {
+            if (item.parentNode) item.parentNode.removeChild(item);
+        }, 2300);
+    }
+
+    async initHardwareDeviceSelectors() {
+        const micSelect = document.getElementById("select-mic-device");
+        const camSelect = document.getElementById("select-cam-device");
+        const spkSelect = document.getElementById("select-speaker-device");
+        if (!micSelect && !camSelect && !spkSelect) return;
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== "function") return;
+
+        const populateDevices = async () => {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const inputsAudio = devices.filter((d) => d.kind === "audioinput");
+                const inputsVideo = devices.filter((d) => d.kind === "videoinput");
+                const outputsAudio = devices.filter((d) => d.kind === "audiooutput");
+
+                if (micSelect && inputsAudio.length > 0) {
+                    const prev = micSelect.value;
+                    micSelect.innerHTML = `<option value="">Default Microphone</option>` + inputsAudio.map((d, i) =>
+                        `<option value="${this.escapeHtml(d.deviceId)}">${this.escapeHtml(d.label || `Microphone ${i + 1}`)}</option>`
+                    ).join("");
+                    if (prev) micSelect.value = prev;
+                }
+                if (camSelect && inputsVideo.length > 0) {
+                    const prev = camSelect.value;
+                    camSelect.innerHTML = `<option value="">Default Camera</option>` + inputsVideo.map((d, i) =>
+                        `<option value="${this.escapeHtml(d.deviceId)}">${this.escapeHtml(d.label || `Camera ${i + 1}`)}</option>`
+                    ).join("");
+                    if (prev) camSelect.value = prev;
+                }
+                if (spkSelect && outputsAudio.length > 0) {
+                    const prev = spkSelect.value;
+                    spkSelect.innerHTML = `<option value="">Default Speaker</option>` + outputsAudio.map((d, i) =>
+                        `<option value="${this.escapeHtml(d.deviceId)}">${this.escapeHtml(d.label || `Speaker ${i + 1}`)}</option>`
+                    ).join("");
+                    if (prev) spkSelect.value = prev;
+                }
+            } catch (_) {}
+        };
+
+        await populateDevices();
+        try {
+            navigator.mediaDevices.addEventListener("devicechange", populateDevices);
+        } catch (_) {}
+
+        if (micSelect) {
+            micSelect.addEventListener("change", async () => {
+                if (this.livekitRoom && typeof this.livekitRoom.switchActiveDevice === "function" && micSelect.value) {
+                    try { await this.livekitRoom.switchActiveDevice("audioinput", micSelect.value); } catch (_) {}
+                }
+            });
+        }
+        if (camSelect) {
+            camSelect.addEventListener("change", async () => {
+                if (this.livekitRoom && typeof this.livekitRoom.switchActiveDevice === "function" && camSelect.value) {
+                    try { await this.livekitRoom.switchActiveDevice("videoinput", camSelect.value); } catch (_) {}
+                }
+            });
+        }
+        if (spkSelect) {
+            spkSelect.addEventListener("change", async () => {
+                if (this.livekitRoom && typeof this.livekitRoom.switchActiveDevice === "function" && spkSelect.value) {
+                    try { await this.livekitRoom.switchActiveDevice("audiooutput", spkSelect.value); } catch (_) {}
+                }
+            });
+        }
+    }
+
+    async handleRealtimeControlPacket(msg) {
+        if (!msg || typeof msg !== "object") return;
+
+        if (msg.type === "meeting_ended" || msg.type === "room_ended") {
+            this.shutdownAllMedia();
+            if (!document.getElementById("meeting-ended-screen")) {
+                window.location.reload();
+            }
+            return;
+        }
+
+        if (msg.type === "recording_state" && msg.recording_state) {
+            this.syncRecordingState(msg.recording_state);
+        }
+
+        if ((msg.type === "poll_created" || msg.type === "poll_updated" || msg.type === "poll_closed") && msg.poll) {
+            this.cachedPolls = this.cachedPolls || [];
+            const idx = this.cachedPolls.findIndex((p) => p.id === msg.poll.id);
+            if (idx >= 0) {
+                this.cachedPolls[idx] = msg.poll;
+            } else {
+                this.cachedPolls.push(msg.poll);
+            }
+            this.renderPolls(this.cachedPolls);
+        }
+
+        if (msg.type === "host_action" || msg.type === "host_command") {
+            const targetId = String(msg.target_participant_id || msg.participant_id || "");
+            const myId = String(this.myParticipantId || "");
+            if ((msg.action === "remove_participant" || msg.action === "remove") && targetId && myId && targetId === myId) {
+                this.shutdownAllMedia();
+                window.location.href = `/foundation/rooms/${this.roomCode}/prejoin/`;
+                return;
+            }
+            if (
+                (msg.action === "mute_participant" && targetId && myId && targetId === myId) ||
+                (msg.action === "mute_all" && !this.isHost)
+            ) {
+                if (!this.isAudioMuted) {
+                    await this.toggleMicrophone(true);
+                    this.setMicStatus("Your microphone was muted by the meeting host.");
+                }
+            }
+            if (msg.action === "grant_floor" && targetId && myId && targetId === myId) {
+                this.setMicStatus("Speaker floor granted by host — you may now unmute.");
+            }
+        }
+
+        if (msg.type === "screenshare_state") {
+            if (!msg.is_sharing && !this.isScreenSharing) {
+                this.detachScreenTrack();
+            }
+        }
+
+        // Force delta reconciliation on next fetch to apply updated participant roster / permissions immediately
+        this.lastStateVersion = "";
+        await this.fetchLatestTranscript(false);
+    }
+
+    syncRecordingState(recState) {
+        if (!recState || typeof recState !== "object") return;
+        this.isCloudRecording = Boolean(recState.is_recording);
+        const recPill = document.getElementById("cloud-recording-pill");
+        const recBtn = document.getElementById("btn-toggle-cloud-recording");
+        if (recPill) {
+            recPill.style.display = this.isCloudRecording ? "inline-flex" : "none";
+        }
+        if (recBtn) {
+            recBtn.textContent = this.isCloudRecording ? "⏹ Stop Recording" : "⏺ Record to Cloud";
+            recBtn.style.background = this.isCloudRecording ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.1)";
+            recBtn.style.borderColor = this.isCloudRecording ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.18)";
+        }
+    }
+
+    async toggleCloudRecording() {
+        if (!this.switchLangUrl || !this.isHost) return;
+        try {
+            const formData = new URLSearchParams();
+            formData.append("action", "toggle_recording");
+            const resp = await fetch(this.switchLangUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": this.getCsrfToken(),
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData.toString()
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok) {
+                if (data.recording_state) {
+                    this.syncRecordingState(data.recording_state);
+                }
+                if (data.message) {
+                    this.setMicStatus(data.message);
+                }
+            } else {
+                if (data.recording_state) {
+                    this.syncRecordingState(data.recording_state);
+                }
+                this.setMicStatus(data.error || "Cloud recording unavailable — verify LiveKit Egress is active.");
+            }
+        } catch (_) {}
+    }
+
+    async toggleWebinarMode() {
+        if (!this.switchLangUrl || !this.isHost) return;
+        try {
+            const formData = new URLSearchParams();
+            formData.append("action", "toggle_webinar_mode");
+            const resp = await fetch(this.switchLangUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": this.getCsrfToken(),
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData.toString()
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                this.webinarMode = Boolean(data.webinar_mode);
+                const btn = document.getElementById("btn-toggle-webinar-mode");
+                if (btn) {
+                    btn.textContent = this.webinarMode ? "STAGE: WEBINAR (1000+)" : "STAGE: INTERACTIVE";
+                }
+            }
+        } catch (_) {}
+    }
+
+    createLiveKitBlurTrackProcessor() {
+        return {
+            name: "background-blur",
+            processedTrack: null,
+            _sourceVideo: null,
+            _canvas: null,
+            _ctx: null,
+            _rafId: null,
+            _stream: null,
+            async init(opts) {
+                const track = opts && opts.track;
+                if (!track) return;
+                const settings = (typeof track.getSettings === "function" ? track.getSettings() : {}) || {};
+                const width = settings.width || 640;
+                const height = settings.height || 360;
+                const videoEl = document.createElement("video");
+                videoEl.muted = true;
+                videoEl.playsInline = true;
+                videoEl.srcObject = new MediaStream([track]);
+                try { await videoEl.play(); } catch (_) {}
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                this._sourceVideo = videoEl;
+                this._canvas = canvas;
+                this._ctx = ctx;
+
+                const renderFrame = () => {
+                    if (!this._ctx || !this._sourceVideo) return;
+                    const w = canvas.width;
+                    const h = canvas.height;
+                    ctx.save();
+                    ctx.filter = "blur(14px)";
+                    ctx.drawImage(videoEl, 0, 0, w, h);
+                    ctx.restore();
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.ellipse(w * 0.5, h * 0.54, w * 0.27, h * 0.38, 0, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.filter = "none";
+                    ctx.drawImage(videoEl, 0, 0, w, h);
+                    ctx.restore();
+                    this._rafId = requestAnimationFrame(renderFrame);
+                };
+                renderFrame();
+                this._stream = canvas.captureStream(24);
+                this.processedTrack = this._stream.getVideoTracks()[0] || track;
+            },
+            async restart(opts) {
+                await this.destroy();
+                await this.init(opts);
+            },
+            async destroy() {
+                if (this._rafId) {
+                    cancelAnimationFrame(this._rafId);
+                    this._rafId = null;
+                }
+                if (this._stream) {
+                    this._stream.getTracks().forEach((t) => { try { t.stop(); } catch (_) {} });
+                    this._stream = null;
+                }
+                if (this._sourceVideo) {
+                    try { this._sourceVideo.pause(); } catch (_) {}
+                    this._sourceVideo.srcObject = null;
+                    this._sourceVideo = null;
+                }
+                this.processedTrack = null;
+            }
+        };
+    }
+
+    async applyCameraBlurProcessor(enableBlur) {
+        if (!this.localCameraTrack) return;
+        try {
+            if (enableBlur && typeof this.localCameraTrack.setProcessor === "function") {
+                this.blurProcessor = this.createLiveKitBlurTrackProcessor();
+                await this.localCameraTrack.setProcessor(this.blurProcessor);
+            } else if (!enableBlur && typeof this.localCameraTrack.stopProcessor === "function") {
+                await this.localCameraTrack.stopProcessor();
+                this.blurProcessor = null;
+            }
+        } catch (err) {
+            console.warn("[WDOS Multilingua] TrackProcessor background blur error:", err);
+        }
+    }
+
+    async toggleBackgroundBlur() {
+        this.isBackgroundBlurEnabled = !this.isBackgroundBlurEnabled;
+        await this.applyCameraBlurProcessor(this.isBackgroundBlurEnabled);
+        const btn = document.getElementById("btn-toggle-bg-blur");
+        if (btn) {
+            btn.classList.toggle("active", Boolean(this.isBackgroundBlurEnabled));
+            const span = btn.querySelector("span");
+            if (span) {
+                span.textContent = this.isBackgroundBlurEnabled ? "Blur: On" : "Blur: Off";
+            } else {
+                btn.textContent = this.isBackgroundBlurEnabled ? "Blur: On" : "Blur: Off";
+            }
+        }
+        if (this.isVideoOff) {
+            this.setMicStatus(
+                this.isBackgroundBlurEnabled
+                    ? "Background Blur enabled — will process outgoing WebRTC video when camera is turned on."
+                    : "Background Blur turned off."
+            );
+        } else {
+            this.setMicStatus(
+                this.isBackgroundBlurEnabled
+                    ? "WebRTC Background Blur active on outgoing camera stream."
+                    : "WebRTC Background Blur turned off."
+            );
+        }
+    }
+
+    renderPolls(polls) {
+        const container = document.getElementById("live-polls-container");
+        if (!container || !Array.isArray(polls)) return;
+        if (polls.length === 0) {
+            container.innerHTML = "";
+            return;
+        }
+        container.innerHTML = polls.slice(-3).reverse().map((poll) => {
+            const total = poll.total_votes || 0;
+            const optsHtml = (poll.options || []).map((opt, idx) => {
+                const count = (poll.votes && poll.votes[idx]) || 0;
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                return `
+                    <button type="button" class="js-vote-poll-btn" data-poll-id="${this.escapeHtml(poll.id)}" data-opt-idx="${idx}" ${!poll.is_open ? "disabled" : ""} style="width:100%;text-align:left;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:6px 10px;margin-bottom:5px;font-size:12px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+                        <span>${this.escapeHtml(opt)}</span>
+                        <span style="font-size:11px;color:#D4006A;font-weight:700;">${count} (${pct}%)</span>
+                    </button>
+                `;
+            }).join("");
+            return `
+                <div style="background:#FFF;border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+                    <div style="font-size:12.5px;font-weight:800;color:#19131A;margin-bottom:6px;">📊 ${this.escapeHtml(poll.question)}</div>
+                    ${optsHtml}
+                    <div style="font-size:10.5px;color:#6B7280;margin-top:4px;">${total} vote(s) · ${poll.is_open ? "Live Poll Open" : "Closed"}</div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    appendRealtimeSegmentToFeed(seg) {
+        if (!seg) return;
+        this.cachedSegments = this.cachedSegments || [];
+        const exists = this.cachedSegments.some((s) => String(s.id || s.sequence_number) === String(seg.id || seg.sequence_number));
+        if (!exists) {
+            this.cachedSegments.push(seg);
+            if (this.cachedSegments.length > 120) {
+                this.cachedSegments = this.cachedSegments.slice(-120);
+            }
+            this.hasLiveSegments = true;
+            this.renderTranscriptFeed(this.cachedSegments);
         }
     }
 
@@ -2140,21 +3607,6 @@ class WDOSMultilinguaMeeting {
             try { window.speechSynthesis.cancel(); } catch (_) {}
         }
         this.updateRemoteWebRTCAudioVolumes();
-    }
-
-    enqueueRawAudioChunk(audioDataUrl, speakerName) {
-        if (!audioDataUrl) return;
-        this.lastRawAudioDataUrl = audioDataUrl;
-        if (this.isSpeakerAudioMuted) return;
-        if (this.audioPlaybackQueue.length >= 8) {
-            this.audioPlaybackQueue.shift();
-        }
-        this.audioPlaybackQueue.push({
-            type: "raw",
-            audioDataUrl,
-            speakerName: speakerName || "Speaker"
-        });
-        this.processAudioQueue();
     }
 
     speakTranslation(text, azureData = null, forcePlay = false, langOverride = null) {
@@ -2356,21 +3808,178 @@ class WDOSMultilinguaMeeting {
         return null;
     }
 
+    async submitChatMessage(form) {
+        const input = form.querySelector("#room-chat-input") || form.querySelector("input[name='message_text']");
+        if (!input || !input.value.trim()) return;
+        const text = input.value.trim();
+        const isAnnouncement = Boolean(form.querySelector("#chat-is-announcement")?.checked);
+        const sendBtn = form.querySelector("button[type='submit']");
+        const origBtnText = sendBtn ? sendBtn.textContent : "";
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.textContent = "...";
+        }
+        input.value = "";
+
+        try {
+            const formData = new URLSearchParams();
+            formData.append("message_text", text);
+            formData.append("is_announcement", isAnnouncement ? "1" : "0");
+            formData.append("sender_name", this.userDisplayName);
+
+            const targetUrl = this.chatUrl || `/api/rooms/${this.roomCode}/chat/`;
+            const resp = await fetch(targetUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": this.getCsrfToken(),
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: formData.toString(),
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.chat_message) {
+                    this.appendChatMessage(data.chat_message, true);
+                    if (this.livekitRoom && this.livekitRoom.state === "connected" && this.livekitRoom.localParticipant) {
+                        try {
+                            const payloadStr = JSON.stringify({ type: "chat_message", message: data.chat_message });
+                            this.livekitRoom.localParticipant.publishData(
+                                new TextEncoder().encode(payloadStr),
+                                { reliable: true, topic: "wdos_chat" }
+                            ).catch(() => {});
+                        } catch (_) {}
+                    }
+                }
+            }
+        } catch (_) {
+        } finally {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.textContent = origBtnText || "Send";
+            }
+        }
+    }
+
+    isChatTabActive() {
+        const chatPane = document.getElementById("tab-pane-chat");
+        if (!chatPane) return false;
+        try {
+            return window.getComputedStyle(chatPane).display !== "none";
+        } catch (_) {
+            return chatPane.style.display !== "none";
+        }
+    }
+
+    clearUnreadChatCount() {
+        this.unreadChatCount = 0;
+        const dockBadge = document.getElementById("dock-chat-badge");
+        if (dockBadge) {
+            dockBadge.style.display = "none";
+            dockBadge.textContent = "0";
+        }
+        try {
+            if (this.roomCode) {
+                sessionStorage.setItem(`wdos_chat_read_${this.roomCode}`, "1");
+            }
+        } catch (_) {}
+    }
+
+    syncChatMessages(messages) {
+        if (!Array.isArray(messages)) return;
+        let added = false;
+        messages.forEach((msg) => {
+            if (msg) {
+                const msgId = String(msg.id || `${msg.sender_name}_${msg.timestamp}_${(msg.message_text || "").slice(0, 10)}`);
+                if (!this.seenChatIds.has(msgId)) {
+                    this.appendChatMessage(msg, false);
+                    added = true;
+                }
+            }
+        });
+        if (added) {
+            const feed = document.getElementById("room-chat-feed");
+            if (feed) feed.scrollTop = feed.scrollHeight;
+        }
+    }
+
+    appendChatMessage(msg, isLocal = false) {
+        if (!msg || !msg.message_text) return;
+        const msgId = String(msg.id || `${msg.sender_name}_${msg.timestamp}_${(msg.message_text || "").slice(0, 10)}`);
+        if (this.seenChatIds.has(msgId)) return;
+        this.seenChatIds.add(msgId);
+
+        const feed = document.getElementById("room-chat-feed");
+        if (!feed) return;
+
+        const emptyNotice = document.getElementById("chat-empty-notice");
+        if (emptyNotice) {
+            emptyNotice.remove();
+        }
+
+        const isMe = msg.sender_name === this.userDisplayName;
+        const isAnnouncement = Boolean(msg.is_host_announcement);
+
+        let roleBadge = "";
+        if (isAnnouncement) {
+            roleBadge = `<span style="font-size:10px; background:#D97706; color:#FFF; padding:1px 5px; border-radius:4px; margin-left:4px;">ANNOUNCEMENT</span>`;
+        } else if (msg.sender_role === "Host") {
+            roleBadge = `<span style="font-size:10px; background:#FCEEF5; color:#D4006A; padding:1px 5px; border-radius:4px; margin-left:4px;">Host</span>`;
+        } else if (msg.sender_role === "Co-Host") {
+            roleBadge = `<span style="font-size:10px; background:#EDE9FE; color:#6D28D9; padding:1px 5px; border-radius:4px; margin-left:4px;">Co-Host</span>`;
+        }
+
+        const bgStyle = isAnnouncement
+            ? "background:#FEF3C7; border:1px solid #FCD34D;"
+            : (isMe ? "background:#FCEEF5; border:1px solid #F4C2DA; margin-left:12px;" : "background:#F9FAFB; border:1px solid #E5E7EB; margin-right:12px;");
+
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "zm-chat-msg";
+        msgDiv.setAttribute("data-chat-id", msgId);
+        msgDiv.style.cssText = `padding:8px 12px; border-radius:10px; ${bgStyle}`;
+        msgDiv.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                <span style="font-size:12px; font-weight:800; color:${isAnnouncement ? '#92400E' : '#19131A'};">
+                    ${this.escapeHtml(msg.sender_name)}${roleBadge}
+                </span>
+                <span style="font-size:10.5px; color:#6B7280;">${this.escapeHtml(msg.timestamp || "")}</span>
+            </div>
+            <div style="font-size:13px; color:#1F2937; word-break:break-word; line-height:1.4;">${this.escapeHtml(msg.message_text)}</div>
+        `;
+
+        feed.appendChild(msgDiv);
+        feed.scrollTop = feed.scrollHeight;
+
+        const tabBadge = document.getElementById("tab-count-chat");
+        if (tabBadge) {
+            tabBadge.textContent = `${this.seenChatIds.size}`;
+        }
+
+        const dockBadge = document.getElementById("dock-chat-badge");
+        if (this.isChatTabActive()) {
+            this.clearUnreadChatCount();
+        } else {
+            if (!isMe && !isLocal) {
+                this.unreadChatCount = (this.unreadChatCount || 0) + 1;
+                if (dockBadge) {
+                    dockBadge.textContent = `${this.unreadChatCount}`;
+                    dockBadge.style.display = "inline-flex";
+                }
+            }
+        }
+    }
+
     startLivePolling() {
-        if (this.pollTimer) clearTimeout(this.pollTimer);
-        this.fetchLatestTranscript(false);
-        const scheduleNextPoll = () => {
-            if (!this.transcriptUrl) return;
-            // When the LiveKit server translation bot is connected, captions & audio arrive in real time
-            // via WebRTC DataPackets/AudioTracks, so HTTP polling only syncs roster/lobby state every 2.5s
-            // (enabling 100+ concurrent participants without overloading Gunicorn).
-            const delayMs = this.hasServerTranslationBot() ? 2500 : 650;
-            this.pollTimer = setTimeout(async () => {
-                await this.fetchLatestTranscript(true);
-                scheduleNextPoll();
-            }, delayMs);
-        };
-        scheduleNextPoll();
+        // Strictly Event-Driven Architecture (Google Meet / Zoom / Teams standard):
+        // Performs a single one-time state hydration on room boot. All subsequent updates
+        // (audio, video, screen share, live captions, chat, reactions, polls, and host governance)
+        // are pushed in real time over LiveKit WebRTC Media Tracks and DataChannels — zero HTTP polling loops.
+        if (this.pollTimer) {
+            clearTimeout(this.pollTimer);
+            this.pollTimer = null;
+        }
+        return this.fetchLatestTranscript(false);
     }
 
     async fetchLatestTranscript(speakNewSegments = true) {
@@ -2378,12 +3987,44 @@ class WDOSMultilinguaMeeting {
         this.isFetchingTranscript = true;
         try {
             const shortListen = this.getShortLang(this.listeningLang);
-            const audioSeqParam = this.lastSeenAudioSeq >= 0 ? `&after_audio_seq=${this.lastSeenAudioSeq}` : "";
-            const resp = await fetch(`${this.transcriptUrl}?lang=${encodeURIComponent(shortListen)}${audioSeqParam}`, {
+            const stateParam = this.lastStateVersion ? `&mode=delta&state_v=${encodeURIComponent(this.lastStateVersion)}` : "&mode=delta";
+            const seqParam = this.lastSeenSequence > 0 ? `&after_seq=${this.lastSeenSequence}` : "";
+            const resp = await fetch(`${this.transcriptUrl}?lang=${encodeURIComponent(shortListen)}${stateParam}${seqParam}`, {
                 headers: { "Accept": "application/json" }
             });
+            if (resp.status === 304) {
+                this.unchangedPollStreak = (this.unchangedPollStreak || 0) + 1;
+                return;
+            }
             if (!resp.ok) return;
             const data = await resp.json();
+
+            if (data.state_v) {
+                this.lastStateVersion = String(data.state_v);
+            }
+
+            // Fast-path: Server confirmed room state is unchanged (~80-byte delta cursor response)
+            if (data.unchanged === true) {
+                this.unchangedPollStreak = (this.unchangedPollStreak || 0) + 1;
+                if (typeof data.latest_seq === "number") {
+                    this.lastSeenSequence = Math.max(this.lastSeenSequence, data.latest_seq);
+                }
+                if (data.live_interim && data.live_interim.original_text) {
+                    const liveInterim = data.live_interim;
+                    const hasActiveLocalInterim = Boolean(
+                        (this.lastLocalInterimAt && (Date.now() - this.lastLocalInterimAt < 2500)) ||
+                        (this.lastServerCaptionAt && (Date.now() - this.lastServerCaptionAt < 2500))
+                    );
+                    if (liveInterim.speaker_name !== this.userDisplayName || !hasActiveLocalInterim) {
+                        this.triggerSpeakingPulse(liveInterim.speaker_name, 1600);
+                        const interimTrans = (liveInterim.translations || {})[shortListen] || liveInterim.translated_text || liveInterim.original_text;
+                        this.renderLiveCaption(liveInterim.speaker_name, liveInterim.original_text, interimTrans, false);
+                    }
+                }
+                return;
+            }
+
+            this.unchangedPollStreak = 0;
 
             // 1. Check if the meeting was ended by the Host/Co-Host
             if (data.room_status === "COMPLETED") {
@@ -2398,13 +4039,31 @@ class WDOSMultilinguaMeeting {
             if (typeof data.is_host === "boolean") {
                 this.isHost = data.is_host;
             }
+            if (data.recording_state) {
+                this.syncRecordingState(data.recording_state);
+            }
+            if (typeof data.webinar_mode === "boolean") {
+                this.webinarMode = data.webinar_mode;
+                const webBtn = document.getElementById("btn-toggle-webinar-mode");
+                if (webBtn) {
+                    webBtn.textContent = this.webinarMode ? "STAGE: WEBINAR (1000+)" : "STAGE: INTERACTIVE";
+                }
+            }
+            if (Array.isArray(data.polls)) {
+                this.cachedPolls = data.polls;
+                this.renderPolls(data.polls);
+            }
             if (data.my_participant) {
                 if (data.my_participant.admission_status === "REMOVED" || data.my_participant.admission_status === "DENIED") {
                     this.shutdownAllMedia();
                     window.location.href = this.isGuest ? "/auth/login/" : "/foundation/meetings/";
                     return;
                 }
-                // Only force-mute when the Host explicitly clicked Mute / Mute All (connection_status === "Muted by Host")
+                if (data.my_participant.admission_status === "LEFT") {
+                    this.shutdownAllMedia();
+                    window.location.href = `/foundation/rooms/${this.roomCode}/prejoin/`;
+                    return;
+                }
                 if (
                     data.my_participant.is_muted &&
                     data.my_participant.connection_status === "Muted by Host" &&
@@ -2414,29 +4073,6 @@ class WDOSMultilinguaMeeting {
                 ) {
                     await this.toggleMicrophone(true);
                     this.setMicStatus("Your microphone was muted by the meeting host.");
-                }
-            }
-
-            // 3. Process fallback original voice audio chunks only if LiveKit WebRTC is not connected
-            if (typeof data.latest_audio_seq === "number") {
-                if (this.lastSeenAudioSeq < 0) {
-                    this.lastSeenAudioSeq = data.latest_audio_seq;
-                } else if (!this.hasActiveRemoteWebRTCAudio() && Array.isArray(data.audio_chunks) && data.audio_chunks.length > 0) {
-                    for (const chunk of data.audio_chunks) {
-                        if (chunk.seq > this.lastSeenAudioSeq) {
-                            this.lastSeenAudioSeq = chunk.seq;
-                            if (chunk.speaker_name !== this.userDisplayName) {
-                                this.triggerSpeakingPulse(chunk.speaker_name, 2200);
-                                this.lastReceivedRawAudioAt = Date.now();
-                                this.lastRawAudioDataUrl = chunk.audio_data_url;
-                                if (!this.isTranslationEnabled && speakNewSegments) {
-                                    this.enqueueRawAudioChunk(chunk.audio_data_url, chunk.speaker_name);
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    this.lastSeenAudioSeq = Math.max(this.lastSeenAudioSeq, data.latest_audio_seq);
                 }
             }
 
@@ -2478,12 +4114,78 @@ class WDOSMultilinguaMeeting {
                 if (lobbyBtn) lobbyBtn.innerHTML = `<span>${data.bypass_lobby ? "Require Lobby" : "Bypass Lobby"}</span>`;
             }
 
+            if (typeof data.is_locked === "boolean") {
+                const lockBadge = document.getElementById("badge-room-lock-status");
+                const popoverLockBadge = document.getElementById("popover-lock-badge");
+                const lockBtn = document.getElementById("btn-toggle-room-lock");
+                if (lockBadge) lockBadge.style.display = data.is_locked ? "inline-flex" : "none";
+                if (popoverLockBadge) {
+                    popoverLockBadge.textContent = data.is_locked ? "Locked (Blocks entry)" : "Unlocked";
+                    popoverLockBadge.style.background = data.is_locked ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.18)";
+                    popoverLockBadge.style.color = data.is_locked ? "#FCA5A5" : "#86EFAC";
+                    popoverLockBadge.style.borderColor = data.is_locked ? "rgba(239,68,68,0.4)" : "rgba(134,239,172,0.35)";
+                }
+                if (lockBtn) {
+                    lockBtn.innerHTML = data.is_locked ? "<span>🔓 Unlock Meeting Room</span>" : "<span>🔒 Lock Meeting Room</span>";
+                }
+            }
+
+            if (typeof data.has_passcode === "boolean") {
+                const passBadge = document.getElementById("badge-passcode-status");
+                const popoverPassBadge = document.getElementById("popover-passcode-badge");
+                if (passBadge) passBadge.style.display = data.has_passcode ? "inline-flex" : "none";
+                if (popoverPassBadge) {
+                    popoverPassBadge.textContent = data.has_passcode ? "Passcode Set" : "No Passcode";
+                    popoverPassBadge.style.background = data.has_passcode ? "rgba(245,158,11,0.2)" : "rgba(255,255,255,0.1)";
+                    popoverPassBadge.style.color = data.has_passcode ? "#FCD34D" : "#E5D9E6";
+                }
+            }
+
+            if (typeof data.allow_participant_screen_share === "boolean") {
+                this.allowParticipantScreenShare = data.allow_participant_screen_share;
+                const policyBtn = document.getElementById("btn-toggle-screenshare-policy");
+                const policyInput = document.getElementById("input-screenshare-policy-action");
+                const policyLabel = document.getElementById("screenshare-policy-btn-label");
+                if (policyLabel) {
+                    policyLabel.textContent = data.allow_participant_screen_share ? "Screen Share: All Allowed" : "Screen Share: Host Only";
+                }
+                if (policyBtn) {
+                    policyBtn.style.background = data.allow_participant_screen_share ? "#DCFCE7" : "#F3F4F6";
+                    policyBtn.style.color = data.allow_participant_screen_share ? "#166534" : "#4B5563";
+                    policyBtn.style.borderColor = data.allow_participant_screen_share ? "#86EFAC" : "#E5E7EB";
+                }
+                if (policyInput) {
+                    policyInput.value = data.allow_participant_screen_share ? "host_only" : "all_participants";
+                }
+            }
+
+            if (typeof data.can_share_screen === "boolean") {
+                this.canShareScreen = data.can_share_screen;
+            }
+            if (data.my_participant) {
+                if (typeof data.my_participant.can_share_screen === "boolean") {
+                    this.canShareScreen = data.my_participant.can_share_screen;
+                }
+                if (data.my_participant.meeting_role === "Host" || data.my_participant.meeting_role === "Co-Host") {
+                    this.canShareScreen = true;
+                }
+            }
+            this.updateScreenShareButtonVisibility();
+
+            if (typeof data.active_screenshare_presenter === "string") {
+                const newPresenter = data.active_screenshare_presenter.trim();
+                if (!this.isScreenSharing && !newPresenter && this.activeScreensharePresenter) {
+                    this.detachScreenTrack();
+                }
+            }
+
             if (Array.isArray(data.waiting_participants)) {
                 this.renderWaitingRoomQueue(data.waiting_participants);
             }
 
             if (Array.isArray(data.participants)) {
                 this.participantCount = data.participants.length;
+                this.cachedParticipants = data.participants;
                 data.participants.forEach((p) => {
                     if (p && p.id && p.speaking_language) {
                         this.participantLanguagesById.set(String(p.id), p.speaking_language);
@@ -2494,9 +4196,24 @@ class WDOSMultilinguaMeeting {
                 });
                 this.updateRemoteWebRTCAudioVolumes();
                 this.renderParticipantsList(data.participants);
+                this.renderVideoGrid(data.participants);
             }
 
-            const segments = data.segments || [];
+            if (Array.isArray(data.chat_messages)) {
+                this.syncChatMessages(data.chat_messages);
+            }
+
+            const incomingSegments = data.segments || [];
+            if (incomingSegments.length > 0) {
+                const existingBySeq = new Map((this.cachedSegments || []).map((s) => [s.sequence_number, s]));
+                incomingSegments.forEach((seg) => {
+                    existingBySeq.set(seg.sequence_number, seg);
+                });
+                this.cachedSegments = Array.from(existingBySeq.values())
+                    .sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0))
+                    .slice(-120);
+            }
+            const segments = this.cachedSegments || [];
             const liveInterim = (data.live_interim && data.live_interim.original_text) ? data.live_interim : null;
             const hasActiveLocalInterim = Boolean(
                 (this.lastLocalInterimAt && (Date.now() - this.lastLocalInterimAt < 2500)) ||
@@ -2513,20 +4230,17 @@ class WDOSMultilinguaMeeting {
                 const newSegments = segments.filter((s) => s.sequence_number > prevSeq);
 
                 if (newSegments.length > 0) {
-                    // A new finalized segment arrived: update caption bar immediately with the committed segment
                     this.lastTranslatedText = translated;
                     this.lastOriginalText = latest.original_text || "";
                     this.lastOriginalLang = latest.original_language || "en-US";
                     this.renderLiveCaption(latest.speaker_name, latest.original_text, translated, true);
                 } else if (liveInterim) {
-                    // Someone is actively speaking mid-sentence right now: render their live growing caption & translation!
                     if (liveInterim.speaker_name !== this.userDisplayName || !hasActiveLocalInterim) {
                         this.triggerSpeakingPulse(liveInterim.speaker_name, 1600);
                         const interimTrans = (liveInterim.translations || {})[shortListen] || liveInterim.translated_text || liveInterim.original_text;
                         this.renderLiveCaption(liveInterim.speaker_name, liveInterim.original_text, interimTrans, false);
                     }
                 } else if (!hasActiveLocalInterim) {
-                    // No active interim speech: keep latest committed segment displayed
                     this.lastTranslatedText = translated;
                     this.lastOriginalText = latest.original_text || "";
                     this.lastOriginalLang = latest.original_language || "en-US";
@@ -2546,8 +4260,6 @@ class WDOSMultilinguaMeeting {
                                 this.participantLanguagesByName.set(String(seg.speaker_name), seg.original_language);
                                 this.updateRemoteWebRTCAudioVolumes();
                             }
-                            // If the server-side LiveKit bot is already streaming translated audio on `lang:<shortListen>`,
-                            // do not trigger duplicate browser TTS playback!
                             if (this.hasSubscribedBotTrack(shortListen)) {
                                 continue;
                             }
@@ -2635,7 +4347,12 @@ class WDOSMultilinguaMeeting {
         const rowsHtml = cleanList.map((wp) => `
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; padding-top:6px; border-top:1px dashed #FDE68A;">
             <div>
-              <div style="font-size:12.5px; font-weight:700; color:#19131A;">${this.escapeHtml(wp.participant_name)}</div>
+              <div style="font-size:12.5px; font-weight:700; color:#19131A; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                <span>${this.escapeHtml(wp.participant_name)}</span>
+                ${wp.is_guest 
+                  ? '<span style="font-size:10px; font-weight:700; color:#B45309; background:#FEF3C7; border:1px solid #FCD34D; border-radius:4px; padding:1px 5px;" title="Unverified guest join">⚠️ Unverified Guest</span>'
+                  : '<span style="font-size:10px; font-weight:700; color:#15803D; background:#DCFCE7; border:1px solid #86EFAC; border-radius:4px; padding:1px 5px;" title="Verified registered member">✓ Verified Member</span>'}
+              </div>
               <div style="font-size:11px; color:#78350F;">Speaks ${this.escapeHtml(wp.speaking_language_display || "English")} · Hears ${this.escapeHtml(wp.listening_language_display || "French")}</div>
             </div>
             <div style="display:flex; gap:6px;">
@@ -2655,16 +4372,35 @@ class WDOSMultilinguaMeeting {
           </div>
         `).join("");
 
+        const unverifiedCount = cleanList.filter((wp) => wp.is_guest).length;
+        const unverifiedNotice = unverifiedCount > 0
+          ? `<div style="color:#B45309; font-weight:700; margin-top:4px;">⚠️ Notice: Queue contains ${unverifiedCount} unverified guest(s). Please verify identities before admitting.</div>`
+          : "";
+
         container.innerHTML = `
           <div id="waiting-room-queue" style="margin-bottom:12px; padding:10px 12px; border-radius:12px; background:#FFFBEB; border:1px solid #FDE68A;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <span style="font-size:12px; font-weight:800; color:#92400E;">Waiting Lobby (${cleanList.length})</span>
-              <form method="post" action="${actionUrl}" class="js-host-ajax-form" style="display:inline;">
-                <input type="hidden" name="csrfmiddlewaretoken" value="${csrf}">
-                <input type="hidden" name="action" value="admit_all">
-                <button type="submit" style="background:#D97706; color:#FFF; border:none; border-radius:6px; padding:3px 9px; font-size:11px; font-weight:700; cursor:pointer;">Admit All</button>
-              </form>
+              <button type="button" id="btn-admit-all-trigger" onclick="if(typeof toggleAdmitAllConfirm==='function')toggleAdmitAllConfirm(true);" style="background:#D97706; color:#FFF; border:none; border-radius:6px; padding:3px 9px; font-size:11px; font-weight:700; cursor:pointer;">Admit All</button>
             </div>
+
+            <div id="confirm-admit-all-box" style="display:none; margin-bottom:10px; padding:10px 12px; border-radius:8px; background:#FEF3C7; border:1.5px solid #F59E0B;">
+              <div style="font-size:12px; font-weight:800; color:#92400E; margin-bottom:4px;">⚠️ Confirm Admit All</div>
+              <div id="confirm-admit-all-msg" style="font-size:11.5px; color:#78350F; line-height:1.4; margin-bottom:8px;">
+                Are you sure you want to admit all <strong>${cleanList.length}</strong> participant(s)?
+                ${unverifiedNotice}
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" onclick="if(typeof toggleAdmitAllConfirm==='function')toggleAdmitAllConfirm(false);" style="background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer;">Cancel</button>
+                <form method="post" action="${actionUrl}" class="js-host-ajax-form" style="display:inline;">
+                  <input type="hidden" name="csrfmiddlewaretoken" value="${csrf}">
+                  <input type="hidden" name="action" value="admit_all">
+                  <input type="hidden" name="confirmed" value="1">
+                  <button type="submit" id="btn-confirm-admit-all" style="background:#16A34A; color:#FFF; border:none; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer;">Yes, Admit All</button>
+                </form>
+              </div>
+            </div>
+
             ${rowsHtml}
           </div>
         `;
@@ -2674,6 +4410,8 @@ class WDOSMultilinguaMeeting {
         const container = document.getElementById("live-participants-list");
         const countEl = document.getElementById("live-participants-count");
         if (countEl) countEl.textContent = `${participants.length}`;
+        const tabCountEl = document.getElementById("tab-count-people");
+        if (tabCountEl) tabCountEl.textContent = `${participants.length}`;
         if (!container) return;
         const sig = JSON.stringify(participants);
         if (!force && this.lastParticipantsSig === sig) {
@@ -2688,8 +4426,16 @@ class WDOSMultilinguaMeeting {
             const parts = String(p.participant_name || "P").trim().split(/\s+/);
             const initials = parts.slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "P";
             const handBadge = p.hand_raised ? `<span style="font-size:11px; color:#D97706; margin-left:4px;">&#9995; Hand Raised</span>` : "";
+            const screenBadge = p.can_share_screen ? `<span style="font-size:10px; font-weight:700; background:#DCFCE7; color:#166534; border:1px solid #BBF7D0; border-radius:4px; padding:1px 5px; margin-left:4px;">Screen Share</span>` : "";
+            const guestBadge = p.is_guest ? `<span style="font-size:10px; font-weight:700; color:#B45309; background:#FEF3C7; border:1px solid #FCD34D; border-radius:4px; padding:1px 5px; margin-left:4px;" title="Unverified guest">Guest</span>` : "";
             const hostControls = (this.isHost && p.meeting_role !== "Host") ? `
-              <div style="width:100%; display:flex; justify-content:flex-end; gap:6px; margin-top:6px; padding-top:6px; border-top:1px dashed #EFE6EE;">
+              <div style="width:100%; display:flex; justify-content:flex-end; gap:6px; margin-top:6px; padding-top:6px; border-top:1px dashed #EFE6EE; flex-wrap:wrap;">
+                <form method="post" action="${actionUrl}" class="js-host-ajax-form" style="display:inline;">
+                  <input type="hidden" name="csrfmiddlewaretoken" value="${csrf}">
+                  <input type="hidden" name="action" value="toggle_screenshare_permission">
+                  <input type="hidden" name="participant_id" value="${this.escapeHtml(p.id)}">
+                  <button type="submit" style="background:${p.can_share_screen ? '#FEE2E2' : '#ECFDF5'}; color:${p.can_share_screen ? '#991B1B' : '#047857'}; border:1px solid ${p.can_share_screen ? '#FCA5A5' : '#A7F3D0'}; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; cursor:pointer;">${p.can_share_screen ? 'Revoke Share' : 'Allow Share'}</button>
+                </form>
                 <form method="post" action="${actionUrl}" class="js-host-ajax-form" style="display:inline;">
                   <input type="hidden" name="csrfmiddlewaretoken" value="${csrf}">
                   <input type="hidden" name="action" value="mute_participant">
@@ -2714,7 +4460,7 @@ class WDOSMultilinguaMeeting {
               <div class="zm-person-row" style="flex-wrap:wrap;">
                 <div class="zm-person-avatar">${this.escapeHtml(initials)}</div>
                 <div class="zm-person-info">
-                  <div class="zm-person-name">${this.escapeHtml(p.participant_name)}${handBadge}</div>
+                  <div class="zm-person-name">${this.escapeHtml(p.participant_name)}${guestBadge}${handBadge}${screenBadge}</div>
                   <div class="zm-person-meta">${this.escapeHtml(p.meeting_role)} · Speaks ${this.escapeHtml(p.speaking_language_display)} · Hears <strong>${this.escapeHtml(p.listening_language_display)}</strong></div>
                 </div>
                 <span class="zm-person-status">${this.escapeHtml(p.connection_status || "Online")}</span>

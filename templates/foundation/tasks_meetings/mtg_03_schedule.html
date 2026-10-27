@@ -158,7 +158,7 @@
     {% if scheduled_meeting and result_success %}
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       {% if scheduled_meeting.has_online_room %}
-      <a href="/foundation/rooms/{{ scheduled_meeting.meeting_code }}/live/" class="dash-btn-primary">Join Online Room</a>
+      <a href="/foundation/rooms/{{ scheduled_meeting.meeting_code }}/prejoin/" class="dash-btn-primary">Join Online Room</a>
       {% endif %}
       <a href="/foundation/meetings/{{ scheduled_meeting.meeting_code }}/?country={{ target_country }}&network={{ target_network }}" class="dash-btn-secondary">View Meeting Details</a>
     </div>

@@ -77,7 +77,7 @@ def _setup_exec_context(request, screen_code: str) -> tuple[Optional[Dict[str, A
     ctx["state_mode"] = request.GET.get("state")
     ctx["active_tab"] = (request.GET.get("tab") or "overview").lower()
     ctx["breadcrumbs"] = [
-        {"label": "Workspace", "url": "/foundation/", "is_current": False},
+        {"label": "Home", "url": "/foundation/dashboard/", "is_current": False},
         {"label": screen.get("module", "Executive"), "url": None, "is_current": False},
         {"label": screen["title"], "url": None, "is_current": True},
     ]

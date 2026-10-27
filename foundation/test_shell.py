@@ -257,26 +257,32 @@ class NetworkSeparationAndGeographyTests(ShellTestCaseBase):
 class ScopedBreadcrumbsHierarchyTests(ShellTestCaseBase):
     def test_breadcrumbs_path_hierarchy(self):
         self.login_as(self.user_wgmn)
-        # Level 1: WDOS
+        # Root foundation redirects to Home (/foundation/dashboard/)
         res1 = self.client.get("/foundation/")
-        self.assertContains(res1, "scoped-breadcrumbs")
-        self.assertContains(res1, "WDOS")
+        self.assertRedirects(res1, "/foundation/dashboard/")
 
-        # Level 2: Network Workspace
+        # Level 1 in hierarchy: Network Workspace (WDOS root removed)
         res2 = self.client.get("/foundation/network/WGMN/")
         self.assertContains(res2, "WGMN Workspace")
+        self.assertNotContains(res2, ">WDOS<")
 
-        # Level 3: Country Hub
+        # Level 2: Country Hub (Breadcrumb: WGMN Workspace / Nigeria Hub)
         res3 = self.client.get("/foundation/network/WGMN/country/NG/")
         self.assertContains(res3, "Nigeria Hub")
+        self.assertContains(res3, "WGMN Workspace")
+        self.assertNotContains(res3, ">WDOS<")
 
-        # Level 4: Leadership Level
+        # Level 3: Leadership Level
         res4 = self.client.get("/foundation/network/WGMN/country/NG/leadership/member/")
         self.assertContains(res4, "Individual Member")
 
-        # Level 5: Individual Profile
+        # Level 4: Individual Profile
         res5 = self.client.get(f"/foundation/network/WGMN/country/NG/leadership/member/profile/{self.person_wgmn.id}/")
         self.assertContains(res5, "Amina Bello")
+
+        # Sidebar contains Home and WGMN Workspace
+        self.assertContains(res3, 'href="/foundation/network/WGMN/"')
+        self.assertContains(res3, "WGMN Workspace")
 
 
 class WorkQueueAndDeepLinkTests(ShellTestCaseBase):

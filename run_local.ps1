@@ -35,11 +35,12 @@ if (Test-Path $EnvPath) {
 
 # Ensure critical defaults for local HTTP execution
 $Port = if ($env:PORT) { $env:PORT } else { "8080" }
+$BindHost = if ($env:HOST) { $env:HOST } else { "0.0.0.0" }
 if (-not $env:PYTHONUTF8) { $env:PYTHONUTF8 = "1" }
 if (-not $env:DJANGO_DEBUG) { $env:DJANGO_DEBUG = "1" }
 if (-not $env:WDOS_SECURE_COOKIES) { $env:WDOS_SECURE_COOKIES = "0" }
 if (-not $env:WDOS_PUBLIC_ORIGIN) { $env:WDOS_PUBLIC_ORIGIN = "http://127.0.0.1:$Port" }
-if (-not $env:DJANGO_ALLOWED_HOSTS) { $env:DJANGO_ALLOWED_HOSTS = "127.0.0.1,localhost" }
+if (-not $env:DJANGO_ALLOWED_HOSTS) { $env:DJANGO_ALLOWED_HOSTS = "*" }
 
 Write-Host "`n[*] Applying database migrations..." -ForegroundColor Cyan
 & $VenvPython manage.py migrate --noinput
@@ -62,7 +63,7 @@ Write-Host "  Pre-configured Accounts:" -ForegroundColor Yellow
 Write-Host "  - Member: member@example.org / DevMember@2026!Wdos" -ForegroundColor Yellow
 Write-Host "  - Admin:  admin@example.org  / DevAdmin@2026!Wdos" -ForegroundColor Yellow
 Write-Host "=======================================================" -ForegroundColor Green
-Write-Host "Starting Django development server at 127.0.0.1:$Port (Ctrl+C to stop)...`n" -ForegroundColor Cyan
+Write-Host "Starting Django development server at $BindHost:$Port (Ctrl+C to stop)...`n" -ForegroundColor Cyan
 
-& $VenvPython manage.py runserver "127.0.0.1:$Port"
+& $VenvPython manage.py runserver "$BindHost:$Port"
 

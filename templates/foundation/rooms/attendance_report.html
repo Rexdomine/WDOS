@@ -1,0 +1,168 @@
+{% extends "foundation/base_shell.html" %}
+{% load static %}
+
+{% block title %}Attendance Report — {{ room_session.title|default:room_session.room_code }}{% endblock %}
+
+{% block content %}
+<div style="max-width:1180px; margin:0 auto; padding:24px 16px; display:flex; flex-direction:column; gap:20px;">
+
+  <!-- Header Banner -->
+  <div style="background:#FFFFFF; border:1px solid #E7DCE6; border-radius:18px; padding:24px 28px; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; box-shadow:0 6px 18px rgba(0,0,0,0.03);">
+    <div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+        <span style="font-size:11px; font-weight:800; background:#FCEEF5; color:#D4006A; border:1px solid #F4C2DA; border-radius:999px; padding:3px 10px; letter-spacing:0.04em;">
+          ATTENDANCE ROSTER &amp; AUDIT REPORT
+        </span>
+        <span style="font-size:12px; font-weight:700; color:#5E5061;">Room: {{ room_session.room_code }}</span>
+      </div>
+      <h1 style="font-family:'Manrope',sans-serif; font-size:24px; font-weight:800; color:#19131A; margin:0 0 6px 0;">
+        {{ room_session.title }}
+      </h1>
+      <p style="font-size:13.5px; color:#5E5061; margin:0;">
+        Host: <strong>{{ room_session.host_name|default:"Host" }}</strong> &middot; Session Status: <strong>{{ room_session.status }}</strong> &middot; Opened: {{ room_session.opened_at|date:"Y-m-d H:i"|default:"Live Session" }}
+      </p>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <a href="?export=csv" class="zm-btn" style="background:#16A34A; color:#FFFFFF; border:1px solid #15803D; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Export CSV</span>
+      </a>
+      <button type="button" onclick="window.print()" class="zm-btn" style="background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">
+        Print Report
+      </button>
+      <a href="/foundation/meetings/attendance-minutes/?meeting={{ meeting_series.meeting_code|default:'MTG-NG-001' }}" class="zm-btn" style="background:#FCEEF5; color:#D4006A; border:1px solid #F4C2DA; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; text-decoration:none;">
+        Minutes &amp; Follow-Up (MTG-05-RECORD)
+      </a>
+      <a href="/foundation/rooms/{{ room_session.room_code }}/live/" class="zm-btn" style="background:#1E1B24; color:#FFFFFF; border:1px solid #332B3B; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; text-decoration:none;">
+        Back to Live Room
+      </a>
+    </div>
+  </div>
+
+  <!-- Key Metrics Row -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px;">
+    <div style="background:#FFFFFF; border:1px solid #E7DCE6; border-radius:14px; padding:16px 20px;">
+      <div style="font-size:12px; font-weight:700; color:#5E5061; margin-bottom:4px;">TOTAL REGISTERED / JOINED</div>
+      <div style="font-size:28px; font-weight:800; color:#19131A;">{{ total_count }}</div>
+    </div>
+    <div style="background:#FFFFFF; border:1px solid #E7DCE6; border-radius:14px; padding:16px 20px;">
+      <div style="font-size:12px; font-weight:700; color:#5E5061; margin-bottom:4px;">ADMITTED PARTICIPANTS</div>
+      <div style="font-size:28px; font-weight:800; color:#16A34A;">{{ admitted_count }}</div>
+    </div>
+    <div style="background:#FFFFFF; border:1px solid #E7DCE6; border-radius:14px; padding:16px 20px;">
+      <div style="font-size:12px; font-weight:700; color:#5E5061; margin-bottom:4px;">HOSTS &amp; CO-HOSTS</div>
+      <div style="font-size:28px; font-weight:800; color:#D4006A;">{{ hosts_count }}</div>
+    </div>
+    <div style="background:#FFFFFF; border:1px solid #E7DCE6; border-radius:14px; padding:16px 20px;">
+      <div style="font-size:12px; font-weight:700; color:#5E5061; margin-bottom:4px;">CURRENTLY CONNECTED</div>
+      <div style="font-size:28px; font-weight:800; color:#2563EB;">{{ active_connected_count }}</div>
+    </div>
+  </div>
+
+  <!-- Languages Represented -->
+  <div style="background:#FFFFFF; border:1px solid #E7DCE6; border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <span style="font-size:13px; font-weight:800; color:#19131A;">Languages in Room:</span>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      {% for lang, count in lang_counts.items %}
+      <span style="background:#F8F3F7; border:1px solid #DECFE0; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:700; color:#4A394D;">
+        {{ lang }}: {{ count }}
+      </span>
+      {% empty %}
+      <span style="color:#6B7280; font-size:12px;">English</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Attendance Table -->
+  <div style="background:#FFFFFF; border:1px solid #E7DCE6; border-radius:18px; padding:20px 24px; box-shadow:0 6px 18px rgba(0,0,0,0.03);">
+    <h3 style="font-family:'Manrope',sans-serif; font-size:17px; font-weight:800; color:#19131A; margin:0 0 16px 0;">
+      Verified Attendee Roster ({{ participants|length }})
+    </h3>
+
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+        <thead>
+          <tr style="border-bottom:2px solid #E5E7EB; color:#4B5563; font-weight:800; font-size:11.5px; text-transform:uppercase; letter-spacing:0.04em;">
+            <th style="padding:10px 12px;">#</th>
+            <th style="padding:10px 12px;">Participant Name</th>
+            <th style="padding:10px 12px;">Meeting Role</th>
+            <th style="padding:10px 12px;">Network / Country</th>
+            <th style="padding:10px 12px;">Speaks</th>
+            <th style="padding:10px 12px;">Hears</th>
+            <th style="padding:10px 12px;">Admission</th>
+            <th style="padding:10px 12px;">Connection</th>
+            <th style="padding:10px 12px;">Joined</th>
+            <th style="padding:10px 12px;">Screen Share</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in participants %}
+          <tr style="border-bottom:1px solid #F3F4F6; transition:background 0.15s ease;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
+            <td style="padding:12px; color:#9CA3AF; font-weight:700;">{{ forloop.counter }}</td>
+            <td style="padding:12px; font-weight:700; color:#111827;">
+              {{ p.participant_name }}
+              {% if p.is_guest %}<span style="font-size:10px; background:#F3F4F6; color:#4B5563; border-radius:4px; padding:1px 5px; margin-left:4px;">Guest</span>{% endif %}
+            </td>
+            <td style="padding:12px;">
+              <span style="font-weight:700; padding:2px 8px; border-radius:6px; font-size:11px;
+                {% if p.meeting_role == 'Host' %}background:#FCEEF5; color:#D4006A; border:1px solid #F4C2DA;
+                {% elif p.meeting_role == 'Co-Host' %}background:#EDE9FE; color:#6D28D9; border:1px solid #DDD6FE;
+                {% else %}background:#F3F4F6; color:#374151; border:1px solid #E5E7EB;{% endif %}">
+                {{ p.meeting_role }}
+              </span>
+            </td>
+            <td style="padding:12px; color:#4B5563;">
+              {{ p.person_profile.primary_network|default:room_session.network|default:"WGMN" }} &middot; {{ p.person_profile.country|default:room_session.country|default:"NG" }}
+            </td>
+            <td style="padding:12px; color:#1F2937;">{{ p.speaking_language_display }}</td>
+            <td style="padding:12px; color:#1F2937; font-weight:600;">{{ p.listening_language_display }}</td>
+            <td style="padding:12px;">
+              <span style="font-size:11px; font-weight:700; padding:2px 7px; border-radius:5px;
+                {% if p.admission_status == 'ADMITTED' %}background:#DCFCE7; color:#166534;
+                {% elif p.admission_status == 'WAITING_ROOM' %}background:#FEF3C7; color:#92400E;
+                {% else %}background:#FEE2E2; color:#991B1B;{% endif %}">
+                {{ p.admission_status }}
+              </span>
+            </td>
+            <td style="padding:12px; color:#4B5563;">{{ p.connection_status }}</td>
+            <td style="padding:12px; color:#6B7280; font-size:12px;">{{ p.joined_at|date:"H:i"|default:"--" }}</td>
+            <td style="padding:12px;">
+              {% if p.can_share_screen %}
+              <span style="font-size:11px; font-weight:700; color:#16A34A; background:#DCFCE7; border:1px solid #BBF7D0; padding:2px 7px; border-radius:5px;">Allowed</span>
+              {% else %}
+              <span style="font-size:11px; color:#9CA3AF;">Restricted</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" style="padding:32px; text-align:center; color:#6B7280;">No participants have joined this room yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Linkage Note -->
+  <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:14px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <div>
+        <strong style="color:#166534; font-size:13.5px;">Linked to Stage 09 Minutes &amp; Follow-Up</strong>
+        <p style="color:#14532D; font-size:12.5px; margin:2px 0 0 0;">
+          All participant attendance records are automatically synchronized into Stage 09 Meeting Follow-Up (MTG-05) and Attendance Minutes (MTG-05-RECORD).
+        </p>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <a href="/foundation/meetings/follow-up/?meeting={{ meeting_series.meeting_code|default:'MTG-NG-001' }}" style="font-size:12px; font-weight:700; color:#166534; text-decoration:underline;">
+        Open MTG-05 Follow-Up &rarr;
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

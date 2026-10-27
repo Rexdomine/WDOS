@@ -1,0 +1,384 @@
+<!-- ===================================================================== -->
+<!-- WDOS MEETING INVITATIONS, CALENDAR (.ICS) & REMINDERS MODAL (WHITE BG) -->
+<!-- ===================================================================== -->
+<div id="invite-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(2px);">
+  <div style="background:#FFFFFF !important; border:1px solid #E5E7EB; border-radius:16px; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; color:#19131A !important; box-shadow:0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.05);">
+    
+    <!-- Modal Header -->
+    <div style="padding:16px 20px; border-bottom:1px solid #E5E7EB; display:flex; justify-content:space-between; align-items:center; background:#FFFFFF;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:22px;">✉️</span>
+        <div>
+          <h2 style="font-size:16px; font-weight:800; margin:0; font-family:'Manrope',sans-serif; color:#19131A !important;">Meeting Invitations &amp; Reminders</h2>
+          <div style="font-size:12px; color:#6B7280;">{{ room_session.room_code }} &middot; {{ room_session.title }}</div>
+        </div>
+      </div>
+      <button type="button" onclick="closeInviteModal()" style="background:transparent; border:none; color:#9CA3AF; font-size:26px; cursor:pointer; padding:2px 8px; line-height:1;" title="Close">&times;</button>
+    </div>
+
+    <!-- Modal Tabs -->
+    <div style="display:flex; border-bottom:1px solid #E5E7EB; background:#F9FAFB;">
+      <button type="button" id="invite-tab-btn-share" onclick="switchInviteTab('share')" style="flex:1; padding:12px 10px; background:#FFFFFF; color:#D4006A; font-size:12.5px; font-weight:800; border:none; border-bottom:2px solid #D4006A; cursor:pointer;">
+        1. Link &amp; Share
+      </button>
+      <button type="button" id="invite-tab-btn-email" onclick="switchInviteTab('email')" style="flex:1; padding:12px 10px; background:transparent; color:#6B7280; font-size:12.5px; font-weight:700; border:none; border-bottom:2px solid transparent; cursor:pointer;">
+        2. Email Invitation
+      </button>
+      <button type="button" id="invite-tab-btn-calendar" onclick="switchInviteTab('calendar')" style="flex:1; padding:12px 10px; background:transparent; color:#6B7280; font-size:12.5px; font-weight:700; border:none; border-bottom:2px solid transparent; cursor:pointer;">
+        3. Calendar (.ics) &amp; Reminders
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div style="padding:20px; background:#FFFFFF;">
+
+      <!-- PANE 1: Link & Text Invitation -->
+      <div id="invite-pane-share" style="display:flex; flex-direction:column; gap:14px;">
+        <div>
+          <label style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#4B5563; display:block; margin-bottom:5px;">Meeting Join Link</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="invite-copy-link-input" readonly value="" style="flex:1; background:#F9FAFB; border:1px solid #D1D5DB; border-radius:8px; padding:9px 12px; font-size:13px; color:#1F2937; outline:none;">
+            <button type="button" onclick="copyInviteLink()" id="btn-copy-link" style="background:#D4006A; color:#FFFFFF; border:none; border-radius:8px; padding:0 16px; font-size:12.5px; font-weight:700; cursor:pointer; min-height:38px;">
+              Copy Link
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <label style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#4B5563;">Complete Invitation Message</label>
+            <span style="font-size:11px; color:#6B7280;">Multi-timezone breakdown included</span>
+          </div>
+          <textarea id="invite-template-text" rows="7" readonly style="width:100%; background:#F9FAFB; border:1px solid #D1D5DB; border-radius:8px; padding:10px 12px; font-size:12px; color:#1F2937; line-height:1.45; font-family:monospace; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
+          <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+            <button type="button" onclick="copyInviteTemplate()" id="btn-copy-template" style="background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; border-radius:8px; min-height:32px; padding:0 14px; font-size:12px; font-weight:700; cursor:pointer;">
+              📋 Copy Full Invitation
+            </button>
+          </div>
+        </div>
+
+        <div style="background:#FAF7FA; border:1px solid #EFE6EE; border-radius:10px; padding:12px 14px;">
+          <div style="font-size:11.5px; font-weight:800; color:#4A394D; margin-bottom:6px;">Meeting Times Across Major African Zones:</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:6px; font-size:12px; color:#1F2937;">
+            <div>WAT (UTC+1): <strong>{{ wat_time_label }}</strong></div>
+            <div>CAT (UTC+2): <strong>{{ cat_time_label }}</strong></div>
+            <div>EAT (UTC+3): <strong>{{ eat_time_label }}</strong></div>
+            <div>UTC (GMT): <strong>{{ utc_time_label }}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANE 2: Send Email Invitation -->
+      <div id="invite-pane-email" style="display:none; flex-direction:column; gap:14px;">
+        <form id="send-email-invitation-form" onsubmit="handleSendEmailInvitation(event)" style="display:flex; flex-direction:column; gap:12px; margin:0;">
+          {% csrf_token %}
+          <div style="display:flex; flex-direction:column; gap:5px;">
+            <label for="invite-recipient-emails" style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#4B5563;">
+              Recipient Email Address(es) <span style="color:#EF4444;">*</span>
+            </label>
+            <input type="text" id="invite-recipient-emails" name="recipients" placeholder="guest@example.com, colleague@ngo.org" required style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:8px; padding:8px 12px; font-size:13px; color:#1F2937; outline:none;">
+            <span style="font-size:11px; color:#6B7280;">Separate multiple addresses with commas, semicolons, or newlines.</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:5px;">
+            <label for="invite-personal-note" style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#4B5563;">
+              Host Personal Note (Optional)
+            </label>
+            <textarea id="invite-personal-note" name="personal_note" rows="2" placeholder="Add an agenda note, session goals, or instructions..." style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:8px; padding:8px 12px; font-size:12.5px; color:#1F2937; outline:none; resize:vertical;"></textarea>
+          </div>
+
+          <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:10px 12px; display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="invite-attach-ics" name="attach_ics" value="1" checked style="accent-color:#D4006A; width:16px; height:16px; cursor:pointer;">
+            <label for="invite-attach-ics" style="font-size:12px; color:#374151; cursor:pointer; user-select:none;">
+              Attach iCalendar (.ics) invite with 15-minute alert and automatic local timezone conversion
+            </label>
+          </div>
+
+          <div id="email-invite-status" style="display:none; padding:10px 12px; border-radius:8px; font-size:12.5px;"></div>
+
+          <div style="display:flex; justify-content:flex-end;">
+            <button type="submit" id="btn-submit-email-invite" style="background:#D4006A; color:#FFFFFF; border:none; border-radius:8px; min-height:38px; padding:0 20px; font-size:13px; font-weight:700; cursor:pointer;">
+              ✉️ Send Email Invitation
+            </button>
+          </div>
+        </form>
+
+        {% if invitation_history %}
+        <div style="border-top:1px solid #E5E7EB; padding-top:10px; margin-top:4px;">
+          <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#6B7280; margin-bottom:6px;">Invitation History</div>
+          <div style="max-height:100px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">
+            {% for item in invitation_history %}
+            <div style="font-size:11.5px; background:#F9FAFB; border:1px solid #E5E7EB; padding:6px 10px; border-radius:6px; display:flex; justify-content:space-between; color:#374151;">
+              <span>Sent to <strong>{{ item.recipient_count }}</strong> recipient(s)</span>
+              <span style="color:#6B7280;">{{ item.sent_at|slice:":16" }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- PANE 3: Calendar (.ics) & Reminders -->
+      <div id="invite-pane-calendar" style="display:none; flex-direction:column; gap:14px;">
+        
+        <!-- Calendar Download Card -->
+        <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <div style="font-size:13.5px; font-weight:800; color:#19131A;">Download iCalendar File (.ics)</div>
+              <div style="font-size:12px; color:#6B7280; margin-top:2px;">RFC 5545 compliant with UTC timestamps &amp; 15-minute alert</div>
+            </div>
+            <a href="/foundation/rooms/{{ room_session.room_code }}/calendar.ics" download="meeting_{{ room_session.room_code }}.ics" style="background:#D4006A; color:#FFFFFF; border:none; border-radius:8px; min-height:34px; padding:6px 14px; font-size:12px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+              📥 Download .ics File
+            </a>
+          </div>
+          <div style="margin-top:8px; font-size:11.5px; color:#4B5563; line-height:1.4;">
+            💡 Compatible with Google Calendar, Outlook, and Apple Calendar. Calendar apps automatically display the meeting in each attendee's local device timezone.
+          </div>
+        </div>
+
+        <!-- Reminders Card -->
+        <div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <div style="font-size:13.5px; font-weight:800; color:#92400E;">Meeting Reminders</div>
+              <div style="font-size:12px; color:#78350F; margin-top:2px;">
+                Reminders sent: <strong id="reminder-count-display">{{ reminder_count }}</strong>
+                &middot; <span id="reminder-last-label">{{ last_reminder_label }}</span>
+              </div>
+            </div>
+            <button type="button" onclick="handleSendMeetingReminder()" id="btn-send-reminder-now" style="background:#D97706; color:#FFFFFF; border:none; border-radius:8px; min-height:34px; padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer;">
+              🔔 Send Reminder Now
+            </button>
+          </div>
+          <div id="reminder-status-msg" style="display:none; margin-top:8px; padding:6px 10px; border-radius:6px; font-size:12px;"></div>
+        </div>
+
+        <!-- Multi-Timezone Table -->
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:10px; padding:12px;">
+          <div style="font-size:12px; font-weight:800; color:#19131A; margin-bottom:8px;">Regional African Timezones</div>
+          <table style="width:100%; border-collapse:collapse; font-size:12px; color:#374151;">
+            <thead>
+              <tr style="border-bottom:1px solid #E5E7EB; color:#6B7280; text-align:left;">
+                <th style="padding:4px 6px;">Zone</th>
+                <th style="padding:4px 6px;">Scheduled Time</th>
+                <th style="padding:4px 6px;">Representative Countries</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #F3F4F6;">
+                <td style="padding:6px; font-weight:700;">WAT (UTC+1)</td>
+                <td style="padding:6px; font-weight:800; color:#D4006A;">{{ wat_time_label }}</td>
+                <td style="padding:6px; color:#6B7280;">Nigeria, Ghana, Cameroon, Niger</td>
+              </tr>
+              <tr style="border-bottom:1px solid #F3F4F6;">
+                <td style="padding:6px; font-weight:700;">CAT (UTC+2)</td>
+                <td style="padding:6px; font-weight:800; color:#D4006A;">{{ cat_time_label }}</td>
+                <td style="padding:6px; color:#6B7280;">South Africa, Zimbabwe, Rwanda, Zambia</td>
+              </tr>
+              <tr style="border-bottom:1px solid #F3F4F6;">
+                <td style="padding:6px; font-weight:700;">EAT (UTC+3)</td>
+                <td style="padding:6px; font-weight:800; color:#D4006A;">{{ eat_time_label }}</td>
+                <td style="padding:6px; color:#6B7280;">Kenya, Uganda, Tanzania, Ethiopia</td>
+              </tr>
+              <tr>
+                <td style="padding:6px; font-weight:700;">UTC (GMT)</td>
+                <td style="padding:6px; font-weight:800; color:#D4006A;">{{ utc_time_label }}</td>
+                <td style="padding:6px; color:#6B7280;">Universal Reference</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  function openInviteModal() {
+    var modal = document.getElementById('invite-modal');
+    if (modal) {
+      modal.style.display = 'flex';
+      var origin = window.location.origin;
+      var roomCode = "{{ room_session.room_code }}";
+      var joinLink = origin + "/foundation/rooms/" + roomCode + "/prejoin/";
+      var linkInp = document.getElementById('invite-copy-link-input');
+      if (linkInp) linkInp.value = joinLink;
+      var templateInp = document.getElementById('invite-template-text');
+      if (templateInp) templateInp.value = buildInviteText(joinLink);
+    }
+  }
+
+  function closeInviteModal() {
+    var modal = document.getElementById('invite-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function switchInviteTab(tabName) {
+    var panes = {
+      'share': document.getElementById('invite-pane-share'),
+      'email': document.getElementById('invite-pane-email'),
+      'calendar': document.getElementById('invite-pane-calendar')
+    };
+    var btns = {
+      'share': document.getElementById('invite-tab-btn-share'),
+      'email': document.getElementById('invite-tab-btn-email'),
+      'calendar': document.getElementById('invite-tab-btn-calendar')
+    };
+    Object.keys(panes).forEach(function(k) {
+      if (panes[k]) panes[k].style.display = (k === tabName) ? 'flex' : 'none';
+      if (btns[k]) {
+        if (k === tabName) {
+          btns[k].style.background = '#FFFFFF';
+          btns[k].style.color = '#D4006A';
+          btns[k].style.borderBottom = '2px solid #D4006A';
+        } else {
+          btns[k].style.background = 'transparent';
+          btns[k].style.color = '#6B7280';
+          btns[k].style.borderBottom = '2px solid transparent';
+        }
+      }
+    });
+  }
+
+  function buildInviteText(joinLink) {
+    var passcode = "{{ room_session.passcode|default:''|escapejs }}";
+    var passLine = passcode ? "Passcode: " + passcode + "\n" : "";
+    var roomCode = "{{ room_session.room_code }}";
+    var title = "{{ room_session.title|default:''|escapejs }}";
+    return "You are invited to join a WDOS Multilingua Coordination Meeting.\n\n" +
+      "Meeting: " + title + "\n" +
+      "Room Code: " + roomCode + "\n" +
+      passLine +
+      "Join Link: " + joinLink + "\n" +
+      "Calendar (.ics): " + window.location.origin + "/foundation/rooms/" + roomCode + "/calendar.ics\n\n" +
+      "Schedule Across African Time Zones:\n" +
+      "• West Africa (WAT): {{ wat_time_label }}\n" +
+      "• Central Africa (CAT): {{ cat_time_label }}\n" +
+      "• East Africa (EAT): {{ eat_time_label }}\n" +
+      "• Universal Time (UTC): {{ utc_time_label }}\n\n" +
+      "Live speech translation across English, French, Swahili, Portuguese, Arabic and African languages is supported.";
+  }
+
+  function copyInviteLink() {
+    var inp = document.getElementById('invite-copy-link-input');
+    if (inp) {
+      navigator.clipboard.writeText(inp.value).then(function() {
+        var btn = document.getElementById('btn-copy-link');
+        if (btn) btn.textContent = 'Copied!';
+        setTimeout(function() { if (btn) btn.textContent = 'Copy Link'; }, 2000);
+      });
+    }
+  }
+
+  function copyInviteTemplate() {
+    var txt = document.getElementById('invite-template-text');
+    if (txt) {
+      navigator.clipboard.writeText(txt.value).then(function() {
+        var btn = document.getElementById('btn-copy-template');
+        if (btn) btn.textContent = 'Copied!';
+        setTimeout(function() { if (btn) btn.textContent = '📋 Copy Full Invitation'; }, 2000);
+      });
+    }
+  }
+
+  function handleSendEmailInvitation(e) {
+    e.preventDefault();
+    var form = document.getElementById('send-email-invitation-form');
+    var statusDiv = document.getElementById('email-invite-status');
+    var btn = document.getElementById('btn-submit-email-invite');
+    var formData = new FormData(form);
+    if (btn) btn.disabled = true;
+    var roomCode = "{{ room_session.room_code }}";
+
+    fetch("/foundation/rooms/" + roomCode + "/invite/email/", {
+      method: "POST",
+      body: formData,
+      headers: {
+        "X-Requested-With": "XMLHttpRequest"
+      }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (btn) btn.disabled = false;
+      if (statusDiv) {
+        statusDiv.style.display = 'block';
+        if (data.status === 'success') {
+          statusDiv.style.background = '#DCFCE7';
+          statusDiv.style.color = '#15803D';
+          statusDiv.style.border = '1px solid #86EFAC';
+          statusDiv.textContent = '✅ ' + (data.message || 'Invitation sent successfully!');
+          form.reset();
+        } else {
+          statusDiv.style.background = '#FEE2E2';
+          statusDiv.style.color = '#991B1B';
+          statusDiv.style.border = '1px solid #FCA5A5';
+          statusDiv.textContent = '⚠️ ' + (data.error || 'Failed to send invitation.');
+        }
+      }
+    })
+    .catch(function(err) {
+      if (btn) btn.disabled = false;
+      if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#FEE2E2';
+        statusDiv.style.color = '#991B1B';
+        statusDiv.style.border = '1px solid #FCA5A5';
+        statusDiv.textContent = '⚠️ Error sending invitation.';
+      }
+    });
+  }
+
+  function handleSendMeetingReminder() {
+    var btn = document.getElementById('btn-send-reminder-now');
+    var statusDiv = document.getElementById('reminder-status-msg');
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
+    if (btn) btn.disabled = true;
+    var roomCode = "{{ room_session.room_code }}";
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    fetch("/foundation/rooms/" + roomCode + "/reminders/", {
+      method: "POST",
+      body: formData,
+      headers: {
+        "X-Requested-With": "XMLHttpRequest"
+      }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (btn) btn.disabled = false;
+      if (statusDiv) {
+        statusDiv.style.display = 'block';
+        if (data.status === 'success') {
+          statusDiv.style.background = '#DCFCE7';
+          statusDiv.style.color = '#15803D';
+          statusDiv.style.border = '1px solid #86EFAC';
+          statusDiv.textContent = '🔔 ' + (data.message || 'Reminder sent!');
+          var countEl = document.getElementById('reminder-count-display');
+          if (countEl) countEl.textContent = data.reminder_count;
+          var labelEl = document.getElementById('reminder-last-label');
+          if (labelEl && data.last_reminder_label) labelEl.textContent = data.last_reminder_label;
+        } else {
+          statusDiv.style.background = '#FEE2E2';
+          statusDiv.style.color = '#991B1B';
+          statusDiv.style.border = '1px solid #FCA5A5';
+          statusDiv.textContent = '⚠️ ' + (data.error || 'Failed to send reminder.');
+        }
+      }
+    })
+    .catch(function(err) {
+      if (btn) btn.disabled = false;
+      if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#FEE2E2';
+        statusDiv.style.color = '#991B1B';
+        statusDiv.style.border = '1px solid #FCA5A5';
+        statusDiv.textContent = '⚠️ Error sending reminder.';
+      }
+    });
+  }
+</script>

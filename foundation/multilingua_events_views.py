@@ -7,14 +7,20 @@ transcript, audio-recovery, and MTG-05/TASK-01 auto-minutes APIs.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
+import re
 import sys
 import uuid
+import zoneinfo
 from typing import Any, Dict, Optional
 
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.conf import settings
+from django.core.cache import cache
+from django.http import HttpResponse, HttpResponseForbidden, HttpResponseNotFound, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.locale import LANGUAGES, catalog
@@ -28,6 +34,7 @@ from .models import (
     MeetingRoomSession,
     MeetingSeries,
     PersonProfile,
+    RoomChatMessage,
     RoomDiagnosticLane,
     RoomParticipantSession,
     ScheduledMeeting,
@@ -206,7 +213,6 @@ def _resolve_stage10_auth(request, meeting_id: Optional[str] = None):
             submitted_name = (request.POST.get("guest_name") or request.GET.get("guest_name") or "").strip()
             if submitted_name:
                 request.session["wdos_guest_name"] = submitted_name[:120]
-                request.session[joined_room_key] = True
             if request.POST.get("speaking_language"):
                 request.session["wdos_guest_speaking_lang"] = normalize_bcp47_language(request.POST.get("speaking_language"), "en-US")
             if request.POST.get("listening_language"):
@@ -393,6 +399,113 @@ def _ensure_room_for_existing_meeting(
     return sched, room
 
 
+def _validate_guest_display_name(
+    guest_name: str,
+    room_session: Optional[MeetingRoomSession],
+    current_participant_id: Any = None,
+) -> tuple[bool, str]:
+    """
+    Guards against guest impersonation of verified WDOS members, staff, or the meeting host.
+    Also guards against duplicate names in the same active room session.
+    """
+    clean = (guest_name or "").strip()
+    if not clean:
+        return False, "Please enter your name to join as a guest."
+    if len(clean) < 2:
+        return False, "Please provide a valid name (at least 2 characters)."
+
+    # 1. Impersonation of Registered WDOS Profiles
+    registered = PersonProfile.objects.filter(full_name__iexact=clean).first()
+    if registered:
+        return False, (
+            f"The name '{clean}' belongs to a registered WDOS member. "
+            "If this is you, please sign in with your WDOS account. "
+            "Otherwise, please use your own name to continue as a guest."
+        )
+
+    # 2. Impersonation of Host
+    if room_session and clean.lower() == (room_session.host_name or "").strip().lower():
+        return False, (
+            f"The name '{clean}' matches the designated meeting host. "
+            "To join as host, please log in with host credentials. "
+            "Otherwise, please enter your own full name."
+        )
+
+    # 3. Duplicate name in room
+    if room_session:
+        qs = room_session.participants.filter(participant_name__iexact=clean).exclude(admission_status__in=["LEFT", "REMOVED"])
+        if current_participant_id:
+            qs = qs.exclude(id=current_participant_id)
+        if qs.exists():
+            return False, (
+                f"A participant named '{clean}' is already in this meeting room. "
+                "Please enter a distinct name or include your chapter/organisation."
+            )
+
+    return True, ""
+
+
+def _validate_room_passcode(
+    request,
+    room_session: Optional[MeetingRoomSession],
+    is_host: bool = False,
+) -> tuple[bool, str]:
+    """
+    Validates optional meeting room passcode for non-host participants.
+    """
+    if not room_session or not room_session.has_passcode or is_host:
+        return True, ""
+    verified_key = f"room_passcode_verified_{room_session.id}"
+    if request.session.get(verified_key):
+        return True, ""
+    entered = (request.POST.get("passcode") or "").strip()
+    if not entered:
+        request.session.pop(verified_key, None)
+        request.session.pop(f"wdos_guest_joined_{room_session.id}", None)
+        return False, "Meeting passcode is required to enter this room."
+    if entered != room_session.passcode.strip():
+        request.session.pop(verified_key, None)
+        request.session.pop(f"wdos_guest_joined_{room_session.id}", None)
+        return False, "Incorrect passcode. Please enter the valid meeting passcode provided by the host."
+    request.session[verified_key] = True
+    return True, ""
+
+
+def _check_room_entry_security(
+    request,
+    room_session: Optional[MeetingRoomSession],
+    participant: Optional[RoomParticipantSession],
+    is_host: bool = False,
+    check_passcode: bool = True,
+) -> tuple[bool, str, str]:
+    """
+    Checks if room lock, link expiry, or missing passcode blocks entry for non-host participants.
+    Returns (allowed, error_message, error_code).
+    """
+    if not room_session or is_host:
+        return True, "", ""
+
+    # Passcode check for post-prejoin screens (lobby, live room, tokens)
+    if check_passcode and room_session.has_passcode:
+        verified_key = f"room_passcode_verified_{room_session.id}"
+        if not request.session.get(verified_key):
+            return False, "Meeting passcode is required to enter this room.", "passcode_required"
+
+    # Link Expiry check
+    if room_session.is_link_expired:
+        expiry_ts = room_session.link_expires_at.strftime("%Y-%m-%d %H:%M UTC") if room_session.link_expires_at else "previously"
+        return False, f"This meeting link expired on {expiry_ts}. Please request an updated link from the host.", "link_expired"
+
+    # Room Lock check
+    if room_session.is_locked:
+        # If participant was already admitted earlier, allow reconnect
+        if participant and participant.admission_status == "ADMITTED":
+            return True, "", ""
+        return False, "This meeting room is locked by the host. New participants cannot join while the room is locked.", "room_locked"
+
+    return True, "", ""
+
+
 def _resolve_meeting_and_room(meeting_id: Optional[str] = None, default_network: str = "WGMN", default_country: str = "NG"):
     """
     Resolves `(ScheduledMeeting, MeetingRoomSession)` from a UUID (`ScheduledMeeting.id` or `MeetingRoomSession.id`),
@@ -541,12 +654,20 @@ def _update_room_policies(
     *,
     allow_guests: Optional[bool] = None,
     bypass_lobby: Optional[bool] = None,
+    allow_screenshare: Optional[bool] = None,
 ) -> None:
     cur_guests = room_session.allow_guest_access if allow_guests is None else allow_guests
     cur_bypass = room_session.bypass_lobby if bypass_lobby is None else bypass_lobby
+    cur_screenshare = room_session.allow_participant_screen_share if allow_screenshare is None else allow_screenshare
     access_tag = "access:anyone_with_link" if cur_guests else "access:wdos_only"
     lobby_tag = "lobby:bypass" if cur_bypass else "lobby:required"
-    room_session.provider_session_id = f"{access_tag}|{lobby_tag}"
+    screenshare_tag = "screenshare:allowed" if cur_screenshare else "screenshare:host_only"
+
+    # Preserve active sharer tag if present
+    sharer = room_session.active_screenshare_presenter
+    sharer_tag = f"|sharer:{sharer}" if sharer else ""
+
+    room_session.provider_session_id = f"{access_tag}|{lobby_tag}|{screenshare_tag}{sharer_tag}"
     room_session.save(update_fields=["provider_session_id"])
 
     target_sm = meeting or room_session.scheduled_meeting
@@ -572,6 +693,18 @@ def _update_room_policies(
             connection_status="Listening",
             joined_at=timezone.now(),
         )
+    state_v = _bump_room_state_version(str(room_session.id))
+    LiveKitAdapter.send_data_packet(
+        room_session.session_name,
+        {
+            "type": "policy_changed",
+            "allow_guest_access": bool(cur_guests),
+            "bypass_lobby": bool(cur_bypass),
+            "allow_participant_screen_share": bool(cur_screenshare),
+            "state_v": state_v,
+        },
+        topic="wdos_control",
+    )
 
 
 def _open_room_if_host(room_session: Optional[MeetingRoomSession], is_host: bool) -> None:
@@ -683,10 +816,16 @@ def _ensure_participant_session(
                 participant.participant_name = display_name
                 updates.append("participant_name")
             if participant.admission_status == "LEFT":
-                participant.admission_status = "ADMITTED" if can_bypass_now else "WAITING_ROOM"
-                participant.connection_status = "Listening" if can_bypass_now else "Waiting in Lobby"
-                participant.joined_at = timezone.now()
-                updates.extend(["admission_status", "connection_status", "joined_at"])
+                is_explicit_rejoin = bool(
+                    req
+                    and req.method == "POST"
+                    and (req.POST.get("action") in ("join", "guest_join", "join_room") or req.POST.get("guest_name"))
+                )
+                if is_explicit_rejoin:
+                    participant.admission_status = "ADMITTED" if can_bypass_now else "WAITING_ROOM"
+                    participant.connection_status = "Listening" if can_bypass_now else "Waiting in Lobby"
+                    participant.joined_at = timezone.now()
+                    updates.extend(["admission_status", "connection_status", "joined_at"])
             elif can_bypass_now and participant.admission_status == "WAITING_ROOM":
                 participant.admission_status = "ADMITTED"
                 participant.connection_status = "Listening"
@@ -751,10 +890,16 @@ def _ensure_participant_session(
             updated_fields.extend(["admission_status", "connection_status", "is_speaker", "meeting_role"])
         elif not is_host:
             if participant.admission_status == "LEFT":
-                participant.admission_status = "ADMITTED" if can_bypass_now else "WAITING_ROOM"
-                participant.connection_status = "Listening" if can_bypass_now else "Waiting in Lobby"
-                participant.joined_at = timezone.now()
-                updated_fields.extend(["admission_status", "connection_status", "joined_at"])
+                is_explicit_rejoin = bool(
+                    req
+                    and req.method == "POST"
+                    and req.POST.get("action") in ("join", "guest_join", "join_room")
+                )
+                if is_explicit_rejoin:
+                    participant.admission_status = "ADMITTED" if can_bypass_now else "WAITING_ROOM"
+                    participant.connection_status = "Listening" if can_bypass_now else "Waiting in Lobby"
+                    participant.joined_at = timezone.now()
+                    updated_fields.extend(["admission_status", "connection_status", "joined_at"])
             elif can_bypass_now and participant.admission_status == "WAITING_ROOM":
                 participant.admission_status = "ADMITTED"
                 participant.connection_status = "Listening"
@@ -812,10 +957,260 @@ def _prune_stale_waiting_participants(room_session: Optional[MeetingRoomSession]
             wp.save(update_fields=["admission_status", "connection_status", "left_at"])
 
 
+_PARTICIPANT_HEARTBEAT_TIMEOUT_SECONDS = 120.0
+
+
+def _get_room_state_version(room_key: str) -> int:
+    if not room_key:
+        return 1
+    cache_key = f"wdos:room_state_v:{room_key}"
+    try:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return int(cached)
+        cache.add(cache_key, 1, timeout=86400)
+    except Exception:
+        pass
+    return 1
+
+
+def _bump_room_state_version(room_key: str) -> int:
+    if not room_key:
+        return 1
+    cache_key = f"wdos:room_state_v:{room_key}"
+    try:
+        cache.add(cache_key, 1, timeout=86400)
+        return int(cache.incr(cache_key))
+    except Exception:
+        next_v = _get_room_state_version(room_key) + 1
+        try:
+            cache.set(cache_key, next_v, timeout=86400)
+        except Exception:
+            pass
+        return next_v
+
+
+def _record_participant_heartbeat(participant_id: str, now_ts: float) -> None:
+    if not participant_id:
+        return
+    try:
+        cache.set(f"wdos:part_hb:{participant_id}", float(now_ts), timeout=300)
+    except Exception:
+        pass
+
+
+def _get_participant_heartbeat(participant_id: str) -> Optional[float]:
+    if not participant_id:
+        return None
+    try:
+        cached_hb = cache.get(f"wdos:part_hb:{participant_id}")
+        if cached_hb is not None:
+            return float(cached_hb)
+    except Exception:
+        pass
+    return None
+
+
+def _clear_participant_heartbeat(participant_id: str) -> None:
+    if not participant_id:
+        return
+    try:
+        cache.delete(f"wdos:part_hb:{participant_id}")
+    except Exception:
+        pass
+
+
+def _is_room_webinar_mode(room_session: Optional[MeetingRoomSession]) -> bool:
+    if not room_session:
+        return False
+    room_key = str(room_session.id)
+    try:
+        explicit = cache.get(f"wdos:webinar_mode:{room_key}")
+        if explicit is not None:
+            return bool(explicit)
+    except Exception:
+        pass
+    if "webinar:1" in (room_session.provider_session_id or ""):
+        return True
+    threshold = int(getattr(settings, "LIVEKIT_WEBINAR_THRESHOLD", 100) or 100)
+    admitted_count = room_session.participants.filter(admission_status="ADMITTED").count()
+    return admitted_count >= threshold
+
+
+def _set_room_webinar_mode(room_session: MeetingRoomSession, enabled: bool) -> None:
+    room_key = str(room_session.id)
+    try:
+        cache.set(f"wdos:webinar_mode:{room_key}", bool(enabled), timeout=86400)
+    except Exception:
+        pass
+    parts = [p for p in (room_session.provider_session_id or "").split("|") if p and not p.startswith("webinar:")]
+    if enabled:
+        parts.append("webinar:1")
+    room_session.provider_session_id = "|".join(parts)
+    room_session.save(update_fields=["provider_session_id"])
+
+
+def _get_room_recording_state(room_key: str) -> Dict[str, Any]:
+    if not room_key:
+        return {"is_recording": False, "egress_id": "", "started_at": None}
+    try:
+        rec = cache.get(f"wdos:room_recording:{room_key}")
+        if isinstance(rec, dict):
+            return rec
+    except Exception:
+        pass
+    return {"is_recording": False, "egress_id": "", "started_at": None}
+
+
+def _set_room_recording_state(room_key: str, state: Dict[str, Any]) -> None:
+    if not room_key:
+        return
+    try:
+        cache.set(f"wdos:room_recording:{room_key}", state, timeout=86400)
+    except Exception:
+        pass
+
+
+def _get_room_polls(room_key: str) -> list[Dict[str, Any]]:
+    if not room_key:
+        return []
+    try:
+        polls = cache.get(f"wdos:room_polls:{room_key}")
+        if not isinstance(polls, list):
+            return []
+        hydrated: list[Dict[str, Any]] = []
+        for p in polls:
+            if not isinstance(p, dict):
+                continue
+            pid = p.get("id", "")
+            opts = p.get("options") or []
+            counts = [
+                int(cache.get(f"wdos:poll_opt:{room_key}:{pid}:{i}", p.get("votes", [0] * len(opts))[i] if i < len(p.get("votes", [])) else 0) or 0)
+                for i in range(len(opts))
+            ]
+            p_copy = dict(p)
+            p_copy["votes"] = counts
+            p_copy["total_votes"] = sum(counts)
+            hydrated.append(p_copy)
+        return hydrated
+    except Exception:
+        return []
+
+
+def _set_room_polls(room_key: str, polls: list[Dict[str, Any]]) -> None:
+    if not room_key:
+        return
+    try:
+        cache.set(f"wdos:room_polls:{room_key}", polls[-25:], timeout=86400)
+    except Exception:
+        pass
+
+
+def _atomic_vote_poll(room_key: str, poll_id: str, voter_id: str, opt_idx: int) -> Optional[Dict[str, Any]]:
+    if not room_key or not poll_id or not voter_id or opt_idx < 0:
+        return None
+    lock_key = f"wdos:poll_lock:{room_key}:{poll_id}"
+    import time as _time
+    acquired = False
+    for _ in range(25):
+        if cache.add(lock_key, "1", timeout=5):
+            acquired = True
+            break
+        _time.sleep(0.01)
+    try:
+        polls = _get_room_polls(room_key)
+        target_poll = None
+        for p in polls:
+            if p.get("id") == poll_id and p.get("is_open", True):
+                target_poll = p
+                break
+        if target_poll is None:
+            return None
+        opts = target_poll.get("options") or []
+        if not (0 <= opt_idx < len(opts)):
+            return None
+        voter_key = f"wdos:poll_voter:{room_key}:{poll_id}:{voter_id}"
+        prev_choice = cache.get(voter_key)
+        if prev_choice is not None and int(prev_choice) == opt_idx:
+            return target_poll
+        if prev_choice is not None and 0 <= int(prev_choice) < len(opts):
+            prev_opt_key = f"wdos:poll_opt:{room_key}:{poll_id}:{int(prev_choice)}"
+            try:
+                val = int(cache.get(prev_opt_key, 0) or 0)
+                cache.set(prev_opt_key, max(0, val - 1), timeout=86400)
+            except Exception:
+                pass
+        opt_key = f"wdos:poll_opt:{room_key}:{poll_id}:{opt_idx}"
+        if not cache.add(opt_key, 1, timeout=86400):
+            try:
+                cache.incr(opt_key)
+            except Exception:
+                cache.set(opt_key, int(cache.get(opt_key, 0) or 0) + 1, timeout=86400)
+        cache.set(voter_key, opt_idx, timeout=86400)
+        counts = [int(cache.get(f"wdos:poll_opt:{room_key}:{poll_id}:{i}", 0) or 0) for i in range(len(opts))]
+        target_poll["votes"] = counts
+        target_poll["total_votes"] = sum(counts)
+        _set_room_polls(room_key, polls)
+        return target_poll
+    finally:
+        if acquired:
+            cache.delete(lock_key)
+
+
+def _compute_room_state_fingerprint(
+    room_session: Optional[MeetingRoomSession],
+    my_p: Optional[RoomParticipantSession] = None,
+) -> str:
+    if not room_session:
+        return "v0"
+    room_key = str(room_session.id)
+    state_v = _get_room_state_version(room_key)
+    latest_seg_seq = (
+        room_session.transcript_segments.order_by("-sequence_number")
+        .values_list("sequence_number", flat=True)
+        .first()
+        or 0
+    )
+    chat_count = room_session.chat_messages.count()
+    p_rows = list(
+        room_session.participants.exclude(participant_name="")
+        .order_by("id")
+        .values_list("id", "admission_status", "connection_status", "is_muted", "hand_raised", "meeting_role", "speaking_language", "listening_language")
+    )
+    my_state = (
+        f"{my_p.id}:{my_p.admission_status}:{my_p.is_muted}:{my_p.hand_raised}:{my_p.connection_status}"
+        if my_p and my_p.pk
+        else "anon"
+    )
+    raw = (
+        f"{state_v}|{room_session.status}|{room_session.is_locked}|{room_session.provider_session_id}|"
+        f"{room_session.active_speaker_name}|{latest_seg_seq}|{chat_count}|{my_state}|{p_rows}"
+    )
+    digest = hashlib.md5(raw.encode("utf-8")).hexdigest()[:12]
+    return f"{state_v}.{latest_seg_seq}.{chat_count}.{digest}"
+
+
 def _serialize_room_participants(room_session: Optional[MeetingRoomSession]) -> tuple[list[Dict[str, Any]], list[Dict[str, Any]]]:
     if not room_session:
         return [], []
     _prune_stale_waiting_participants(room_session)
+    now_ts = timezone.now().timestamp()
+    for p in list(room_session.participants.filter(admission_status="ADMITTED").exclude(participant_name="")):
+        pid_str = str(p.id)
+        last_hb = _get_participant_heartbeat(pid_str)
+        if last_hb and (now_ts - last_hb) > _PARTICIPANT_HEARTBEAT_TIMEOUT_SECONDS:
+            p.admission_status = "LEFT"
+            p.connection_status = "Disconnected"
+            p.left_at = timezone.now()
+            p.save(update_fields=["admission_status", "connection_status", "left_at"])
+            _PARTICIPANT_LAST_HEARTBEAT.pop(pid_str, None)
+            if room_session.active_screenshare_presenter == p.participant_name:
+                parts = [part for part in (room_session.provider_session_id or "").split("|") if not part.startswith("sharer:")]
+                room_session.provider_session_id = "|".join(parts)
+                room_session.save(update_fields=["provider_session_id"])
+                _ROOM_LIVE_SCREEN_FRAME.pop(str(room_session.id), None)
+    admitted_qs = room_session.participants.filter(admission_status="ADMITTED").exclude(participant_name="")
+    room_session._total_admitted_count = admitted_qs.count()
     participants_list = [
         {
             "id": str(p.id),
@@ -825,23 +1220,177 @@ def _serialize_room_participants(room_session: Optional[MeetingRoomSession]) -> 
             "listening_language": p.listening_language,
             "speaking_language_display": p.speaking_language_display,
             "listening_language_display": p.listening_language_display,
+            "caption_language": p.caption_language,
             "connection_status": p.connection_status,
             "admission_status": p.admission_status,
+            "is_speaker": p.is_speaker,
             "is_muted": p.is_muted,
             "hand_raised": p.hand_raised,
+            "can_share_screen": p.can_share_screen(),
+            "is_guest": getattr(p, "is_guest", False),
+            "is_verified": getattr(p, "is_verified_member", False),
         }
-        for p in room_session.participants.filter(admission_status="ADMITTED").exclude(participant_name="").order_by("joined_at", "participant_name")
+        for p in admitted_qs.order_by("-is_speaker", "-hand_raised", "joined_at", "participant_name")[:250]
     ]
     waiting_list = [
         {
             "id": str(p.id),
             "participant_name": p.participant_name,
+            "meeting_role": p.meeting_role,
             "speaking_language_display": p.speaking_language_display,
             "listening_language_display": p.listening_language_display,
+            "is_guest": getattr(p, "is_guest", False),
+            "is_verified": getattr(p, "is_verified_member", False),
         }
-        for p in room_session.participants.filter(admission_status="WAITING_ROOM").exclude(participant_name="").order_by("joined_at", "participant_name")
+        for p in room_session.participants.filter(admission_status="WAITING_ROOM").exclude(participant_name="").order_by("joined_at", "participant_name")[:250]
     ]
     return participants_list, waiting_list
+
+
+def generate_meeting_ics(room_session: MeetingRoomSession, request=None) -> str:
+    """
+    Stage 10 Meeting Invitations:
+    Generates an RFC 5545 compliant iCalendar (.ics) string with UTC timestamps,
+    join link, passcode, and an embedded 15-minute VALARM reminder.
+    """
+    dt_start = room_session.scheduled_datetime
+    if timezone.is_naive(dt_start):
+        dt_start = timezone.make_aware(dt_start, datetime.timezone.utc)
+    else:
+        dt_start = dt_start.astimezone(datetime.timezone.utc)
+
+    duration = 60
+    if room_session.scheduled_meeting and room_session.scheduled_meeting.duration_minutes:
+        duration = room_session.scheduled_meeting.duration_minutes
+    dt_end = dt_start + datetime.timedelta(minutes=duration)
+
+    now_utc = timezone.now().astimezone(datetime.timezone.utc)
+    dtstamp = now_utc.strftime("%Y%m%dT%H%M%SZ")
+    dtstart_str = dt_start.strftime("%Y%m%dT%H%M%SZ")
+    dtend_str = dt_end.strftime("%Y%m%dT%H%M%SZ")
+
+    if request:
+        join_url = request.build_absolute_uri(f"/foundation/rooms/{room_session.room_code}/prejoin/")
+    else:
+        join_url = f"/foundation/rooms/{room_session.room_code}/prejoin/"
+
+    summary = room_session.title or "WDOS Multilingua Meeting"
+    uid_base = room_session.room_code
+    ts_uid = int(room_session.created_at.timestamp()) if room_session.created_at else int(dt_start.timestamp())
+    uid = f"wdos-meeting-{uid_base}-{ts_uid}@wdos.org"
+
+    passcode_part = f"Passcode: {room_session.passcode}\\n" if room_session.has_passcode else ""
+    desc_lines = [
+        f"WDOS Multilingua Coordination Meeting",
+        f"Room Code: {room_session.room_code}",
+        f"{passcode_part}Join Online: {join_url}",
+        f"Time Zones: {room_session.wat_time_label} / {room_session.cat_time_label} / {room_session.eat_time_label} / {room_session.utc_time_label}",
+        f"Network Scope: {room_session.scope_label}",
+        f"Languages: Live speech translation across English, French, Swahili, Portuguese, Arabic & African languages.",
+    ]
+    description = "\\n".join(desc_lines)
+
+    ics_content = (
+        "BEGIN:VCALENDAR\r\n"
+        "VERSION:2.0\r\n"
+        "PRODID:-//WDOS//Multilingua Meeting Engine//EN\r\n"
+        "CALSCALE:GREGORIAN\r\n"
+        "METHOD:REQUEST\r\n"
+        "BEGIN:VEVENT\r\n"
+        f"UID:{uid}\r\n"
+        f"DTSTAMP:{dtstamp}\r\n"
+        f"DTSTART:{dtstart_str}\r\n"
+        f"DTEND:{dtend_str}\r\n"
+        f"SUMMARY:{summary}\r\n"
+        f"DESCRIPTION:{description}\r\n"
+        f"LOCATION:{join_url}\r\n"
+        "STATUS:CONFIRMED\r\n"
+        "BEGIN:VALARM\r\n"
+        "TRIGGER:-PT15M\r\n"
+        "ACTION:DISPLAY\r\n"
+        f"DESCRIPTION:Reminder: {summary} starts in 15 minutes\r\n"
+        "END:VALARM\r\n"
+        "END:VEVENT\r\n"
+        "END:VCALENDAR\r\n"
+    )
+    return ics_content
+
+
+def _get_meeting_schedule_info(room_session: MeetingRoomSession, viewer_tz: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Computes scheduled timestamps across major African time zones (WAT, CAT, EAT)
+    and UTC, along with the viewer's detected local timezone and detailed comparison table.
+    """
+    dt = room_session.scheduled_datetime
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, datetime.timezone.utc)
+    else:
+        dt = dt.astimezone(datetime.timezone.utc)
+
+    tz_wat = zoneinfo.ZoneInfo("Africa/Lagos")
+    tz_cat = zoneinfo.ZoneInfo("Africa/Harare")
+    tz_eat = zoneinfo.ZoneInfo("Africa/Nairobi")
+
+    wat_time = dt.astimezone(tz_wat)
+    cat_time = dt.astimezone(tz_cat)
+    eat_time = dt.astimezone(tz_eat)
+
+    viewer_local_label = ""
+    viewer_tz_clean = (viewer_tz or "").strip()
+    if viewer_tz_clean:
+        try:
+            v_tz = zoneinfo.ZoneInfo(viewer_tz_clean)
+            v_time = dt.astimezone(v_tz)
+            viewer_local_label = f"{v_time.strftime('%H:%M')} {viewer_tz_clean}"
+        except Exception:
+            viewer_local_label = ""
+
+    timezone_table = [
+        {
+            "code": "WAT",
+            "name": "West Africa Time (UTC+1)",
+            "time": wat_time.strftime("%H:%M"),
+            "full_label": f"{wat_time.strftime('%H:%M')} WAT",
+            "countries": "Nigeria, Ghana, Cameroon, Angola, DRC (Kinshasa)",
+            "is_base": True,
+        },
+        {
+            "code": "CAT",
+            "name": "Central Africa Time (UTC+2)",
+            "time": cat_time.strftime("%H:%M"),
+            "full_label": f"{cat_time.strftime('%H:%M')} CAT",
+            "countries": "South Africa, Zimbabwe, Rwanda, Malawi, DRC (Lubumbashi)",
+            "is_base": False,
+        },
+        {
+            "code": "EAT",
+            "name": "East Africa Time (UTC+3)",
+            "time": eat_time.strftime("%H:%M"),
+            "full_label": f"{eat_time.strftime('%H:%M')} EAT",
+            "countries": "Kenya, Uganda, Tanzania, Ethiopia",
+            "is_base": False,
+        },
+        {
+            "code": "UTC",
+            "name": "Universal Time (UTC/GMT)",
+            "time": dt.strftime("%H:%M"),
+            "full_label": f"{dt.strftime('%H:%M')} UTC",
+            "countries": "Global standard reference time",
+            "is_base": False,
+        },
+    ]
+
+    return {
+        "scheduled_utc_iso": dt.isoformat(),
+        "scheduled_date_str": dt.strftime("%A, %B %d, %Y"),
+        "wat_time_label": f"{wat_time.strftime('%H:%M')} WAT",
+        "cat_time_label": f"{cat_time.strftime('%H:%M')} CAT",
+        "eat_time_label": f"{eat_time.strftime('%H:%M')} EAT",
+        "utc_time_label": f"{dt.strftime('%H:%M')} UTC",
+        "viewer_tz": viewer_tz_clean,
+        "viewer_local_label": viewer_local_label,
+        "timezone_table": timezone_table,
+    }
 
 
 def _build_stage10_context(
@@ -905,7 +1454,14 @@ def _build_stage10_context(
         room_session.participants.filter(admission_status="WAITING_ROOM").exclude(participant_name="").order_by("joined_at", "participant_name")
     ) if room_session else []
     transcript_segments = list(room_session.transcript_segments.order_by("sequence_number", "timestamp")) if room_session else []
+    chat_messages = list(room_session.chat_messages.order_by("timestamp")[:150]) if room_session else []
     diagnostic_lanes = list(room_session.diagnostic_lanes.exclude(lane_name="__live_audio_relay__").order_by("sort_order")) if room_session else []
+
+    mtg_series = room_session.meeting_series if room_session else None
+    if not mtg_series and room_session and room_session.scheduled_meeting_id:
+        mtg_series = MeetingSeries.objects.filter(linked_scheduled_meeting_id=room_session.scheduled_meeting_id).first()
+    if not mtg_series:
+        mtg_series = MeetingSeries.objects.filter(meeting_code="MTG-NG-001").first()
 
     room_screens = [STAGE10_SCREENS[f"ROOM-0{i}"] for i in range(1, 9)]
     event_screens = [STAGE10_SCREENS[f"EVENT-{i:02d}"] for i in range(1, 11)]
@@ -956,6 +1512,14 @@ def _build_stage10_context(
     ready_prompt_en = 'Click "Turn Mic On" or type a statement below to speak — live translation & voice synthesis will play automatically.'
     ready_prompt_translated = AzureSpeechAdapter.DEFAULT_TRANSLATION_PHRASES.get(ready_prompt_en, {}).get(short_lang, ready_prompt_en)
 
+    viewer_tz = (
+        request.GET.get("tz")
+        or request.COOKIES.get("wdos_user_timezone")
+        or getattr(auth_bundle.get("account"), "timezone", None)
+        or ""
+    )
+    schedule_info = _get_meeting_schedule_info(room_session, viewer_tz=viewer_tz) if room_session else {}
+
     ctx.update({
         "screen": screen_meta,
         "screen_code": screen_code,
@@ -963,20 +1527,46 @@ def _build_stage10_context(
         "state_contract": state_contract,
         "state_card": state_contract if state_key and state_key != "default" else None,
         "meeting": meeting,
+        "meeting_series": mtg_series,
         "room_session": room_session_ctx,
         "participant": participant_ctx,
         "is_host": is_host,
+        "is_locked": bool(getattr(room_session, "is_locked", False)),
+        "has_passcode": bool(getattr(room_session, "has_passcode", False)),
+        "room_passcode": (room_session.passcode if is_host and room_session else "") if room_session else "",
+        "is_link_expired": bool(getattr(room_session, "is_link_expired", False)),
+        "link_expires_at": getattr(room_session, "link_expires_at", None),
+        "can_share_screen": participant.can_share_screen(is_host=is_host) if participant else is_host,
+        "allow_participant_screen_share": getattr(room_session, "allow_participant_screen_share", False),
+        "active_screenshare_presenter": getattr(room_session, "active_screenshare_presenter", ""),
         "is_guest_session": bool(auth_bundle.get("is_guest")),
         "needs_guest_name": bool(auth_bundle.get("needs_guest_name")),
         "admitted_participants": admitted_participants,
         "waiting_participants": waiting_participants,
+        "unverified_waiting_count": sum(1 for wp in waiting_participants if getattr(wp, "is_guest", False)),
         "transcript_segments": transcript_segments,
+        "chat_messages": chat_messages,
         "latest_segment": latest_seg,
         "latest_translated_text": latest_translated_text,
         "ready_prompt_translated": ready_prompt_translated,
         "diagnostic_lanes": diagnostic_lanes,
         "supported_languages": AzureSpeechAdapter.SUPPORTED_LANGUAGES,
         "speaking_choices": SUPPORTED_SPEAKING_CHOICES,
+        "schedule_info": schedule_info,
+        "scheduled_utc_iso": schedule_info.get("scheduled_utc_iso", ""),
+        "wat_time_label": schedule_info.get("wat_time_label", getattr(room_session, "wat_time_label", "10:00 WAT")),
+        "cat_time_label": schedule_info.get("cat_time_label", getattr(room_session, "cat_time_label", "11:00 CAT")),
+        "eat_time_label": schedule_info.get("eat_time_label", getattr(room_session, "eat_time_label", "12:00 EAT")),
+        "utc_time_label": schedule_info.get("utc_time_label", getattr(room_session, "utc_time_label", "09:00 UTC")),
+        "viewer_tz": viewer_tz,
+        "viewer_local_label": schedule_info.get("viewer_local_label", ""),
+        "timezone_table": schedule_info.get("timezone_table", []),
+        "invitation_history": getattr(room_session, "invitation_history", []) if room_session else [],
+        "reminder_count": getattr(room_session, "reminder_count", 0) if room_session else 0,
+        "reminder_sent_at": getattr(room_session, "reminder_sent_at", None) if room_session else None,
+        "last_reminder_label": getattr(room_session, "last_reminder_label", "No reminders sent yet") if room_session else "No reminders sent yet",
+        "has_reminders_sent": getattr(room_session, "has_reminders_sent", False) if room_session else False,
+        "ics_download_url": f"/foundation/rooms/{room_session.room_code}/calendar.ics" if room_session else "",
         "conference_event": conf_event_ctx,
         "session_tracks": session_tracks,
         "event_registration": registration,
@@ -990,7 +1580,7 @@ def _build_stage10_context(
         "step_num": request.GET.get("step", "1").strip(),
         "query": track_q,
         "breadcrumbs": [
-            {"label": "Workspace", "url": "/foundation/", "is_current": False},
+            {"label": "Home", "url": "/foundation/dashboard/", "is_current": False},
             {"label": "Meetings & events", "url": "/foundation/meetings/", "is_current": False},
             {"label": screen_meta["title"], "url": None, "is_current": True},
         ],
@@ -1019,15 +1609,37 @@ def room_prejoin_view(request, meeting_id: Optional[str] = None):
     participant = _ensure_participant_session(auth_bundle, meeting, room_session)
     is_host = _is_user_room_host(auth_bundle, meeting, room_session)
 
+    # Security Guard: Room Lock & Link Expiry
+    allowed, sec_err, sec_code = _check_room_entry_security(request, room_session, participant, is_host=is_host, check_passcode=False)
+    if not allowed:
+        ctx = _build_stage10_context(request, auth_bundle, "ROOM-01", meeting_id=meeting_id)
+        ctx["validation_error"] = sec_err
+        return render(request, "foundation/rooms/room_workspace.html", ctx)
+
     action_message = ""
     validation_error = ""
     if request.method == "POST":
         if not room_session or not participant:
             validation_error = "No active meeting room session found. Schedule a meeting first."
         else:
+            # 1. Passcode verification
+            pass_ok, pass_err = _validate_room_passcode(request, room_session, is_host=is_host)
+            if not pass_ok:
+                validation_error = pass_err
+                request.session.pop(f"room_passcode_verified_{room_session.id}", None)
+                request.session.pop(f"wdos_guest_joined_{room_session.id}", None)
+
+            # 2. Guest Name verification & Impersonation Protection
             guest_name_input = (request.POST.get("guest_name") or "").strip()
-            if auth_bundle.get("is_guest"):
-                if guest_name_input:
+            if not validation_error and auth_bundle.get("is_guest"):
+                valid_name, name_err = _validate_guest_display_name(
+                    guest_name_input,
+                    room_session,
+                    current_participant_id=participant.id if participant and participant.pk else None,
+                )
+                if not valid_name:
+                    validation_error = name_err
+                else:
                     request.session["wdos_guest_name"] = guest_name_input[:120]
                     request.session["guest_participant_name"] = guest_name_input[:120]
                     request.session[f"wdos_guest_joined_{room_session.id}"] = True
@@ -1035,47 +1647,49 @@ def room_prejoin_view(request, meeting_id: Optional[str] = None):
                     auth_bundle["needs_guest_name"] = False
                     if auth_bundle.get("ctx"):
                         auth_bundle["ctx"]["display_name"] = guest_name_input[:120]
-                participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
-                if guest_name_input:
+                    participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
                     participant.participant_name = guest_name_input[:120]
+                    participant.is_guest = True
+                    participant.save(update_fields=["participant_name", "is_guest"])
 
-            speaking_raw = request.POST.get("speaking_language") or request.POST.get("i_speak") or participant.speaking_language
-            listening_raw = request.POST.get("listening_language") or request.POST.get("i_want_to_hear") or participant.listening_language
-            mic_device = request.POST.get("audio_input_device") or request.POST.get("microphone") or participant.audio_input_device
-            out_device = request.POST.get("audio_output_device") or request.POST.get("speaker_headphones") or participant.audio_output_device
+            if not validation_error:
+                speaking_raw = request.POST.get("speaking_language") or request.POST.get("i_speak") or participant.speaking_language
+                listening_raw = request.POST.get("listening_language") or request.POST.get("i_want_to_hear") or participant.listening_language
+                mic_device = request.POST.get("audio_input_device") or request.POST.get("microphone") or participant.audio_input_device
+                out_device = request.POST.get("audio_output_device") or request.POST.get("speaker_headphones") or participant.audio_output_device
 
-            participant.speaking_language = normalize_bcp47_language(speaking_raw, "en-US")
-            participant.listening_language = normalize_bcp47_language(listening_raw, "fr-FR")
-            participant.caption_language = participant.listening_language_display
-            participant.audio_input_device = mic_device
-            participant.audio_output_device = out_device
-            participant.save()
+                participant.speaking_language = normalize_bcp47_language(speaking_raw, "en-US")
+                participant.listening_language = normalize_bcp47_language(listening_raw, "fr-FR")
+                participant.caption_language = participant.listening_language_display
+                participant.audio_input_device = mic_device
+                participant.audio_output_device = out_device
+                participant.save()
 
-            post_action = request.POST.get("action", "join").strip().lower()
-            if post_action == "save_draft":
-                action_message = "Pre-join audio and language preferences saved."
-            elif request.POST.get("stay_on_screen") != "1":
-                target_id = str(meeting.id) if meeting else room_session.room_code
-                if is_host:
-                    _open_room_if_host(room_session, is_host=True)
-                    participant.admission_status = "ADMITTED"
-                    participant.joined_at = participant.joined_at or timezone.now()
-                    participant.save(update_fields=["admission_status", "joined_at"])
-                    return redirect(f"/foundation/rooms/{target_id}/live/")
-                if room_session.status == "LIVE" and (room_session.bypass_lobby or participant.admission_status == "ADMITTED"):
-                    if participant.admission_status != "ADMITTED":
+                post_action = request.POST.get("action", "join").strip().lower()
+                if post_action == "save_draft":
+                    action_message = "Pre-join audio and language preferences saved."
+                elif request.POST.get("stay_on_screen") != "1":
+                    target_id = str(meeting.id) if meeting else room_session.room_code
+                    if is_host:
+                        _open_room_if_host(room_session, is_host=True)
                         participant.admission_status = "ADMITTED"
-                        participant.connection_status = "Listening"
                         participant.joined_at = participant.joined_at or timezone.now()
-                        participant.save(update_fields=["admission_status", "connection_status", "joined_at"])
-                    return redirect(f"/foundation/rooms/{target_id}/live/")
-                if participant.admission_status not in ("DENIED", "REMOVED"):
-                    participant.admission_status = "WAITING_ROOM"
-                    participant.connection_status = "Waiting for Host" if room_session.status != "LIVE" else "Waiting in Lobby"
-                    participant.save(update_fields=["admission_status", "connection_status"])
-                return redirect(f"/foundation/rooms/{target_id}/waiting/")
-            else:
-                action_message = "Ready to enter the Multilingua room."
+                        participant.save(update_fields=["admission_status", "joined_at"])
+                        return redirect(f"/foundation/rooms/{target_id}/live/")
+                    if room_session.status == "LIVE" and (room_session.bypass_lobby or participant.admission_status == "ADMITTED"):
+                        if participant.admission_status != "ADMITTED":
+                            participant.admission_status = "ADMITTED"
+                            participant.connection_status = "Listening"
+                            participant.joined_at = participant.joined_at or timezone.now()
+                            participant.save(update_fields=["admission_status", "connection_status", "joined_at"])
+                        return redirect(f"/foundation/rooms/{target_id}/live/")
+                    if participant.admission_status not in ("DENIED", "REMOVED"):
+                        participant.admission_status = "WAITING_ROOM"
+                        participant.connection_status = "Waiting for Host" if room_session.status != "LIVE" else "Waiting in Lobby"
+                        participant.save(update_fields=["admission_status", "connection_status"])
+                    return redirect(f"/foundation/rooms/{target_id}/waiting/")
+                else:
+                    action_message = "Ready to enter the Multilingua room."
 
     ctx = _build_stage10_context(request, auth_bundle, "ROOM-01", meeting_id=meeting_id)
     ctx["action_message"] = action_message
@@ -1100,7 +1714,15 @@ def get_room_tokens_api(request, meeting_id: str):
     is_host = _is_user_room_host(auth_bundle, meeting, room_session)
     if is_host:
         _open_room_if_host(room_session, is_host=True)
-    participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
+    participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=False)
+
+    # Security Guard: Room Lock, Link Expiry & Passcode
+    if not is_host:
+        allowed, sec_err, sec_code = _check_room_entry_security(request, room_session, participant, is_host=is_host, check_passcode=True)
+        if not allowed:
+            return JsonResponse({"error": sec_err, "code": sec_code, "status": "blocked"}, status=403)
+    if not participant or getattr(participant, "_is_unjoined_preview", False):
+        participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
 
     # Host-Must-Open & Waiting Lobby Gate (ROOM-02)
     is_lobby_poll = request.GET.get("check") == "lobby"
@@ -1114,6 +1736,28 @@ def get_room_tokens_api(request, meeting_id: str):
         ):
             participant.joined_at = timezone.now()
             participant.save(update_fields=["joined_at"])
+        lobby_lk: Dict[str, Any] = {"enabled": False}
+        if LiveKitAdapter.is_configured() and participant and participant.admission_status == "WAITING_ROOM":
+            try:
+                lobby_tok = LiveKitAdapter.generate_token(
+                    session_name=room_session.session_name,
+                    user_id=f"lobby__{participant.id}",
+                    participant_name=participant.participant_name or "Lobby Guest",
+                    role_type=0,
+                    can_publish=False,
+                    can_subscribe=False,
+                    can_share_screen=False,
+                    can_publish_sources=[],
+                    hidden=True,
+                )
+                lobby_lk = {
+                    "enabled": True,
+                    "url": (getattr(settings, "LIVEKIT_URL", "") or "").strip(),
+                    "token": lobby_tok,
+                    "participant_id": str(participant.id),
+                }
+            except Exception:
+                lobby_lk = {"enabled": False}
         if room_session.status in ("WAITING", "INITIALIZING"):
             return JsonResponse(
                 {
@@ -1122,6 +1766,7 @@ def get_room_tokens_api(request, meeting_id: str):
                     "room_status": room_session.status,
                     "bypass_lobby": room_session.bypass_lobby,
                     "admission_status": participant.admission_status,
+                    "lobby_livekit": lobby_lk,
                     "message": "Waiting for the host or co-host to open the meeting (ROOM-02).",
                 },
                 status=waiting_http_status,
@@ -1134,6 +1779,7 @@ def get_room_tokens_api(request, meeting_id: str):
                     "room_status": room_session.status,
                     "bypass_lobby": room_session.bypass_lobby,
                     "admission_status": participant.admission_status,
+                    "lobby_livekit": lobby_lk,
                     "message": "Waiting for host admission (ROOM-02).",
                 },
                 status=waiting_http_status,
@@ -1144,11 +1790,25 @@ def get_room_tokens_api(request, meeting_id: str):
     user_identity = str(profile.id) if profile else str(participant.id)
     client_cid = (request.GET.get("cid") or "").strip()[:16]
     lk_identity = f"{participant.id}__{client_cid}" if client_cid else str(participant.id)
+    can_share = participant.can_share_screen(is_host=is_host)
+    webinar_mode = _is_room_webinar_mode(room_session)
+    is_presenter = bool(
+        is_host
+        or participant.meeting_role in ("Host", "Co-Host", "Speaker")
+        or participant.is_speaker
+    )
+    can_publish = True if not webinar_mode else is_presenter
+
     lk_metadata = json.dumps(
         {
             "participant_id": str(participant.id),
+            "participant_name": participant.participant_name,
+            "meeting_role": participant.meeting_role,
+            "is_host": bool(is_host),
             "speaking_lang": participant.speaking_language,
             "listening_lang": participant.listening_language,
+            "can_share_screen": bool(can_share),
+            "webinar_mode": bool(webinar_mode),
         }
     )
 
@@ -1159,7 +1819,16 @@ def get_room_tokens_api(request, meeting_id: str):
             participant_name=participant.participant_name,
             role_type=role_type,
             metadata=lk_metadata,
+            can_publish=can_publish,
+            can_share_screen=can_share,
+            webinar_mode=webinar_mode,
         )
+        if livekit_data.get("enabled"):
+            try:
+                from .multilingua.livekit_agent import ensure_translation_supervisor_daemon
+                ensure_translation_supervisor_daemon()
+            except Exception:
+                pass
         try:
             zoom_token = ZoomVideoSDKAdapter.generate_token(
                 session_name=room_session.session_name,
@@ -1177,12 +1846,17 @@ def get_room_tokens_api(request, meeting_id: str):
             room_session.status = "LIVE"
             room_session.opened_at = timezone.now()
             room_session.save(update_fields=["status", "opened_at"])
+            _bump_room_state_version(str(room_session.id))
+
+        if participant and participant.pk:
+            _record_participant_heartbeat(str(participant.id), timezone.now().timestamp())
 
         return JsonResponse(
             {
                 "status": "admitted",
                 "room_session_id": str(room_session.id),
                 "room_code": room_session.room_code,
+                "webinar_mode": webinar_mode,
                 "livekit": livekit_data,
                 "zoom": {
                     "session_name": room_session.session_name,
@@ -1193,9 +1867,12 @@ def get_room_tokens_api(request, meeting_id: str):
                 "participant": {
                     "id": str(participant.id),
                     "name": participant.participant_name,
+                    "meeting_role": participant.meeting_role,
                     "speaking_lang": participant.speaking_language,
                     "listening_lang": participant.listening_language,
                     "is_speaker": participant.is_speaker,
+                    "can_publish": can_publish,
+                    "can_share_screen": can_share,
                 },
             }
         )
@@ -1222,6 +1899,7 @@ def room_host_admit_api(request, meeting_id: str):
         return JsonResponse({"error": "Host privileges required."}, status=403)
 
     _open_room_if_host(room_session, is_host=True)
+    room_key = str(room_session.id) if room_session else str(meeting_id)
 
     payload = {}
     if request.content_type and "application/json" in request.content_type:
@@ -1235,15 +1913,86 @@ def room_host_admit_api(request, meeting_id: str):
 
     if action == "mute_all":
         room_session.participants.exclude(meeting_role="Host").update(is_muted=True, connection_status="Muted by Host")
-        return JsonResponse({"status": "updated", "action": "mute_all"})
+        state_v = _bump_room_state_version(room_key)
+        LiveKitAdapter.send_data_packet(
+            room_session.session_name,
+            {"type": "host_command", "action": "mute_all", "state_v": state_v},
+            topic="wdos_control",
+        )
+        return JsonResponse({"status": "updated", "action": "mute_all", "state_v": state_v})
+
+    if action in ("toggle_room_lock", "set_room_lock"):
+        if "is_locked" in request.POST or "is_locked" in payload:
+            raw_locked = request.POST.get("is_locked") if "is_locked" in request.POST else payload.get("is_locked")
+            room_session.is_locked = raw_locked in ("1", "true", True)
+        else:
+            room_session.is_locked = not room_session.is_locked
+        room_session.save(update_fields=["is_locked"])
+        state_v = _bump_room_state_version(room_key)
+        msg = f"Room {room_session.room_code} is now {'locked' if room_session.is_locked else 'unlocked'}."
+        LiveKitAdapter.send_data_packet(
+            room_session.session_name,
+            {"type": "policy_changed", "action": "toggle_room_lock", "is_locked": room_session.is_locked, "state_v": state_v},
+            topic="wdos_control",
+        )
+        return JsonResponse({"status": "updated", "action": "toggle_room_lock", "is_locked": room_session.is_locked, "message": msg, "state_v": state_v})
+
+    if action == "set_passcode":
+        pass_val = (request.POST.get("passcode") or payload.get("passcode") or "").strip()
+        room_session.passcode = pass_val
+        room_session.save(update_fields=["passcode"])
+        state_v = _bump_room_state_version(room_key)
+        msg = "Meeting passcode updated." if pass_val else "Meeting passcode removed."
+        return JsonResponse({"status": "updated", "action": "set_passcode", "has_passcode": room_session.has_passcode, "message": msg, "state_v": state_v})
+
+    if action == "set_link_expiry":
+        hours = request.POST.get("expiry_hours") or payload.get("expiry_hours")
+        if hours in ("clear", "none", "", None):
+            room_session.link_expires_at = None
+            msg = "Meeting link expiration removed."
+        else:
+            try:
+                h = int(hours)
+                room_session.link_expires_at = timezone.now() + timezone.timedelta(hours=h)
+                msg = f"Meeting link set to expire in {h} hour(s)."
+            except (ValueError, TypeError):
+                msg = "Invalid expiry duration."
+        room_session.save(update_fields=["link_expires_at"])
+        state_v = _bump_room_state_version(room_key)
+        return JsonResponse({
+            "status": "updated",
+            "action": "set_link_expiry",
+            "link_expires_at": room_session.link_expires_at.isoformat() if room_session.link_expires_at else None,
+            "is_link_expired": room_session.is_link_expired,
+            "message": msg,
+            "state_v": state_v,
+        })
 
     if action == "admit_all":
-        count = room_session.participants.filter(admission_status="WAITING_ROOM").update(
+        confirmed = request.POST.get("confirmed") in ("1", "true", True) or payload.get("confirmed") in ("1", "true", True)
+        waiting_qs = room_session.participants.filter(admission_status="WAITING_ROOM").exclude(participant_name="")
+        if not confirmed:
+            guest_count = waiting_qs.filter(is_guest=True).count()
+            return JsonResponse({
+                "status": "confirmation_required",
+                "action": "admit_all",
+                "waiting_count": waiting_qs.count(),
+                "unverified_guests_count": guest_count,
+                "message": f"Confirmation required before admitting all {waiting_qs.count()} participant(s).",
+            }, status=200)
+
+        count = waiting_qs.update(
             admission_status="ADMITTED",
             connection_status="Listening",
             joined_at=timezone.now(),
         )
-        return JsonResponse({"status": "updated", "action": "admit_all", "admitted_count": count})
+        state_v = _bump_room_state_version(room_key)
+        LiveKitAdapter.send_data_packet(
+            room_session.session_name,
+            {"type": "roster_changed", "action": "admit_all", "admitted_count": count, "state_v": state_v},
+            topic="wdos_control",
+        )
+        return JsonResponse({"status": "updated", "action": "admit_all", "admitted_count": count, "state_v": state_v})
 
     target = None
     if participant_id:
@@ -1284,6 +2033,29 @@ def room_host_admit_api(request, meeting_id: str):
         target.connection_status = "Listening"
 
     target.save()
+    state_v = _bump_room_state_version(room_key)
+    if action == "remove":
+        LiveKitAdapter.remove_participant_from_sfu(room_session.session_name, str(target.id))
+    elif action in ("grant_floor", "revoke_floor"):
+        LiveKitAdapter.update_participant_permissions(
+            room_session.session_name,
+            str(target.id),
+            can_publish=bool(target.is_speaker),
+        )
+    LiveKitAdapter.send_data_packet(
+        room_session.session_name,
+        {
+            "type": "host_command",
+            "action": action,
+            "participant_id": str(target.id),
+            "participant_name": target.participant_name,
+            "admission_status": target.admission_status,
+            "is_speaker": target.is_speaker,
+            "meeting_role": target.meeting_role,
+            "state_v": state_v,
+        },
+        topic="wdos_control",
+    )
     return JsonResponse(
         {
             "status": "updated",
@@ -1292,154 +2064,51 @@ def room_host_admit_api(request, meeting_id: str):
             "admission_status": target.admission_status,
             "is_speaker": target.is_speaker,
             "meeting_role": target.meeting_role,
+            "state_v": state_v,
         }
     )
 
 
-_ROOM_LIVE_AUDIO_CHUNKS: Dict[str, list[Dict[str, Any]]] = {}
-_ROOM_LIVE_AUDIO_SEQ: Dict[str, int] = {}
-_ROOM_LIVE_INTERIM: Dict[str, Optional[Dict[str, Any]]] = {}
-
-
-def _get_room_audio_chunks(room_session: Optional[MeetingRoomSession], room_key: str, after_audio_seq: int, now_ts: float) -> tuple[int, list[Dict[str, Any]], Optional[Dict[str, Any]]]:
+def _get_room_live_interim(room_key: str, now_ts: float) -> Optional[Dict[str, Any]]:
     """
-    Reads live speaker voice chunks and live interim captions from shared PostgreSQL storage
-    (so multi-worker Gunicorn deployments on Render share real-time state across all worker processes)
-    with in-memory fallback.
+    Reads active interim caption state from distributed cache (Redis / shared cache).
     """
-    raw_chunks = list(_ROOM_LIVE_AUDIO_CHUNKS.get(room_key, []))
-    latest_seq = _ROOM_LIVE_AUDIO_SEQ.get(room_key, 0)
-    live_interim = _ROOM_LIVE_INTERIM.get(room_key)
-
-    if room_session:
-        relay_lane = room_session.diagnostic_lanes.filter(lane_name="__live_audio_relay__").first()
-        if relay_lane and relay_lane.notes:
-            try:
-                db_payload = json.loads(relay_lane.notes)
-                db_seq = int(db_payload.get("latest_seq", 0))
-                db_chunks = db_payload.get("chunks", [])
-                if db_seq >= latest_seq and isinstance(db_chunks, list):
-                    latest_seq = db_seq
-                    raw_chunks = db_chunks
-                    _ROOM_LIVE_AUDIO_SEQ[room_key] = latest_seq
-                    _ROOM_LIVE_AUDIO_CHUNKS[room_key] = raw_chunks
-                db_interim = db_payload.get("live_interim")
-                if isinstance(db_interim, dict):
-                    curr_ts = float(live_interim.get("ts", 0)) if isinstance(live_interim, dict) else 0.0
-                    if float(db_interim.get("ts", 0)) >= curr_ts:
-                        live_interim = db_interim
-                        _ROOM_LIVE_INTERIM[room_key] = live_interim
-                elif db_interim is None and isinstance(live_interim, dict) and float(db_payload.get("interim_cleared_ts", 0)) > float(live_interim.get("ts", 0)):
-                    live_interim = None
-                    _ROOM_LIVE_INTERIM[room_key] = None
-            except Exception:
-                pass
-
-    fresh_chunks = [c for c in raw_chunks if isinstance(c, dict) and now_ts - float(c.get("ts", 0)) < 25.0]
-    _ROOM_LIVE_AUDIO_CHUNKS[room_key] = fresh_chunks
-    new_chunks = (
-        [c for c in fresh_chunks if int(c.get("seq", 0)) > after_audio_seq]
-        if after_audio_seq >= 0
-        else []
-    )
-    if isinstance(live_interim, dict) and now_ts - float(live_interim.get("ts", 0)) < 4.5:
-        active_interim = live_interim
-    else:
-        active_interim = None
-    return latest_seq, new_chunks, active_interim
+    if not room_key:
+        return None
+    try:
+        live_interim = cache.get(f"wdos:live_interim:{room_key}")
+        if isinstance(live_interim, dict) and now_ts - float(live_interim.get("ts", 0)) < 4.5:
+            return live_interim
+    except Exception:
+        pass
+    return None
 
 
 def _set_room_live_interim(room_session: Optional[MeetingRoomSession], room_key: str, interim_data: Optional[Dict[str, Any]], now_ts: float) -> None:
-    _ROOM_LIVE_INTERIM[room_key] = interim_data
-    if not room_session:
+    """
+    Stores or clears active interim caption state in distributed cache (Redis / shared cache).
+    """
+    if not room_key:
         return
+    cache_key = f"wdos:live_interim:{room_key}"
     try:
-        latest_seq = _ROOM_LIVE_AUDIO_SEQ.get(room_key, 0)
-        chunks = _ROOM_LIVE_AUDIO_CHUNKS.get(room_key, [])
-        relay_lane = room_session.diagnostic_lanes.filter(lane_name="__live_audio_relay__").first()
-        if relay_lane and relay_lane.notes:
-            try:
-                db_payload = json.loads(relay_lane.notes)
-                if int(db_payload.get("latest_seq", 0)) >= latest_seq:
-                    latest_seq = int(db_payload.get("latest_seq", 0))
-                    chunks = db_payload.get("chunks", [])
-            except Exception:
-                pass
-        serialized = json.dumps({
-            "latest_seq": latest_seq,
-            "chunks": chunks[-6:] if isinstance(chunks, list) else [],
-            "live_interim": interim_data,
-            "interim_cleared_ts": now_ts if interim_data is None else 0.0,
-        })
-        if relay_lane:
-            relay_lane.notes = serialized
-            relay_lane.save(update_fields=["notes", "updated_at"])
+        if interim_data is None:
+            cache.delete(cache_key)
         else:
-            RoomDiagnosticLane.objects.create(
-                room_session=room_session,
-                lane_name="__live_audio_relay__",
-                language_label="Original Audio",
-                evidence_summary="Live voice relay buffer",
-                state_label="Verified",
-                notes=serialized,
-                sort_order=99,
-            )
+            cache.set(cache_key, interim_data, timeout=10)
     except Exception:
         pass
-
-
-def _append_room_audio_chunk(room_session: Optional[MeetingRoomSession], room_key: str, speaker_name: str, audio_data_url: str, now_ts: float) -> int:
-    """
-    Appends a recorded human voice chunk to both in-memory state and shared PostgreSQL storage
-    so any Gunicorn worker on Render can immediately stream the speaker's real voice to listeners.
-    """
-    latest_seq, fresh_chunks, active_interim = _get_room_audio_chunks(room_session, room_key, 0, now_ts)
-    next_seq = latest_seq + 1
-    fresh_chunks.append(
-        {
-            "seq": next_seq,
-            "speaker_name": speaker_name,
-            "audio_data_url": audio_data_url,
-            "ts": now_ts,
-        }
-    )
-    trimmed_chunks = fresh_chunks[-6:]
-    _ROOM_LIVE_AUDIO_SEQ[room_key] = next_seq
-    _ROOM_LIVE_AUDIO_CHUNKS[room_key] = trimmed_chunks
-
-    if room_session:
-        try:
-            serialized = json.dumps({
-                "latest_seq": next_seq,
-                "chunks": trimmed_chunks,
-                "live_interim": active_interim,
-            })
-            relay_lane = room_session.diagnostic_lanes.filter(lane_name="__live_audio_relay__").first()
-            if relay_lane:
-                relay_lane.notes = serialized
-                relay_lane.save(update_fields=["notes", "updated_at"])
-            else:
-                RoomDiagnosticLane.objects.create(
-                    room_session=room_session,
-                    lane_name="__live_audio_relay__",
-                    language_label="Original Audio",
-                    evidence_summary="Live voice relay buffer",
-                    state_label="Verified",
-                    notes=serialized,
-                    sort_order=99,
-                )
-        except Exception:
-            pass
-
-    return next_seq
 
 
 @require_http_methods(["GET", "POST"])
 def room_transcript_api(request, meeting_id: str):
     """
-    Live Transcript Segment API (ROOM-03, ROOM-04, ROOM-05):
-    GET returns ordered transcript segments, live room status, participant states, and live original voice chunks.
-    POST records a new spoken segment (or live original voice audio chunk) and populates multilingual translations.
+    Live Transcript & Room State Reconciliation API (ROOM-03, ROOM-04, ROOM-05):
+    - Supports event-driven delta reconciliation (`?mode=delta&state_v=<cursor>&after_seq=<seq>`):
+      when room state has not changed since `state_v`, returns an ~80-byte `{"status": "ok", "unchanged": true}`
+      payload with zero heavy serialization.
+    - Full GET returns ordered transcript segments, live room status, participant states, and chat messages.
+    - POST records a new spoken segment and broadcasts real-time captions over LiveKit DataPackets.
     """
     auth_bundle, err_resp = _resolve_stage10_auth(request, meeting_id=meeting_id)
     if err_resp:
@@ -1455,14 +2124,48 @@ def room_transcript_api(request, meeting_id: str):
     if request.method == "GET":
         raw_lang = request.GET.get("lang", "fr").strip()
         target_lang = LANGUAGE_CODE_TO_SHORT.get(raw_lang, raw_lang.split("-")[0].lower())
+        has_after_seq_param = "after_seq" in request.GET
         try:
-            after_audio_seq = int(request.GET.get("after_audio_seq", "-1"))
+            after_seq_val = int(request.GET.get("after_seq", "0")) if has_after_seq_param else 0
         except (ValueError, TypeError):
-            after_audio_seq = -1
+            after_seq_val = 0
+
         my_p = _ensure_participant_session(auth_bundle, meeting, room_session)
         is_host = _is_user_room_host(auth_bundle, meeting, room_session)
+        if my_p and my_p.pk:
+            _record_participant_heartbeat(str(my_p.id), now_ts)
+
+        current_state_v = _compute_room_state_fingerprint(room_session, my_p)
+        client_state_v = (request.GET.get("state_v") or "").strip()
+        if_none_match = (request.headers.get("If-None-Match") or "").strip().strip('"')
+        req_mode = (request.GET.get("mode") or "").strip().lower()
+
+        # Fast-path zero-payload delta response when nothing changed in the room
+        if (req_mode == "delta" or client_state_v) and client_state_v and client_state_v == current_state_v:
+            if not (my_p and my_p.is_muted and my_p.connection_status == "Muted by Host"):
+                resp = JsonResponse(
+                    {
+                        "status": "ok",
+                        "unchanged": True,
+                        "state_v": current_state_v,
+                        "room_code": room_session.room_code,
+                        "room_status": room_session.status,
+                        "is_locked": bool(room_session.is_locked),
+                    }
+                )
+                resp["ETag"] = f'"{current_state_v}"'
+                return resp
+
+        if if_none_match and if_none_match == current_state_v and req_mode == "etag":
+            resp = HttpResponse(status=304)
+            resp["ETag"] = f'"{current_state_v}"'
+            return resp
+
         segments = []
-        recent_segments = list(room_session.transcript_segments.order_by("-sequence_number", "-timestamp")[:60])
+        seg_qs = room_session.transcript_segments.order_by("-sequence_number", "-timestamp")
+        if has_after_seq_param and after_seq_val > 0:
+            seg_qs = seg_qs.filter(sequence_number__gt=after_seq_val)
+        recent_segments = list(seg_qs[:60])
         recent_segments.reverse()
         for seg in recent_segments:
             tr = dict(seg.translations or {})
@@ -1485,7 +2188,7 @@ def room_transcript_api(request, meeting_id: str):
                 }
             )
         participants_list, waiting_list = _serialize_room_participants(room_session)
-        latest_audio_seq, new_audio_chunks, active_interim = _get_room_audio_chunks(room_session, room_key, after_audio_seq, now_ts)
+        active_interim = _get_room_live_interim(room_key, now_ts)
         live_interim_payload = None
         if isinstance(active_interim, dict) and active_interim.get("original_text"):
             interim_tr = dict(active_interim.get("translations") or {})
@@ -1510,13 +2213,37 @@ def room_transcript_api(request, meeting_id: str):
             my_p.connection_status = "Listening"
             if not getattr(my_p, "_is_unjoined_preview", False) and my_p.pk:
                 my_p.save(update_fields=["connection_status"])
-        return JsonResponse(
+        chat_messages = list(room_session.chat_messages.order_by("timestamp")[:150])
+        chat_list = [
+            {
+                "id": str(cm.id),
+                "sender_name": cm.sender_name,
+                "sender_role": cm.sender_role,
+                "message_text": cm.message_text,
+                "timestamp": cm.timestamp.strftime("%H:%M") if cm.timestamp else "",
+                "is_host_announcement": cm.is_host_announcement,
+            }
+            for cm in chat_messages
+        ]
+
+        resp = JsonResponse(
             {
                 "status": "ok",
+                "unchanged": False,
+                "state_v": current_state_v,
                 "room_code": room_session.room_code,
                 "room_status": room_session.status,
+                "is_locked": bool(room_session.is_locked),
+                "has_passcode": bool(room_session.has_passcode),
+                "is_link_expired": bool(room_session.is_link_expired),
                 "allow_guest_access": room_session.allow_guest_access,
                 "bypass_lobby": room_session.bypass_lobby,
+                "allow_participant_screen_share": room_session.allow_participant_screen_share,
+                "active_screenshare_presenter": room_session.active_screenshare_presenter,
+                "webinar_mode": _is_room_webinar_mode(room_session),
+                "recording_state": _get_room_recording_state(room_key),
+                "polls": _get_room_polls(room_key),
+                "can_share_screen": my_p.can_share_screen(is_host=is_host) if my_p else is_host,
                 "is_host": is_host,
                 "active_speaker_name": room_session.active_speaker_name,
                 "active_speaker_role": room_session.active_speaker_role,
@@ -1528,15 +2255,18 @@ def room_transcript_api(request, meeting_id: str):
                     "connection_status": my_conn_status,
                     "is_muted": my_p.is_muted,
                     "hand_raised": my_p.hand_raised,
+                    "can_share_screen": my_p.can_share_screen(is_host=is_host),
                 } if my_p else None,
                 "participants": participants_list,
+                "total_admitted_count": getattr(room_session, "_total_admitted_count", len(participants_list)),
                 "waiting_participants": waiting_list,
                 "segments": segments,
+                "chat_messages": chat_list,
                 "live_interim": live_interim_payload,
-                "latest_audio_seq": latest_audio_seq,
-                "audio_chunks": new_audio_chunks,
             }
         )
+        resp["ETag"] = f'"{current_state_v}"'
+        return resp
 
     payload = {}
     if request.content_type and "application/json" in request.content_type:
@@ -1547,17 +2277,13 @@ def room_transcript_api(request, meeting_id: str):
 
     req_action = (request.POST.get("action") or payload.get("action") or "").strip().lower()
     if req_action == "audio_chunk":
-        audio_data_url = (request.POST.get("audio_data_url") or payload.get("audio_data_url") or "").strip()
-        if not audio_data_url or not audio_data_url.startswith("data:audio/") or len(audio_data_url) > 280000:
-            return JsonResponse({"status": "ignored_audio_chunk"}, status=200)
-        participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
-        speaker_name = (
-            request.POST.get("speaker_name")
-            or payload.get("speaker_name")
-            or (participant.participant_name if participant else "Speaker")
+        return JsonResponse(
+            {
+                "error": "HTTP audio chunk relay is disabled. Use LiveKit WebRTC audio tracks.",
+                "code": "WEBRTC_MEDIA_REQUIRED",
+            },
+            status=410,
         )
-        next_audio_seq = _append_room_audio_chunk(room_session, room_key, speaker_name, audio_data_url, now_ts)
-        return JsonResponse({"status": "audio_chunk_recorded", "seq": next_audio_seq}, status=200)
 
     if req_action == "live_interim":
         interim_text = (request.POST.get("original_text") or payload.get("original_text") or "").strip()
@@ -1575,17 +2301,26 @@ def room_transcript_api(request, meeting_id: str):
             or (participant.speaking_language if participant else "en-US")
         )
         interim_translations = payload.get("translations") if isinstance(payload.get("translations"), dict) else {}
-        _set_room_live_interim(
-            room_session,
-            room_key,
+        interim_obj = {
+            "speaker_name": speaker_name,
+            "original_language": interim_lang,
+            "original_text": interim_text[:500],
+            "translations": interim_translations,
+            "ts": now_ts,
+        }
+        _set_room_live_interim(room_session, room_key, interim_obj, now_ts)
+        LiveKitAdapter.send_data_packet(
+            room_session.session_name,
             {
+                "type": "interim",
+                "speaker_id": str(participant.id) if participant else "",
                 "speaker_name": speaker_name,
                 "original_language": interim_lang,
                 "original_text": interim_text[:500],
                 "translations": interim_translations,
                 "ts": now_ts,
             },
-            now_ts,
+            topic="wdos_caption",
         )
         return JsonResponse({"status": "interim_recorded"}, status=200)
 
@@ -1659,20 +2394,36 @@ def room_transcript_api(request, meeting_id: str):
     room_session.active_speaker_name = speaker_name
     room_session.active_speaker_role = f"{role_prefix} · speaking in {lang_meta['name']}"
     room_session.save(update_fields=["active_speaker_name", "active_speaker_role"])
+    state_v = _bump_room_state_version(room_key)
+
+    seg_dict = {
+        "id": str(seg.id),
+        "sequence_number": seg.sequence_number,
+        "speaker_name": seg.speaker_name,
+        "original_language": seg.original_language,
+        "original_text": seg.original_text,
+        "translations": seg.translations,
+        "timestamp": seg.timestamp.isoformat() if seg.timestamp else "",
+    }
+    LiveKitAdapter.send_data_packet(
+        room_session.session_name,
+        {
+            "type": "final_segment",
+            "segment": seg_dict,
+            "active_speaker_name": room_session.active_speaker_name,
+            "active_speaker_role": room_session.active_speaker_role,
+            "state_v": state_v,
+        },
+        topic="wdos_caption",
+    )
 
     return JsonResponse(
         {
             "status": "recorded",
+            "state_v": state_v,
             "active_speaker_name": room_session.active_speaker_name,
             "active_speaker_role": room_session.active_speaker_role,
-            "segment": {
-                "id": str(seg.id),
-                "sequence_number": seg.sequence_number,
-                "speaker_name": seg.speaker_name,
-                "original_language": seg.original_language,
-                "original_text": seg.original_text,
-                "translations": seg.translations,
-            },
+            "segment": seg_dict,
         },
         status=201,
     )
@@ -1716,9 +2467,22 @@ def room_end_session_api(request, meeting_id: str):
         return JsonResponse({"error": "Host privileges required."}, status=403)
 
     result = finalize_room_session_and_bridge_minutes(room_session, actor_account=auth_bundle["account"])
+    state_v = _bump_room_state_version(str(room_session.id))
+    LiveKitAdapter.send_data_packet(
+        room_session.session_name,
+        {
+            "type": "room_ended",
+            "room_code": room_session.room_code,
+            "room_status": room_session.status,
+            "state_v": state_v,
+        },
+        topic="wdos_control",
+    )
+    LiveKitAdapter.delete_room_on_sfu(room_session.session_name)
     return JsonResponse(
         {
             "status": "completed",
+            "state_v": state_v,
             "room_code": room_session.room_code,
             "room_status": room_session.status,
             "meeting_code": result["meeting_series"].meeting_code if result["meeting_series"] else "",
@@ -1754,6 +2518,7 @@ def room_restore_audio_api(request, meeting_id: str):
         state_label="Verified",
         evidence_summary="Playback validated via audio recovery",
     )
+    _bump_room_state_version(str(room_session.id))
 
     return JsonResponse(
         {
@@ -1764,6 +2529,799 @@ def room_restore_audio_api(request, meeting_id: str):
             "listening_language": participant.listening_language,
         }
     )
+
+
+@csrf_exempt
+@require_POST
+def livekit_webhook_api(request):
+    """
+    LiveKit Server Webhook Receiver (`/api/livekit/webhook/`).
+    Verifies cryptographic signature (`Authorization` JWT + `sha256` body claim)
+    and synchronizes room lifecycle & participant presence directly from the LiveKit SFU.
+    """
+    auth_header = request.headers.get("Authorization") or request.META.get("HTTP_AUTHORIZATION") or ""
+    event_data = LiveKitAdapter.verify_webhook(request.body, auth_header)
+    if event_data is None:
+        return JsonResponse({"error": "Invalid LiveKit webhook signature."}, status=401)
+
+    event_type = (event_data.get("event") or "").strip()
+    room_info = event_data.get("room") or {}
+    participant_info = event_data.get("participant") or {}
+    track_info = event_data.get("track") or {}
+
+    room_name = (room_info.get("name") or "").strip()
+    if not room_name:
+        return JsonResponse({"status": "ignored", "reason": "no_room_name"})
+
+    room_session = (
+        MeetingRoomSession.objects.filter(session_name__iexact=room_name).first()
+        or MeetingRoomSession.objects.filter(room_code__iexact=room_name).first()
+    )
+    if not room_session:
+        return JsonResponse({"status": "ignored", "reason": "room_not_found"})
+
+    room_key = str(room_session.id)
+    now_ts = timezone.now().timestamp()
+    raw_identity = (participant_info.get("identity") or "").strip()
+    if raw_identity.startswith("wdos-translator-bot"):
+        return JsonResponse({"status": "ok", "bot": True})
+
+    base_pid = raw_identity.split("__")[0] if raw_identity else ""
+    participant = None
+    if base_pid:
+        try:
+            participant = room_session.participants.filter(id=uuid.UUID(base_pid)).first()
+        except (ValueError, TypeError):
+            participant = room_session.participants.filter(participant_name__iexact=base_pid).first()
+
+    if event_type == "participant_joined" and participant:
+        _record_participant_heartbeat(str(participant.id), now_ts)
+        if participant.admission_status in ("ADMITTED", "LEFT"):
+            participant.admission_status = "ADMITTED"
+            participant.connection_status = "Connected" if not participant.is_muted else "Listening"
+            participant.joined_at = participant.joined_at or timezone.now()
+            participant.save(update_fields=["admission_status", "connection_status", "joined_at"])
+        _bump_room_state_version(room_key)
+
+    elif event_type == "participant_left" and participant:
+        _clear_participant_heartbeat(str(participant.id))
+        if participant.admission_status == "ADMITTED":
+            participant.admission_status = "LEFT"
+            participant.connection_status = "Left"
+            participant.is_muted = True
+            participant.left_at = timezone.now()
+            participant.save(update_fields=["admission_status", "connection_status", "is_muted", "left_at"])
+        if room_session.active_screenshare_presenter == participant.participant_name:
+            parts = [p for p in (room_session.provider_session_id or "").split("|") if not p.startswith("sharer:")]
+            room_session.provider_session_id = "|".join(parts)
+            room_session.save(update_fields=["provider_session_id"])
+        _bump_room_state_version(room_key)
+
+    elif event_type in ("track_published", "track_unpublished") and participant:
+        _record_participant_heartbeat(str(participant.id), now_ts)
+        source = (track_info.get("source") or "").upper()
+        is_pub = event_type == "track_published"
+        if "SCREEN_SHARE" in source:
+            if is_pub:
+                parts = [p for p in (room_session.provider_session_id or "").split("|") if not p.startswith("sharer:")]
+                parts.append(f"sharer:{participant.participant_name}")
+                room_session.provider_session_id = "|".join(parts)
+                room_session.save(update_fields=["provider_session_id"])
+            elif room_session.active_screenshare_presenter == participant.participant_name:
+                parts = [p for p in (room_session.provider_session_id or "").split("|") if not p.startswith("sharer:")]
+                room_session.provider_session_id = "|".join(parts)
+                room_session.save(update_fields=["provider_session_id"])
+        elif "MICROPHONE" in source:
+            muted = bool(track_info.get("muted")) if is_pub else True
+            participant.is_muted = muted
+            participant.connection_status = "Listening" if muted else "Mic On"
+            participant.save(update_fields=["is_muted", "connection_status"])
+        _bump_room_state_version(room_key)
+
+    elif event_type == "room_finished":
+        _bump_room_state_version(room_key)
+
+    return JsonResponse({"status": "ok", "event": event_type, "room_code": room_session.room_code})
+
+
+# =============================================================================
+# IN-ROOM CHAT, ATTENDANCE REPORT & TRANSCRIPT/MINUTES EXPORT APIS
+# =============================================================================
+
+@require_http_methods(["GET", "POST"])
+def room_chat_api(request, meeting_id: str):
+    """
+    In-room text chat endpoint for WDOS Multilingua Meeting Rooms.
+    GET: Returns list of in-room chat messages.
+    POST: Sends a chat message (or host announcement).
+    """
+    auth_bundle, err_resp = _resolve_stage10_auth(request, meeting_id=meeting_id)
+    if err_resp:
+        return JsonResponse({"error": "Authentication required."}, status=401)
+
+    meeting, room_session = _resolve_meeting_and_room(meeting_id=meeting_id)
+    if not _check_room_network_isolation(auth_bundle, meeting, room_session):
+        return JsonResponse({"error": "Cross-network room isolation enforced."}, status=403)
+
+    if not room_session:
+        return JsonResponse({"error": "Meeting room not found."}, status=404)
+
+    is_host = _is_user_room_host(auth_bundle, meeting, room_session)
+    participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=False)
+
+    if request.method == "POST":
+        payload = {}
+        if request.content_type and "application/json" in request.content_type:
+            try:
+                payload = json.loads(request.body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                payload = {}
+
+        message_text = (
+            request.POST.get("message_text")
+            or payload.get("message_text")
+            or request.POST.get("message")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+        if not message_text:
+            return JsonResponse({"error": "Message text cannot be empty."}, status=400)
+
+        is_announcement = (
+            request.POST.get("is_announcement") in ("1", "true", True)
+            or payload.get("is_announcement") in ("1", "true", True)
+        )
+        if is_announcement and not is_host:
+            is_announcement = False
+
+        sender_name = (
+            request.POST.get("sender_name")
+            or payload.get("sender_name")
+            or (participant.participant_name if participant else None)
+            or auth_bundle.get("display_name")
+            or "Participant"
+        ).strip()
+
+        sender_role = "Host" if is_host else (participant.meeting_role if participant else "Participant")
+
+        chat_msg = RoomChatMessage.objects.create(
+            room_session=room_session,
+            sender_name=sender_name,
+            sender_profile=auth_bundle.get("profile"),
+            sender_role=sender_role,
+            message_text=message_text,
+            is_host_announcement=is_announcement,
+        )
+        state_v = _bump_room_state_version(str(room_session.id))
+
+        chat_msg_dict = {
+            "id": str(chat_msg.id),
+            "sender_name": chat_msg.sender_name,
+            "sender_role": chat_msg.sender_role,
+            "message_text": chat_msg.message_text,
+            "timestamp": chat_msg.timestamp.strftime("%H:%M") if chat_msg.timestamp else "",
+            "is_host_announcement": chat_msg.is_host_announcement,
+        }
+        LiveKitAdapter.send_data_packet(
+            room_session.session_name,
+            {
+                "type": "chat_message",
+                "chat_message": chat_msg_dict,
+                "state_v": state_v,
+            },
+            topic="wdos_chat",
+        )
+        return JsonResponse(
+            {
+                "ok": True,
+                "status": "ok",
+                "chat_message": chat_msg_dict,
+                "message": chat_msg_dict,
+            },
+            status=201,
+        )
+
+    # GET
+    chat_messages = list(room_session.chat_messages.order_by("timestamp")[:150])
+    return JsonResponse(
+        {
+            "ok": True,
+            "status": "ok",
+            "chat_messages": [
+                {
+                    "id": str(cm.id),
+                    "sender_name": cm.sender_name,
+                    "sender_role": cm.sender_role,
+                    "message_text": cm.message_text,
+                    "timestamp": cm.timestamp.strftime("%H:%M") if cm.timestamp else "",
+                    "is_host_announcement": cm.is_host_announcement,
+                }
+                for cm in chat_messages
+            ],
+            "total_count": len(chat_messages),
+        }
+    )
+
+
+@require_http_methods(["GET"])
+def room_attendance_view(request, meeting_id: str):
+    """
+    Renders an attendance report for the Multilingua Meeting Room.
+    Supports ?export=csv to download a CSV attendance roster.
+    """
+    auth_bundle, err_resp = _resolve_stage10_auth(request, meeting_id=meeting_id)
+    if err_resp:
+        return err_resp
+
+    meeting, room_session = _resolve_meeting_and_room(meeting_id=meeting_id)
+    if not _check_room_network_isolation(auth_bundle, meeting, room_session):
+        return HttpResponseForbidden("Access Denied: Cross-network room isolation enforced.")
+
+    if not room_session:
+        return HttpResponseNotFound("Meeting room not found.")
+
+    participants = list(
+        room_session.participants.exclude(participant_name="").order_by("joined_at", "participant_name")
+    )
+
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        filename = f"attendance_{room_session.room_code}_{timezone.now().strftime('%Y%m%d_%H%M')}.csv"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        import csv
+        writer = csv.writer(response)
+        writer.writerow([
+            "Room Code",
+            "Participant Name",
+            "Role",
+            "Network",
+            "Country",
+            "Speaking Language",
+            "Listening Language",
+            "Admission Status",
+            "Connection Status",
+            "Joined At",
+            "Left At",
+            "Can Share Screen",
+        ])
+        for p in participants:
+            net = p.person_profile.primary_network if p.person_profile else room_session.network
+            cty = p.person_profile.country if p.person_profile else room_session.country
+            writer.writerow([
+                room_session.room_code,
+                p.participant_name,
+                p.meeting_role,
+                net or "",
+                cty or "",
+                p.speaking_language_display,
+                p.listening_language_display,
+                p.admission_status,
+                p.connection_status,
+                p.joined_at.strftime("%Y-%m-%d %H:%M:%S") if p.joined_at else "",
+                p.left_at.strftime("%Y-%m-%d %H:%M:%S") if p.left_at else "",
+                "Yes" if p.can_share_screen() else "No",
+            ])
+        return response
+
+    total_count = len(participants)
+    admitted_count = sum(1 for p in participants if p.admission_status == "ADMITTED")
+    hosts_count = sum(1 for p in participants if p.meeting_role in ("Host", "Co-Host"))
+    active_connected_count = sum(1 for p in participants if p.connection_status in ("Connected", "Listening", "Speaking"))
+
+    if request.path.startswith("/api/") or request.GET.get("format") == "json":
+        return JsonResponse({
+            "ok": True,
+            "status": "ok",
+            "room_code": room_session.room_code,
+            "total_count": total_count,
+            "admitted_count": admitted_count,
+            "hosts_count": hosts_count,
+            "active_connected_count": active_connected_count,
+            "participants": [
+                {
+                    "id": str(p.id),
+                    "name": p.participant_name,
+                    "role": p.meeting_role,
+                    "network": p.person_profile.primary_network if p.person_profile else room_session.network,
+                    "country": p.person_profile.country if p.person_profile else room_session.country,
+                    "speaking_language": p.speaking_language_display,
+                    "listening_language": p.listening_language_display,
+                    "admission_status": p.admission_status,
+                    "connection_status": p.connection_status,
+                    "can_share_screen": p.can_share_screen(),
+                    "joined_at": p.joined_at.isoformat() if p.joined_at else "",
+                    "left_at": p.left_at.isoformat() if p.left_at else "",
+                }
+                for p in participants
+            ],
+        })
+
+    lang_counts = {}
+    for p in participants:
+        lang = p.speaking_language_display
+        lang_counts[lang] = lang_counts.get(lang, 0) + 1
+
+    mtg_series = room_session.meeting_series
+    if not mtg_series and room_session.scheduled_meeting_id:
+        mtg_series = MeetingSeries.objects.filter(linked_scheduled_meeting_id=room_session.scheduled_meeting_id).first()
+    if not mtg_series:
+        mtg_series = MeetingSeries.objects.filter(meeting_code="MTG-NG-001").first()
+
+    ctx = dict(auth_bundle.get("ctx", {}))
+    ctx.update({
+        "room_session": room_session,
+        "meeting": meeting,
+        "meeting_series": mtg_series,
+        "participants": participants,
+        "total_count": total_count,
+        "admitted_count": admitted_count,
+        "hosts_count": hosts_count,
+        "active_connected_count": active_connected_count,
+        "lang_counts": lang_counts,
+        "now": timezone.now(),
+    })
+    return render(request, "foundation/rooms/attendance_report.html", ctx)
+
+
+@require_http_methods(["GET"])
+def room_transcript_export_view(request, meeting_id: str):
+    """
+    Exports the compiled Multilingua Room transcript and linked minutes document.
+    Supports formats:
+      - ?format=minutes (Official minutes with transcript appendix - txt/download)
+      - ?format=csv (Raw transcript segments in CSV)
+      - ?format=json (Structured transcript JSON)
+    """
+    auth_bundle, err_resp = _resolve_stage10_auth(request, meeting_id=meeting_id)
+    if err_resp:
+        return err_resp
+
+    meeting, room_session = _resolve_meeting_and_room(meeting_id=meeting_id)
+    if not _check_room_network_isolation(auth_bundle, meeting, room_session):
+        return HttpResponseForbidden("Access Denied: Cross-network room isolation enforced.")
+
+    if not room_session:
+        return HttpResponseNotFound("Meeting room not found.")
+
+    segments = list(room_session.transcript_segments.order_by("sequence_number", "timestamp"))
+    participants = list(room_session.participants.filter(admission_status="ADMITTED").exclude(participant_name=""))
+
+    mtg_series = room_session.meeting_series
+    if not mtg_series and room_session.scheduled_meeting_id:
+        mtg_series = MeetingSeries.objects.filter(linked_scheduled_meeting_id=room_session.scheduled_meeting_id).first()
+    if not mtg_series:
+        mtg_series = MeetingSeries.objects.filter(meeting_code="MTG-NG-001").first()
+
+    fmt = (request.GET.get("format") or "minutes").lower()
+    ts_now = timezone.now().strftime("%Y%m%d_%H%M")
+
+    if fmt == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="transcript_{room_session.room_code}_{ts_now}.csv"'
+        import csv
+        writer = csv.writer(response)
+        writer.writerow(["Sequence", "Timestamp", "Speaker", "Original Language", "Original Text", "French", "Portuguese", "Arabic", "Swahili", "Hausa", "Yoruba", "Igbo"])
+        for seg in segments:
+            tr = seg.translations or {}
+            writer.writerow([
+                seg.sequence_number,
+                seg.timestamp.strftime("%Y-%m-%d %H:%M:%S") if seg.timestamp else "",
+                seg.speaker_name,
+                seg.original_language,
+                seg.original_text,
+                tr.get("fr", ""),
+                tr.get("pt", ""),
+                tr.get("ar", ""),
+                tr.get("sw", ""),
+                tr.get("ha", ""),
+                tr.get("yo", ""),
+                tr.get("ig", ""),
+            ])
+        return response
+
+    if fmt == "json":
+        chat_msgs = list(room_session.chat_messages.order_by("timestamp")[:150])
+        response = JsonResponse({
+            "room_code": room_session.room_code,
+            "title": room_session.session_name,
+            "meeting_code": mtg_series.meeting_code if mtg_series else "",
+            "exported_at": timezone.now().isoformat(),
+            "participants_count": len(participants),
+            "segments_count": len(segments),
+            "segments": [
+                {
+                    "seq": s.sequence_number,
+                    "timestamp": s.timestamp.isoformat() if s.timestamp else "",
+                    "speaker": s.speaker_name,
+                    "lang": s.original_language,
+                    "original_text": s.original_text,
+                    "translations": s.translations or {},
+                }
+                for s in segments
+            ],
+            "chat_messages": [
+                {
+                    "sender_name": cm.sender_name,
+                    "sender_role": cm.sender_role,
+                    "message_text": cm.message_text,
+                    "timestamp": cm.timestamp.isoformat() if cm.timestamp else "",
+                    "is_host_announcement": cm.is_host_announcement,
+                }
+                for cm in chat_msgs
+            ],
+        }, json_dumps_params={"indent": 2})
+        response["Content-Disposition"] = f'attachment; filename="transcript_{room_session.room_code}_{ts_now}.json"'
+        return response
+
+    meeting_title = room_session.session_name or (meeting.title if meeting else "Coordination Meeting")
+    host_name = room_session.host_name or "Host"
+    actions = list(mtg_series.decisions_and_actions.order_by("record_code")) if mtg_series and hasattr(mtg_series, "decisions_and_actions") else []
+
+    doc_lines = [
+        "=" * 78,
+        "WDOS OFFICIAL MEETING MINUTES & MULTILINGUAL TRANSCRIPT",
+        "=" * 78,
+        f"Meeting Title  : {meeting_title}",
+        f"Room Code      : {room_session.room_code}",
+        f"Meeting Code   : {mtg_series.meeting_code if mtg_series else 'N/A'}",
+        f"Host           : {host_name}",
+        f"Date & Time    : {room_session.opened_at.strftime('%Y-%m-%d %H:%M UTC') if room_session.opened_at else timezone.now().strftime('%Y-%m-%d')}",
+        f"Status         : {room_session.status}",
+        f"Total Attendees: {len(participants)}",
+        f"Follow-Up URL  : /foundation/meetings/follow-up/?meeting={mtg_series.meeting_code if mtg_series else 'MTG-NG-001'}",
+        f"Attendance URL : /foundation/meetings/attendance-minutes/?meeting={mtg_series.meeting_code if mtg_series else 'MTG-NG-001'}",
+        "=" * 78,
+        "",
+        "SECTION 1: VERIFIED ATTENDANCE",
+        "-" * 78,
+    ]
+    for idx, p in enumerate(participants, 1):
+        doc_lines.append(f"{idx}. {p.participant_name} ({p.meeting_role}) — Speaks {p.speaking_language_display}, Hears {p.listening_language_display} [{p.connection_status}]")
+    if not participants:
+        doc_lines.append("No recorded attendees.")
+
+    doc_lines.extend([
+        "",
+        "SECTION 2: AGREED DECISIONS & ACTION ITEMS (MISSION CONTROL LINKED)",
+        "-" * 78,
+    ])
+    if actions:
+        for a in actions:
+            status = f"Converted to {a.converted_task.task_code}" if a.converted_task else ("Completed" if a.is_converted else "Pending")
+            doc_lines.append(f"[{a.record_type.upper()}] {a.record_code}: {a.detail_text}")
+            doc_lines.append(f"   Owner: {a.owner_label} | Deadline: {a.deadline_or_version} | Status: {status}")
+    else:
+        doc_lines.append("No explicit action items recorded in this session.")
+
+    doc_lines.extend([
+        "",
+        f"SECTION 3: MULTILINGUAL TRANSCRIPT APPENDIX ({len(segments)} SEGMENTS)",
+        "-" * 78,
+    ])
+    for s in segments:
+        ts_s = s.timestamp.strftime("%H:%M:%S") if s.timestamp else "00:00:00"
+        tr_fr = (s.translations or {}).get("fr", "")
+        line = f"[{ts_s}] {s.speaker_name} ({s.original_language}): {s.original_text}"
+        if tr_fr and tr_fr != s.original_text:
+            line += f"\n       [FR]: {tr_fr}"
+        doc_lines.append(line)
+    if not segments:
+        doc_lines.append("No spoken transcript recorded.")
+
+    doc_lines.extend([
+        "",
+        "=" * 78,
+        "End of Minutes & Transcript Record — Generated by WDOS Multilingua Engine",
+        "=" * 78,
+    ])
+
+    minutes_content = "\n".join(doc_lines)
+    response = HttpResponse(minutes_content, content_type="text/plain; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="minutes_{room_session.room_code}_{ts_now}.txt"'
+    return response
+
+
+@require_http_methods(["GET"])
+def room_calendar_ics_view(request, meeting_id: str):
+    """
+    Stage 10 Meeting Invitations:
+    Renders and downloads an RFC 5545 iCalendar (.ics) file for the room session.
+    Automatically handles UTC conversion and adds a 15-minute VALARM reminder.
+    """
+    target_network = request.GET.get("network", "WGMN")
+    target_country = request.GET.get("country", "NG")
+    meeting, room_session = _resolve_meeting_and_room(
+        meeting_id=meeting_id,
+        default_network=target_network,
+        default_country=target_country,
+    )
+    if not room_session:
+        return HttpResponseNotFound("Meeting room not found")
+
+    ics_content = generate_meeting_ics(room_session, request=request)
+    filename = f"meeting_{room_session.room_code}.ics"
+    response = HttpResponse(ics_content, content_type="text/calendar; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@require_http_methods(["GET", "POST"])
+def room_send_email_invitation_view(request, meeting_id: str):
+    """
+    Stage 10 Meeting Invitations:
+    Sends formatted email invitations with meeting details, time zones (WAT, CAT, EAT, UTC),
+    passcode (if active), join URL, and an attached .ics calendar file.
+    Tracks sent invitations in room_session.invitation_history.
+    """
+    from django.core.mail import EmailMultiAlternatives
+    from django.conf import settings
+
+    target_network = request.POST.get("network") or request.GET.get("network", "WGMN")
+    target_country = request.POST.get("country") or request.GET.get("country", "NG")
+    meeting, room_session = _resolve_meeting_and_room(
+        meeting_id=meeting_id,
+        default_network=target_network,
+        default_country=target_country,
+    )
+    if not room_session:
+        return JsonResponse({"error": "Meeting room not found"}, status=404)
+
+    if request.method == "GET":
+        schedule_info = _get_meeting_schedule_info(room_session)
+        return JsonResponse({
+            "room_code": room_session.room_code,
+            "title": room_session.title,
+            "schedule": schedule_info,
+            "invitation_history": room_session.invitation_history,
+        })
+
+    raw_recipients = request.POST.get("recipients", "")
+    if not raw_recipients and request.body:
+        try:
+            body_data = json.loads(request.body.decode("utf-8"))
+            raw_recipients = body_data.get("recipients", "")
+        except Exception:
+            pass
+
+    recipient_list = []
+    if isinstance(raw_recipients, list):
+        recipient_list = [r.strip() for r in raw_recipients if r and "@" in r]
+    elif isinstance(raw_recipients, str):
+        tokens = re.split(r"[,;\n\r\s]+", raw_recipients)
+        recipient_list = [t.strip() for t in tokens if t and "@" in t]
+
+    if not recipient_list:
+        return JsonResponse({"error": "Please provide at least one valid recipient email address."}, status=400)
+
+    personal_note = (request.POST.get("personal_note") or "").strip()
+    sender_name = request.user.get_full_name() if (request.user and request.user.is_authenticated) else (room_session.host_name or "Meeting Host")
+    sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@wdos.org") or "noreply@wdos.org"
+
+    join_url = request.build_absolute_uri(f"/foundation/rooms/{room_session.room_code}/prejoin/")
+    ics_url = request.build_absolute_uri(f"/foundation/rooms/{room_session.room_code}/calendar.ics")
+    schedule_info = _get_meeting_schedule_info(room_session)
+
+    passcode_text = f"Passcode: {room_session.passcode}\n" if room_session.has_passcode else "Passcode: None required\n"
+    passcode_html = f'<p style="margin: 6px 0; font-size: 15px;"><strong>Passcode:</strong> <span style="font-family: monospace; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: bold;">{room_session.passcode}</span></p>' if room_session.has_passcode else ''
+
+    subject = f"Invitation: {room_session.title} — WDOS Multilingua Meeting ({schedule_info['wat_time_label']})"
+
+    plain_content = f"""Hello,
+
+You are invited to join the following WDOS Multilingua Coordination Meeting.
+
+Meeting: {room_session.title}
+Room Code: {room_session.room_code}
+{passcode_text}
+Schedule Across African Time Zones:
+- West Africa Time (WAT): {schedule_info['wat_time_label']}
+- Central Africa Time (CAT): {schedule_info['cat_time_label']}
+- East Africa Time (EAT): {schedule_info['eat_time_label']}
+- Universal Time (UTC/GMT): {schedule_info['utc_time_label']}
+
+Join Online: {join_url}
+Download Calendar Invite (.ics): {ics_url}
+
+{personal_note if personal_note else ''}
+
+Note: When you join the room, you can select your preferred spoken and listening languages with live speech translation.
+
+Best regards,
+{sender_name}
+WDOS Platform Team
+"""
+
+    html_content = f"""
+<!DOCTYPE html>
+<html>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: #ffffff; padding: 24px;">
+      <span style="display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 6px; margin-bottom: 8px;">WDOS Multilingua Meeting</span>
+      <h1 style="margin: 0; font-size: 22px; font-weight: 700;">{room_session.title}</h1>
+      <p style="margin: 6px 0 0 0; font-size: 14px; opacity: 0.9;">Room: {room_session.room_code} · Hosted by {sender_name}</p>
+    </div>
+    
+    <div style="padding: 24px;">
+      {f'<div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; margin-bottom: 20px; border-radius: 0 6px 6px 0;"><p style="margin:0; font-size: 14px; color: #1e40af;"><strong>Note from host:</strong> {personal_note}</p></div>' if personal_note else ''}
+      
+      <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+        <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #0f172a;">Meeting Schedule in Major African Time Zones</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">West Africa Time (WAT, UTC+1):</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #0f172a; text-align: right;">{schedule_info['wat_time_label']}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Central Africa Time (CAT, UTC+2):</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #0f172a; text-align: right;">{schedule_info['cat_time_label']}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">East Africa Time (EAT, UTC+3):</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #0f172a; text-align: right;">{schedule_info['eat_time_label']}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Universal Time (UTC/GMT):</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #0f172a; text-align: right;">{schedule_info['utc_time_label']}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        {passcode_html}
+        <p style="margin: 6px 0; font-size: 14px; color: #64748b;">Supported Languages: Live speech translation across English, French, Swahili, Portuguese, Arabic, Hausa, Yoruba, and Igbo.</p>
+      </div>
+
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="{join_url}" style="background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">Join Multilingua Room</a>
+      </div>
+
+      <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 12px; color: #94a3b8; text-align: center;">
+        <p style="margin: 0 0 6px 0;">Or copy this link to join: <a href="{join_url}" style="color: #3b82f6;">{join_url}</a></p>
+        <p style="margin: 0;">An iCalendar (.ics) invite is attached so you can save this meeting directly to your Google Calendar, Outlook, or Apple Calendar.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    ics_content = generate_meeting_ics(room_session, request=request)
+
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=plain_content,
+        from_email=sender_email,
+        to=recipient_list,
+    )
+    msg.attach_alternative(html_content, "text/html")
+    msg.attach(
+        f"meeting_{room_session.room_code}.ics",
+        ics_content,
+        "text/calendar; charset=utf-8; method=REQUEST",
+    )
+    msg.send(fail_silently=False)
+
+    history_entry = {
+        "sent_at": timezone.now().isoformat(),
+        "sent_by": sender_name,
+        "recipients": recipient_list,
+        "recipient_count": len(recipient_list),
+        "has_note": bool(personal_note),
+    }
+    room_session.invitation_history.append(history_entry)
+    room_session.save(update_fields=["invitation_history"])
+
+    room_session.participants.filter(email__in=recipient_list).update(invitation_sent_at=timezone.now())
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.content_type == "application/json":
+        return JsonResponse({
+            "status": "success",
+            "message": f"Invitation sent to {len(recipient_list)} recipient(s).",
+            "recipients_count": len(recipient_list),
+            "history": room_session.invitation_history,
+        })
+    return redirect(f"/foundation/rooms/{room_session.room_code}/live/?tab=invite&sent=1")
+
+
+@require_http_methods(["GET", "POST"])
+def room_send_reminder_view(request, meeting_id: str):
+    """
+    Stage 10 Meeting Reminders:
+    Sends reminder notifications/emails to all previously invited recipients
+    and/or participants. Updates reminder_sent_at, reminder_count, and reminder_history.
+    """
+    from django.core.mail import EmailMultiAlternatives
+    from django.conf import settings
+
+    target_network = request.POST.get("network") or request.GET.get("network", "WGMN")
+    target_country = request.POST.get("country") or request.GET.get("country", "NG")
+    meeting, room_session = _resolve_meeting_and_room(
+        meeting_id=meeting_id,
+        default_network=target_network,
+        default_country=target_country,
+    )
+    if not room_session:
+        return JsonResponse({"error": "Meeting room not found"}, status=404)
+
+    recipients = set()
+    for item in room_session.invitation_history:
+        for r in item.get("recipients", []):
+            if r and "@" in r:
+                recipients.add(r.strip())
+    for p in room_session.participants.filter(email__contains="@"):
+        recipients.add(p.email.strip())
+
+    extra = request.POST.get("additional_recipients", "")
+    if extra:
+        for r in re.split(r"[,;\n\r\s]+", extra):
+            if r and "@" in r:
+                recipients.add(r.strip())
+
+    recipient_list = sorted(list(recipients))
+    if not recipient_list:
+        host_email = "host@wdos.org"
+        recipient_list = [host_email]
+
+    sender_name = request.user.get_full_name() if (request.user and request.user.is_authenticated) else (room_session.host_name or "Meeting Host")
+    sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@wdos.org") or "noreply@wdos.org"
+
+    join_url = request.build_absolute_uri(f"/foundation/rooms/{room_session.room_code}/prejoin/")
+    schedule_info = _get_meeting_schedule_info(room_session)
+
+    passcode_text = f"Passcode: {room_session.passcode}\n" if room_session.has_passcode else ""
+
+    subject = f"REMINDER: {room_session.title} — Multilingua Meeting Starting Soon ({schedule_info['wat_time_label']})"
+    plain_content = f"""Hello,
+
+This is a reminder that the following WDOS Multilingua Coordination Meeting is starting soon:
+
+Meeting: {room_session.title}
+Room Code: {room_session.room_code}
+{passcode_text}
+Meeting Times Across Time Zones:
+- West Africa Time (WAT): {schedule_info['wat_time_label']}
+- Central Africa Time (CAT): {schedule_info['cat_time_label']}
+- East Africa Time (EAT): {schedule_info['eat_time_label']}
+- Universal Time (UTC/GMT): {schedule_info['utc_time_label']}
+
+Click to join: {join_url}
+
+Best regards,
+{sender_name}
+WDOS Platform Team
+"""
+
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=plain_content,
+        from_email=sender_email,
+        to=recipient_list,
+    )
+    msg.send(fail_silently=False)
+
+    now = timezone.now()
+    room_session.reminder_sent_at = now
+    room_session.reminder_count += 1
+    room_session.reminder_history.append({
+        "sent_at": now.isoformat(),
+        "recipient_count": len(recipient_list),
+        "recipients": recipient_list[:10],
+    })
+    room_session.save(update_fields=["reminder_sent_at", "reminder_count", "reminder_history"])
+    room_session.participants.filter(email__in=recipient_list).update(reminder_sent_at=now)
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.content_type == "application/json":
+        return JsonResponse({
+            "status": "success",
+            "message": f"Reminder sent to {len(recipient_list)} recipient(s).",
+            "reminder_count": room_session.reminder_count,
+            "reminder_sent_at": now.isoformat(),
+            "last_reminder_label": room_session.last_reminder_label,
+        })
+    return redirect(f"/foundation/rooms/{room_session.room_code}/live/?tab=invite&reminder_sent=1")
 
 
 # =============================================================================
@@ -1785,6 +3343,8 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
         return err_resp
 
     meeting, room_session = _resolve_meeting_and_room(meeting_id=resolved_mid)
+    room_key = str(room_session.id) if room_session else str(resolved_mid)
+    now_ts = timezone.now().timestamp()
     if not _check_room_network_isolation(auth_bundle, meeting, room_session):
         return HttpResponseForbidden("Access Denied: Cross-network room isolation enforced.")
 
@@ -1795,27 +3355,66 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
     action_message = ""
     validation_error = ""
 
+    # Security check: room lock, link expiry & passcode
+    if code.startswith("ROOM-"):
+        need_passcode_check = (code != "ROOM-01")
+        allowed, sec_err, sec_code = _check_room_entry_security(
+            request, room_session, participant, is_host=is_host, check_passcode=need_passcode_check
+        )
+        if not allowed:
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"error": sec_err, "code": sec_code}, status=403)
+            code = "ROOM-01"
+            validation_error = sec_err
+
     if request.method == "POST":
         post_action = (request.POST.get("action") or "").strip().lower()
         guest_name_input = (request.POST.get("guest_name") or "").strip()
-        if auth_bundle.get("is_guest") and (guest_name_input or post_action in ("guest_join", "join")) and room_session:
+
+        # 1. Passcode check on entry actions (must precede participant creation and session marking)
+        if (post_action in ("guest_join", "join") or guest_name_input) and not is_host and room_session:
+            pass_ok, pass_err = _validate_room_passcode(request, room_session, is_host=is_host)
+            if not pass_ok:
+                validation_error = pass_err
+                request.session.pop(f"room_passcode_verified_{room_session.id}", None)
+                request.session.pop(f"wdos_guest_joined_{room_session.id}", None)
+                code = "ROOM-01"
+
+        # 2. Guest Name verification & Impersonation Protection
+        if not validation_error and auth_bundle.get("is_guest") and (guest_name_input or post_action in ("guest_join", "join")) and room_session:
             if guest_name_input:
-                request.session["wdos_guest_name"] = guest_name_input[:120]
-                request.session["guest_participant_name"] = guest_name_input[:120]
-                auth_bundle["guest_name"] = guest_name_input[:120]
-                if auth_bundle.get("ctx"):
-                    auth_bundle["ctx"]["display_name"] = guest_name_input[:120]
-            request.session[f"wdos_guest_joined_{room_session.id}"] = True
-            auth_bundle["needs_guest_name"] = False
-            participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
-            if guest_name_input and participant:
-                participant.participant_name = guest_name_input[:120]
-                participant.save(update_fields=["participant_name"])
+                valid_name, name_err = _validate_guest_display_name(
+                    guest_name_input,
+                    room_session,
+                    current_participant_id=participant.id if participant and participant.pk else None,
+                )
+                if not valid_name:
+                    validation_error = name_err
+                    code = "ROOM-01"
+                else:
+                    request.session["wdos_guest_name"] = guest_name_input[:120]
+                    request.session["guest_participant_name"] = guest_name_input[:120]
+                    request.session[f"wdos_guest_joined_{room_session.id}"] = True
+                    auth_bundle["guest_name"] = guest_name_input[:120]
+                    auth_bundle["needs_guest_name"] = False
+                    if auth_bundle.get("ctx"):
+                        auth_bundle["ctx"]["display_name"] = guest_name_input[:120]
+                    participant = _ensure_participant_session(auth_bundle, meeting, room_session, create_if_unjoined=True)
+                    if participant:
+                        participant.participant_name = guest_name_input[:120]
+                        participant.is_guest = True
+                        participant.save(update_fields=["participant_name", "is_guest"])
+            elif not participant or getattr(participant, "_is_unjoined_preview", False):
+                validation_error = "Please enter your name to join as a guest."
+                code = "ROOM-01"
+
+        if validation_error and code.startswith("ROOM-"):
+            code = "ROOM-01"
 
         if code.startswith("ROOM-") and (not room_session or not participant):
             validation_error = "No active meeting room session found. Schedule a meeting first."
 
-        elif post_action == "guest_join":
+        elif post_action == "guest_join" and not validation_error:
             if request.POST.get("speaking_language"):
                 participant.speaking_language = normalize_bcp47_language(request.POST.get("speaking_language"), "en-US")
             if request.POST.get("listening_language"):
@@ -1901,18 +3500,173 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                     "message": action_message,
                 })
 
+        elif post_action == "toggle_screenshare_policy":
+            if not is_host:
+                return HttpResponseForbidden("Host privileges required.")
+            req_policy = (request.POST.get("screenshare_policy") or "").strip().lower()
+            if req_policy in ("allow_all", "allowed", "true", "1"):
+                new_policy = True
+            elif req_policy in ("host_only", "disallow", "false", "0"):
+                new_policy = False
+            else:
+                new_policy = not room_session.allow_participant_screen_share
+            _update_room_policies(room_session, meeting, allow_screenshare=new_policy)
+            action_message = (
+                "Screen sharing enabled for all participants: Participants can now present slides and documents."
+                if new_policy
+                else "Screen sharing restricted: Only host and co-hosts can share their screen."
+            )
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({
+                    "status": "updated",
+                    "action": "toggle_screenshare_policy",
+                    "allow_participant_screen_share": room_session.allow_participant_screen_share,
+                    "message": action_message,
+                })
+
+        elif post_action == "toggle_screenshare_permission":
+            if not is_host:
+                return HttpResponseForbidden("Host privileges required.")
+            target_id = request.POST.get("participant_id")
+            target = room_session.participants.filter(id=target_id).first()
+            if target:
+                if target.can_share_screen(is_host=False) and not room_session.allow_participant_screen_share:
+                    target.connection_status = target.connection_status.replace(" · Screenshare Allowed", "").replace("Screenshare Allowed", "Connected").strip()
+                    target.is_speaker = False
+                    action_message = f"Screen sharing permission revoked for {target.participant_name}."
+                else:
+                    if "Screenshare Allowed" not in (target.connection_status or ""):
+                        target.connection_status = f"{target.connection_status} · Screenshare Allowed" if target.connection_status else "Screenshare Allowed"
+                    target.is_speaker = True
+                    action_message = f"Screen sharing permission granted to {target.participant_name}."
+                target.save(update_fields=["connection_status", "is_speaker"])
+            state_v = _bump_room_state_version(room_key)
+            LiveKitAdapter.send_data_packet(
+                room_session.session_name,
+                {"type": "host_command", "action": "toggle_screenshare_permission", "participant_id": target_id, "state_v": state_v},
+                topic="wdos_control",
+            )
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                participants_list, waiting_list = _serialize_room_participants(room_session)
+                return JsonResponse({
+                    "status": "updated",
+                    "action": "toggle_screenshare_permission",
+                    "participant_id": target_id,
+                    "participants": participants_list,
+                    "message": action_message,
+                    "state_v": state_v,
+                })
+
+        elif post_action == "set_screenshare_state":
+            is_sharing = request.POST.get("is_sharing") in ("true", "1", True)
+            if is_sharing:
+                if not (is_host or (participant and participant.can_share_screen(is_host=is_host)) or room_session.allow_participant_screen_share):
+                    return HttpResponseForbidden("Screen sharing permission required.")
+                sharer_name = (request.POST.get("presenter_name") or (participant.participant_name if participant else "Presenter")).strip()
+                parts = [p for p in (room_session.provider_session_id or "").split("|") if not p.startswith("sharer:")]
+                parts.append(f"sharer:{sharer_name}")
+                room_session.provider_session_id = "|".join(parts)
+                room_session.save(update_fields=["provider_session_id"])
+                action_message = f"{sharer_name} is now presenting."
+            else:
+                parts = [p for p in (room_session.provider_session_id or "").split("|") if not p.startswith("sharer:")]
+                room_session.provider_session_id = "|".join(parts)
+                room_session.save(update_fields=["provider_session_id"])
+                action_message = "Screen sharing concluded."
+            state_v = _bump_room_state_version(room_key)
+            LiveKitAdapter.send_data_packet(
+                room_session.session_name,
+                {
+                    "type": "screenshare_state",
+                    "is_sharing": is_sharing,
+                    "active_screenshare_presenter": room_session.active_screenshare_presenter,
+                    "state_v": state_v,
+                },
+                topic="wdos_control",
+            )
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({
+                    "status": "ok",
+                    "action": "set_screenshare_state",
+                    "is_sharing": is_sharing,
+                    "active_screenshare_presenter": room_session.active_screenshare_presenter,
+                    "message": action_message,
+                    "state_v": state_v,
+                })
+
+        elif post_action == "broadcast_screen_frame":
+            if not (is_host or (participant and participant.can_share_screen(is_host=is_host)) or (room_session and room_session.allow_participant_screen_share)):
+                return HttpResponseForbidden("Screen sharing permission required.")
+            return JsonResponse(
+                {
+                    "error": "HTTP screen-frame relay is disabled. Use LiveKit WebRTC SCREEN_SHARE tracks.",
+                    "code": "WEBRTC_SCREENSHARE_REQUIRED",
+                },
+                status=410,
+            )
+
+        elif post_action == "send_chat_message":
+            msg_text = (request.POST.get("message_text") or request.POST.get("message") or "").strip()
+            if msg_text and room_session:
+                is_announcement = request.POST.get("is_announcement") in ("1", "true", True) and is_host
+                s_name = (
+                    request.POST.get("sender_name")
+                    or (participant.participant_name if participant else None)
+                    or auth_bundle.get("display_name")
+                    or "Participant"
+                ).strip()
+                s_role = "Host" if is_host else (participant.meeting_role if participant else "Participant")
+                chat_msg = RoomChatMessage.objects.create(
+                    room_session=room_session,
+                    sender_name=s_name,
+                    sender_profile=auth_bundle.get("profile"),
+                    sender_role=s_role,
+                    message_text=msg_text,
+                    is_host_announcement=is_announcement,
+                )
+                state_v = _bump_room_state_version(room_key)
+                chat_dict = {
+                    "id": str(chat_msg.id),
+                    "sender_name": chat_msg.sender_name,
+                    "sender_role": chat_msg.sender_role,
+                    "message_text": chat_msg.message_text,
+                    "timestamp": chat_msg.timestamp.strftime("%H:%M") if chat_msg.timestamp else "",
+                    "is_host_announcement": chat_msg.is_host_announcement,
+                }
+                LiveKitAdapter.send_data_packet(
+                    room_session.session_name,
+                    {"type": "chat_message", "chat_message": chat_dict, "state_v": state_v},
+                    topic="wdos_chat",
+                )
+                action_message = "Message sent to room."
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return JsonResponse({
+                        "status": "ok",
+                        "action": "send_chat_message",
+                        "chat_message": chat_dict,
+                        "message": action_message,
+                        "state_v": state_v,
+                    })
+
+            elif post_action == "send_email_invitation":
+                return room_send_email_invitation_view(request, meeting_id=room_session.room_code)
+
+            elif post_action == "send_meeting_reminder":
+                return room_send_reminder_view(request, meeting_id=room_session.room_code)
+
         # ROOM-01 form submission (Step 1: Pre-join Lobby -> Step 2: Live Room)
-        elif code == "ROOM-01":
-            participant.speaking_language = normalize_bcp47_language(
-                request.POST.get("speaking_language") or request.POST.get("i_speak") or "en-US"
-            )
-            participant.listening_language = normalize_bcp47_language(
-                request.POST.get("listening_language") or request.POST.get("i_want_to_hear") or "fr-FR"
-            )
-            participant.caption_language = participant.listening_language_display
-            participant.audio_input_device = request.POST.get("microphone", participant.audio_input_device)
-            participant.audio_output_device = request.POST.get("speaker_headphones", participant.audio_output_device)
-            participant.save()
+        elif code == "ROOM-01" and not validation_error:
+            if participant and not getattr(participant, "_is_unjoined_preview", False):
+                participant.speaking_language = normalize_bcp47_language(
+                    request.POST.get("speaking_language") or request.POST.get("i_speak") or "en-US"
+                )
+                participant.listening_language = normalize_bcp47_language(
+                    request.POST.get("listening_language") or request.POST.get("i_want_to_hear") or "fr-FR"
+                )
+                participant.caption_language = participant.listening_language_display
+                participant.audio_input_device = request.POST.get("microphone", participant.audio_input_device)
+                participant.audio_output_device = request.POST.get("speaker_headphones", participant.audio_output_device)
+                participant.save()
             if post_action == "join" and request.POST.get("stay_on_screen") != "1":
                 target_id = str(meeting.id) if meeting else room_session.room_code
                 if participant.admission_status == "ADMITTED" or is_host:
@@ -1978,6 +3732,7 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                     participant.speaking_language = normalize_bcp47_language(request.POST.get("speaking_language", "en-US"))
                 if not getattr(participant, "_is_unjoined_preview", False) and (participant.participant_name or "").strip():
                     participant.save(update_fields=["listening_language", "speaking_language", "caption_language"])
+                state_v = _bump_room_state_version(room_key)
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return JsonResponse({
                         "status": "updated",
@@ -1985,24 +3740,45 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                         "speaking_language_display": participant.speaking_language_display,
                         "listening_language": participant.listening_language,
                         "listening_language_display": participant.listening_language_display,
+                        "state_v": state_v,
                     })
                 action_message = f"Language updated: speaking {participant.speaking_language_display}, listening & reading in {participant.listening_language_display}."
 
             elif post_action == "leave_room":
-                if participant and not getattr(participant, "_is_unjoined_preview", False) and participant.pk:
-                    participant.admission_status = "LEFT"
-                    participant.connection_status = "Left"
-                    participant.is_muted = True
-                    participant.left_at = timezone.now()
-                    participant.save(update_fields=["admission_status", "connection_status", "is_muted", "left_at"])
+                target_p = participant
+                req_pid = request.POST.get("participant_id")
+                if req_pid and room_session:
+                    try:
+                        found_p = room_session.participants.filter(id=uuid.UUID(str(req_pid))).first()
+                        if found_p:
+                            target_p = found_p
+                    except (ValueError, TypeError):
+                        pass
+                if target_p and not getattr(target_p, "_is_unjoined_preview", False) and target_p.pk:
+                    target_p.admission_status = "LEFT"
+                    target_p.connection_status = "Left"
+                    target_p.is_muted = True
+                    target_p.left_at = timezone.now()
+                    target_p.save(update_fields=["admission_status", "connection_status", "is_muted", "left_at"])
+                    _clear_participant_heartbeat(str(target_p.id))
+                    if room_session and room_session.active_screenshare_presenter == target_p.participant_name:
+                        parts = [p for p in (room_session.provider_session_id or "").split("|") if not p.startswith("sharer:")]
+                        room_session.provider_session_id = "|".join(parts)
+                        room_session.save(update_fields=["provider_session_id"])
+                    _bump_room_state_version(room_key)
+
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.POST.get("is_beacon"):
+                    return JsonResponse({"status": "left", "redirect_url": f"/foundation/rooms/{room_session.room_code}/prejoin/" if room_session else "/foundation/meetings/"})
+
                 if auth_bundle.get("is_guest"):
                     if room_session:
                         request.session.pop(f"wdos_guest_joined_{room_session.id}", None)
                         request.session.pop(f"wdos_guest_pid_{room_session.id}", None)
-                    auth_bundle["needs_guest_name"] = True
+                        request.session.pop("wdos_guest_name", None)
                     target_id = room_session.room_code if room_session else meeting_id
-                    return redirect(f"/foundation/rooms/{target_id}/live/")
-                return redirect("/foundation/meetings/")
+                    return redirect(f"/foundation/rooms/{target_id}/prejoin/")
+                target_id = room_session.room_code if room_session else meeting_id
+                return redirect(f"/foundation/rooms/{target_id}/prejoin/")
 
             elif post_action == "update_media_state":
                 muted_flag = request.POST.get("is_muted", "true").lower() in ("true", "1", "yes")
@@ -2010,11 +3786,13 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                 participant.connection_status = "Listening" if muted_flag else "Mic On"
                 if not getattr(participant, "_is_unjoined_preview", False) and (participant.participant_name or "").strip():
                     participant.save(update_fields=["is_muted", "connection_status"])
+                state_v = _bump_room_state_version(room_key)
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return JsonResponse({
                         "status": "updated",
                         "is_muted": participant.is_muted,
                         "connection_status": participant.connection_status,
+                        "state_v": state_v,
                     })
                 action_message = "Microphone state updated."
 
@@ -2026,12 +3804,45 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                 participant.is_speaker = True
                 if not getattr(participant, "_is_unjoined_preview", False) and (participant.participant_name or "").strip():
                     participant.save(update_fields=["hand_raised", "is_speaker"])
+                state_v = _bump_room_state_version(room_key)
+                if room_session:
+                    LiveKitAdapter.send_data_packet(
+                        room_session.session_name,
+                        {
+                            "type": "hand_state",
+                            "participant_id": str(participant.id),
+                            "participant_name": participant.participant_name,
+                            "hand_raised": participant.hand_raised,
+                            "state_v": state_v,
+                        },
+                        topic="wdos_control",
+                    )
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return JsonResponse({
                         "status": "updated",
                         "hand_raised": participant.hand_raised,
+                        "state_v": state_v,
                     })
                 action_message = "Hand raised — the host and room have been notified." if participant.hand_raised else "Hand lowered."
+
+            elif post_action == "vote_poll":
+                poll_id = (request.POST.get("poll_id") or "").strip()
+                option_idx_raw = request.POST.get("option_index")
+                voter_id = str(participant.id) if participant else str(auth_bundle.get("display_name") or "anon")
+                try:
+                    opt_idx = int(option_idx_raw)
+                except (ValueError, TypeError):
+                    opt_idx = -1
+                updated_poll = _atomic_vote_poll(room_key, poll_id, voter_id, opt_idx)
+                if updated_poll is None:
+                    return JsonResponse({"error": "Poll not found or closed."}, status=400)
+                state_v = _bump_room_state_version(room_key)
+                LiveKitAdapter.send_data_packet(
+                    room_session.session_name,
+                    {"type": "poll_updated", "poll": updated_poll, "state_v": state_v},
+                    topic="wdos_control",
+                )
+                return JsonResponse({"status": "updated", "action": "vote_poll", "poll": updated_poll, "state_v": state_v})
 
             elif post_action in (
                 "end_session",
@@ -2045,11 +3856,141 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                 "toggle_cohost",
                 "remove_participant",
                 "open_queue",
+                "toggle_room_lock",
+                "set_room_lock",
+                "set_passcode",
+                "set_link_expiry",
+                "toggle_recording",
+                "toggle_webinar_mode",
+                "create_poll",
+                "close_poll",
             ) or (code == "ROOM-05" and not post_action):
                 if not is_host:
                     return HttpResponseForbidden("Host privileges required.")
-                if post_action == "end_session":
+                if post_action == "toggle_recording":
+                    rec_state = _get_room_recording_state(room_key)
+                    try:
+                        if rec_state.get("is_recording"):
+                            egress_res = LiveKitAdapter.stop_room_recording(
+                                room_session.session_name,
+                                str(rec_state.get("egress_id") or ""),
+                            )
+                            new_rec = {
+                                "is_recording": False,
+                                "egress_id": egress_res.get("egress_id", ""),
+                                "stopped_at": egress_res.get("stopped_at"),
+                            }
+                            action_message = "Cloud recording stopped and saved."
+                        else:
+                            egress_res = LiveKitAdapter.start_room_recording(room_session.session_name)
+                            new_rec = {
+                                "is_recording": True,
+                                "egress_id": egress_res.get("egress_id", ""),
+                                "started_at": egress_res.get("started_at"),
+                            }
+                            action_message = "LiveKit Egress cloud recording started."
+                    except RuntimeError as egress_err:
+                        return JsonResponse(
+                            {
+                                "error": str(egress_err),
+                                "code": "EGRESS_UNAVAILABLE",
+                                "recording_state": rec_state,
+                            },
+                            status=502,
+                        )
+                    _set_room_recording_state(room_key, new_rec)
+                    state_v = _bump_room_state_version(room_key)
+                    LiveKitAdapter.send_data_packet(
+                        room_session.session_name,
+                        {"type": "recording_state", "recording_state": new_rec, "state_v": state_v},
+                        topic="wdos_control",
+                    )
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return JsonResponse({
+                            "status": "updated",
+                            "action": "toggle_recording",
+                            "recording_state": new_rec,
+                            "message": action_message,
+                            "state_v": state_v,
+                        })
+                elif post_action == "toggle_webinar_mode":
+                    curr_webinar = _is_room_webinar_mode(room_session)
+                    next_webinar = not curr_webinar
+                    if "webinar_mode" in request.POST:
+                        next_webinar = request.POST.get("webinar_mode") in ("1", "true", True)
+                    _set_room_webinar_mode(room_session, next_webinar)
+                    state_v = _bump_room_state_version(room_key)
+                    action_message = (
+                        "Large-scale Webinar Mode enabled (attendees join in subscriber mode until granted floor)."
+                        if next_webinar
+                        else "Standard interactive mode enabled."
+                    )
+                    LiveKitAdapter.send_data_packet(
+                        room_session.session_name,
+                        {"type": "policy_changed", "action": "toggle_webinar_mode", "webinar_mode": next_webinar, "state_v": state_v},
+                        topic="wdos_control",
+                    )
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return JsonResponse({
+                            "status": "updated",
+                            "action": "toggle_webinar_mode",
+                            "webinar_mode": next_webinar,
+                            "message": action_message,
+                            "state_v": state_v,
+                        })
+                elif post_action == "create_poll":
+                    question = (request.POST.get("question") or "").strip()
+                    raw_options = request.POST.get("options") or ""
+                    opt_list = [o.strip() for o in raw_options.split("|") if o.strip()] if "|" in raw_options else [o.strip() for o in raw_options.split(",") if o.strip()]
+                    if not question or len(opt_list) < 2:
+                        return JsonResponse({"error": "Poll requires a question and at least 2 options."}, status=400)
+                    polls = _get_room_polls(room_key)
+                    new_poll = {
+                        "id": f"poll-{uuid.uuid4().hex[:8]}",
+                        "question": question[:240],
+                        "options": opt_list[:8],
+                        "votes": [0] * len(opt_list[:8]),
+                        "total_votes": 0,
+                        "voters": {},
+                        "is_open": True,
+                        "created_by": participant.participant_name if participant else "Host",
+                    }
+                    polls.append(new_poll)
+                    _set_room_polls(room_key, polls)
+                    state_v = _bump_room_state_version(room_key)
+                    LiveKitAdapter.send_data_packet(
+                        room_session.session_name,
+                        {"type": "poll_created", "poll": new_poll, "state_v": state_v},
+                        topic="wdos_control",
+                    )
+                    return JsonResponse({"status": "updated", "action": "create_poll", "poll": new_poll, "state_v": state_v})
+                elif post_action == "close_poll":
+                    poll_id = (request.POST.get("poll_id") or "").strip()
+                    polls = _get_room_polls(room_key)
+                    closed_poll = None
+                    for poll in polls:
+                        if poll.get("id") == poll_id:
+                            poll["is_open"] = False
+                            closed_poll = poll
+                            break
+                    _set_room_polls(room_key, polls)
+                    state_v = _bump_room_state_version(room_key)
+                    if closed_poll:
+                        LiveKitAdapter.send_data_packet(
+                            room_session.session_name,
+                            {"type": "poll_closed", "poll": closed_poll, "state_v": state_v},
+                            topic="wdos_control",
+                        )
+                    return JsonResponse({"status": "updated", "action": "close_poll", "poll": closed_poll, "state_v": state_v})
+                elif post_action == "end_session":
                     res = finalize_room_session_and_bridge_minutes(room_session, actor_account=auth_bundle["account"])
+                    state_v = _bump_room_state_version(room_key)
+                    LiveKitAdapter.send_data_packet(
+                        room_session.session_name,
+                        {"type": "room_ended", "room_code": room_session.room_code, "room_status": room_session.status, "state_v": state_v},
+                        topic="wdos_control",
+                    )
+                    LiveKitAdapter.delete_room_on_sfu(room_session.session_name)
                     action_message = (
                         f"Session completed. {res['segment_count']} transcript segments filed to MTG-05 minutes "
                         f"and {len(res['created_tasks'])} follow-up task(s) synced to Mission Control."
@@ -2062,19 +4003,97 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                     participant.admission_status = "ADMITTED"
                     participant.connection_status = "Connected"
                     participant.save(update_fields=["admission_status", "connection_status"])
+                    _bump_room_state_version(room_key)
                     action_message = "Meeting room reopened for live participation."
+                elif post_action in ("toggle_room_lock", "set_room_lock"):
+                    if "is_locked" in request.POST:
+                        room_session.is_locked = request.POST.get("is_locked") in ("1", "true", True)
+                    else:
+                        room_session.is_locked = not room_session.is_locked
+                    room_session.save(update_fields=["is_locked"])
+                    state_v = _bump_room_state_version(room_key)
+                    LiveKitAdapter.send_data_packet(
+                        room_session.session_name,
+                        {"type": "policy_changed", "action": "toggle_room_lock", "is_locked": room_session.is_locked, "state_v": state_v},
+                        topic="wdos_control",
+                    )
+                    action_message = f"Room {room_session.room_code} is now {'locked' if room_session.is_locked else 'unlocked'}."
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return JsonResponse({"status": "updated", "is_locked": room_session.is_locked, "message": action_message, "state_v": state_v})
+                elif post_action == "set_passcode":
+                    new_pass = (request.POST.get("passcode") or "").strip()
+                    room_session.passcode = new_pass
+                    room_session.save(update_fields=["passcode"])
+                    state_v = _bump_room_state_version(room_key)
+                    action_message = "Meeting passcode updated." if new_pass else "Meeting passcode removed."
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return JsonResponse({"status": "updated", "has_passcode": room_session.has_passcode, "message": action_message, "state_v": state_v})
+                elif post_action == "set_link_expiry":
+                    exp_val = request.POST.get("expiry_hours") or request.POST.get("expiry_mode")
+                    if exp_val in ("clear", "none", "", None):
+                        room_session.link_expires_at = None
+                        action_message = "Meeting link expiry removed."
+                    else:
+                        try:
+                            h = int(exp_val)
+                            room_session.link_expires_at = timezone.now() + timezone.timedelta(hours=h)
+                            action_message = f"Meeting link set to expire in {h} hour(s)."
+                        except (ValueError, TypeError):
+                            action_message = "Invalid link expiry value."
+                    room_session.save(update_fields=["link_expires_at"])
+                    state_v = _bump_room_state_version(room_key)
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return JsonResponse({
+                            "status": "updated",
+                            "link_expires_at": room_session.link_expires_at.isoformat() if room_session.link_expires_at else None,
+                            "is_link_expired": room_session.is_link_expired,
+                            "message": action_message,
+                            "state_v": state_v,
+                        })
                 elif post_action == "admit_all":
-                    _prune_stale_waiting_participants(room_session)
-                    admitted_count = room_session.participants.filter(admission_status="WAITING_ROOM").exclude(participant_name="").update(
-                        admission_status="ADMITTED",
-                        connection_status="Listening",
-                        joined_at=timezone.now(),
+                    confirmed = (
+                        request.POST.get("confirmed") in ("1", "true", True)
+                        or request.POST.get("confirm_admit_all") in ("1", "true", True)
                     )
-                    action_message = (
-                        f"Admitted {admitted_count} participant(s) from the waiting lobby."
-                        if admitted_count > 0
-                        else "No active participants waiting in the lobby (stale entries removed)."
-                    )
+                    waiting_qs = room_session.participants.filter(admission_status="WAITING_ROOM").exclude(participant_name="")
+                    if not confirmed:
+                        guest_count = waiting_qs.filter(is_guest=True).count()
+                        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                            return JsonResponse({
+                                "status": "confirmation_required",
+                                "action": "admit_all",
+                                "waiting_count": waiting_qs.count(),
+                                "unverified_guests_count": guest_count,
+                                "message": f"Confirmation required before admitting all {waiting_qs.count()} participant(s).",
+                            })
+                        action_message = f"Confirmation required before admitting all {waiting_qs.count()} waiting participants."
+                        validation_error = "Please review waiting participants and confirm Admit All."
+                    else:
+                        _prune_stale_waiting_participants(room_session)
+                        admitted_count = waiting_qs.update(
+                            admission_status="ADMITTED",
+                            connection_status="Listening",
+                            joined_at=timezone.now(),
+                        )
+                        state_v = _bump_room_state_version(room_key)
+                        LiveKitAdapter.send_data_packet(
+                            room_session.session_name,
+                            {"type": "roster_changed", "action": "admit_all", "admitted_count": admitted_count, "state_v": state_v},
+                            topic="wdos_control",
+                        )
+                        action_message = (
+                            f"Admitted {admitted_count} participant(s) from the waiting lobby."
+                            if admitted_count > 0
+                            else "No active participants waiting in the lobby."
+                        )
+                        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                            return JsonResponse({
+                                "status": "updated",
+                                "action": "admit_all",
+                                "admitted_count": admitted_count,
+                                "message": action_message,
+                                "state_v": state_v,
+                            })
                 elif post_action == "admit":
                     target_id = request.POST.get("participant_id")
                     target = room_session.participants.filter(id=target_id).first() if target_id else room_session.participants.filter(admission_status="WAITING_ROOM").exclude(participant_name="").first()
@@ -2109,6 +4128,13 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                         target.hand_raised = False
                         target.connection_status = "Ready"
                         target.save()
+                        room_session.active_speaker_name = target.participant_name
+                        room_session.save(update_fields=["active_speaker_name"])
+                        LiveKitAdapter.update_participant_permissions(
+                            room_session.session_name,
+                            str(target.id),
+                            can_publish=True,
+                        )
                         action_message = f"Speaker floor granted to {target.participant_name}."
                 elif post_action == "mute_all":
                     room_session.participants.exclude(meeting_role="Host").update(is_muted=True, connection_status="Muted by Host")
@@ -2133,6 +4159,11 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                             target.is_speaker = True
                             action_message = f"{target.participant_name} is now a Co-Host."
                         target.save(update_fields=["meeting_role", "is_speaker"])
+                        LiveKitAdapter.update_participant_permissions(
+                            room_session.session_name,
+                            str(target.id),
+                            can_publish=True,
+                        )
                 elif post_action == "remove_participant":
                     target_id = request.POST.get("participant_id")
                     target = room_session.participants.filter(id=target_id).first() if target_id else None
@@ -2142,9 +4173,23 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                         target.is_muted = True
                         target.left_at = timezone.now()
                         target.save(update_fields=["admission_status", "connection_status", "is_muted", "left_at"])
+                        LiveKitAdapter.remove_participant_from_sfu(room_session.session_name, str(target.id))
                         action_message = f"{target.participant_name} was removed from the meeting."
                 else:
                     action_message = "Admission queue opened for review."
+
+                state_v = _bump_room_state_version(room_key)
+                if room_session and post_action not in ("end_session", "open_queue"):
+                    LiveKitAdapter.send_data_packet(
+                        room_session.session_name,
+                        {
+                            "type": "host_command",
+                            "action": post_action,
+                            "participant_id": request.POST.get("participant_id") or "",
+                            "state_v": state_v,
+                        },
+                        topic="wdos_control",
+                    )
 
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest" and post_action not in ("end_session", "reopen_session"):
                     participants_list, waiting_list = _serialize_room_participants(room_session)
@@ -2154,6 +4199,7 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
                         "message": action_message,
                         "participants": participants_list,
                         "waiting_participants": waiting_list,
+                        "state_v": state_v,
                     })
 
             elif post_action in ("apply", "save_draft") or code == "ROOM-06":
@@ -2356,11 +4402,23 @@ def stage10_screen_view(request, screen_code: str, meeting_id: Optional[str] = N
             else:
                 action_message = "Session health telemetry refreshed across conference rooms."
 
-    # When an unauthenticated guest pastes the meeting link in their browser and has not yet
-    # filled out the Join Page, show the Join Page (ROOM-01) first before placing them in the lobby or meeting.
+    # Strict Passcode and Guest Admission Screen Guard:
+    # 1. Non-hosts trying to access any room screen when room has a passcode
+    #    must have verified the passcode in session; otherwise force ROOM-01.
     if (
+        not is_host
+        and room_session
+        and room_session.has_passcode
+        and not request.session.get(f"room_passcode_verified_{room_session.id}")
+        and code.startswith("ROOM-")
+        and room_session.status != "COMPLETED"
+    ):
+        code = "ROOM-01"
+
+    # 2. Guests who have not joined yet must complete Join Page (ROOM-01).
+    elif (
         auth_bundle.get("is_guest")
-        and auth_bundle.get("needs_guest_name")
+        and (auth_bundle.get("needs_guest_name") or not request.session.get(f"wdos_guest_joined_{room_session.id}"))
         and code.startswith("ROOM-")
         and room_session
         and room_session.status != "COMPLETED"

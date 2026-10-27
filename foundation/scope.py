@@ -229,6 +229,10 @@ class UserScope:
             or len(set(self.allowed_networks).intersection({"WGMN", "WNNN", "BOTH"})) > 1
         )
 
+    @property
+    def can_access_wgmn(self) -> bool:
+        return self.can_access_network("WGMN")
+
     def can_access_network(self, network: str) -> bool:
         if not network:
             return True
@@ -1180,40 +1184,39 @@ def get_breadcrumbs(
 ) -> List[dict]:
     """
     Construct the scoped breadcrumbs trail following the canonical hierarchy:
-    WDOS → Network Workspace → Country Hub → Leadership Level → Individual Profile
+    Network Workspace → Country Hub → Leadership Level → Individual Profile
+    (WDOS root is removed; standalone overlays begin with Home)
     """
     crumbs = []
 
-    # Level 1: WDOS Root
-    crumbs.append({
-        "label": "WDOS",
-        "url": "/foundation/",
-        "is_current": not network and not page_name,
-        "tier": "root",
-    })
-
-    # Page overlay without network hierarchy (e.g. Work Queue, Notifications, Settings, Privacy)
-    if page_name and not network:
+    # Standalone page overlay without network hierarchy (e.g. Work Queue, Notifications, Settings, Privacy)
+    if not network:
         crumbs.append({
-            "label": page_name,
-            "url": None,
-            "is_current": True,
-            "tier": "page",
+            "label": "Home",
+            "url": "/foundation/dashboard/",
+            "is_current": not page_name,
+            "tier": "root",
         })
+        if page_name:
+            crumbs.append({
+                "label": page_name,
+                "url": None,
+                "is_current": True,
+                "tier": "page",
+            })
         return crumbs
 
-    # Level 2: Network Workspace
-    if network:
-        net_is_current = not country and not level and not profile_name and not page_name
-        crumbs.append({
-            "label": f"{network} Workspace",
-            "url": f"/foundation/network/{network}/",
-            "is_current": net_is_current,
-            "tier": "network",
-        })
+    # Network hierarchy: WDOS root is removed, begins with Network Workspace
+    net_is_current = not country and not level and not profile_name and not page_name
+    crumbs.append({
+        "label": f"{network} Workspace",
+        "url": f"/foundation/network/{network}/",
+        "is_current": net_is_current,
+        "tier": "network",
+    })
 
-    # Level 3: Country Hub
-    if network and country:
+    # Level 2: Country Hub
+    if country:
         country_name = get_country_display_name(country)
         country_is_current = not level and not profile_name and not page_name
         crumbs.append({
@@ -1223,8 +1226,8 @@ def get_breadcrumbs(
             "tier": "country",
         })
 
-    # Level 4: Leadership Level
-    if network and country and level:
+    # Level 3: Leadership Level
+    if country and level:
         level_name = get_leadership_display_name(level)
         level_is_current = not profile_name and not page_name
         crumbs.append({

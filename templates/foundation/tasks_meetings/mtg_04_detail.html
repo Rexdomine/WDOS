@@ -242,16 +242,142 @@
       </div>
 
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-        <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/foundation/rooms/{{ meeting.meeting_code|default:'ROOM-NG-001' }}/live/'); this.textContent='Link Copied';" style="background:rgba(255,255,255,0.12); color:#FFFFFF; border:1px solid rgba(255,255,255,0.24); border-radius:10px; padding:11px 16px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px;">
+        <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/foundation/rooms/{{ room_session.room_code|default:meeting.meeting_code }}/prejoin/'); this.textContent='Link Copied';" style="background:rgba(255,255,255,0.12); color:#FFFFFF; border:1px solid rgba(255,255,255,0.24); border-radius:10px; padding:11px 16px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copy Room Link
         </button>
-        <a href="/foundation/rooms/{{ meeting.meeting_code|default:'ROOM-NG-001' }}/live/" class="dash-btn-primary" style="padding:11px 22px; font-size:14px; border-radius:10px; display:inline-flex; align-items:center; gap:8px;">
+        <button type="button" id="btn-open-invite-modal" onclick="openInviteModal()" style="background:#FFFFFF; color:#D4006A; border:1.5px solid #F4C2DA; border-radius:10px; padding:11px 16px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px;" title="Send invitations by email, share link, and export calendar .ics">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Invite &amp; Calendar
+        </button>
+        <a href="/foundation/rooms/{{ room_session.room_code|default:meeting.meeting_code }}/attendance/" target="_blank" style="background:rgba(255,255,255,0.12); color:#FFFFFF; border:1px solid rgba(255,255,255,0.24); border-radius:10px; padding:11px 16px; font-size:13px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:7px;" title="View attendance roster and audit report">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+          Attendance Report
+        </a>
+        <a href="/foundation/rooms/{{ room_session.room_code|default:meeting.meeting_code }}/prejoin/" class="dash-btn-primary" style="padding:11px 22px; font-size:14px; border-radius:10px; display:inline-flex; align-items:center; gap:8px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           Join Online Room
         </a>
       </div>
     </div>
+
+    <!-- Room Access & Restrict Controls (Host Settings Card) -->
+    {% if is_meeting_host and room_session %}
+    <div style="background:#FAF7FA; border:1px solid #E7DCE6; border-radius:14px; padding:16px 20px; margin-top:14px; margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:16px;">🛡️</span>
+          <strong style="font-size:14px; color:#19131A;">Room Access &amp; Restrict Controls</strong>
+        </div>
+        <span style="font-size:11px; font-weight:700; color:#6B7280;">Host Settings</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+        <!-- Who Can Join -->
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:10px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <span style="font-size:11px; font-weight:800; color:#4B5563; text-transform:uppercase;">Who Can Join</span>
+            {% if room_session.allow_guest_access %}
+            <span style="font-size:10.5px; font-weight:700; color:#15803D; background:#DCFCE7; padding:1px 6px; border-radius:4px;">Anyone with link</span>
+            {% else %}
+            <span style="font-size:10.5px; font-weight:700; color:#4B5563; background:#F3F4F6; padding:1px 6px; border-radius:4px;">WDOS accounts only</span>
+            {% endif %}
+          </div>
+          <div style="font-size:11.5px; color:#6B7280; margin-bottom:8px;">
+            {% if room_session.allow_guest_access %}Guests can enter display names and join without an account.{% else %}Only authenticated WDOS members can enter.{% endif %}
+          </div>
+          <form method="post" action="" style="margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle_room_access">
+            <input type="hidden" name="room_access" value="{% if room_session.allow_guest_access %}wdos_only{% else %}anyone_with_link{% endif %}">
+            <button type="submit" class="dash-btn-secondary" style="width:100%; font-size:11.5px; padding:5px 10px; justify-content:center;">
+              {% if room_session.allow_guest_access %}Restrict to WDOS Only{% else %}Allow Anyone with Link{% endif %}
+            </button>
+          </form>
+        </div>
+
+        <!-- Passcode Protection -->
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:10px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <span style="font-size:11px; font-weight:800; color:#4B5563; text-transform:uppercase;">Passcode Protection</span>
+            {% if room_session.has_passcode %}
+            <span style="font-size:10.5px; font-weight:700; color:#15803D; background:#DCFCE7; padding:1px 6px; border-radius:4px;">Code: {{ room_session.passcode }}</span>
+            {% else %}
+            <span style="font-size:10.5px; color:#9CA3AF;">None</span>
+            {% endif %}
+          </div>
+          <div style="font-size:11.5px; color:#6B7280; margin-bottom:8px;">Require attendees to enter this passcode before joining.</div>
+          <form method="post" action="" style="display:flex; gap:6px; margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="set_passcode">
+            <input type="text" name="passcode" value="{{ room_session.passcode }}" placeholder="e.g. 1234 or leave blank" style="flex:1; font-size:11.5px; padding:4px 8px; border:1px solid #D1D5DB; border-radius:6px;">
+            <button type="submit" class="dash-btn-secondary" style="font-size:11.5px; padding:4px 10px;">Set</button>
+          </form>
+        </div>
+
+        <!-- Link Expiry -->
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:10px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <span style="font-size:11px; font-weight:800; color:#4B5563; text-transform:uppercase;">Link Expiry</span>
+            <span style="font-size:10.5px; color:{% if room_session.link_expires_at %}#7C3AED{% else %}#6B7280{% endif %}; font-weight:700;">
+              {% if room_session.link_expires_at %}{{ room_session.link_expires_at|date:"d M H:i" }}{% else %}No Expiry{% endif %}
+            </span>
+          </div>
+          <div style="font-size:11.5px; color:#6B7280; margin-bottom:8px;">Automatically block new entries after scheduled time.</div>
+          <form method="post" action="" style="display:flex; gap:6px; margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="set_link_expiry">
+            <select name="expiry_hours" style="flex:1; font-size:11px; padding:4px 6px; border:1px solid #D1D5DB; border-radius:6px; background:#FFF;">
+              <option value="clear">No Expiry (Open)</option>
+              <option value="1">Expire in 1 hour</option>
+              <option value="2">Expire in 2 hours</option>
+              <option value="4">Expire in 4 hours</option>
+              <option value="8">Expire in 8 hours</option>
+              <option value="24">Expire in 24 hours</option>
+            </select>
+            <button type="submit" class="dash-btn-secondary" style="font-size:11.5px; padding:4px 10px;">Apply</button>
+          </form>
+        </div>
+
+        <!-- Waiting Lobby (Bypass Meeting) -->
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:10px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <span style="font-size:11px; font-weight:800; color:#4B5563; text-transform:uppercase;">Waiting Lobby</span>
+            <span style="font-size:10.5px; font-weight:700; color:{% if room_session.bypass_lobby %}#0284C7{% else %}#D97706{% endif %};">
+              {% if room_session.bypass_lobby %}Bypass Enabled{% else %}Host Admits{% endif %}
+            </span>
+          </div>
+          <div style="font-size:11.5px; color:#6B7280; margin-bottom:8px;">Control whether joiners must wait in lobby for host admission.</div>
+          <form method="post" action="" style="margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle_lobby_policy">
+            <input type="hidden" name="lobby_policy" value="{% if room_session.bypass_lobby %}wait_in_lobby{% else %}bypass_lobby{% endif %}">
+            <button type="submit" class="dash-btn-secondary" style="width:100%; font-size:11.5px; padding:5px 10px; justify-content:center;">
+              {% if room_session.bypass_lobby %}Require Waiting Lobby{% else %}Bypass Meeting Lobby{% endif %}
+            </button>
+          </form>
+        </div>
+
+        <!-- Room Lock (Lock Meeting) -->
+        <div style="background:#FFFFFF; border:1px solid #E5E7EB; border-radius:10px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <span style="font-size:11px; font-weight:800; color:#4B5563; text-transform:uppercase;">Room Lock</span>
+            <span style="font-size:10.5px; font-weight:700; color:{% if room_session.is_locked %}#DC2626{% else %}#15803D{% endif %};">
+              {% if room_session.is_locked %}🔒 Locked{% else %}🔓 Unlocked{% endif %}
+            </span>
+          </div>
+          <div style="font-size:11.5px; color:#6B7280; margin-bottom:8px;">When locked, no new participants can enter the room.</div>
+          <form method="post" action="" style="margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle_room_lock">
+            <button type="submit" class="dash-btn-secondary" style="width:100%; font-size:11.5px; padding:5px 10px; justify-content:center; {% if room_session.is_locked %}color:#991B1B; border-color:#FECACA; background:#FEF2F2;{% endif %}">
+              {% if room_session.is_locked %}Unlock Meeting{% else %}Lock Meeting{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     {% else %}
     <!-- In-Person Venue Card (Shown when meeting is In-Person Only) -->
     <div style="padding:20px 22px; border-radius:16px; background:#F0F9FF; border:1px solid #BAE6FD; color:#0C4A6E; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:6px;">
@@ -528,4 +654,6 @@
     }
   }
 </script>
+
+{% include "foundation/rooms/_invite_calendar_modal.html" %}
 {% endblock %}

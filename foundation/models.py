@@ -1,3 +1,4 @@
+import datetime
 import uuid
 from django.db import models
 from django.utils import timezone
@@ -1977,6 +1978,17 @@ class MeetingRoomSession(models.Model):
     translation_provider = models.CharField(max_length=32, default="azure")
     provider_session_id = models.CharField(max_length=255, blank=True, null=True)
 
+    # Security & Access Controls (Room Lock, Optional Passcode, Link Expiry)
+    is_locked = models.BooleanField(default=False)
+    passcode = models.CharField(max_length=64, blank=True, default="")
+    link_expires_at = models.DateTimeField(null=True, blank=True)
+
+    # Invitations & Reminders
+    invitation_history = models.JSONField(default=list, blank=True)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    reminder_count = models.PositiveIntegerField(default=0)
+    reminder_history = models.JSONField(default=list, blank=True)
+
     # Timestamps
     opened_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
@@ -2028,6 +2040,89 @@ class MeetingRoomSession(models.Model):
     def lobby_policy_label(self) -> str:
         return "Bypass lobby" if self.bypass_lobby else "Wait in lobby"
 
+    @property
+    def allow_participant_screen_share(self) -> bool:
+        if self.provider_session_id and "screenshare:" in self.provider_session_id:
+            return "screenshare:allowed" in self.provider_session_id
+        return False
+
+    @property
+    def screen_share_policy_label(self) -> str:
+        return "Participants can share" if self.allow_participant_screen_share else "Host only"
+
+    @property
+    def has_passcode(self) -> bool:
+        return bool(self.passcode and self.passcode.strip())
+
+    @property
+    def is_link_expired(self) -> bool:
+        if self.link_expires_at and timezone.now() > self.link_expires_at:
+            return True
+        return False
+
+    @property
+    def active_screenshare_presenter(self) -> str:
+        if self.provider_session_id and "sharer:" in self.provider_session_id:
+            for part in self.provider_session_id.split("|"):
+                if part.startswith("sharer:"):
+                    return part.split(":", 1)[1]
+        return ""
+
+    @property
+    def scheduled_datetime(self):
+        if self.scheduled_meeting and self.scheduled_meeting.scheduled_at:
+            return self.scheduled_meeting.scheduled_at
+        if self.opened_at:
+            return self.opened_at
+        return self.created_at or timezone.now()
+
+    @property
+    def scheduled_utc_iso(self) -> str:
+        dt = self.scheduled_datetime
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, datetime.timezone.utc)
+        return dt.astimezone(datetime.timezone.utc).isoformat()
+
+    def get_time_in_zone(self, tz_name: str = "Africa/Lagos") -> str:
+        try:
+            import zoneinfo
+            tz = zoneinfo.ZoneInfo(tz_name)
+            dt = self.scheduled_datetime
+            if timezone.is_naive(dt):
+                dt = timezone.make_aware(dt, datetime.timezone.utc)
+            return dt.astimezone(tz).strftime("%H:%M")
+        except Exception:
+            return self.scheduled_datetime.strftime("%H:%M")
+
+    @property
+    def wat_time_label(self) -> str:
+        return f"{self.get_time_in_zone('Africa/Lagos')} WAT"
+
+    @property
+    def cat_time_label(self) -> str:
+        return f"{self.get_time_in_zone('Africa/Harare')} CAT"
+
+    @property
+    def eat_time_label(self) -> str:
+        return f"{self.get_time_in_zone('Africa/Nairobi')} EAT"
+
+    @property
+    def utc_time_label(self) -> str:
+        dt = self.scheduled_datetime
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, datetime.timezone.utc)
+        return f"{dt.astimezone(datetime.timezone.utc).strftime('%H:%M')} UTC"
+
+    @property
+    def has_reminders_sent(self) -> bool:
+        return self.reminder_count > 0 or self.reminder_sent_at is not None
+
+    @property
+    def last_reminder_label(self) -> str:
+        if not self.reminder_sent_at:
+            return "No reminders sent yet"
+        return self.reminder_sent_at.strftime("%b %d, %Y at %H:%M UTC")
+
     def __str__(self):
         return f"{self.room_code}: {self.title} ({self.status})"
 
@@ -2066,6 +2161,10 @@ class RoomParticipantSession(models.Model):
         on_delete=models.SET_NULL,
         related_name="room_participations",
     )
+    is_guest = models.BooleanField(default=False)
+    email = models.CharField(max_length=255, blank=True, default="")
+    invitation_sent_at = models.DateTimeField(null=True, blank=True)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     participant_name = models.CharField(max_length=160, default="Ada Okafor")
     meeting_role = models.CharField(max_length=48, default="Listener")
     admission_status = models.CharField(max_length=20, choices=ADMISSION_CHOICES, default="WAITING_ROOM")
@@ -2097,9 +2196,32 @@ class RoomParticipantSession(models.Model):
         ordering = ["joined_at", "participant_name"]
 
     def save(self, *args, **kwargs):
+        if not self.person_profile_id and not self.account_id:
+            self.is_guest = True
+        elif self.person_profile_id or self.account_id:
+            self.is_guest = False
         if self.person_profile_id and self.person_profile and (not self.participant_name or self.participant_name == "Ada Okafor"):
             self.participant_name = self.person_profile.full_name
         super().save(*args, **kwargs)
+
+    @property
+    def display_role_badge(self) -> str:
+        if self.is_guest:
+            return "Guest"
+        return self.meeting_role or "Member"
+
+    @property
+    def is_verified_member(self) -> bool:
+        return not self.is_guest and bool(self.person_profile_id or self.account_id)
+
+    def can_share_screen(self, is_host: bool = False) -> bool:
+        if is_host or self.meeting_role in ("Host", "Co-Host"):
+            return True
+        if "Screenshare Allowed" in (self.connection_status or ""):
+            return True
+        if self.room_session and getattr(self.room_session, "allow_participant_screen_share", False):
+            return True
+        return False
 
     @property
     def speaking_language_display(self) -> str:
@@ -2344,6 +2466,37 @@ class EventModerationQuestion(models.Model):
 
     def __str__(self):
         return f"[{self.moderation_state}] {self.author_name}: {self.question_text[:48]}"
+
+
+class RoomChatMessage(models.Model):
+    """
+    Stage 10 (ROOM-04):
+    In-room text chat and host announcements.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    room_session = models.ForeignKey(
+        MeetingRoomSession,
+        on_delete=models.CASCADE,
+        related_name="chat_messages",
+    )
+    sender_profile = models.ForeignKey(
+        "PersonProfile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="room_chat_messages",
+    )
+    sender_name = models.CharField(max_length=150)
+    sender_role = models.CharField(max_length=50, default="Participant")
+    message_text = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_host_announcement = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["timestamp"]
+
+    def __str__(self):
+        return f"{self.sender_name}: {self.message_text[:30]}"
 
 
 def _resolve_user_person_profile(user_obj):

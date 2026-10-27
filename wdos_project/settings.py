@@ -25,6 +25,8 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "wdos-local-development-only")
 
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",") if h]
+if "*" not in ALLOWED_HOSTS and os.getenv("WDOS_ENVIRONMENT") not in ("staging", "production"):
+    ALLOWED_HOSTS.append("*")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -177,6 +179,10 @@ MEETING_TRANSLATION_PROVIDER = os.getenv("MEETING_TRANSLATION_PROVIDER", "azure"
 LIVEKIT_URL = os.getenv("LIVEKIT_URL", "").strip()
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "").strip()
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "").strip()
+LIVEKIT_WEBINAR_THRESHOLD = int(os.getenv("LIVEKIT_WEBINAR_THRESHOLD", "100"))
+LIVEKIT_EGRESS_S3_BUCKET = os.getenv("LIVEKIT_EGRESS_S3_BUCKET", "").strip()
+LIVEKIT_EGRESS_S3_REGION = os.getenv("LIVEKIT_EGRESS_S3_REGION", "us-east-1").strip()
+LIVEKIT_WORKER_DEDICATED = os.getenv("LIVEKIT_WORKER_DEDICATED", "0") == "1"
 ZOOM_SDK_KEY = os.getenv("ZOOM_SDK_KEY", "wdos-dev-zoom-sdk-key")
 ZOOM_SDK_SECRET = os.getenv("ZOOM_SDK_SECRET", "wdos-dev-zoom-sdk-secret-hs256-min-32-bytes")
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "wdos-dev-azure-speech-key").strip()
@@ -185,5 +191,26 @@ AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus").strip()
 AZURE_TRANSLATOR_KEY = (os.getenv("AZURE_TRANSLATOR_KEY") or os.getenv("AZURE_TRANSLATION_KEY") or "").strip()
 AZURE_TRANSLATOR_KEY_2 = (os.getenv("AZURE_TRANSLATOR_KEY_2") or os.getenv("AZURE_TRANSLATION_KEY_2") or "").strip()
 AZURE_TRANSLATOR_REGION = (os.getenv("AZURE_TRANSLATOR_REGION") or os.getenv("AZURE_TRANSLATION_REGION") or "").strip()
+
+# Distributed Cache Configuration (Redis in multi-worker / production; LocMemCache in local dev & tests)
+REDIS_URL = (os.getenv("REDIS_URL") or os.getenv("DJANGO_REDIS_URL") or "").strip()
+if REDIS_URL and not _is_test_run:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "KEY_PREFIX": "wdos_rt",
+            "TIMEOUT": 7200,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "wdos-realtime-shared-state",
+            "KEY_PREFIX": "wdos_rt",
+            "TIMEOUT": 7200,
+        }
+    }
 
 

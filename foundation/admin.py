@@ -18,6 +18,7 @@ from .models import (
     MeetingRoomSession,
     RoomParticipantSession,
     LiveTranscriptSegment,
+    RoomChatMessage,
     RoomDiagnosticLane,
     ConferenceEvent,
     EventSessionTrack,
@@ -143,6 +144,13 @@ class LiveTranscriptSegmentAdmin(admin.ModelAdmin):
     list_display = ("sequence_number", "speaker_name", "original_language", "room_session", "timestamp")
     list_filter = ("original_language",)
     search_fields = ("speaker_name", "original_text")
+
+
+@admin.register(RoomChatMessage)
+class RoomChatMessageAdmin(admin.ModelAdmin):
+    list_display = ("sender_name", "sender_role", "room_session", "is_host_announcement", "timestamp")
+    list_filter = ("sender_role", "is_host_announcement")
+    search_fields = ("sender_name", "message_text")
 
 
 @admin.register(RoomDiagnosticLane)

@@ -16,10 +16,12 @@ from .models import (
     EventSessionTrack,
     LiveTranscriptSegment,
     MeetingDecisionAction,
+    MeetingParticipantRecord,
     MeetingRoomSession,
     MeetingSeries,
     MissionControlTask,
     PersonProfile,
+    RoomChatMessage,
     RoomDiagnosticLane,
     RoomParticipantSession,
     ScheduledMeeting,
@@ -1034,14 +1036,16 @@ def seed_stage10_fixtures(network: str = "WGMN", country: str = "NG", force: boo
         },
     ]
     for p_data in canonical_participants:
-        RoomParticipantSession.objects.get_or_create(
+        existing_p = RoomParticipantSession.objects.filter(
             room_session=room_session,
             participant_name=p_data["participant_name"],
-            defaults={
+        ).first()
+        if not existing_p:
+            RoomParticipantSession.objects.create(
+                room_session=room_session,
                 **p_data,
-                "joined_at": timezone.now(),
-            },
-        )
+                joined_at=timezone.now(),
+            )
 
     # Seed initial live transcript segments
     if not room_session.transcript_segments.exists():
@@ -1411,13 +1415,30 @@ def finalize_room_session_and_bridge_minutes(room_session: MeetingRoomSession, a
                 created_tasks.append(mc_task)
 
     compiled_transcript = "\n".join(transcript_lines)
-    if mtg_series and compiled_transcript:
-        marker = f"--- Multilingua Transcript ({room_session.room_code}) ---"
-        if marker not in (mtg_series.minutes_text or ""):
-            base_minutes = (mtg_series.minutes_text or "").strip()
-            mtg_series.minutes_text = f"{base_minutes}\n\n{marker}\n{compiled_transcript}".strip()
-            mtg_series.minutes_status = "Reviewed"
-            mtg_series.save(update_fields=["minutes_text", "minutes_status", "updated_at"])
+    if mtg_series:
+        for p in room_session.participants.exclude(participant_name=""):
+            p_profile = p.person_profile
+            acc = getattr(getattr(p_profile, "user", None), "account_profile", None) if p_profile else None
+            MeetingParticipantRecord.objects.get_or_create(
+                meeting=mtg_series,
+                participant_name=p.participant_name,
+                defaults={
+                    "person": p_profile,
+                    "account": acc,
+                    "role_or_title": p.meeting_role or "Participant",
+                    "rsvp_status": "Attending",
+                    "attendance_status": "Present" if p.admission_status == "ADMITTED" else "Absent",
+                    "detail_note": f"Recorded from Multilingua Room {room_session.room_code} (Spoke {p.speaking_language}, Heard {p.listening_language})",
+                },
+            )
+
+        if compiled_transcript:
+            marker = f"--- Multilingua Transcript ({room_session.room_code}) ---"
+            if marker not in (mtg_series.minutes_text or ""):
+                base_minutes = (mtg_series.minutes_text or "").strip()
+                mtg_series.minutes_text = f"{base_minutes}\n\n{marker}\n{compiled_transcript}".strip()
+                mtg_series.minutes_status = "Reviewed"
+                mtg_series.save(update_fields=["minutes_text", "minutes_status", "updated_at"])
 
     return {
         "room_session": room_session,

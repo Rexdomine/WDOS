@@ -83,7 +83,19 @@ def _build_stage9_common_context(request, ctx: Dict[str, Any], screen_code: str)
 
     active_nav = "meetings" if screen_code.startswith("MTG-") else "work"
     parent_label = "Meetings & events" if screen_code.startswith("MTG-") else "Work & programmes"
-    parent_url = "/foundation/calendar/" if screen_code.startswith("MTG-") else "/foundation/tasks/"
+    parent_url = "/foundation/meetings/" if screen_code.startswith("MTG-") else "/foundation/tasks/"
+
+    if screen_code == "MTG-02":
+        breadcrumbs = [
+            {"label": "Home", "url": "/foundation/dashboard/", "is_current": False},
+            {"label": "Meetings & events", "url": "/foundation/meetings/", "is_current": True},
+        ]
+    else:
+        breadcrumbs = [
+            {"label": "Home", "url": "/foundation/dashboard/", "is_current": False},
+            {"label": parent_label, "url": parent_url, "is_current": False},
+            {"label": screen["title"], "url": None, "is_current": True},
+        ]
 
     return {
         "screen": screen,
@@ -101,11 +113,8 @@ def _build_stage9_common_context(request, ctx: Dict[str, Any], screen_code: str)
         "is_organizer_or_reviewer": is_stage9_organizer_or_reviewer(user_scope),
         "audit_history": get_stage9_audit_history(network=target_network, country=target_country),
         "seeded_data": seeded,
-        "breadcrumbs": [
-            {"label": "Workspace", "url": "/foundation/", "is_current": False},
-            {"label": parent_label, "url": parent_url, "is_current": False},
-            {"label": screen["title"], "url": None, "is_current": True},
-        ],
+        "breadcrumbs": breadcrumbs,
+        "custom_breadcrumbs": breadcrumbs,
     }
 
 
@@ -974,6 +983,21 @@ def stage9_meeting_detail_view(request, meeting_code: str = "MTG-NG-001"):
     result_success = True
     active_panel = request.GET.get("panel", "").strip().lower()
 
+    # Resolve corresponding Stage 10 live room session if available
+    room_session = None
+    if meeting:
+        from .multilingua_events_views import _resolve_meeting_and_room, _update_room_policies
+        try:
+            _, room_session = _resolve_meeting_and_room(
+                meeting.meeting_code,
+                default_network=s9_ctx["target_network"],
+                default_country=s9_ctx["target_country"],
+            )
+        except Exception:
+            room_session = None
+        if not room_session and hasattr(meeting, "room_sessions"):
+            room_session = meeting.room_sessions.first()
+
     if request.method == "POST" and meeting:
         post_action = request.POST.get("action", "save_rsvp").strip().lower()
         try:
@@ -986,6 +1010,58 @@ def stage9_meeting_detail_view(request, meeting_code: str = "MTG-NG-001"):
                 return redirect(
                     f"/foundation/meetings/?country={s9_ctx['target_network'] and s9_ctx['target_country']}&network={s9_ctx['target_network']}&deleted={quote(deleted_info['title'])}"
                 )
+            elif post_action == "toggle_room_access" and room_session:
+                target_access = (request.POST.get("room_access") or "").strip().lower()
+                if target_access not in ("anyone_with_link", "wdos_only"):
+                    target_access = "wdos_only" if room_session.allow_guest_access else "anyone_with_link"
+                _update_room_policies(room_session, getattr(room_session, "scheduled_meeting", None), allow_guests=(target_access == "anyone_with_link"))
+                room_session.refresh_from_db()
+                state_card = s9_ctx["screen"]["state_contracts"]["record_updated"]
+                result_message = f"Guest access updated: {'Anyone with link' if room_session.allow_guest_access else 'WDOS accounts only'}."
+                result_success = True
+            elif post_action == "toggle_lobby_policy" and room_session:
+                target_lobby = (request.POST.get("lobby_policy") or "").strip().lower()
+                if target_lobby in ("bypass_lobby", "bypass"):
+                    new_bypass = True
+                elif target_lobby in ("wait_in_lobby", "required", "lobby"):
+                    new_bypass = False
+                else:
+                    new_bypass = not room_session.bypass_lobby
+                _update_room_policies(room_session, getattr(room_session, "scheduled_meeting", None), bypass_lobby=new_bypass)
+                state_card = s9_ctx["screen"]["state_contracts"]["record_updated"]
+                result_message = f"Waiting lobby policy updated: {'Bypass enabled' if new_bypass else 'Host must admit'}."
+                result_success = True
+            elif post_action in ("toggle_room_lock", "set_room_lock") and room_session:
+                if "is_locked" in request.POST:
+                    room_session.is_locked = request.POST.get("is_locked") in ("1", "true", True)
+                else:
+                    room_session.is_locked = not room_session.is_locked
+                room_session.save(update_fields=["is_locked"])
+                state_card = s9_ctx["screen"]["state_contracts"]["record_updated"]
+                result_message = f"Room {room_session.room_code} is now {'locked' if room_session.is_locked else 'unlocked'}."
+                result_success = True
+            elif post_action == "set_passcode" and room_session:
+                new_pass = (request.POST.get("passcode") or "").strip()
+                room_session.passcode = new_pass
+                room_session.save(update_fields=["passcode"])
+                state_card = s9_ctx["screen"]["state_contracts"]["record_updated"]
+                result_message = "Meeting passcode updated." if new_pass else "Meeting passcode removed."
+                result_success = True
+            elif post_action == "set_link_expiry" and room_session:
+                exp_val = request.POST.get("expiry_hours") or request.POST.get("expiry_mode")
+                if exp_val in ("clear", "none", "", None):
+                    room_session.link_expires_at = None
+                    result_message = "Meeting link expiry removed."
+                else:
+                    try:
+                        h = int(exp_val)
+                        room_session.link_expires_at = timezone.now() + timezone.timedelta(hours=h)
+                        result_message = f"Meeting link set to expire in {h} hour(s)."
+                    except (ValueError, TypeError):
+                        result_message = "Invalid link expiry value."
+                room_session.save(update_fields=["link_expires_at"])
+                state_card = s9_ctx["screen"]["state_contracts"]["record_updated"]
+                result_success = True
             elif post_action == "save_minutes":
                 active_panel = "minutes"
                 res = review_minutes_or_convert_actions(
@@ -1119,6 +1195,16 @@ def stage9_meeting_detail_view(request, meeting_code: str = "MTG-NG-001"):
     ctx.update(s9_ctx)
     ctx.update({
         "meeting": meeting,
+        "meeting_code": meeting.meeting_code if meeting else meeting_code,
+        "room_session": room_session,
+        "wat_time_label": room_session.wat_time_label if room_session else getattr(meeting, "local_time_label", "10:00 WAT"),
+        "cat_time_label": room_session.cat_time_label if room_session else "11:00 CAT",
+        "eat_time_label": room_session.eat_time_label if room_session else "12:00 EAT",
+        "utc_time_label": room_session.utc_time_label if room_session else "09:00 UTC",
+        "scheduled_utc_iso": room_session.scheduled_utc_iso if room_session else "",
+        "invitation_history": room_session.invitation_history if room_session else [],
+        "reminder_count": room_session.reminder_count if room_session else 0,
+        "last_reminder_label": room_session.last_reminder_label if room_session else "No reminders sent yet",
         "is_meeting_host": is_meeting_host,
         "can_delete_meeting": is_meeting_host,
         "user_participant": user_participant,

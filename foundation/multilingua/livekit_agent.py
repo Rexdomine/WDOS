@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 import uuid
 from typing import Any, Dict, Optional, Set
@@ -984,27 +985,66 @@ AZURE_TARGET_TRANSLATION_CHANNELS = ("en", "fr", "pt", "ar", "sw")
 
 class TranslationAgentSupervisor:
     """
-    Polls the database for active `MeetingRoomSession` instances and maintains
-    a connected `RoomTranslationBot` for every active room.
+    Horizontally scalable LiveKit Room Translation Agent supervisor.
+    Polls the database for active `MeetingRoomSession` instances, coordinates room ownership
+    across multiple worker processes via distributed Redis/cache leases (`wdos_agent_lease:<room_id>`),
+    and maintains a connected `RoomTranslationBot` for every leased room.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, worker_id: str = "", max_rooms: int = 25, is_standalone_worker: bool = False) -> None:
+        import uuid
+        from django.core.cache import cache
+        self._cache = cache
+        self.worker_id = worker_id or f"worker-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+        self.max_rooms = max(1, int(max_rooms))
+        self.is_standalone_worker = bool(is_standalone_worker)
         self.bots: Dict[str, RoomTranslationBot] = {}
+        self._room_backoff: Dict[str, tuple[int, float]] = {}
+
+    def _acquire_or_renew_room_lease(self, room_id: str) -> bool:
+        lease_key = f"wdos_agent_lease:{room_id}"
+        try:
+            owner = self._cache.get(lease_key)
+            if owner is None:
+                return bool(self._cache.add(lease_key, self.worker_id, timeout=18))
+            if owner == self.worker_id:
+                self._cache.set(lease_key, self.worker_id, timeout=18)
+                return True
+            return False
+        except Exception:
+            return True
+
+    def _release_room_lease(self, room_id: str) -> None:
+        lease_key = f"wdos_agent_lease:{room_id}"
+        try:
+            if self._cache.get(lease_key) == self.worker_id:
+                self._cache.delete(lease_key)
+        except Exception:
+            pass
+
+    def _publish_worker_heartbeat(self) -> None:
+        if not self.is_standalone_worker:
+            return
+        try:
+            self._cache.set("wdos_agent_worker_active", self.worker_id, timeout=20)
+        except Exception:
+            pass
 
     def _fetch_active_rooms_sync(self) -> list[dict[str, str]]:
         if "test" not in sys.argv:
             close_old_connections()
         if not LiveKitAdapter.is_configured():
             return []
-        cutoff = timezone.now() - datetime.timedelta(hours=12)
+        cutoff = timezone.now() - datetime.timedelta(hours=4)
         qs = MeetingRoomSession.objects.filter(
             status__in=["LIVE", "WAITING"],
-        ).order_by("-opened_at")[:25]
+        ).order_by("-opened_at")[: self.max_rooms]
         rooms: list[dict[str, str]] = []
         for r in qs:
-            if r.opened_at and r.opened_at < cutoff and not r.participants.filter(admission_status="ADMITTED").exists():
+            # Never connect a translation bot to a room with zero admitted human participants
+            if not r.participants.filter(admission_status="ADMITTED").exclude(participant_name="").exists():
                 continue
-            if r.status == "WAITING" and not r.participants.filter(admission_status="ADMITTED").exists():
+            if r.opened_at and r.opened_at < cutoff:
                 continue
             rooms.append(
                 {
@@ -1019,21 +1059,49 @@ class TranslationAgentSupervisor:
         return await sync_to_async(self._fetch_active_rooms_sync, thread_sensitive=True)()
 
     async def reconcile_once(self) -> int:
+        self._publish_worker_heartbeat()
         loop = asyncio.get_running_loop()
+        now_mono = time.monotonic()
         active_rooms = await self._fetch_active_rooms()
         active_ids = {r["id"] for r in active_rooms}
 
-        # Stop bots for rooms that have ended or are no longer active
+        # Stop bots for rooms that have ended, lost lease, are unhealthy, or have 0 human participants for >60s
         for room_id in list(self.bots.keys()):
             bot = self.bots[room_id]
-            if room_id not in active_ids or not bot.is_healthy():
-                await bot.stop()
-                self.bots.pop(room_id, None)
+            remote_humans = 0
+            if bot.room is not None:
+                try:
+                    remote_humans = sum(
+                        1 for p in bot.room.remote_participants.values()
+                        if not getattr(p, "identity", "").startswith(BOT_IDENTITY_PREFIX)
+                    )
+                except Exception:
+                    remote_humans = 1
+            if remote_humans == 0:
+                empty_since = getattr(bot, "_empty_since", 0.0) or now_mono
+                bot._empty_since = empty_since
+                idle_too_long = (now_mono - empty_since) > 60.0
+            else:
+                bot._empty_since = 0.0
+                idle_too_long = False
 
-        # Start bots for newly active rooms
+            if room_id not in active_ids or not bot.is_healthy() or idle_too_long or not self._acquire_or_renew_room_lease(room_id):
+                await bot.stop()
+                self._release_room_lease(room_id)
+                self.bots.pop(room_id, None)
+                if idle_too_long:
+                    # Wait 30s before re-probing an idle room
+                    self._room_backoff[room_id] = (1, now_mono + 30.0)
+
+        # Start bots for newly active rooms where this worker acquires the distributed lease
         for r_info in active_rooms:
             room_id = r_info["id"]
             if room_id not in self.bots:
+                fail_count, retry_at = self._room_backoff.get(room_id, (0, 0.0))
+                if now_mono < retry_at:
+                    continue
+                if not self._acquire_or_renew_room_lease(room_id):
+                    continue
                 bot = RoomTranslationBot(
                     room_session_id=room_id,
                     room_code=r_info["room_code"],
@@ -1042,11 +1110,84 @@ class TranslationAgentSupervisor:
                 )
                 ok = await bot.start()
                 if ok:
+                    self._room_backoff.pop(room_id, None)
                     self.bots[room_id] = bot
+                else:
+                    self._release_room_lease(room_id)
+                    next_fails = fail_count + 1
+                    backoff_sec = min(300.0, 30.0 * (2 ** (next_fails - 1)))
+                    self._room_backoff[room_id] = (next_fails, now_mono + backoff_sec)
 
         return len(self.bots)
 
     async def shutdown(self) -> None:
-        for bot in list(self.bots.values()):
+        for room_id, bot in list(self.bots.items()):
             await bot.stop()
+            self._release_room_lease(room_id)
         self.bots.clear()
+
+
+_SUPERVISOR_DAEMON_LOCK = threading.Lock()
+_SUPERVISOR_DAEMON_STARTED = False
+_SUPERVISOR_WAKE_EVENT = threading.Event()
+
+
+def ensure_translation_supervisor_daemon() -> bool:
+    """
+    Ensures the LiveKit TranslationAgentSupervisor is running when no dedicated external
+    translation worker (`run_translation_agent` / `run_livekit_translation_worker`) is active,
+    and wakes it on room join events instead of tight-polling when idle.
+    """
+    global _SUPERVISOR_DAEMON_STARTED
+    _SUPERVISOR_WAKE_EVENT.set()
+    if _SUPERVISOR_DAEMON_STARTED:
+        return True
+    if "test" in sys.argv:
+        return False
+    if getattr(settings, "LIVEKIT_WORKER_DEDICATED", False) or os.environ.get("WDOS_EXTERNAL_TRANSLATION_WORKER", "").strip().lower() in ("1", "true", "yes"):
+        return False
+    try:
+        from django.core.cache import cache
+        if cache.get("wdos_agent_worker_active"):
+            return False
+    except Exception:
+        pass
+    if rtc is None or not LiveKitAdapter.is_configured():
+        return False
+
+    with _SUPERVISOR_DAEMON_LOCK:
+        if _SUPERVISOR_DAEMON_STARTED:
+            return True
+        _SUPERVISOR_DAEMON_STARTED = True
+
+        def _daemon_runner() -> None:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            supervisor = TranslationAgentSupervisor(is_standalone_worker=False)
+
+            async def _run_forever() -> None:
+                while True:
+                    active_bots = 0
+                    try:
+                        from django.core.cache import cache
+                        if cache.get("wdos_agent_worker_active"):
+                            await supervisor.shutdown()
+                            await loop.run_in_executor(None, _SUPERVISOR_WAKE_EVENT.wait, 30.0)
+                            _SUPERVISOR_WAKE_EVENT.clear()
+                            continue
+                        active_bots = await supervisor.reconcile_once()
+                    except Exception as exc:
+                        logger.debug("Translation supervisor reconcile error: %s", exc)
+                    wait_sec = 12.0 if active_bots > 0 else 60.0
+                    await loop.run_in_executor(None, _SUPERVISOR_WAKE_EVENT.wait, wait_sec)
+                    _SUPERVISOR_WAKE_EVENT.clear()
+
+            try:
+                loop.run_until_complete(_run_forever())
+            except Exception:
+                pass
+
+        t = threading.Thread(target=_daemon_runner, name="wdos-livekit-translation-daemon", daemon=True)
+        t.start()
+        return True
+

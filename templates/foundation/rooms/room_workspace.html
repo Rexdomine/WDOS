@@ -335,6 +335,7 @@
   .zm-lang-pill select {
     background: transparent;
     color: #FFFFFF;
+    color-scheme: dark;
     border: none;
     font-size: 13px;
     font-weight: 800;
@@ -342,7 +343,28 @@
     outline: none;
     min-width: 0;
   }
-  .zm-lang-pill select option { background: #18121A; color: #FFFFFF; }
+  .zm-lang-pill select option { background: #18121A; background-color: #18121A; color: #FFFFFF; }
+
+  #select-manual-timezone {
+    background: transparent !important;
+    color: #FFFFFF !important;
+    color-scheme: dark;
+    border: none !important;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 6px;
+    outline: none;
+    cursor: pointer;
+  }
+  #select-manual-timezone option {
+    background-color: #1A1320 !important;
+    color: #FFFFFF !important;
+    font-size: 12px;
+  }
+  .zm-tz-select-container:hover {
+    border-color: rgba(255, 255, 255, 0.35) !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+  }
 
   /* Right Sidebar: Spacious Participant Rows & Stacked Transcript Cards */
   .zm-side {
@@ -461,6 +483,263 @@
   }
 
   /* ===================================================================== */
+  /* GOOGLE MEET / ZOOM MULTI-PARTICIPANT VIDEO GRID & REALTIME CONTROLS   */
+  /* ===================================================================== */
+  .zm-stage-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+    z-index: 12;
+  }
+  .zm-layout-Segment {
+    display: inline-flex;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 3px;
+  }
+  .zm-layout-btn {
+    background: transparent;
+    color: #D8CBD9;
+    border: none;
+    border-radius: 7px;
+    padding: 5px 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s ease;
+  }
+  .zm-layout-btn.is-active {
+    background: #D4006A;
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(212, 0, 106, 0.35);
+  }
+  .zm-net-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.48);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    padding: 4px 11px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #86EFAC;
+  }
+  .zm-net-bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 11px;
+  }
+  .zm-net-bars i {
+    width: 3px;
+    background: #4ADE80;
+    border-radius: 1px;
+    display: inline-block;
+  }
+  .zm-net-bars i:nth-child(1) { height: 4px; }
+  .zm-net-bars i:nth-child(2) { height: 7px; }
+  .zm-net-bars i:nth-child(3) { height: 11px; }
+
+  .zm-video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
+    width: 100%;
+    min-height: 220px;
+    align-items: stretch;
+    box-sizing: border-box;
+    z-index: 5;
+  }
+  .zm-video-grid.layout-speaker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zm-video-tile {
+    position: relative;
+    background: linear-gradient(145deg, #251929 0%, #150E18 100%);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    min-height: 175px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32);
+  }
+  .zm-video-tile.is-active-speaker {
+    border-color: #4ADE80;
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.45), 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  .zm-video-tile.is-pinned {
+    grid-column: 1 / -1;
+    min-height: 280px;
+    border-color: #F4C2DA;
+  }
+  .zm-video-tile video {
+    width: 100%;
+    height: 100%;
+    min-height: 175px;
+    max-height: 360px;
+    object-fit: cover;
+    display: none;
+    background: #0B080D;
+  }
+  .zm-video-tile video.is-local-camera {
+    transform: scaleX(-1);
+  }
+  .zm-tile-avatar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 2;
+  }
+  .zm-tile-avatar {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #D4006A;
+    color: #FFFFFF;
+    font-family: 'Manrope', sans-serif;
+    font-size: 19px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 4px rgba(212, 0, 106, 0.24);
+  }
+  .zm-video-tile.is-active-speaker .zm-tile-avatar {
+    box-shadow: 0 0 0 5px rgba(74, 222, 128, 0.5), 0 0 18px rgba(74, 222, 128, 0.65);
+  }
+  .zm-tile-topbar {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+    z-index: 6;
+  }
+  .zm-tile-pin-btn {
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.55);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 7px;
+    padding: 3px 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+    cursor: pointer;
+    opacity: 0.78;
+    transition: opacity 0.15s ease;
+  }
+  .zm-tile-pin-btn:hover { opacity: 1; background: rgba(212, 0, 106, 0.75); }
+  .zm-tile-footer {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 10, 18, 0.76);
+    backdrop-filter: blur(6px);
+    padding: 5px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 6;
+  }
+  .zm-tile-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #FFFFFF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .zm-tile-lang-badge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(212, 0, 106, 0.32);
+    color: #F4C2DA;
+    border: 1px solid rgba(244, 194, 218, 0.3);
+    flex-shrink: 0;
+  }
+
+  .zm-reaction-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 30;
+  }
+  .zm-reaction-burst {
+    position: absolute;
+    bottom: 18px;
+    font-size: 26px;
+    font-weight: 800;
+    color: #FFFFFF;
+    text-shadow: 0 3px 10px rgba(0,0,0,0.45);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(23, 18, 25, 0.75);
+    border: 1px solid rgba(255,255,255,0.18);
+    padding: 4px 10px;
+    border-radius: 999px;
+    animation: zmFloatReaction 2.8s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  }
+  @keyframes zmFloatReaction {
+    0% { transform: translateY(0) scale(0.8); opacity: 0; }
+    15% { transform: translateY(-24px) scale(1.05); opacity: 1; }
+    80% { transform: translateY(-130px) scale(1); opacity: 0.92; }
+    100% { transform: translateY(-170px) scale(0.9); opacity: 0; }
+  }
+  .zm-reaction-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(0, 0, 0, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    padding: 3px 6px;
+  }
+  .zm-reaction-btn {
+    background: transparent;
+    border: none;
+    font-size: 15px;
+    padding: 4px 6px;
+    border-radius: 7px;
+    cursor: pointer;
+    line-height: 1;
+    transition: transform 0.12s ease, background 0.12s ease;
+  }
+  .zm-reaction-btn:hover {
+    transform: scale(1.22);
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  /* ===================================================================== */
   /* MOBILE RESPONSIVE OVERHAUL (<= 640px)                                 */
   /* ===================================================================== */
   @media (max-width: 640px) {
@@ -557,7 +836,6 @@
   {% if validation_error %}
   <div class="zm-alert" role="alert" style="background:#FEE2E2; border-color:#FCA5A5; color:#991B1B;">
     <div><strong>Notice:</strong> {{ validation_error }}</div>
-    <a href="/foundation/meetings/" class="zm-btn zm-btn-primary" style="min-height:34px; padding:6px 14px;">Go to Meetings</a>
   </div>
   {% endif %}
 
@@ -605,31 +883,124 @@
           </div>
         </div>
         {% if not is_guest_session %}
-        <a href="/foundation/meetings/" class="zm-btn" style="min-height:36px; padding:6px 14px;">Back</a>
+        <a href="{% if meeting %}/foundation/meetings/{{ meeting.meeting_code }}/{% else %}/foundation/meetings/{% endif %}" class="zm-btn" style="min-height:36px; padding:6px 14px;">Back</a>
         {% endif %}
       </div>
 
-      <div class="zm-canvas" style="min-height:200px; padding:22px 20px;">
-        <video id="prejoin-preview" autoplay muted playsinline style="display:none; width:100%; max-height:200px; border-radius:12px; object-fit:cover;"></video>
-        <div id="stage-avatar-container" style="display:flex; flex-direction:column; align-items:center;">
-          <div id="stage-speaker-initials" class="zm-avatar" style="width:64px; height:64px; font-size:20px;">{% if is_guest_session and needs_guest_name %}GU{% else %}{{ participant.participant_name|slice:":2"|upper|default:"GU" }}{% endif %}</div>
-          <div style="margin-top:4px; font-size:13.5px; color:#D8CBD9;">
-            {% if is_guest_session and needs_guest_name %}
-              Ready to join <strong>{{ room_session.title }}</strong>
-            {% else %}
-              Joining as <strong>{{ participant.participant_name }}</strong>
+      <!-- Modern Meeting Schedule & Timezone Bar (ROOM-01) -->
+      <div class="zm-card" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:12px 18px; margin:14px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <!-- Time Details -->
+          <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:10px; background:rgba(212,0,106,0.18); border:1px solid rgba(212,0,106,0.35); color:#F472B6;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.07em; color:#B4A5B8; font-weight:700;">Meeting Schedule &amp; Local Time</div>
+              <div style="font-size:14.5px; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span class="js-base-time" data-utc="{{ scheduled_utc_iso }}">{{ wat_time_label }}</span>
+                <span style="font-size:12px; font-weight:700; color:#93C5FD; background:rgba(59,130,246,0.16); border:1px solid rgba(59,130,246,0.32); padding:3px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" id="guest-local-time-badge">
+                  <span style="width:6px; height:6px; border-radius:50%; background:#60A5FA; display:inline-block;"></span>
+                  <span>Your Time: <strong class="js-guest-local-time-text">Detecting local time...</strong></span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions: Timezone Selector & Calendar Button -->
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <!-- Modern Select Zone Manually Dropdown -->
+            <div class="zm-tz-select-container" style="display:inline-flex; align-items:center; gap:7px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); border-radius:10px; padding:6px 12px; transition:all 0.2s ease;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F4C2DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <label for="select-manual-timezone" style="font-size:12px; font-weight:700; color:#E5DDE6; margin:0; cursor:pointer;">Zone:</label>
+              <select id="select-manual-timezone" style="background:transparent; color:#FFFFFF; color-scheme:dark; border:none; font-size:12px; font-weight:600; outline:none; cursor:pointer;">
+                <option value="" style="background-color:#1E1524; color:#FFFFFF;">Browser Detected</option>
+                <option value="Africa/Lagos" style="background-color:#1E1524; color:#FFFFFF;">Africa/Lagos (WAT, UTC+1)</option>
+                <option value="Africa/Harare" style="background-color:#1E1524; color:#FFFFFF;">Africa/Harare (CAT, UTC+2)</option>
+                <option value="Africa/Nairobi" style="background-color:#1E1524; color:#FFFFFF;">Africa/Nairobi (EAT, UTC+3)</option>
+                <option value="Africa/Johannesburg" style="background-color:#1E1524; color:#FFFFFF;">Africa/Johannesburg (CAT, UTC+2)</option>
+                <option value="Africa/Cairo" style="background-color:#1E1524; color:#FFFFFF;">Africa/Cairo (EET, UTC+2)</option>
+                <option value="Africa/Kinshasa" style="background-color:#1E1524; color:#FFFFFF;">DRC Kinshasa (WAT, UTC+1)</option>
+                <option value="Africa/Lubumbashi" style="background-color:#1E1524; color:#FFFFFF;">DRC Lubumbashi (CAT, UTC+2)</option>
+                <option value="UTC" style="background-color:#1E1524; color:#FFFFFF;">UTC (GMT Universal)</option>
+                <option value="Europe/London" style="background-color:#1E1524; color:#FFFFFF;">London (GMT/BST)</option>
+                <option value="Europe/Paris" style="background-color:#1E1524; color:#FFFFFF;">Paris / Berlin (CET)</option>
+                <option value="America/New_York" style="background-color:#1E1524; color:#FFFFFF;">New York (ET)</option>
+              </select>
+            </div>
+
+            {% if not is_guest_session %}
+            <a href="/foundation/rooms/{{ room_session.room_code }}/calendar.ics" download="meeting_{{ room_session.room_code }}.ics" class="zm-btn" style="min-height:34px; padding:6px 12px; font-size:12px; border-radius:10px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:#FFFFFF;" title="Download iCalendar file (.ics) with 15-minute alert">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span>Add to Calendar (.ics)</span>
+            </a>
             {% endif %}
           </div>
         </div>
       </div>
 
-      <form id="room-01-form" method="post" {% if is_guest_session %}action="/foundation/rooms/{{ room_session.room_code }}/live/"{% endif %} style="display:flex; flex-direction:column; gap:14px;">
+      <!-- Ready to Join Preview Studio -->
+      <div class="zm-canvas" style="min-height:220px; padding:24px 20px; position:relative; overflow:hidden; border-radius:16px; background:radial-gradient(circle at center, #26162D 0%, #150F1A 100%); border:1px solid rgba(255,255,255,0.12); display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        
+        <!-- Live Video Element (Mirrored Preview) -->
+        <video id="prejoin-preview" autoplay muted playsinline style="display:none; width:100%; max-height:220px; border-radius:12px; object-fit:cover; transform:scaleX(-1); box-shadow:0 8px 24px rgba(0,0,0,0.4);"></video>
+        
+        <!-- Avatar State when Camera is Off -->
+        <div id="stage-avatar-container" style="display:flex; flex-direction:column; align-items:center; z-index:2;">
+          <div id="stage-speaker-initials" class="zm-avatar" style="width:72px; height:72px; font-size:24px; box-shadow:0 8px 20px rgba(0,0,0,0.3); border:2px solid rgba(255,255,255,0.18);">{% if is_guest_session and needs_guest_name %}GU{% else %}{{ participant.participant_name|slice:":2"|upper|default:"GU" }}{% endif %}</div>
+          <div style="margin-top:8px; font-size:14px; font-weight:700; color:#FFFFFF;">
+            {% if is_guest_session and needs_guest_name %}
+              Ready to join <span style="color:#F4C2DA;">{{ room_session.title }}</span>
+            {% else %}
+              Joining as <span style="color:#F4C2DA;">{{ participant.participant_name }}</span>
+            {% endif %}
+          </div>
+          <div style="font-size:12px; color:#A89BA9; margin-top:2px;">Test your camera and microphone below before entering</div>
+        </div>
+
+        <!-- Real-time Mic Activity Level Meter -->
+        <div id="prejoin-mic-meter" style="display:none; align-items:center; gap:8px; margin-top:14px; background:rgba(0,0,0,0.55); backdrop-filter:blur(8px); padding:6px 14px; border-radius:999px; border:1px solid rgba(255,255,255,0.18); z-index:3;">
+          <span style="font-size:13px;">🎤</span>
+          <div style="display:flex; align-items:center; gap:3px; height:18px;">
+            <span class="prejoin-eq-bar" style="width:3px; height:5px; background:#4ADE80; border-radius:2px; transition:height 0.06s ease;"></span>
+            <span class="prejoin-eq-bar" style="width:3px; height:8px; background:#4ADE80; border-radius:2px; transition:height 0.06s ease;"></span>
+            <span class="prejoin-eq-bar" style="width:3px; height:14px; background:#4ADE80; border-radius:2px; transition:height 0.06s ease;"></span>
+            <span class="prejoin-eq-bar" style="width:3px; height:7px; background:#4ADE80; border-radius:2px; transition:height 0.06s ease;"></span>
+            <span class="prejoin-eq-bar" style="width:3px; height:12px; background:#4ADE80; border-radius:2px; transition:height 0.06s ease;"></span>
+          </div>
+          <span id="prejoin-mic-label" style="font-size:12px; font-weight:700; color:#86EFAC;">Testing mic... Speak now</span>
+        </div>
+
+        <!-- Top Status Pill -->
+        <div id="prejoin-cam-badge" style="position:absolute; top:12px; left:12px; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; background:rgba(0,0,0,0.5); color:#D8CBD9; border:1px solid rgba(255,255,255,0.1); z-index:3;">
+          📷 Camera Off
+        </div>
+      </div>
+
+      <form id="room-01-form" method="post" style="display:flex; flex-direction:column; gap:14px;">
         {% csrf_token %}
+        {% if is_locked and not is_host %}
+        <div style="background:rgba(239,68,68,0.2); border:1px solid #EF4444; border-radius:10px; padding:12px 16px; color:#FCA5A5; font-size:13px; font-weight:600; text-align:center;">
+          🔒 <strong>Meeting Room Locked</strong>: This room is currently locked by the host. Additional participants cannot join while the room is locked.
+        </div>
+        {% endif %}
+        {% if is_link_expired and not is_host %}
+        <div style="background:rgba(239,68,68,0.2); border:1px solid #EF4444; border-radius:10px; padding:12px 16px; color:#FCA5A5; font-size:13px; font-weight:600; text-align:center;">
+          ⏱️ <strong>Meeting Link Expired</strong>: This meeting link has expired{% if link_expires_at %} (expired on {{ link_expires_at|date:"Y-m-d H:i" }} UTC){% endif %}. Please request an updated link from the host.
+        </div>
+        {% endif %}
         {% if is_guest_session %}
         <input type="hidden" name="action" value="guest_join">
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <label for="guest-name-prejoin" style="font-size:12px; font-weight:800; color:#F4C2DA; text-transform:uppercase; letter-spacing:0.05em;">Your Display Name</label>
-          <input id="guest-name-prejoin" type="text" name="guest_name" value="{% if not needs_guest_name %}{{ participant.participant_name }}{% endif %}" placeholder="Enter your full name (e.g. James Okafor)" required autofocus style="background:rgba(255,255,255,0.1); color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.25); border-radius:10px; font-size:14px; font-weight:700; padding:11px 14px; outline:none; width:100%;">
+          <label for="guest-name-prejoin" style="font-size:12px; font-weight:800; color:#F4C2DA; text-transform:uppercase; letter-spacing:0.05em;">Your Display Name (Guest)</label>
+          <input id="guest-name-prejoin" type="text" name="guest_name" value="{% if not needs_guest_name %}{{ participant.participant_name }}{% endif %}" placeholder="Enter your full name (e.g. Visitor Peter)" required autofocus style="background:rgba(255,255,255,0.1); color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.25); border-radius:10px; font-size:14px; font-weight:700; padding:11px 14px; outline:none; width:100%;">
+          <div style="font-size:11px; color:#FBCFE8; opacity:0.9;">⚠️ Note: Guest names are unverified. Registered member and host names cannot be used by guests to prevent impersonation.</div>
+        </div>
+        {% endif %}
+        {% if has_passcode and not is_host %}
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label for="room-passcode-prejoin" style="font-size:12px; font-weight:800; color:#F4C2DA; text-transform:uppercase; letter-spacing:0.05em;">Meeting Passcode <span style="color:#EF4444;">*</span></label>
+          <input id="room-passcode-prejoin" type="password" name="passcode" placeholder="Enter meeting passcode" required autocomplete="off" style="background:rgba(255,255,255,0.1); color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.25); border-radius:10px; font-size:14px; font-weight:700; padding:11px 14px; outline:none; width:100%;">
         </div>
         {% endif %}
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
@@ -663,8 +1034,8 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             <span>Test Mic</span>
           </button>
-          <button type="submit" id="btn-join-room" {% if not is_guest_session %}name="action" value="join"{% endif %} class="zm-btn zm-btn-primary" style="padding:10px 28px; font-size:14.5px;">
-            Join Meeting Room
+          <button type="submit" id="btn-join-room" {% if is_locked and not is_host or is_link_expired and not is_host %}disabled style="padding:10px 28px; font-size:14.5px; opacity:0.5; cursor:not-allowed;"{% else %}{% if not is_guest_session %}name="action" value="join"{% endif %} class="zm-btn zm-btn-primary" style="padding:10px 28px; font-size:14.5px;"{% endif %}>
+            {% if is_locked and not is_host %}Room Locked{% elif is_link_expired and not is_host %}Link Expired{% else %}Join Meeting Room{% endif %}
           </button>
         </div>
       </form>
@@ -733,14 +1104,33 @@
         <a id="lobby-enter-room-link" href="/foundation/rooms/{{ room_session.room_code }}/live/" class="zm-btn zm-btn-primary">Enter Room</a>
         <button type="submit" name="action" value="cancel" class="zm-btn zm-btn-danger">Cancel &amp; Leave Lobby</button>
       </form>
+
+      <!-- Lobby Schedule & Calendar Helper -->
+      <div style="margin-top:16px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px 18px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#B4A5B8; font-weight:700;">Meeting Time Across Zones</span>
+            <div style="font-size:14px; font-weight:700; color:#FFFFFF; margin-top:2px;">
+              <span class="js-base-time" data-utc="{{ scheduled_utc_iso }}">{{ wat_time_label }}</span>
+              &middot; <span style="color:#93C5FD; font-size:12px;">Your time: <strong class="js-guest-local-time-text">Detecting...</strong></span>
+            </div>
+          </div>
+          {% if not is_guest_session %}
+          <a href="/foundation/rooms/{{ room_session.room_code }}/calendar.ics" download="meeting_{{ room_session.room_code }}.ics" class="zm-btn" style="min-height:30px; padding:3px 10px; font-size:11.5px; border-radius:8px;">
+            Add to Calendar (.ics)
+          </a>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
+  <script src="/static/foundation/vendor/livekit-client-2.5.7.umd.min.js"></script>
   <script>
     (function() {
       var tokensUrl = "/api/rooms/{{ meeting.id|default:room_session.room_code }}/tokens/?check=lobby";
-      var waitingUrl = "/foundation/rooms/{{ room_session.room_code }}/waiting/";
       var liveUrl = "/foundation/rooms/{{ room_session.room_code }}/live/";
       var isNavigating = false;
+      var lobbyRoom = null;
       var formEl = document.getElementById("lobby-action-form");
       var enterLink = document.getElementById("lobby-enter-room-link");
       if (formEl) {
@@ -749,21 +1139,45 @@
       if (enterLink) {
         enterLink.addEventListener("click", function() { isNavigating = true; });
       }
+      async function connectLobbySignaling(lkCfg) {
+        if (lobbyRoom || !window.LivekitClient || !lkCfg || !lkCfg.enabled || !lkCfg.url || !lkCfg.token) return;
+        try {
+          var LK = window.LivekitClient;
+          lobbyRoom = new LK.Room();
+          lobbyRoom.on(LK.RoomEvent.DataReceived, function(payload, participant, kind, topic) {
+            try {
+              var msg = JSON.parse(new TextDecoder().decode(payload));
+              var myId = String(lkCfg.participant_id || "");
+              var targetId = String(msg.participant_id || msg.target_participant_id || "");
+              if (msg.action === "admit_all" || ((msg.action === "admit" || msg.action === "deny") && (!targetId || targetId === myId))) {
+                checkLobbyStatus();
+              }
+            } catch (e) {}
+          });
+          await lobbyRoom.connect(lkCfg.url, lkCfg.token, { autoSubscribe: false });
+        } catch (e) {
+          lobbyRoom = null;
+        }
+      }
       async function checkLobbyStatus() {
+        if (isNavigating) return;
         try {
           var resp = await fetch(tokensUrl, { headers: { "Accept": "application/json" } });
           var data = await resp.json();
           if (resp.ok && data.status === "admitted") {
             isNavigating = true;
-            clearInterval(pollLobby);
+            if (lobbyRoom) { try { lobbyRoom.disconnect(); } catch (e) {} }
             window.location.replace(liveUrl + "?admitted=1");
             return;
+          }
+          if (data && data.lobby_livekit && data.lobby_livekit.enabled) {
+            connectLobbySignaling(data.lobby_livekit);
           }
           var badgeEl = document.getElementById("lobby-status-badge");
           var headEl = document.getElementById("lobby-heading-text");
           var subEl = document.getElementById("lobby-subtitle-text");
           if (data && data.admission_status === "DENIED") {
-            clearInterval(pollLobby);
+            if (lobbyRoom) { try { lobbyRoom.disconnect(); } catch (e) {} }
             if (badgeEl) { badgeEl.textContent = "ENTRY DECLINED"; badgeEl.style.background = "#EF4444"; badgeEl.style.color = "#FFFFFF"; }
             if (headEl) headEl.textContent = "The host declined your request to join";
             if (subEl) subEl.textContent = "Your request to join this meeting was declined by the host or co-host.";
@@ -775,7 +1189,6 @@
         } catch (e) {}
       }
       checkLobbyStatus();
-      var pollLobby = setInterval(checkLobbyStatus, 1800);
       document.addEventListener("visibilitychange", function() {
         if (document.visibilityState === "visible") {
           checkLobbyStatus();
@@ -866,98 +1279,140 @@
           <span class="zm-live-badge">LIVE</span>
           <strong style="font-size:17px; font-family:'Manrope',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:340px;">{{ room_session.title }}</strong>
           <span style="font-size:11.5px; font-weight:700; color:#D8CBD9; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); padding:3px 9px; border-radius:999px;">{{ room_session.room_code }}</span>
+          <span id="badge-room-lock-status" style="{% if not room_session.is_locked %}display:none;{% else %}display:inline-flex;{% endif %} align-items:center; gap:4px; font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:rgba(239,68,68,0.2); color:#FCA5A5; border:1px solid rgba(239,68,68,0.4);" title="Meeting room locked by host">🔒 LOCKED</span>
+          <span id="badge-passcode-status" style="{% if not room_session.has_passcode %}display:none;{% else %}display:inline-flex;{% endif %} align-items:center; gap:4px; font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:rgba(245,158,11,0.2); color:#FCD34D; border:1px solid rgba(245,158,11,0.4);" title="Passcode protected">🔑 PASSCODE</span>
+          <span id="badge-link-expiry-status" style="{% if not room_session.link_expires_at %}display:none;{% else %}display:inline-flex;{% endif %} align-items:center; gap:4px; font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:rgba(168,85,247,0.2); color:#E9D5FF; border:1px solid rgba(168,85,247,0.4);" title="Meeting link expiry set">⏱️ EXP: {{ room_session.link_expires_at|date:"H:i" }}</span>
         </div>
 
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/foundation/rooms/{{ room_session.room_code }}/live/'); this.querySelector('span').textContent='Copied!';" class="zm-btn" style="min-height:36px; padding:6px 12px; font-size:12px;" title="Copy meeting invite link">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span>Invite Link</span>
+          <!-- Copy Meet Link -->
+          <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/foundation/rooms/{{ room_session.room_code }}/prejoin/'); var sp=this.querySelector('span'); var old=sp.textContent; sp.textContent='Link Copied!'; setTimeout(function(){ sp.textContent=old; }, 2000);" id="btn-copy-meet-link" class="zm-btn" style="min-height:36px; padding:6px 14px; font-size:12.5px; font-weight:700;" title="Copy meeting invite link to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span>Copy meet link</span>
           </button>
 
-          <details class="zm-top-menu">
-            <summary class="zm-btn" style="min-height:36px; padding:6px 12px; font-size:12px;" title="View or change room access and lobby settings">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <span>Room Access</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.75;"><polyline points="6 9 12 15 18 9"/></svg>
-            </summary>
-            <div class="zm-top-popover">
-              <div class="zm-top-popover-row">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                  <span style="font-size:11px; font-weight:800; color:#B4A5B8; text-transform:uppercase; letter-spacing:0.05em;">Who Can Join</span>
-                  {% if room_session.allow_guest_access %}
-                  <span id="badge-guest-access" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(34,197,94,0.18); color:#86EFAC; border:1px solid rgba(134,239,172,0.35);">Anyone with link</span>
-                  {% else %}
-                  <span id="badge-guest-access" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,0.1); color:#E5D9E6; border:1px solid rgba(255,255,255,0.18);">WDOS accounts only</span>
-                  {% endif %}
-                </div>
-                {% if is_host %}
-                <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="margin-top:4px;">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="toggle_room_access">
-                  <input type="hidden" name="room_access" id="input-toggle-room-access" value="{% if room_session.allow_guest_access %}wdos_only{% else %}anyone_with_link{% endif %}">
-                  <button type="submit" id="btn-toggle-room-access" class="zm-btn" style="width:100%; justify-content:center; min-height:34px; padding:5px 10px; font-size:12px;">
-                    {% if room_session.allow_guest_access %}
-                      <span>Restrict to WDOS Only</span>
-                    {% else %}
-                      <span>Allow Anyone with Link</span>
-                    {% endif %}
-                  </button>
-                </form>
-                {% endif %}
-              </div>
-
-              <div class="zm-top-popover-row">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                  <span style="font-size:11px; font-weight:800; color:#B4A5B8; text-transform:uppercase; letter-spacing:0.05em;">Waiting Lobby</span>
-                  {% if room_session.bypass_lobby %}
-                  <span id="badge-lobby-policy" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(56,189,248,0.18); color:#7DD3FC; border:1px solid rgba(125,211,252,0.35);">Lobby: Bypass On</span>
-                  {% else %}
-                  <span id="badge-lobby-policy" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:rgba(245,158,11,0.18); color:#FCD34D; border:1px solid rgba(252,211,77,0.35);">Lobby: Host Admits</span>
-                  {% endif %}
-                </div>
-                {% if is_host %}
-                <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="margin-top:4px;">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="toggle_lobby_policy">
-                  <input type="hidden" name="lobby_policy" id="input-toggle-lobby-policy" value="{% if room_session.bypass_lobby %}wait_in_lobby{% else %}bypass_lobby{% endif %}">
-                  <button type="submit" id="btn-toggle-lobby-policy" class="zm-btn" style="width:100%; justify-content:center; min-height:34px; padding:5px 10px; font-size:12px;">
-                    {% if room_session.bypass_lobby %}
-                      <span>Require Lobby</span>
-                    {% else %}
-                      <span>Bypass Lobby</span>
-                    {% endif %}
-                  </button>
-                </form>
-                {% endif %}
-              </div>
-            </div>
-          </details>
-
+          <!-- End Meeting (Host only) -->
           {% if is_host %}
           <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" style="display:inline;" onsubmit="if(window.wdosRoomEngine){window.wdosRoomEngine.shutdownAllMedia();}">
             {% csrf_token %}
             <input type="hidden" name="action" value="end_session">
-            <button type="submit" id="btn-end-meeting" class="zm-btn zm-btn-danger" style="min-height:36px; padding:6px 12px; font-size:12px;" title="End meeting for all participants and save minutes">
+            <button type="submit" id="btn-end-meeting" class="zm-btn zm-btn-danger" style="min-height:36px; padding:6px 14px; font-size:12.5px; font-weight:700;" title="End meeting for all participants and save minutes">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
-              <span>End Meeting</span>
+              <span>End meeting</span>
             </button>
           </form>
           {% endif %}
+
+          <!-- Leave Meeting -->
           <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" style="display:inline;" onsubmit="if(window.wdosRoomEngine){window.wdosRoomEngine.shutdownAllMedia();}">
             {% csrf_token %}
             <input type="hidden" name="action" value="leave_room">
-            <button type="submit" id="btn-leave-meeting" class="zm-btn" style="min-height:36px; padding:6px 12px; font-size:12px; background:rgba(220,38,38,0.22); border-color:rgba(248,113,113,0.45); color:#FCA5A5;" title="Leave this room">
+            <input type="hidden" name="participant_id" value="{{ participant.id }}">
+            <button type="submit" id="btn-leave-meeting" class="zm-btn" style="min-height:36px; padding:6px 14px; font-size:12.5px; font-weight:700; background:rgba(220,38,38,0.22); border-color:rgba(248,113,113,0.45); color:#FCA5A5;" title="Leave this meeting">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              <span>Leave</span>
+              <span>Leave meeting</span>
             </button>
           </form>
         </div>
       </div>
 
       <!-- Center Video / Active Speaker Canvas -->
-      <div class="zm-canvas">
-        <video id="live-stage-video" autoplay playsinline muted style="display:none; width:100%; max-height:280px; border-radius:14px; object-fit:cover;"></video>
-        <div id="stage-avatar-container" style="display:flex; flex-direction:column; align-items:center; width:100%;">
+      <div class="zm-canvas" id="live-stage-canvas">
+        <!-- Floating Emoji Reactions Layer -->
+        <div id="reaction-float-layer" class="zm-reaction-layer" aria-hidden="true"></div>
+
+        <!-- Stage Top Toolbar: View Layout Switcher, LiveKit SFU Telemetry & Fullscreen -->
+        <div class="zm-stage-toolbar">
+          <div class="zm-layout-Segment" role="group" aria-label="Stage layout mode">
+            <button type="button" id="btn-layout-grid" class="zm-layout-btn is-active" title="Google Meet Gallery Grid View (multi-participant tiles)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              <span>Gallery Grid</span>
+            </button>
+            <button type="button" id="btn-layout-speaker" class="zm-layout-btn" title="Active Speaker Spotlight View">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="12" cy="11" r="3"/><path d="M7 18c1.2-2 3-3 5-3s3.8 1 5 3"/></svg>
+              <span>Speaker View</span>
+            </button>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span id="cloud-recording-pill" style="display:none; align-items:center; gap:5px; font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px; background:rgba(220,38,38,0.28); border:1px solid rgba(252,165,165,0.5); color:#FCA5A5;" title="LiveKit Egress Cloud Recording Active">● REC</span>
+            <span id="webrtc-quality-pill" class="zm-net-pill" title="LiveKit WebRTC SFU Media &amp; Data Plane">
+              <span class="zm-net-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span id="webrtc-quality-text">LiveKit SFU Ready</span>
+            </span>
+            <button type="button" id="btn-toggle-bg-blur" onclick="if(window.wdosRoomEngine){window.wdosRoomEngine.toggleBackgroundBlur();}" class="zm-layout-btn" style="background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.15);" title="Toggle Video Privacy Blur">
+              <span>Blur: Off</span>
+            </button>
+            {% if is_host %}
+            <button type="button" id="btn-toggle-cloud-recording" onclick="if(window.wdosRoomEngine){window.wdosRoomEngine.toggleCloudRecording();}" class="zm-layout-btn" style="background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.15);" title="Start or stop LiveKit Cloud Recording (Egress)">
+              <span>Record Room</span>
+            </button>
+            <button type="button" id="btn-toggle-webinar-mode" onclick="if(window.wdosRoomEngine){window.wdosRoomEngine.toggleWebinarMode();}" class="zm-layout-btn" style="background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.15);" title="Toggle 1,000+ Participant Stage / Webinar Mode">
+              <span>Webinar: Auto</span>
+            </button>
+            {% endif %}
+            <button type="button" id="btn-stage-fullscreen" class="zm-layout-btn" style="background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.15);" title="Toggle Fullscreen Stage">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+              <span>Fullscreen</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Screen Sharing Presentation Stage Canvas -->
+        <div id="stage-screenshare-container" style="display:none; position:relative; width:100%; border-radius:14px; overflow:hidden; background:#0B080C; box-shadow:0 8px 30px rgba(0,0,0,0.5); margin-bottom:12px;">
+          <div style="position:relative; width:100%; display:flex; justify-content:center; align-items:center;">
+            <video id="live-screenshare-video" autoplay playsinline style="width:100%; max-height:480px; object-fit:contain; border-radius:14px; background:#050306; display:block;"></video>
+            <img id="live-screenshare-img" alt="Screen presentation" style="display:none; width:100%; max-height:480px; object-fit:contain; border-radius:14px; background:#050306;">
+            
+            <!-- Presenter Status Badge -->
+            <div id="screenshare-badge" style="position:absolute; top:12px; left:12px; z-index:10; background:rgba(25,19,26,0.85); backdrop-filter:blur(8px); border:1px solid rgba(244,194,218,0.25); color:#FFFFFF; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; display:flex; align-items:center; gap:8px;">
+              <span style="width:8px; height:8px; border-radius:50%; background:#22C55E; display:inline-block; box-shadow:0 0 8px #22C55E;"></span>
+              <span id="screenshare-presenter-name">Presenting screen &amp; slides</span>
+            </div>
+
+            <!-- Presenter Floating Stop Sharing Action -->
+            <button type="button" id="btn-stop-screenshare-overlay" style="display:none; position:absolute; top:12px; right:12px; z-index:10; background:#DC2626; color:#FFFFFF; border:none; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(220,38,38,0.4); align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+              <span>Stop Presenting</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Multi-Participant Responsive Video Tile Grid (Google Meet / Zoom Standard) -->
+        <div id="live-video-grid" class="zm-video-grid" aria-label="Participant video grid">
+          {% for p in admitted_participants|slice:":12" %}
+          <div class="zm-video-tile {% if p.participant_name == room_session.active_speaker_name %}is-active-speaker{% endif %}" data-participant-id="{{ p.id }}" data-participant-name="{{ p.participant_name }}">
+            <div class="zm-tile-topbar">
+              <span class="zm-tile-lang-badge">{{ p.speaking_language_display }}</span>
+              <button type="button" class="zm-tile-pin-btn" onclick="if(window.wdosRoomEngine){window.wdosRoomEngine.togglePinParticipant('{{ p.id }}');}" title="Pin or unpin participant">📌 Pin</button>
+            </div>
+            <video autoplay playsinline {% if p.id == participant.id %}muted class="is-local-camera"{% endif %}></video>
+            <div class="zm-tile-avatar-wrap">
+              <div class="zm-tile-avatar">{{ p.participant_name|slice:":2"|upper }}</div>
+            </div>
+            <div class="zm-tile-footer">
+              <div class="zm-tile-name">
+                <span>{{ p.participant_name }}{% if p.id == participant.id %} (You){% endif %}</span>
+                {% if p.hand_raised %}<span title="Hand Raised">✋</span>{% endif %}
+              </div>
+              <span style="font-size:11px; color:{% if p.is_muted %}#F87171{% else %}#4ADE80{% endif %}; font-weight:800;">
+                {% if p.is_muted %}🔇{% else %}🎤{% endif %}
+              </span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Pagination Bar for Large Rooms (1,000+ Participants with AdaptiveStream) -->
+        <div id="video-grid-pagination" style="display:none; justify-content:center; align-items:center; gap:10px; margin-top:10px; width:100%;">
+          <button type="button" id="btn-grid-prev" class="zm-layout-btn" style="background:rgba(255,255,255,0.1);">&larr; Prev Page</button>
+          <span id="video-grid-page-label" style="font-size:11.5px; font-weight:700; color:#D8CBD9;">Page 1 of 1</span>
+          <button type="button" id="btn-grid-next" class="zm-layout-btn" style="background:rgba(255,255,255,0.1);">Next Page &rarr;</button>
+        </div>
+
+        <!-- Active Speaker Spotlight Stage (Shown in Speaker View or Fallback) -->
+        <video id="live-stage-video" autoplay playsinline muted style="display:none; width:100%; max-height:280px; border-radius:14px; object-fit:cover; margin-top:10px;"></video>
+        <div id="stage-avatar-container" style="display:none; flex-direction:column; align-items:center; width:100%; margin-top:8px;">
           <div id="stage-speaker-initials" class="zm-avatar">{{ initials|default:"SP" }}</div>
           <div id="stage-speaker-name" style="font-size:19px; font-weight:800; word-break:break-word;">{{ room_session.active_speaker_name }}</div>
           <div id="stage-speaker-role" style="font-size:12.5px; color:#B4A5B8; margin-top:2px;">{{ room_session.active_speaker_role }}</div>
@@ -1026,10 +1481,30 @@
             <span>Turn Camera On</span>
           </button>
 
+          <button type="button" id="btn-toggle-screenshare" class="zm-btn" title="Present slides, documents or screen" style="display:{% if can_share_screen %}inline-flex{% else %}none{% endif %};">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><polyline points="15 10 12 7 9 10"/><line x1="12" y1="7" x2="12" y2="13"/></svg>
+            <span>Share Screen</span>
+          </button>
+
           <button type="button" id="btn-raise-hand" class="zm-btn" {% if participant.hand_raised %}style="background:#D97706; border-color:#FCD34D; color:#FFFFFF;"{% endif %}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
             <span id="btn-raise-hand-label">{% if participant.hand_raised %}Lower Hand{% else %}Raise Hand{% endif %}</span>
           </button>
+
+          <button type="button" id="btn-dock-chat" class="zm-btn" title="Open in-room text chat" onclick="switchSideTab('chat')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+            <span id="dock-chat-badge" style="display:{% if chat_messages %}inline-flex{% else %}none{% endif %}; font-size:10px; font-weight:800; background:#D4006A; color:#FFF; border-radius:999px; padding:1px 6px;">{{ chat_messages|length|default:0 }}</span>
+          </button>
+
+          <!-- Live Emoji Reactions Bar (WebRTC DataChannel Push) -->
+          <div class="zm-reaction-bar" role="group" aria-label="Send live reaction">
+            <button type="button" class="zm-reaction-btn" data-reaction="👍" title="Thumbs up">👍</button>
+            <button type="button" class="zm-reaction-btn" data-reaction="👏" title="Applause">👏</button>
+            <button type="button" class="zm-reaction-btn" data-reaction="🎉" title="Celebrate">🎉</button>
+            <button type="button" class="zm-reaction-btn" data-reaction="❤️" title="Appreciate">❤️</button>
+            <button type="button" class="zm-reaction-btn" data-reaction="💡" title="Key insight">💡</button>
+          </div>
         </div>
 
         <div class="zm-dock-langs">
@@ -1070,22 +1545,47 @@
       </form>
     </section>
 
-    <!-- RIGHT SIDEBAR: SPACIOUS PARTICIPANT CARDS & STACKED TRANSCRIPT CARDS -->
-    <aside class="zm-side" aria-label="Participants and live transcript">
-      <!-- 1. People in Room (Clean Horizontal Cards — Never Squished) -->
-      <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <!-- RIGHT SIDEBAR: SPACIOUS PARTICIPANT CARDS, IN-ROOM CHAT & STACKED TRANSCRIPT CARDS -->
+    <aside class="zm-side" aria-label="Meeting tools, chat, participants, and live transcript">
+      <!-- Side Rail Tab Navigation -->
+      <div style="display:flex; gap:6px; background:#F5EDF3; padding:4px; border-radius:12px; margin-bottom:4px;">
+        <button type="button" id="tab-btn-people" class="zm-tab-btn" onclick="switchSideTab('people')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:7px 8px; border-radius:8px; font-size:12px; font-weight:800; border:none; cursor:pointer; background:#FFFFFF; color:#D4006A; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>People (<span id="tab-count-people">{{ admitted_participants|length }}</span>)</span>
+        </button>
+        <button type="button" id="tab-btn-chat" class="zm-tab-btn" onclick="switchSideTab('chat')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:7px 8px; border-radius:8px; font-size:12px; font-weight:800; border:none; cursor:pointer; background:transparent; color:#6B7280;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>Chat (<span id="tab-count-chat">{{ chat_messages|length|default:0 }}</span>)</span>
+        </button>
+        <button type="button" id="tab-btn-transcript" class="zm-tab-btn" onclick="switchSideTab('transcript')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:7px 8px; border-radius:8px; font-size:12px; font-weight:800; border:none; cursor:pointer; background:transparent; color:#6B7280;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Transcript</span>
+        </button>
+      </div>
+
+      <!-- TAB PANE 1: PEOPLE IN ROOM -->
+      <div id="tab-pane-people" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:6px;">
           <h3 class="zm-side-heading">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4006A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span>People in Room (<span id="live-participants-count">{{ admitted_participants|length }}</span>)</span>
           </h3>
-          {% if is_host %}
-          <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="mute_all">
-            <button type="submit" id="btn-mute-all" style="background:#F8F3F7; border:1px solid #DECFE0; border-radius:8px; padding:4px 10px; font-size:11.5px; font-weight:700; color:#4A394D; cursor:pointer;">Mute All</button>
-          </form>
-          {% endif %}
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            {% if is_host %}
+            <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="toggle_screenshare_policy">
+              <button type="submit" id="btn-toggle-screenshare-policy" style="background:#F8F3F7; border:1px solid #DECFE0; border-radius:8px; padding:4px 8px; font-size:11px; font-weight:700; color:#4A394D; cursor:pointer;" title="Allow or restrict screen sharing for participants">
+                <span id="screenshare-policy-btn-label">{% if allow_participant_screen_share %}Share: All{% else %}Share: Host Only{% endif %}</span>
+              </button>
+            </form>
+            <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="mute_all">
+              <button type="submit" id="btn-mute-all" style="background:#F8F3F7; border:1px solid #DECFE0; border-radius:8px; padding:4px 8px; font-size:11px; font-weight:700; color:#4A394D; cursor:pointer;">Mute All</button>
+            </form>
+            {% endif %}
+          </div>
         </div>
 
         <div id="waiting-room-container">
@@ -1093,16 +1593,40 @@
           <div id="waiting-room-queue" style="margin-bottom:12px; padding:10px 12px; border-radius:12px; background:#FFFBEB; border:1px solid #FDE68A;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <span style="font-size:12px; font-weight:800; color:#92400E;">Waiting Lobby ({{ waiting_participants|length }})</span>
-              <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="admit_all">
-                <button type="submit" style="background:#D97706; color:#FFF; border:none; border-radius:6px; padding:3px 9px; font-size:11px; font-weight:700; cursor:pointer;">Admit All</button>
-              </form>
+              <button type="button" id="btn-admit-all-trigger" onclick="toggleAdmitAllConfirm(true)" style="background:#D97706; color:#FFF; border:none; border-radius:6px; padding:3px 9px; font-size:11px; font-weight:700; cursor:pointer;">Admit All</button>
             </div>
+
+            <!-- Admit All Confirmation Dialog -->
+            <div id="confirm-admit-all-box" style="display:none; margin-bottom:10px; padding:10px 12px; border-radius:8px; background:#FEF3C7; border:1.5px solid #F59E0B;">
+              <div style="font-size:12px; font-weight:800; color:#92400E; margin-bottom:4px;">⚠️ Confirm Admit All</div>
+              <div id="confirm-admit-all-msg" style="font-size:11.5px; color:#78350F; line-height:1.4; margin-bottom:8px;">
+                Are you sure you want to admit all <strong>{{ waiting_participants|length }}</strong> participant(s)?
+                {% if unverified_waiting_count > 0 %}
+                <div style="color:#B45309; font-weight:700; margin-top:4px;">⚠️ Notice: Queue contains {{ unverified_waiting_count }} unverified guest(s). Please verify identities before admitting.</div>
+                {% endif %}
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" onclick="toggleAdmitAllConfirm(false)" style="background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer;">Cancel</button>
+                <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="admit_all">
+                  <input type="hidden" name="confirmed" value="1">
+                  <button type="submit" id="btn-confirm-admit-all" style="background:#16A34A; color:#FFF; border:none; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer;">Yes, Admit All</button>
+                </form>
+              </div>
+            </div>
+
             {% for wp in waiting_participants %}
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; padding-top:6px; border-top:1px dashed #FDE68A;">
               <div>
-                <div style="font-size:12.5px; font-weight:700; color:#19131A;">{{ wp.participant_name }}</div>
+                <div style="font-size:12.5px; font-weight:700; color:#19131A; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                  <span>{{ wp.participant_name }}</span>
+                  {% if wp.is_guest %}
+                  <span style="font-size:10px; font-weight:700; color:#B45309; background:#FEF3C7; border:1px solid #FCD34D; border-radius:4px; padding:1px 5px;" title="Unverified guest join">⚠️ Unverified Guest</span>
+                  {% else %}
+                  <span style="font-size:10px; font-weight:700; color:#15803D; background:#DCFCE7; border:1px solid #86EFAC; border-radius:4px; padding:1px 5px;" title="Verified registered member">✓ Verified Member</span>
+                  {% endif %}
+                </div>
                 <div style="font-size:11px; color:#78350F;">Speaks {{ wp.speaking_language_display }} &middot; Hears {{ wp.listening_language_display }}</div>
               </div>
               <div style="display:flex; gap:6px;">
@@ -1125,25 +1649,33 @@
           {% endif %}
         </div>
 
-        <div id="live-participants-list" style="max-height:210px; overflow-y:auto;">
+        <div id="live-participants-list" style="max-height:280px; overflow-y:auto;">
           {% for p in admitted_participants %}
           <div class="zm-person-row" style="flex-wrap:wrap;">
             <div class="zm-person-avatar">{{ p.participant_name|slice:":2"|upper }}</div>
             <div class="zm-person-info">
               <div class="zm-person-name">
                 {{ p.participant_name }}
+                {% if p.is_guest %}<span style="font-size:10px; font-weight:700; color:#B45309; background:#FEF3C7; border:1px solid #FCD34D; border-radius:4px; padding:1px 5px; margin-left:4px;" title="Unverified guest">Guest</span>{% endif %}
                 {% if p.hand_raised %}<span style="font-size:11px; color:#D97706; margin-left:4px;">&#9995; Hand Raised</span>{% endif %}
+                {% if p.can_share_screen %}<span style="font-size:10.5px; color:#16A34A; margin-left:4px;" title="Can share screen">&#128187; Screen Share</span>{% endif %}
               </div>
               <div class="zm-person-meta">{{ p.meeting_role }} &middot; Speaks {{ p.speaking_language_display }} &middot; Hears <strong>{{ p.listening_language_display }}</strong></div>
             </div>
             <span class="zm-person-status">{{ p.connection_status }}</span>
             {% if is_host and p.meeting_role != "Host" %}
-            <div style="width:100%; display:flex; justify-content:flex-end; gap:6px; margin-top:6px; padding-top:6px; border-top:1px dashed #EFE6EE;">
+            <div style="width:100%; display:flex; justify-content:flex-end; gap:6px; margin-top:6px; padding-top:6px; border-top:1px dashed #EFE6EE; flex-wrap:wrap;">
               <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="mute_participant">
                 <input type="hidden" name="participant_id" value="{{ p.id }}">
                 <button type="submit" style="background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; cursor:pointer;">Mute</button>
+              </form>
+              <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_screenshare_permission">
+                <input type="hidden" name="participant_id" value="{{ p.id }}">
+                <button type="submit" style="background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; cursor:pointer;" title="Allow or disallow screen sharing for this participant">{% if p.can_share_screen %}Revoke Share{% else %}Allow Share{% endif %}</button>
               </form>
               <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
                 {% csrf_token %}
@@ -1162,16 +1694,129 @@
           </div>
           {% endfor %}
         </div>
+
+        <!-- Live Polls & Audience Q&A Widget (WebRTC DataChannel Push) -->
+        <div id="live-polls-container" style="margin-top:6px;"></div>
+        {% if is_host %}
+        <details style="margin-top:8px; border-top:1px solid #EFE6EE; padding-top:8px; font-size:12px; color:#67586A;">
+          <summary style="cursor:pointer; font-weight:800; color:#4A394D; display:flex; align-items:center; gap:6px; user-select:none;">
+            <span>📊 Launch Live Audience Poll</span>
+          </summary>
+          <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:flex; flex-direction:column; gap:6px; margin-top:8px; background:#F9FAFB; padding:10px; border-radius:10px; border:1px solid #E5E7EB;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_poll">
+            <input type="text" name="question" placeholder="Poll question (e.g. Approve Q4 Resolution?)" style="padding:6px 8px; border:1px solid #D1D5DB; border-radius:6px; font-size:12px;">
+            <input type="text" name="options" value="Approve, Abstain, Oppose" placeholder="Comma-separated options" style="padding:6px 8px; border:1px solid #D1D5DB; border-radius:6px; font-size:12px;">
+            <button type="submit" style="background:#D4006A; color:#FFFFFF; border:none; border-radius:6px; padding:6px 10px; font-size:11.5px; font-weight:800; cursor:pointer;">Launch Poll to Room</button>
+          </form>
+        </details>
+        {% endif %}
+
+        {% if is_host %}
+        <details style="margin-top:10px; border-top:1px solid #EFE6EE; padding-top:10px; font-size:12px; color:#67586A;">
+          <summary style="cursor:pointer; font-weight:800; color:#4A394D; display:flex; align-items:center; gap:6px; user-select:none;" title="Click to view and configure in-room access controls">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Room Access &amp; Restrict Controls</span>
+          </summary>
+          <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px; background:#F9FAFB; padding:10px; border-radius:10px; border:1px solid #E5E7EB;">
+            
+            <!-- Waiting Lobby (Bypass Meeting) -->
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+              <div>
+                <span style="font-size:11px; font-weight:800; color:#4B5563; text-transform:uppercase;">Waiting Lobby</span>
+                <div id="label-lobby-policy-status" style="font-size:11px; color:#6B7280;">{% if room_session.bypass_lobby %}Bypass enabled{% else %}Host must admit{% endif %}</div>
+              </div>
+              <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_lobby_policy">
+                <input type="hidden" name="lobby_policy" id="input-toggle-lobby-policy" value="{% if room_session.bypass_lobby %}wait_in_lobby{% else %}bypass_lobby{% endif %}">
+                <button type="submit" id="btn-toggle-lobby-policy" style="background:#FFFFFF; border:1px solid #D1D5DB; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; color:#374151; cursor:pointer;">
+                  {% if room_session.bypass_lobby %}Require Lobby{% else %}Bypass Lobby{% endif %}
+                </button>
+              </form>
+            </div>
+
+            <!-- Lock Meeting -->
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding-top:6px; border-top:1px dashed #E5E7EB;">
+              <div>
+                <span style="font-size:11px; font-weight:800; color:#4B5563; text-transform:uppercase;">Room Lock</span>
+                <div id="label-room-lock-status" style="font-size:11px; color:{% if room_session.is_locked %}#DC2626{% else %}#6B7280{% endif %}; font-weight:{% if room_session.is_locked %}700{% else %}normal{% endif %};">
+                  {% if room_session.is_locked %}🔒 Locked (no new joins){% else %}🔓 Unlocked{% endif %}
+                </div>
+              </div>
+              <form method="post" action="/foundation/rooms/{{ room_session.room_code }}/live/" class="js-host-ajax-form" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_room_lock">
+                <button type="submit" id="btn-toggle-room-lock" style="background:{% if room_session.is_locked %}#FEE2E2{% else %}#FFFFFF{% endif %}; border:1px solid {% if room_session.is_locked %}#FCA5A5{% else %}#D1D5DB{% endif %}; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; color:{% if room_session.is_locked %}#991B1B{% else %}#374151{% endif %}; cursor:pointer;">
+                  {% if room_session.is_locked %}🔓 Unlock Meeting{% else %}🔒 Lock Meeting Room{% endif %}
+                </button>
+              </form>
+            </div>
+
+          </div>
+        </details>
+        {% endif %}
       </div>
 
-      <!-- 2. Live Translated Conversation Feed (Full-Width Stacked Cards) -->
-      <div style="border-top:1px solid #EFE6EE; padding-top:14px; flex:1; display:flex; flex-direction:column;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <!-- TAB PANE 2: IN-ROOM CHAT -->
+      <div id="tab-pane-chat" style="display:none; flex-direction:column; gap:10px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 class="zm-side-heading">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4006A" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>In-Room Chat</span>
+          </h3>
+          <span style="font-size:11px; font-weight:700; color:#5E5061;">Visible to everyone</span>
+        </div>
+
+        <!-- Chat feed -->
+        <div id="room-chat-feed" style="max-height:300px; min-height:200px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding-right:4px;">
+          {% for cm in chat_messages %}
+          <div class="zm-chat-msg" data-chat-id="{{ cm.id }}" style="padding:8px 12px; border-radius:10px; {% if cm.is_host_announcement %}background:#FEF3C7; border:1px solid #FCD34D;{% elif cm.sender_name == participant.participant_name %}background:#FCEEF5; border:1px solid #F4C2DA; margin-left:12px;{% else %}background:#F9FAFB; border:1px solid #E5E7EB; margin-right:12px;{% endif %}">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+              <span style="font-size:12px; font-weight:800; color:{% if cm.is_host_announcement %}#92400E{% else %}#19131A{% endif %};">
+                {{ cm.sender_name }}
+                {% if cm.is_host_announcement %}<span style="font-size:10px; background:#D97706; color:#FFF; padding:1px 5px; border-radius:4px; margin-left:4px;">ANNOUNCEMENT</span>
+                {% elif cm.sender_role == "Host" %}<span style="font-size:10px; background:#FCEEF5; color:#D4006A; padding:1px 5px; border-radius:4px; margin-left:4px;">Host</span>
+                {% elif cm.sender_role == "Co-Host" %}<span style="font-size:10px; background:#EDE9FE; color:#6D28D9; padding:1px 5px; border-radius:4px; margin-left:4px;">Co-Host</span>{% endif %}
+              </span>
+              <span style="font-size:10.5px; color:#6B7280;">{{ cm.timestamp|date:"H:i" }}</span>
+            </div>
+            <div style="font-size:13px; color:#1F2937; word-break:break-word; line-height:1.4;">{{ cm.message_text }}</div>
+          </div>
+          {% empty %}
+          <div id="chat-empty-notice" style="color:#67586A; text-align:center; padding:28px 12px; font-size:12.5px; border:1px dashed #E7DCE6; border-radius:10px;">
+            No chat messages yet. Type a message below to chat with everyone in the room!
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Chat form -->
+        <form id="room-chat-form" method="post" action="/api/rooms/{{ room_session.room_code }}/chat/" style="display:flex; flex-direction:column; gap:6px;">
+          {% csrf_token %}
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="room-chat-input" name="message_text" placeholder="Type a message to everyone..." autocomplete="off" style="flex:1; min-height:38px; padding:6px 12px; border:1px solid #D1D5DB; border-radius:8px; font-size:13px; outline:none;">
+            <button type="submit" id="btn-send-chat" class="zm-btn zm-btn-primary" style="min-height:38px; padding:6px 14px; font-size:13px;">Send</button>
+          </div>
+          {% if is_host %}
+          <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#5E5061; cursor:pointer;">
+            <input type="checkbox" id="chat-is-announcement" name="is_announcement" value="1">
+            <span>Send as Host Announcement (highlighted note)</span>
+          </label>
+          {% endif %}
+        </form>
+      </div>
+
+      <!-- TAB PANE 3: LIVE TRANSCRIPT & MINUTES EXPORT -->
+      <div id="tab-pane-transcript" style="display:none; flex-direction:column; gap:12px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
           <h3 class="zm-side-heading">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4006A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>Live Transcript (<span id="live-transcript-count">{{ transcript_segments|length }}</span>)</span>
           </h3>
-          <span id="transcript-col-lang" style="font-size:11px; font-weight:800; color:#D4006A; background:#FCEEF5; padding:3px 9px; border-radius:999px;">{{ participant.listening_language_display|upper }}</span>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <a href="/foundation/rooms/{{ room_session.room_code }}/transcript/export/?format=minutes" class="zm-btn-ghost zm-btn-xs" style="text-decoration:none; font-size:11px; font-weight:700; color:#D4006A; background:#FCEEF5; border:1px solid #F4C2DA; border-radius:6px; padding:3px 8px;" title="Export official minutes document with transcript appendix">Export Minutes</a>
+            <span id="transcript-col-lang" style="font-size:11px; font-weight:800; color:#D4006A; background:#FCEEF5; padding:3px 9px; border-radius:999px;">{{ participant.listening_language_display|upper }}</span>
+          </div>
         </div>
 
         <div id="live-transcript-feed" style="max-height:330px; overflow-y:auto;">
@@ -1190,17 +1835,84 @@
           </div>
           {% endfor %}
         </div>
+
       </div>
+
+      <script>
+        function toggleAdmitAllConfirm(show) {
+          var box = document.getElementById('confirm-admit-all-box');
+          var btn = document.getElementById('btn-admit-all-trigger');
+          if (box) box.style.display = show ? 'block' : 'none';
+          if (btn) btn.style.display = show ? 'none' : 'inline-block';
+        }
+
+        function switchSideTab(tabName) {
+          var panes = {
+            'people': document.getElementById('tab-pane-people'),
+            'chat': document.getElementById('tab-pane-chat'),
+            'transcript': document.getElementById('tab-pane-transcript')
+          };
+          var btns = {
+            'people': document.getElementById('tab-btn-people'),
+            'chat': document.getElementById('tab-btn-chat'),
+            'transcript': document.getElementById('tab-btn-transcript')
+          };
+          Object.keys(panes).forEach(function(k) {
+            if (panes[k]) {
+              panes[k].style.display = (k === tabName) ? 'flex' : 'none';
+            }
+            if (btns[k]) {
+              if (k === tabName) {
+                btns[k].style.background = '#FFFFFF';
+                btns[k].style.color = '#D4006A';
+                btns[k].style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+              } else {
+                btns[k].style.background = 'transparent';
+                btns[k].style.color = '#6B7280';
+                btns[k].style.boxShadow = 'none';
+              }
+            }
+          });
+          if (tabName === 'chat') {
+            var inp = document.getElementById('room-chat-input');
+            if (inp) inp.focus();
+            var feed = document.getElementById('room-chat-feed');
+            if (feed) feed.scrollTop = feed.scrollHeight;
+            var dockBadge = document.getElementById('dock-chat-badge');
+            if (dockBadge) {
+              dockBadge.style.display = 'none';
+              dockBadge.textContent = '0';
+            }
+            if (window.wdosRoomEngine && typeof window.wdosRoomEngine.clearUnreadChatCount === 'function') {
+              window.wdosRoomEngine.clearUnreadChatCount();
+            }
+          }
+        }
+      </script>
 
       <!-- Collapsible Audio Settings & Diagnostics -->
       <details style="border-top:1px solid #EFE6EE; padding-top:10px; font-size:12px; color:#67586A;">
-        <summary style="cursor:pointer; font-weight:700;">Audio Troubleshooting &amp; Settings</summary>
+        <summary style="cursor:pointer; font-weight:700;">Audio &amp; Video Hardware Settings</summary>
         <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
           {% if screen_code == "ROOM-07" or participant.audio_degraded %}
           <div id="room-degraded-banner" role="alert" style="padding:8px; background:#FEF3C7; color:#92400E; border-radius:8px;">
             <span class="degraded-reason">Translated voice fallback active.</span>
           </div>
           {% endif %}
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label for="select-mic-device" style="font-size:11px; font-weight:800; color:#4A394D;">Microphone Input</label>
+            <select id="select-mic-device" style="width:100%; padding:6px 8px; border-radius:6px; border:1px solid #D1D5DB; font-size:12px; background:#FFF;">
+              <option value="default">Default Microphone</option>
+            </select>
+            <label for="select-cam-device" style="font-size:11px; font-weight:800; color:#4A394D;">Camera Input</label>
+            <select id="select-cam-device" style="width:100%; padding:6px 8px; border-radius:6px; border:1px solid #D1D5DB; font-size:12px; background:#FFF;">
+              <option value="default">Default Camera</option>
+            </select>
+            <label for="select-speaker-device" style="font-size:11px; font-weight:800; color:#4A394D;">Speaker / Audio Output</label>
+            <select id="select-speaker-device" style="width:100%; padding:6px 8px; border-radius:6px; border:1px solid #D1D5DB; font-size:12px; background:#FFF;">
+              <option value="default">Default Audio Output</option>
+            </select>
+          </div>
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="retry_audio">
@@ -1226,20 +1938,61 @@
   {% endif %}
 </div>
 
+<!-- ===================================================================== -->
+<!-- MEETING INVITATIONS, CALENDAR (.ICS) & REMINDERS MODAL                -->
+<!-- ===================================================================== -->
+{% include "foundation/rooms/_invite_calendar_modal.html" %}
+
+<script>
+  // Automatic Client-Side Local Timezone Detection across all screens
+  (function initGuestTimezoneDisplay() {
+    var detectedTz = "";
+    try {
+      detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    } catch(e) {}
+
+    var badgeTexts = document.querySelectorAll('.js-guest-local-time-text');
+    var baseEl = document.querySelector('.js-base-time');
+    var utcIso = baseEl ? baseEl.getAttribute('data-utc') : '{{ scheduled_utc_iso }}';
+
+    function renderTime(targetTz) {
+      if (!targetTz) targetTz = detectedTz;
+      if (!targetTz) {
+        badgeTexts.forEach(function(el) { el.textContent = '{{ wat_time_label }}'; });
+        return;
+      }
+      try {
+        var dt = utcIso ? new Date(utcIso) : new Date();
+        var formatter = new Intl.DateTimeFormat([], {
+          timeZone: targetTz,
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        var formatted = formatter.format(dt);
+        badgeTexts.forEach(function(el) {
+          el.textContent = formatted + ' (' + targetTz + ')';
+        });
+      } catch(err) {
+        badgeTexts.forEach(function(el) { el.textContent = targetTz; });
+      }
+    }
+
+    renderTime(detectedTz);
+
+    var sel = document.getElementById('select-manual-timezone');
+    if (sel) {
+      sel.addEventListener('change', function() {
+        renderTime(this.value);
+      });
+    }
+  })();
+</script>
+
 {% if screen_code != "ROOM-02" and room_session.status != "COMPLETED" %}
 <script src="/static/foundation/vendor/livekit-client-2.5.7.umd.min.js"></script>
-<script>
-  if (!window.LivekitClient) {
-    document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js" crossorigin="anonymous"></scr' + 'ipt>');
-  }
-</script>
 <script src="/static/foundation/vendor/speech-sdk-1.53.0.min.js"></script>
-<script>
-  if (!window.SpeechSDK) {
-    document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.53.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js" crossorigin="anonymous"></scr' + 'ipt>');
-  }
-</script>
-<script src="/static/foundation/js/multilingua_engine.js?v=25"></script>
+<script src="/static/foundation/js/multilingua_engine.js?v=34"></script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function() {
@@ -1248,6 +2001,7 @@
       roomCode: "{{ room_session.room_code }}",
       tokensUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/tokens/",
       transcriptUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/transcript/",
+      chatUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/chat/",
       ttsUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/tts/",
       restoreAudioUrl: "/api/rooms/{{ meeting.id|default:room_session.room_code }}/restore-audio/",
       switchLangUrl: "/foundation/rooms/{{ room_session.room_code }}/live/",
@@ -1256,6 +2010,9 @@
       listeningLang: "{{ participant.listening_language|escapejs }}",
       isHost: {{ is_host|yesno:"true,false" }},
       isGuest: {{ is_guest_session|yesno:"true,false" }},
+      canShareScreen: {{ can_share_screen|yesno:"true,false" }},
+      allowParticipantScreenShare: {{ allow_participant_screen_share|yesno:"true,false" }},
+      activeScreensharePresenter: "{{ active_screenshare_presenter|escapejs }}",
       initialSequence: {{ latest_segment.sequence_number|default:0 }}
     });
     window.wdosRoomEngine.boot();

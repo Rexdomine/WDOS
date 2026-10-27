@@ -294,11 +294,11 @@
           Details &amp; RSVP
         </a>
         {% if m.has_online_room %}
-        <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/foundation/rooms/{{ m.meeting_code }}/live/'); this.textContent='Copied';" class="me-btn-secondary">
+        <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/foundation/rooms/{{ m.meeting_code }}/prejoin/'); this.textContent='Copied';" class="me-btn-secondary">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copy Link
         </button>
-        <a href="/foundation/rooms/{{ m.meeting_code }}/live/" class="me-btn-primary">
+        <a href="/foundation/rooms/{{ m.meeting_code }}/prejoin/" class="me-btn-primary">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           Join Online Room
         </a>

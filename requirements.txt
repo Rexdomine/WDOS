@@ -8,5 +8,7 @@ Pillow>=11,<13
 PyJWT>=2.8,<3
 requests>=2.31,<3
 livekit>=1.1.21,<2
+livekit-api>=1.2.2,<2
+redis>=5.0,<9
 azure-cognitiveservices-speech>=1.53.0,<2
 
